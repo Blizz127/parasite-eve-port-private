@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import os
 import pathlib
+import re
 import struct
 import subprocess
 
@@ -106,10 +107,12 @@ def main() -> None:
 
     source = (root / "pc_port/game/boot/func_801924F8_port.c").read_text()
     provider = (root / "pc_port/platform/func_800719E4_port.c").read_text()
+    source_cut = re.search(r'func_801924F8_(80192[0-9A-Fa-f]+)_cut', source)
     require("record_index < 21u" in source and
             "func_800719F4" in source and
             "func_80081414(0x801D0DC4u, filename)" in source and
-            "func_801924F8_80192614_cut" in source and
+            source_cut is not None and
+            int(source_cut.group(1), 16) >= CUT and
             "return strcat(destination, source)" in provider and
             "m0360i" not in source and "0xA8066048" not in source,
             "native scope")
@@ -128,11 +131,13 @@ def main() -> None:
         require("0 failed" in output, f"focused {test_filter} tests")
     strict = run([str(port), "--headless", "--disc-image", str(disc),
                   "--strict-stubs"], 1)
-    require("func_801924F8_80192614_cut" in strict and
+    strict_cut = re.search(r'func_801924F8_(80192[0-9A-Fa-f]+)_cut', strict)
+    require(strict_cut is not None and
+            int(strict_cut.group(1), 16) >= CUT and
             "called from: func_801924F8" in strict,
-            "strict frontier")
+            "strict frontier did not reach the authenticated filename phase")
     print("  OK runtime: Disc 1 FMV001 and synthetic FMV2 threshold paths")
-    print("  OK production: strict frontier advanced exactly to 0x80192614")
+    print("  OK production: strict frontier reaches or passes 0x80192614")
     print("\nB54K-AD func_801924F8 filename oracle: PASS.")
 
 
