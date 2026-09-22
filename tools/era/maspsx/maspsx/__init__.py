@@ -44,6 +44,11 @@
 #      ROM evidence (Parasite Eve disc1): func_80076B44
 #      (`lui $v0,%hi(D_800A3348)` / `addu $v0,$v0,$a0` / `lbu $v0,%lo(...)($v0)`)
 #      and func_80076B20 (same shape with an `sb` in the jr delay slot).
+#      When the destination IS the index register (`lhu $2,SYM($2)`) the
+#      dest-temp form is impossible (the `lui` would clobber the index), so
+#      the load falls back to the $at form like GNU as: func_80074A44 has
+#      both `lhu $v1,D_800957CC($v0)` (dest-temp) and
+#      `lhu $v0,D_800957D8($v0)` ($at) in one body.
 #      Default OFF: opt in per leaf; flag-off is byte-identical.
 #   5. symbol_at_temp (ctor arg, or env MASPSX_SYMBOL_AT_TEMP=1): for compound
 #      indexed symbolic loads/stores of the form `op $d,SYM($b)` under ASPSX
@@ -60,6 +65,138 @@
 #      4658 non-$at indexed accesses exist in the split asm, most of which are
 #      this shape with a wider register pair than patch 4 can reach.
 #      Default OFF: opt in per leaf; flag-off is byte-identical.
+#   6. fill_branch_delay_slot (ctor arg, or env
+#      MASPSX_FILL_BRANCH_DELAY_SLOT=1): fill the delay slot of a REORDER-mode
+#      conditional branch with the instruction that follows it, instead of the
+#      unconditional `nop`.
+#      WHY cc1 leaves the slot empty: gcc's reorg.c refuses any delay-slot
+#      candidate that SETS a resource the branch itself NEEDS
+#      (`insn_sets_resource_p (trial, &needed, 1)` in fill_slots_from_thread),
+#      so a compare that overwrites the register the branch just tested can
+#      never be scheduled by cc1 even though it is architecturally legal (the
+#      branch latches its operands before the slot executes). Retail's build
+#      does perform that fill.
+#      WHY THIS IS NARROW: this fill moves an instruction from the
+#      fall-through-only position into a slot that executes on BOTH edges, so
+#      it is only legal when the instruction's destination register is DEAD at
+#      the branch target. ROM evidence: of the 357 reorder-mode conditional
+#      branches in the repo's LINK_EXACT leaves, 70 are followed by an
+#      instruction that redefines a tested register and retail keeps a `nop`
+#      in every one of them (e.g. func_80077DC4 `bgez $4,$L2` / `subu $4,$0,$4`
+#      -- an abs() whose $4 is LIVE at the target; filling it would
+#      miscompile). The shape alone therefore does NOT license the fill; only
+#      liveness does. This patch performs a real, conservative reachability /
+#      liveness walk of the assembly from the branch target and refuses the
+#      fill on ANY construct it cannot fully account for (calls, indirect
+#      jumps, inline asm, reorder-mode branches inside the walked region,
+#      unknown mnemonics, function end, a step budget). The candidate itself
+#      must be a single-word, non-memory, non-trapping, non-hi/lo ALU
+#      instruction from a closed allow-list with an immediate that cannot
+#      provoke an `$at` expansion, and must be the immediately following line
+#      (no label, directive or comment in between).
+#      TWO GATES, both mandatory: a SAFETY gate (the liveness walk above) and
+#      a FIDELITY gate (the candidate must be a compare -- slt/slti/sltu/sltiu
+#      -- whose result the immediately following conditional branch consumes).
+#      The fidelity gate exists because liveness alone licenses 2 fills retail
+#      does not take (func_80012E7C `sll $2,$3,2`, func_8006A2E8 `move $2,$5`
+#      -- both legal, both a `nop` in ROM).  With both gates on, the knob
+#      changes exactly ONE of the repo's 815 matched leaves: func_80043474.
+#      The non-compare rows of branch_fill_candidates are therefore inert
+#      today; they are the structural single-word analysis that a future
+#      widening of the fidelity gate would need, and must not be treated as
+#      ROM-evidenced on their own.
+#      ROM evidence (Parasite Eve disc1): func_80043474 (band classifier) --
+#      `bnez $v0,.L800434B4` / `slti $v0,$a0,0x2D3` at 0x8004349C, where $v0 is
+#      killed by the epilogue `addu $v0,$v1,$zero` on the taken path.
+#      Default OFF: opt in per leaf; flag-off is byte-identical.
+#   7. sized-`.extern` gp classification for the load-delay nop (ALWAYS ON --
+#      a correctness fix, not a knob). `preprocess_lines` used to skip
+#      `.extern SYM, size` lines, so `_uses_gp` could never recognise a
+#      cc1 `-G<n>` external as gp-relative. For `load $r` / `op $r,SYM` where
+#      GNU as collapses the macro to ONE gp-relative instruction, the
+#      mandatory MIPS-I load-delay nop was then emitted only by the
+#      version-gated `nop_at_expansion` clause (ASPSX < 2.30), i.e. for the
+#      wrong reason, and silently dropped at >= 2.30. Sized externs that fit
+#      `-G<n>` are now recorded in `extern_entries` and consulted by
+#      `_uses_gp` only; operand rewriting is unchanged (GNU as already places
+#      sized externs gp-relative). Requires the driver to forward cc1's
+#      `-G<n>` to maspsx (it did not before; `sdata_limit` was always 0).
+#      ROM evidence (Parasite Eve disc1): func_800339A0 0x800339FC
+#      `lhu $v0,0x0($v1)` / `nop` / `sh $v0,0x114($gp)`, func_80046DFC
+#      0x80046E7C `lw $v0,0x19C($gp)` / `nop` / `sw $v0,0x248($gp)`,
+#      func_80012700 0x80012708 `lw $v0,0x24($a2)` / `nop` /
+#      `sw $v0,0x8C($gp)` -- the only three era leaves that matched at
+#      2.21 but not 2.30 before this fix; all three match at both after it.
+#   8. fill_call_delay_slot (ctor arg, or env MASPSX_FILL_CALL_DELAY_SLOT=1):
+#      the CALL/JUMP sibling of patch 1. Schedule the second word of an
+#      absolute store macro (`sw/sh/sb $r,SYM`) or of an address macro
+#      (`la $r,SYM`) into the delay slot of a following plain
+#      `jal <symbol>` / `j <label>`:
+#        lui $at,%hi(SYM) / jal T / sw $r,%lo(SYM)($at)
+#        lui $r,%hi(SYM)  / jal T / addiu $r,$r,%lo(SYM)
+#      Why this cannot be done by cc1 (and so has to live here): the `$at`
+#      form is only ever written by the assembler, so retail's store was a
+#      macro and the fill was ASPSX's reorder pass. Verified: cc1 2.8.1
+#      DOES fill jal slots, but only in its default -msplit-addresses mode,
+#      where it materializes %hi into a real GPR (`lui $2,%hi(SYM)` /
+#      `sw $r,%lo(SYM)($2)`) — never `$at`; under -mno-split-addresses it
+#      emits the macro and leaves the jal slot empty, exactly like 2.7.2.
+#      No --aspsx-version value changes this either: maspsx forces
+#      `.set noreorder` per function and inserts its own branch/jump nop,
+#      and config_for_aspsx_version has no scheduling knobs at all.
+#      ROM evidence (Parasite Eve disc1, whole-image scan): 90 sites /
+#      45 functions — 36 absolute-store splits (16 jal+sw, 19 j+sw,
+#      1 jal+sh), 53 `la` splits (49 jal, 4 j) and 1 indexed-store split
+#      (not covered by this patch).
+#      HAZARDS (each one is a guard below; when a hazard cannot be decided
+#      from maspsx's line-oriented view the knob refuses the site):
+#        H1 the only instruction that MOVES is the macro's second word, from
+#           just before the jump to just after it. `jal` writes $31, so a
+#           moved word that READS $31 would read the new return address:
+#           refuse when the stored value register is $31/$ra.
+#        H2 the `la` arm's moved word WRITES its register. Refuse when that
+#           register is $31/$ra (it would destroy the return address the
+#           `jal` just stored).
+#        H3 register-indirect jumps (`jalr`/`jr`, which cc1 spells `jal $2` /
+#           `j $2`) read their target register AT jump time, i.e. before the
+#           delay slot executes. They are IN scope — ROM: func_80074BB8's
+#           `lui $a0,%hi(D_80011814)` / `jalr $v0` / `addiu $a0,$a0,%lo(...)`
+#           — but only when the moved word cannot disturb that register:
+#           the `la` arm refuses target == its own destination (the jump
+#           would read a half-formed address), and the store arm refuses
+#           target == `$at` (clobbered by the surviving `lui`). Register
+#           names are compared canonically so `$4`/`$a0` cannot fail open.
+#           `j $31` (the return) is always refused: that slot belongs to
+#           patches 1 and 3 and their ROM evidence, and stealing it would
+#           change their behaviour when several knobs are on.
+#        H4 `$at` is written by the `lui` that stays BEFORE the jump and read
+#           by the store in the slot. Nothing can clobber it in between: the
+#           only instruction in between is the jump, and j/jal write $31
+#           only. `$at` is never live across the call because the store
+#           retires before control transfers. Still refused if the stored
+#           value register is itself `$at`.
+#        H5 a label or a `.set` directive between the macro and the jump
+#           means the jump is a branch target, or that cc1 already scheduled
+#           the slot inside its own `.set noreorder` block. Refused (the
+#           lookahead deliberately does not skip labels or `.set`).
+#        H6 conditional branches are NOT touched: only `j`/`jal`. A branch's
+#           slot is a separate ROM family with its own scheduling rules.
+#        H7 compound (`;`) macro lines on either side are refused: their
+#           expansion order is not a single instruction pair.
+#        H8 gp-relative destinations are a single instruction with no second
+#           word to move, so the gp arm is tested first; the `la` arm also
+#           refuses outright when gp_allow_la is in effect (ASPSX >= 2.80).
+#        H9 numeric operands (`sw $2,56200($4)`, `la $2,-4`) are not
+#           symbol macros; refused.
+#      Default OFF: opt in per leaf; flag-off is byte-identical.
+#   9. explicit `%lo` store passthrough (ALWAYS ON). gcc-2.8.1-psx cc1
+#      (per-leaf ERA_CC1_VER=2.8.1) emits absolute stores as an explicit
+#      `lui $b,%hi(SYM)` / `op $r,%lo(SYM)($b)` pair; 2.7.2 never does. The
+#      `%lo` store is already one instruction with a LO16 reloc, so the store
+#      arm now passes it through exactly like the load arm always did instead
+#      of re-expanding it into the 4-word $at macro. 2.7.2 output is
+#      byte-identical (it never produces the form). Durable test
+#      tests/test_lo_store_passthrough.py.
 import struct
 import os
 import re
@@ -124,6 +261,100 @@ double_reg_loads = {
     "slti",
     "sltu",
 }
+
+
+# --- LOCAL PATCH 6 (fill_branch_delay_slot) tables -------------------------
+#
+# Conditional branches, split by how many register operands precede the label.
+# Anything not listed here is never treated as a conditional branch by the
+# patch (and is refused when met inside the liveness walk).
+cond_branch_two_reg = {"beq", "bne"}
+cond_branch_one_reg = {"bgez", "bgtz", "blez", "bltz"}
+cond_branch_mnemonics = cond_branch_two_reg | cond_branch_one_reg
+
+# Closed allow-list of fill candidates: every entry is a single machine word
+# after GNU as / maspsx processing, touches no memory, cannot trap, writes no
+# hi/lo and writes exactly its first operand.  (`move` is rewritten to `addu`
+# by expand_move; `li` is range-checked so as emits one word.)
+#   name -> (operand count, immediate kind)
+# immediate kind: None  = all operands must be registers
+#                 "s16" = last operand may be a signed 16-bit literal
+#                 "u16" = last operand may be an unsigned 16-bit literal
+#                 "sh"  = last operand must be a 0..31 shift count
+#                 "li"  = a single literal operand (range checked separately)
+branch_fill_candidates = {
+    "addu": (3, "s16"),
+    "addiu": (3, "s16"),
+    "subu": (3, "s16"),
+    "and": (3, "u16"),
+    "andi": (3, "u16"),
+    "or": (3, "u16"),
+    "ori": (3, "u16"),
+    "xor": (3, "u16"),
+    "xori": (3, "u16"),
+    "nor": (3, None),
+    "slt": (3, "s16"),
+    "slti": (3, "s16"),
+    "sltu": (3, "u15"),
+    "sltiu": (3, "u15"),
+    "sll": (3, "sh"),
+    "srl": (3, "sh"),
+    "sra": (3, "sh"),
+    "sllv": (3, None),
+    "srlv": (3, None),
+    "srav": (3, None),
+    "move": (2, None),
+    "li": (2, "li"),
+}
+
+# Registers this patch refuses to treat as a fill destination: the ABI-fixed
+# ones (whose liveness the walk cannot reason about) plus the assembler temp.
+branch_fill_forbidden_dest = {
+    "$0", "$zero", "$1", "$at",
+    "$26", "$27", "$k0", "$k1",
+    "$28", "$gp", "$29", "$sp", "$30", "$fp", "$s8", "$31", "$ra",
+}
+
+# Liveness classifier for the reachability walk.  An instruction whose
+# mnemonic is in neither table makes the walk refuse the fill.
+#   writes its FIRST operand, every other register operand is a read
+live_write_first = {
+    "addu", "addiu", "add", "addi", "subu", "sub", "and", "andi", "or", "ori",
+    "xor", "xori", "nor", "sll", "srl", "sra", "sllv", "srlv", "srav",
+    "slt", "slti", "sltu", "sltiu", "lui", "li", "la", "move", "negu", "neg",
+    "not", "mflo", "mfhi", "lb", "lbu", "lh", "lhu", "lw",
+}
+#   writes no general register; every register operand is a read
+live_write_none = {
+    "sb", "sh", "sw", "nop", "break", "mtlo", "mthi",
+}
+
+reg_operand_re = re.compile(r"\$[A-Za-z0-9]+")
+
+# Canonical GPR numbering, so `$v0` and `$2` compare equal.
+_gpr_names = {
+    "$zero": 0, "$at": 1, "$v0": 2, "$v1": 3,
+    "$a0": 4, "$a1": 5, "$a2": 6, "$a3": 7,
+    "$t0": 8, "$t1": 9, "$t2": 10, "$t3": 11,
+    "$t4": 12, "$t5": 13, "$t6": 14, "$t7": 15,
+    "$s0": 16, "$s1": 17, "$s2": 18, "$s3": 19,
+    "$s4": 20, "$s5": 21, "$s6": 22, "$s7": 23,
+    "$t8": 24, "$t9": 25, "$k0": 26, "$k1": 27,
+    "$gp": 28, "$sp": 29, "$fp": 30, "$s8": 30, "$ra": 31,
+}
+
+
+def gpr_number(name: str):
+    """Canonical GPR number for a register operand, or None if it is not a
+    plain general-purpose register (float/COP registers included)."""
+    num = _gpr_names.get(name)
+    if num is not None:
+        return num
+    if re.match(r"^\$\d{1,2}$", name):
+        num = int(name[1:])
+        if 0 <= num <= 31:
+            return num
+    return None
 
 
 def strip_comments(line: str) -> str:
@@ -244,6 +475,29 @@ def uses_at(line: str) -> bool:
             return False
 
     return True
+
+
+# LOCAL PATCH helper (patch 8): canonicalise a MIPS register spelling so that
+# `$4` and `$a0` (or `$1` and `$at`) compare equal. cc1 only ever emits the
+# numeric form, but the hazard guards must not fail open on an alias.
+_MIPS_REG_NAMES = (
+    "zero", "at", "v0", "v1", "a0", "a1", "a2", "a3",
+    "t0", "t1", "t2", "t3", "t4", "t5", "t6", "t7",
+    "s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7",
+    "t8", "t9", "k0", "k1", "gp", "sp", "fp", "ra",
+)
+_MIPS_REG_CANON = {}
+for _i, _n in enumerate(_MIPS_REG_NAMES):
+    _MIPS_REG_CANON[f"${_n}"] = _i
+    _MIPS_REG_CANON[f"${_i}"] = _i
+_MIPS_REG_CANON["$s8"] = 30  # gas alias for $fp
+
+
+def canon_reg(token):
+    """Return the register number for `token`, or the token itself if unknown."""
+    if token is None:
+        return None
+    return _MIPS_REG_CANON.get(token.strip(), token)
 
 
 def parse_load_or_store(rest: str):
@@ -462,6 +716,8 @@ class MaspsxProcessor:
         use_comm_for_lcomm=False,
         fill_store_delay_slot=False,
         fill_epilogue_delay_slot=False,
+        fill_call_delay_slot=False,
+        fill_branch_delay_slot=False,
         three_word_symbol_store=False,
         symbol_load_dest_temp=False,
         symbol_at_temp=False,
@@ -498,6 +754,20 @@ class MaspsxProcessor:
             fill_epilogue_delay_slot
             or os.environ.get("MASPSX_FILL_EPILOGUE_DELAY_SLOT") == "1"
         )
+        # LOCAL PATCH (patch 8): opt-in store/`la` macro second word into the
+        # delay slot of a plain `jal <symbol>` / `j <label>`.
+        self.fill_call_delay_slot = (
+            fill_call_delay_slot
+            or os.environ.get("MASPSX_FILL_CALL_DELAY_SLOT") == "1"
+        )
+        # LOCAL PATCH 6: opt-in fill of a reorder-mode conditional branch delay
+        # slot from the following instruction (see the patch log).
+        self.fill_branch_delay_slot = (
+            fill_branch_delay_slot
+            or os.environ.get("MASPSX_FILL_BRANCH_DELAY_SLOT") == "1"
+        )
+        self._branch_fill_label_map = None
+        self._branch_fill_reorder = None
         # LOCAL PATCH: the env gate keeps the untracked maspsx.py driver
         # untouched and permits per-leaf selection.
         self.three_word_symbol_store = (
@@ -538,6 +808,12 @@ class MaspsxProcessor:
         self.bss_entries: dict[str, int] = {}
         self.sbss_entries: dict[str, int] = {}
         self.sdata_entries: dict[str, int] = {}
+        # LOCAL PATCH 7: sized `.extern SYM, size` declarations that fit the
+        # small-data limit.  GNU as places these gp-relative exactly like
+        # `.comm` symbols, so a load/store macro on them collapses to ONE
+        # instruction and a preceding load needs its MIPS-I load-delay nop
+        # (see _uses_gp / _handle_nop_before_next_instruction).
+        self.extern_entries: dict[str, int] = {}
 
         self.comm_symbols: set[str] = set()
 
@@ -582,7 +858,15 @@ class MaspsxProcessor:
                 continue
 
             if line.startswith(".extern"):
+                # e.g.	.extern	D_8009CE84, 2   (cc1 -G<n> emits these for
+                # every external whose size fits the small-data limit)
                 in_sdata = False
+                if match := re.match(
+                    r"\.extern\s+([^,\s]+)\s*,\s*(\d+)", line
+                ):
+                    symbol, size = match.group(1), int(match.group(2))
+                    if size <= self.sdata_limit:
+                        self.extern_entries[symbol] = size
                 continue
 
             if line.startswith(".comm") or line.startswith(".lcomm"):
@@ -641,9 +925,15 @@ class MaspsxProcessor:
         self.skip_instructions = 0
         self.file_num = 1
 
+        # LOCAL PATCH 6 caches are derived from self.lines; drop them here so a
+        # reused processor re-derives them.
+        self._branch_fill_label_map = None
+        self._branch_fill_reorder = None
+
         self.bss_entries = {}
         self.sbss_entries = {}
         self.sdata_entries = {}
+        self.extern_entries = {}
 
         self.preprocess_lines()
 
@@ -752,6 +1042,440 @@ class MaspsxProcessor:
             return op == "j" and rest == ["$31"]
         return False
 
+    # --- LOCAL PATCH 6: fill_branch_delay_slot ---------------------------
+    #
+    # Everything below refuses the fill (returns None / False) whenever it
+    # cannot fully account for the code it is looking at.  Refusing restores
+    # the stock `nop`, so every bail-out is the pre-patch behaviour.
+
+    def _branch_fill_labels(self) -> dict:
+        if self._branch_fill_label_map is None:
+            self._branch_fill_label_map = {
+                line[:-1]: i
+                for i, line in enumerate(self.lines)
+                if is_label(line)
+            }
+        return self._branch_fill_label_map
+
+    def _branch_fill_reorder_flags(self) -> List[bool]:
+        """Per-input-line reorder state, mirroring process_line's tracking.
+
+        Needed because a branch inside a cc1 `.set noreorder` block owns the
+        next line as its delay slot, while a reorder-mode branch does not.
+        """
+        if self._branch_fill_reorder is None:
+            flags = []
+            state = True
+            for line in self.lines:
+                flags.append(state)
+                if line.startswith(".set\t"):
+                    if line.endswith("\tnoreorder"):
+                        state = False
+                    elif line.endswith("\treorder"):
+                        state = True
+            self._branch_fill_reorder = flags
+        return self._branch_fill_reorder
+
+    @staticmethod
+    def _branch_fill_operands(line: str) -> List[str]:
+        line = strip_comments(line)
+        parts = line.split(None, 1)
+        if len(parts) < 2:
+            return []
+        return [p.strip() for p in parts[1].split(",")]
+
+    def _branch_fill_next_index(self, index: int):
+        """Index of the next line that is a real instruction, or None.
+
+        Blank lines, comments and `.set macro/nomacro/volatile/novolatile`
+        noise are stepped over; a label or any other directive returns None so
+        the caller refuses (we must never reason across a basic-block edge we
+        did not model).
+        """
+        i = index + 1
+        while i < len(self.lines):
+            line = self.lines[i]
+            if line == "":
+                i += 1
+                continue
+            if line.startswith("#"):
+                if line in ("#APP", "#NO_APP"):
+                    return None
+                i += 1
+                continue
+            if line in (
+                ".set\tmacro",
+                ".set\tnomacro",
+                ".set\tvolatile",
+                ".set\tnovolatile",
+            ):
+                i += 1
+                continue
+            if line.startswith(".") or is_label(line) or line.endswith(":"):
+                return None
+            return i
+        return None
+
+    def _branch_fill_delay_slot_index(self, index: int):
+        """Index of the delay-slot instruction of the branch/jump at `index`.
+
+        Strict on purpose: only blank lines and the `.set macro/nomacro` pair
+        cc1 wraps a scheduled branch in may intervene.  A comment (cc1's own
+        `#nop` placeholder included), a label or any other directive means we
+        are not looking at a plain `branch` / `slot` pair, so refuse.
+        """
+        i = index + 1
+        while i < len(self.lines):
+            line = self.lines[i]
+            if line == "" or line in (".set\tmacro", ".set\tnomacro"):
+                i += 1
+                continue
+            if line.startswith("#") or line.startswith(".") or line.endswith(":"):
+                return None
+            return i
+        return None
+
+    def _branch_fill_consumer_index(self, index: int):
+        """Index of the instruction that follows `index`, skipping the cc1
+        `.set` noise that wraps a scheduled branch.  A label or any other
+        directive returns None (the value could then be consumed elsewhere)."""
+        i = index + 1
+        while i < len(self.lines):
+            line = self.lines[i]
+            if line == "":
+                i += 1
+                continue
+            if line.startswith("#"):
+                if line in ("#APP", "#NO_APP"):
+                    return None
+                i += 1
+                continue
+            if line.startswith(".set\t"):
+                i += 1
+                continue
+            if line.startswith(".") or is_label(line) or line.endswith(":"):
+                return None
+            return i
+        return None
+
+    def _branch_fill_effect(self, line: str, reg: int):
+        """Effect of a single instruction on `reg`: "read", "write", "none" or
+        "bail" (mnemonic or operand shape not fully understood)."""
+        line = strip_comments(line)
+        if ";" in line:
+            return "bail"
+        if line == "" or line == "nop":
+            return "none"
+        parts = line.split(None, 1)
+        op = parts[0]
+        if op in live_write_none:
+            writes = None
+        elif op in live_write_first:
+            writes = "first"
+        else:
+            return "bail"
+        operands = self._branch_fill_operands(line)
+        regs = []
+        for tok in reg_operand_re.findall(" ".join(operands)):
+            num = gpr_number(tok)
+            if num is None:
+                return "bail"
+            regs.append(num)
+        if writes == "first":
+            first = operands[0] if operands else ""
+            dest = gpr_number(first)
+            if dest is None:
+                return "bail"
+            # every register after the destination is a pure read
+            if reg in regs[1:]:
+                return "read"
+            return "write" if dest == reg else "none"
+        return "read" if reg in regs else "none"
+
+    def _branch_fill_reg_dead_at(self, label: str, reg: int) -> bool:
+        """True when `reg` is provably dead at `label`.
+
+        A conservative forward reachability walk: every path leaving `label`
+        must overwrite `reg` before any instruction reads it, and every
+        construct the walk cannot model (a call, an indirect or computed jump,
+        inline asm, a reorder-mode conditional branch, an unknown mnemonic,
+        the end of the function, a blown step budget) makes it answer False.
+        """
+        labels = self._branch_fill_labels()
+        if label not in labels:
+            return False
+        reorder = self._branch_fill_reorder_flags()
+
+        stack = [labels[label]]
+        seen = set()
+        steps = 0
+        budget = 4096
+
+        while stack:
+            i = stack.pop()
+            killed = False
+            while True:
+                steps += 1
+                if steps > budget or i is None or i >= len(self.lines):
+                    return False
+                if i in seen:
+                    # this program point has already been proven safe on an
+                    # earlier path (an unsafe one would have returned False)
+                    killed = True
+                    break
+                line = self.lines[i]
+                if line == "":
+                    i += 1
+                    continue
+                if line.startswith("#"):
+                    if line in ("#APP", "#NO_APP"):
+                        return False
+                    i += 1
+                    continue
+                if is_label(line):
+                    i += 1
+                    continue
+                if line.startswith("."):
+                    if line.startswith(".set\t") or line.startswith(".loc\t"):
+                        i += 1
+                        continue
+                    # .end / .ent / section or data directives: stop guessing
+                    return False
+                if line.endswith(":"):
+                    # a non-cc1 label (function entry, asm label)
+                    return False
+
+                seen.add(i)
+                op = strip_comments(line).split(None, 1)[0]
+
+                if op in cond_branch_mnemonics:
+                    if reorder[i]:
+                        # no textual delay slot, and with this very patch on
+                        # the slot's contents are not knowable here
+                        return False
+                    operands = self._branch_fill_operands(line)
+                    if not operands:
+                        return False
+                    target = operands[-1]
+                    slot = self._branch_fill_delay_slot_index(i)
+                    if slot is None or target not in labels:
+                        return False
+                    effect = self._branch_fill_effect(self.lines[slot], reg)
+                    if effect in ("bail", "read"):
+                        return False
+                    if effect == "write":
+                        killed = True
+                        break
+                    stack.append(labels[target])
+                    i = slot + 1
+                    continue
+
+                if op in ("j", "jr"):
+                    operands = self._branch_fill_operands(line)
+                    if len(operands) != 1:
+                        return False
+                    target = operands[0]
+                    if reorder[i]:
+                        if target in ("$31", "$ra"):
+                            # reg is live out of the function at a return we
+                            # cannot prove kills it
+                            return False
+                        if target not in labels:
+                            return False
+                        i = labels[target]
+                        continue
+                    slot = self._branch_fill_delay_slot_index(i)
+                    if slot is None:
+                        return False
+                    effect = self._branch_fill_effect(self.lines[slot], reg)
+                    if effect in ("bail", "read"):
+                        return False
+                    if effect == "write":
+                        killed = True
+                        break
+                    if target in ("$31", "$ra") or target not in labels:
+                        return False
+                    i = labels[target]
+                    continue
+
+                if op in ("jal", "jalr"):
+                    return False
+
+                effect = self._branch_fill_effect(line, reg)
+                if effect in ("bail", "read"):
+                    return False
+                if effect == "write":
+                    killed = True
+                    break
+                i += 1
+
+            if not killed:
+                return False
+        return True
+
+    def _branch_fill_candidate(self, branch_line: str):
+        """The line to emit in this reorder-mode conditional branch's delay
+        slot, or None to keep the stock `nop`."""
+        if not self.fill_branch_delay_slot:
+            return None
+        branch_line = strip_comments(branch_line)
+        op = branch_line.split(None, 1)[0]
+        if op not in cond_branch_mnemonics:
+            return None
+        operands = self._branch_fill_operands(branch_line)
+        want = 3 if op in cond_branch_two_reg else 2
+        if len(operands) != want:
+            return None
+        target = operands[-1]
+        if target not in self._branch_fill_labels():
+            return None
+
+        index = self._branch_fill_next_index(self.line_index)
+        if index is None:
+            return None
+        # the candidate must be the IMMEDIATELY following line; only blank
+        # lines may separate it, so `skip_instructions` lands on it exactly
+        if any(self.lines[j] != "" for j in range(self.line_index + 1, index)):
+            return None
+
+        cand = self.lines[index]
+        if ";" in cand:
+            return None
+        cand_stripped = strip_comments(cand)
+        cop = cand_stripped.split(None, 1)[0]
+        spec = branch_fill_candidates.get(cop)
+        if spec is None:
+            return None
+        nargs, imm_kind = spec
+        cargs = self._branch_fill_operands(cand_stripped)
+        if len(cargs) != nargs:
+            return None
+        dest = cargs[0]
+        if dest in branch_fill_forbidden_dest:
+            return None
+        dest_num = gpr_number(dest)
+        if dest_num is None or dest_num in (0, 1) or dest_num >= 26:
+            return None
+        # operands other than an allowed trailing literal must be plain GPRs
+        for arg in cargs[1:-1] if nargs == 3 else []:
+            if gpr_number(arg) is None:
+                return None
+        if nargs == 2 and imm_kind is None and gpr_number(cargs[1]) is None:
+            return None
+
+        last = cargs[-1]
+        if imm_kind == "li" and gpr_number(last) is not None:
+            return None
+        if gpr_number(last) is None:
+            # a literal: it must be in range for a one-word encoding, so GNU
+            # as / maspsx can never reach for `$at`
+            if not is_number(last):
+                return None
+            value = int(last, 0)
+            if imm_kind == "s16":
+                if not -0x8000 <= value <= 0x7FFF:
+                    return None
+                if cop == "subu" and not -0x7FFF <= value <= 0x8000:
+                    return None
+            elif imm_kind == "u16":
+                if not 0 <= value <= 0xFFFF:
+                    return None
+            elif imm_kind == "u15":
+                if not 0 <= value <= 0x7FFF:
+                    return None
+            elif imm_kind == "sh":
+                if not 0 <= value <= 31:
+                    return None
+            elif imm_kind == "li":
+                # `li` is one word only for a 16-bit-representable value; the
+                # expand_li path must also produce exactly one instruction
+                if not -0x8000 <= value <= 0xFFFF:
+                    return None
+                if self.expand_li and len(expand_load_immediate(cand_stripped)) != 1:
+                    return None
+            else:
+                return None
+        elif imm_kind == "sh":
+            # sllv/srlv/srav are spelled out separately; a register shift
+            # count under sll/srl/sra would be a different instruction
+            return None
+
+        # FIDELITY GATE (as opposed to the safety gate below).  Liveness alone
+        # licenses more fills than retail actually performs: of the 70
+        # same-shape sites in the repo's LINK_EXACT leaves, retail keeps the
+        # `nop` at all 70 even though 2 of them (func_80012E7C `sll $2,$3,2`,
+        # func_8006A2E8 `move $2,$5`) are provably dead-at-target and would be
+        # legal to fill.  The ROM-evidenced family is specifically a COMPARE
+        # that the immediately following conditional branch consumes -- the
+        # compare-chain shape of func_80043474 -- so require exactly that.
+        if cop not in ("slt", "slti", "sltu", "sltiu"):
+            return None
+        consumer = self._branch_fill_consumer_index(index)
+        if consumer is None:
+            return None
+        consumer_line = strip_comments(self.lines[consumer])
+        cons_op = consumer_line.split(None, 1)[0]
+        if cons_op not in cond_branch_mnemonics:
+            return None
+        cons_regs = [
+            gpr_number(tok)
+            for tok in reg_operand_re.findall(consumer_line)
+        ]
+        if dest_num not in cons_regs:
+            return None
+
+        # SAFETY GATE: the fill executes on the taken edge too, so the
+        # destination must be provably dead there.
+        if not self._branch_fill_reg_dead_at(target, dest_num):
+            return None
+
+        # emit exactly what the normal path would have emitted for this line
+        if cop == "move":
+            return expand_move(cand_stripped)
+        if cop == "li" and self.expand_li:
+            return expand_load_immediate(cand_stripped)[0]
+        return cand
+
+    def _next_line_is_plain_call(self):
+        # LOCAL PATCH helper (patch 8): inspect the next non-blank,
+        # non-comment input line and return `(line, target_register)` when it
+        # is a plain jump/call whose delay slot may be filled with a macro's
+        # second word, else None. `target_register` is None for a direct
+        # `jal <symbol>` / `j <label>` and e.g. "$2" for the register-indirect
+        # forms, which cc1 spells `jal $2` (jalr) and `j $2` (jr).
+        #
+        # Like _next_line_is_return_jump this deliberately does NOT skip
+        # `.set` or label lines (hazard H5): a label means the jump is a
+        # branch target and the macro is not guaranteed to have run, and a
+        # cc1 `.set noreorder` block means cc1 already owns that slot.
+        #
+        # `j $31` (the function return) is always refused: that slot belongs
+        # to patches 1 and 3, whose ROM evidence covers it, and stealing it
+        # here would change their behaviour when both knobs are on.
+        i = self.line_index + 1
+        while i < len(self.lines):
+            line = self.lines[i]
+            if line == "" or line.startswith("#"):
+                i += 1
+                continue
+            if ";" in line:  # H7: compound macro line
+                return None
+            parts = line.split()
+            if len(parts) != 2:
+                return None
+            op, target = parts
+            if op not in ("j", "jal"):  # H6: not a conditional branch
+                return None
+            if not target.startswith("$"):
+                return (line, None)
+            if canon_reg(target) == 31:  # patch 1 / patch 3 own this slot
+                return None
+            # H3: a register-indirect jump reads its target register at jump
+            # time, i.e. BEFORE the delay slot runs. The caller must check
+            # that the moved word does not write that register.
+            return (line, target)
+        return None
+
     def _uses_gp(self, line: str) -> bool:
         if self.sdata_limit == 0:
             return False
@@ -776,7 +1500,14 @@ class MaspsxProcessor:
                     gp_allowed = True
 
                 if gp_allowed and (
-                    symbol in self.sbss_entries or symbol in self.sdata_entries
+                    symbol in self.sbss_entries
+                    or symbol in self.sdata_entries
+                    # LOCAL PATCH 7: sized externs resolve gp-relative too.
+                    # Only the hazard decision consults this; the rewrite to
+                    # an explicit %gp_rel operand stays GNU as's job (it
+                    # already honours the sized `.extern`), so flag-off text
+                    # is unchanged apart from the mandatory nop.
+                    or symbol in self.extern_entries
                 ):
                     return True
 
@@ -1056,6 +1787,53 @@ class MaspsxProcessor:
             self.skip_instructions = 1
             return res
 
+        # LOCAL PATCH (patch 8, `la` arm): put the address macro's second word
+        # into the delay slot of the following plain jal/j:
+        #   lui $r,%hi(SYM) / jal T / addiu $r,$r,%lo(SYM)
+        # This is a dedicated block rather than a widening of the store
+        # branch's `la` condition so that nothing else in that chain becomes
+        # newly reachable for `la` when the knob is on.
+        if (
+            self.fill_call_delay_slot
+            and op == "la"
+            and not is_macro  # H7
+            and len(rest) == 1
+            # H8: with gp_allow_la (ASPSX >= 2.80) a `la` of a small-data
+            # symbol is a single gp-relative instruction with no second word
+            # to move. That eligibility is not decidable here for every
+            # operand spelling, so refuse the whole mode.
+            and not self.gp_allow_la
+        ):
+            la_parts = rest[0].split(",")
+            la_operand = la_parts[1] if len(la_parts) == 2 else ""
+            call = self._next_line_is_plain_call()
+            if (
+                call is not None
+                and la_operand
+                and "(" not in la_operand  # not an indexed form
+                # H2: the moved word WRITES this register; $31 would destroy
+                # the return address `jal` has just stored.
+                and canon_reg(la_parts[0]) not in (31, 1)
+                # H3: a register-indirect jump reads its target register
+                # BEFORE the slot runs, so the moved word must not be what
+                # completes that address.
+                and canon_reg(call[1]) != canon_reg(la_parts[0])
+                # H9: a numeric operand is not a symbol macro.
+                and not re.match(r"^-?(0x[0-9A-Fa-f]+|\d+)$", la_operand)
+            ):
+                r_dest = la_parts[0]
+                res.extend(
+                    [
+                        "# FILL_CALL_DELAY_SLOT LA START",
+                        f"lui\t{r_dest},%hi({la_operand})",
+                        call[0],
+                        f"addiu\t{r_dest},{r_dest},%lo({la_operand})",
+                        "# FILL_CALL_DELAY_SLOT LA END",
+                    ]
+                )
+                self.skip_instructions = 1
+                return res
+
         if op in load_mnemonics:
             r_source, r_dest, operand, is_addend, needs_expanding = parse_load_or_store(
                 " ".join(rest)
@@ -1118,6 +1896,14 @@ class MaspsxProcessor:
                     self.symbol_load_dest_temp
                     and not is_macro
                     and not re.match(r"^-?(0x[0-9A-Fa-f]+|\d+)$", operand)
+                    # The destination cannot serve as the address temp when
+                    # it IS the index register (`lhu $2,SYM($2)`): the
+                    # `lui $2` would clobber the index before the `addu`
+                    # read it.  GNU as (and retail: func_80074A44 has both
+                    # `lhu $v1,D_800957CC($v0)` dest-temp and
+                    # `lhu $v0,D_800957D8($v0)` via $at) fall back to the
+                    # $at form in exactly that case.
+                    and canon_reg(r_dest) != canon_reg(r_source)
                 )
                 # LOCAL PATCH (patch 5): 3-word $at address temp, %lo kept.
                 at_temp_used = (
@@ -1239,11 +2025,19 @@ class MaspsxProcessor:
                 res.extend(extra_nops)
 
         elif op in store_mnemonics or (op == "la" and self.sdata_limit > 0):
-            r_source, r_dest, operand, is_addend, _ = parse_load_or_store(
+            r_source, r_dest, operand, is_addend, needs_expanding = parse_load_or_store(
                 " ".join(rest)
             )
 
-            if is_addend and r_source is None:
+            if not needs_expanding:
+                # LOCAL PATCH: an explicit `op $r,%lo(SYM)($base)` store (the
+                # form gcc-2.8.1-psx cc1 emits after its own `lui $base,%hi`;
+                # 2.7.2 never emits it) is already one instruction with a
+                # LO16 reloc — pass it through exactly like the load arm above
+                # instead of re-expanding it into the 4-word $at macro.
+                res.append(f"{line} # DEBUG: leaving for assembler to expand")
+
+            elif is_addend and r_source is None:
                 # e.g. sw	$v0,D_800E52E0
                 if operand.count("+") == 1:
                     symbol, offset = operand.split("+")
@@ -1286,6 +2080,36 @@ class MaspsxProcessor:
                             f"{op}\t{r_dest},%lo({operand})($at)",
                             ".set\tat",
                             "# FILL_STORE_DELAY_SLOT END",
+                        ]
+                    )
+                    self.skip_instructions = 1
+                elif (
+                    # LOCAL PATCH (patch 8, absolute-store arm): the macro's
+                    # second word goes into the delay slot of the following
+                    # plain jal/j, exactly as ASPSX's reorder pass schedules
+                    # it:  lui $at,%hi(SYM) / jal T / sw $r,%lo(SYM)($at)
+                    self.fill_call_delay_slot
+                    and op in ("sb", "sh", "sw")
+                    and not is_macro  # H7
+                    # H1: `jal` writes $31, so a value register of $31 would
+                    # store the NEW return address once moved past the call.
+                    # H4: $at is the address temp the `lui` sets up.
+                    and canon_reg(r_dest) not in (31, 1)
+                    and (call := self._next_line_is_plain_call()) is not None
+                    # H3: the moved store writes no register, so a
+                    # register-indirect target is safe unless it is the `$at`
+                    # the surviving `lui` overwrites before the jump.
+                    and canon_reg(call[1]) != 1
+                ):
+                    res.extend(
+                        [
+                            "# FILL_CALL_DELAY_SLOT START",
+                            ".set\tnoat",
+                            f"lui\t$at,%hi({operand})",
+                            call[0],
+                            f"{op}\t{r_dest},%lo({operand})($at)",
+                            ".set\tat",
+                            "# FILL_CALL_DELAY_SLOT END",
                         ]
                     )
                     self.skip_instructions = 1
@@ -1375,7 +2199,21 @@ class MaspsxProcessor:
         elif op in branch_mnemonics or op in jump_mnemonics:
             res.append(line)
             if self.is_reorder:
-                res.append("nop  # DEBUG: branch/jump")
+                # LOCAL PATCH 6: opt-in fill from the following instruction
+                # when that instruction's destination is provably dead at the
+                # branch target; otherwise the stock nop.
+                fill = self._branch_fill_candidate(line)
+                if fill is not None:
+                    res.extend(
+                        [
+                            "# FILL_BRANCH_DELAY_SLOT START",
+                            fill,
+                            "# FILL_BRANCH_DELAY_SLOT END",
+                        ]
+                    )
+                    self.skip_instructions = 1
+                else:
+                    res.append("nop  # DEBUG: branch/jump")
 
         elif op == "move":
             # expand move $2,$16 to addu $2,$16,$zero

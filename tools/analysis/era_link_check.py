@@ -22,8 +22,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 ERA = ROOT / "tools" / "era"
-CC1 = ERA / "gcc-2.7.2-psx" / "cc1"
-CPP = ERA / "gcc-2.7.2-psx" / "cpp"
+# ERA_CC1_VER selects the stock decompals/old-gcc cc1+cpp pair (2.7.2 default,
+# 2.8.1 for the leaves whose delay slots only 2.8.1 fills). Same per-leaf
+# environment contract as ERA_ASPSX_VER: the build profile's `environment`
+# block sets it, and this check honours the same variable so the two agree.
+CC1_VER = os.environ.get("ERA_CC1_VER", "2.7.2")
+CC1 = ERA / f"gcc-{CC1_VER}-psx" / "cc1"
+CPP = ERA / f"gcc-{CC1_VER}-psx" / "cpp"
 MASPSX = ERA / "maspsx" / "maspsx.py"
 HOST = ROOT / "tools" / "mipsel-host"
 AS = HOST / "usr" / "bin" / "mipsel-linux-gnu-as"
@@ -33,6 +38,30 @@ NM = HOST / "usr" / "bin" / "mipsel-linux-gnu-nm"
 EXE = ROOT / "build" / "extracted" / "disc1" / "SLUS_006.62"
 
 SYM_TAIL_RE = re.compile(r"([0-9A-Fa-f]{6,8})$")
+
+# Retail SLUS_006.62 was assembled with ASPSX >= 2.30 throughout (1246
+# signature sites for 2.30 behaviour, 0 for 2.21 -- see
+# docs/ai_context/TOOLCHAIN_REBUILD.md).  ERA_ASPSX_VER remains a per-leaf
+# override.
+ERA_ASPSX_VER_DEFAULT = "2.30"
+
+
+def maspsx_sdata_flag(flags):
+    """Return cc1's `-G<n>` small-data limit as the `-G<n>` maspsx expects.
+
+    maspsx must know the same limit cc1 used: a `.extern SYM, size` whose
+    size fits the limit resolves gp-relative (one instruction), and the
+    MIPS-I load-delay nop before such a store is only emitted when maspsx can
+    see that.  Missing `-G` means `-G0` (nothing gp-relative).
+    """
+    limit = "0"
+    it = iter(flags)
+    for flag in it:
+        if flag == "-G":
+            limit = next(it, "0")
+        elif flag.startswith("-G") and flag[2:].isdigit():
+            limit = flag[2:]
+    return f"-G{limit}"
 
 
 def elf_section(data: bytes, want: str):
@@ -76,6 +105,9 @@ def main():
     src_path = Path(src)
     if not src_path.is_absolute():
         src_path = ROOT / src_path
+    if not (CC1.is_file() and CPP.is_file()):
+        print(f"MISSING_ERA_CC1 {CC1_VER}: {CC1.parent}; run scripts/setup_era.sh")
+        return 2
 
     with tempfile.TemporaryDirectory() as d:
         d = Path(d)
@@ -97,12 +129,20 @@ def main():
             (d / "x.s").write_text(text)
         with open(d / "xm.s", "w") as fo:
             maspsx_command = [sys.executable, str(MASPSX),
-                              f"--aspsx-version={os.environ.get('ERA_ASPSX_VER', '2.21')}",
+                              f"--aspsx-version={os.environ.get('ERA_ASPSX_VER', ERA_ASPSX_VER_DEFAULT)}",
                               "--dont-expand-li"]
             if os.environ.get("MASPSX_EXPAND_DIV") == "1":
                 maspsx_command.append("--expand-div")
+            if os.environ.get("MASPSX_USE_COMM_SECTION") == "1":
+                maspsx_command.append("--use-comm-section")
+            # Forward cc1's small-data limit (maspsx's own `-G<n>` parsing);
+            # it must precede the input path, which maspsx pops last.
+            maspsx_command.append(maspsx_sdata_flag(flags))
             maspsx_command.append(str(d / "x.s"))
-            r = subprocess.run(maspsx_command, stdout=fo, stderr=subprocess.DEVNULL)
+            # maspsx reads its file argument only when stdin is a tty or hits EOF;
+            # an inherited socket stdin (agent harness, CI) would block forever.
+            r = subprocess.run(maspsx_command, stdin=subprocess.DEVNULL,
+                               stdout=fo, stderr=subprocess.DEVNULL)
         assert r.returncode == 0, "maspsx failed"
         r = subprocess.run([str(AS), "-EL", "-mips1", "-mabi=32",
                             "-I", str(ROOT / "include"), "-o", str(d / "x.o"),

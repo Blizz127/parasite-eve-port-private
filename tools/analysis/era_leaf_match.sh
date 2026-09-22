@@ -12,8 +12,11 @@ SIZE="${3:?size}"
 shift 3
 FLAGS=("${@:-"-O2" "-G8"}")
 
-ERA_CPP="$ROOT/tools/era/gcc-2.7.2-psx/cpp"
-ERA_CC1="$ROOT/tools/era/gcc-2.7.2-psx/cc1"
+# ERA_CC1_VER=2.8.1 selects the stock gcc-2.8.1-psx pair (default 2.7.2), the
+# same per-leaf knob era_link_check.py / disc1_build.py honour.
+ERA_CC1_VER="${ERA_CC1_VER:-2.7.2}"
+ERA_CPP="$ROOT/tools/era/gcc-$ERA_CC1_VER-psx/cpp"
+ERA_CC1="$ROOT/tools/era/gcc-$ERA_CC1_VER-psx/cc1"
 MASPSX="$ROOT/tools/era/maspsx/maspsx.py"
 AS="${AS:-mips-linux-gnu-as}"
 OBJDUMP="${OBJDUMP:-mips-linux-gnu-objdump}"
@@ -29,7 +32,12 @@ trap 'rm -rf "$d"' EXIT
 
 "$ERA_CPP" "$SRC" > "$d/x.i" 2>/dev/null
 "$ERA_CC1" -quiet "${FLAGS[@]}" "$d/x.i" -o "$d/x.s"
-python3 "$MASPSX" --aspsx-version=2.21 --dont-expand-li "$d/x.s" > "$d/xm.s" </dev/null
+# ASPSX >= 2.30 is the retail baseline (docs/ai_context/TOOLCHAIN_REBUILD.md);
+# ERA_ASPSX_VER overrides per invocation.  cc1's -G<n> is forwarded so maspsx
+# classifies sized `.extern` symbols the way GNU as will place them.
+G_FLAG="-G0"
+for f in "${FLAGS[@]}"; do case "$f" in -G[0-9]*) G_FLAG="$f";; esac; done
+python3 "$MASPSX" --aspsx-version="${ERA_ASPSX_VER:-2.30}" --dont-expand-li "$G_FLAG" "$d/x.s" > "$d/xm.s" </dev/null
 "$AS" -EL -mips1 -mabi=32 -I "$ROOT/include" -o "$d/x.o" "$d/xm.s"
 
 echo "==== cc1 flags: ${FLAGS[*]} ===="

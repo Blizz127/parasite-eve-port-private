@@ -490,6 +490,22 @@ def _run(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[Any]:
     return subprocess.run(command, check=True, **kwargs)
 
 
+# Mirrors disc1_build.ERA_ASPSX_VER_DEFAULT / maspsx_sdata_flag (the fast path
+# must not import the build module).
+ERA_ASPSX_VER_DEFAULT = "2.30"
+
+
+def _maspsx_sdata_flag(flags: list[str]) -> str:
+    limit = "0"
+    it = iter(flags)
+    for flag in it:
+        if flag == "-G":
+            limit = next(it, "0")
+        elif flag.startswith("-G") and flag[2:].isdigit():
+            limit = flag[2:]
+    return f"-G{limit}"
+
+
 def _force_absolute_symbols(assembly: Path, specification: str) -> None:
     text = assembly.read_text(encoding="utf-8")
     for symbol in specification.split(","):
@@ -517,18 +533,23 @@ def _compile_leaf(
                     stderr=subprocess.DEVNULL,
                 )
             else:
+                # Same per-leaf ERA_CC1_VER selection as disc1_build.compile_era,
+                # or this pass would report false mismatches for 2.8.1 leaves.
+                import disc1_build  # noqa: PLC0415
+
+                era_cpp, era_cc1 = disc1_build.era_compiler(unit["environment"])
                 preprocessed = temp / "x.i"
                 assembly = temp / "x.s"
                 expanded = temp / "xm.s"
                 with preprocessed.open("wb") as stream:
                     _run(
-                        [str(root / ERA_CPP), str(source)],
+                        [str(root / era_cpp), str(source)],
                         stdout=stream,
                         stderr=subprocess.DEVNULL,
                         env=env,
                     )
                 _run(
-                    [str(root / ERA_CC1), "-quiet", *unit["flags"],
+                    [str(root / era_cc1), "-quiet", *unit["flags"],
                      str(preprocessed), "-o", str(assembly)],
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
@@ -540,14 +561,20 @@ def _compile_leaf(
                 command = [
                     sys.executable,
                     str(root / MASPSX),
-                    f"--aspsx-version={unit['environment'].get('ERA_ASPSX_VER', '2.21')}",
+                    f"--aspsx-version={unit['environment'].get('ERA_ASPSX_VER', ERA_ASPSX_VER_DEFAULT)}",
                     "--dont-expand-li",
                 ]
                 if unit["environment"].get("MASPSX_EXPAND_DIV") == "1":
                     command.append("--expand-div")
+                if unit["environment"].get("MASPSX_USE_COMM_SECTION") == "1":
+                    command.append("--use-comm-section")
+                command.append(_maspsx_sdata_flag(list(unit["flags"])))
                 command.append(str(assembly))
                 with expanded.open("wb") as stream:
-                    _run(command, stdout=stream, stderr=subprocess.DEVNULL, env=env)
+                    # See era_link_check.py: maspsx blocks on an inherited
+                    # non-tty stdin instead of reading its file argument.
+                    _run(command, stdin=subprocess.DEVNULL, stdout=stream,
+                         stderr=subprocess.DEVNULL, env=env)
                 _run(
                     [*tools.runner, tools.assembler, "-EL", "-mips1", "-mabi=32",
                      "-I", str(root / "include"), "-o", str(output), str(expanded)],
@@ -612,7 +639,11 @@ def check_deep(
     # present the *build* step is the authority on prerequisites (it reports a
     # clean ENV/FAIL). Skipping here keeps this preflight from misclassifying a
     # missing-toolchain environment as a configuration failure.
-    missing_tools = [str(tool) for tool in (ERA_CPP, ERA_CC1, MASPSX) if not (root / tool).is_file()]
+    required_tools: list[Path] = [ERA_CPP, ERA_CC1, MASPSX]
+    for unit in units:
+        if unit["toolchain"] == "era":
+            required_tools.extend(disc1_build.era_compiler(unit["environment"]))
+    missing_tools = sorted({str(tool) for tool in required_tools if not (root / tool).is_file()})
     if missing_tools:
         print(
             "disc1_preflight: WARN deep size check skipped (missing era tool(s): "

@@ -24,6 +24,7 @@ GENERATED = Path("build/generated")
 EXE = Path("build/extracted/disc1/SLUS_006.62")
 ERA_CPP = Path("tools/era/gcc-2.7.2-psx/cpp")
 ERA_CC1 = Path("tools/era/gcc-2.7.2-psx/cc1")
+ERA_CC1_VER_DEFAULT = "2.7.2"
 MASPSX = Path("tools/era/maspsx/maspsx.py")
 TRIM = Path("tools/trim_elf_section_pad.py")
 AS_FLAGS = ["-EL", "-mips1", "-mabi=32"]
@@ -39,6 +40,31 @@ MODERN_C_FLAGS = [
     "-fno-builtin",
     "-O1",
 ]
+
+
+# Retail SLUS_006.62 was assembled with ASPSX >= 2.30 throughout (1246
+# signature sites for 2.30 behaviour, 0 for 2.21 -- see
+# docs/ai_context/TOOLCHAIN_REBUILD.md).  A profile's ERA_ASPSX_VER still
+# overrides this per leaf.
+ERA_ASPSX_VER_DEFAULT = "2.30"
+
+
+def maspsx_sdata_flag(flags: list[str]) -> str:
+    """Return cc1's `-G<n>` small-data limit as the `-G<n>` maspsx expects.
+
+    maspsx must know the same limit cc1 used: a `.extern SYM, size` whose size
+    fits the limit resolves gp-relative (one instruction), and the MIPS-I
+    load-delay nop before such a store is only emitted when maspsx can see
+    that.  A missing `-G` means `-G0` (nothing gp-relative).
+    """
+    limit = "0"
+    it = iter(flags)
+    for flag in it:
+        if flag == "-G":
+            limit = next(it, "0")
+        elif flag.startswith("-G") and flag[2:].isdigit():
+            limit = flag[2:]
+    return f"-G{limit}"
 
 
 class BuildError(RuntimeError):
@@ -156,6 +182,22 @@ def find_toolchain() -> Toolchain:
     )
 
 
+def era_compiler(environment: dict[str, str]) -> tuple[Path, Path]:
+    """Resolve the (cpp, cc1) pair for a leaf from its profile ``environment``.
+
+    ``ERA_CC1_VER`` selects the stock decompals/old-gcc release directory
+    ``tools/era/gcc-<ver>-psx`` (2.7.2 by default, 2.8.1 for the leaves whose
+    delay slots only 2.8.1 fills). It is read from the unit's own environment
+    block exactly like ``ERA_ASPSX_VER`` so the SHA-1 gate, the deep preflight
+    and ``era_link_check.py`` all pick the same compiler. Paths are ROOT-relative.
+    """
+    version = environment.get("ERA_CC1_VER", ERA_CC1_VER_DEFAULT)
+    if version == ERA_CC1_VER_DEFAULT:
+        return ERA_CPP, ERA_CC1
+    directory = Path(f"tools/era/gcc-{version}-psx")
+    return directory / "cpp", directory / "cc1"
+
+
 def require_inputs(plan: dict[str, Any]) -> None:
     if not (ROOT / "CLAUDE.md").is_file():
         raise BuildError(f"not a repository root: {ROOT}")
@@ -172,6 +214,18 @@ def require_inputs(plan: dict[str, Any]) -> None:
             raise BuildError(f"missing required tool: {path}")
     if not os.access(ROOT / ERA_CPP, os.X_OK) or not os.access(ROOT / ERA_CC1, os.X_OK):
         raise BuildError("era cpp/cc1 are not executable; run scripts/setup_era.sh")
+    # Every non-default ERA_CC1_VER a leaf's profile names must be installed
+    # too, or the SHA-1 gate would fail mid-run on that leaf.
+    for unit in plan["units"]:
+        if unit["kind"] != "c" or unit["toolchain"] != "era":
+            continue
+        for path in era_compiler(unit["environment"]):
+            if not (ROOT / path).is_file() or not os.access(ROOT / path, os.X_OK):
+                raise BuildError(
+                    f"{unit['name']}: ERA_CC1_VER="
+                    f"{unit['environment'].get('ERA_CC1_VER')} needs {path}; "
+                    "run scripts/setup_era.sh"
+                )
     info(f"OK original EXE SHA-1 {actual}")
     info(
         f"OK YAML plan: {plan['counts']['units']} spans, "
@@ -426,6 +480,7 @@ def compile_era(unit: dict[str, Any], tools: Toolchain) -> None:
     output = ROOT / unit["object"]
     leaf_environment = os.environ.copy()
     leaf_environment.update(unit["environment"])
+    era_cpp, era_cc1 = era_compiler(unit["environment"])
     with tempfile.TemporaryDirectory(prefix="pe-era-") as temporary:
         temp = Path(temporary)
         preprocessed = temp / "x.i"
@@ -433,14 +488,14 @@ def compile_era(unit: dict[str, Any], tools: Toolchain) -> None:
         expanded = temp / "xm.s"
         with preprocessed.open("wb") as stream:
             run(
-                [str(ROOT / ERA_CPP), str(source)],
+                [str(ROOT / era_cpp), str(source)],
                 env=leaf_environment,
                 stdout=stream,
                 stderr=subprocess.DEVNULL,
             )
         run(
             [
-                str(ROOT / ERA_CC1),
+                str(ROOT / era_cc1),
                 "-quiet",
                 *unit["flags"],
                 str(preprocessed),
@@ -452,11 +507,15 @@ def compile_era(unit: dict[str, Any], tools: Toolchain) -> None:
         forced = unit["environment"].get("MASPSX_FORCE_ABSOLUTE_SYMBOLS")
         if forced:
             force_absolute_symbols(assembly, forced)
-        aspsx_version = unit["environment"].get("ERA_ASPSX_VER", "2.21")
+        aspsx_version = unit["environment"].get("ERA_ASPSX_VER", ERA_ASPSX_VER_DEFAULT)
         maspsx_command = [
             sys.executable,
             str(ROOT / MASPSX),
             f"--aspsx-version={aspsx_version}",
+            # cc1's small-data limit, so maspsx classifies sized `.extern`
+            # symbols the way GNU as will place them (must precede the input
+            # path, which maspsx pops last).
+            maspsx_sdata_flag(list(unit["flags"])),
         ]
         # Most retail leaves want cc1's `li` left alone (GNU as expands it to
         # addiu). A few were compiled with the immediate materialised as
@@ -467,6 +526,8 @@ def compile_era(unit: dict[str, Any], tools: Toolchain) -> None:
             maspsx_command.append("--dont-expand-li")
         if unit["environment"].get("MASPSX_EXPAND_DIV") == "1":
             maspsx_command.append("--expand-div")
+        if unit["environment"].get("MASPSX_USE_COMM_SECTION") == "1":
+            maspsx_command.append("--use-comm-section")
         maspsx_command.append(str(assembly))
         with expanded.open("wb") as stream:
             run(

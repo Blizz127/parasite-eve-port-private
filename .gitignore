@@ -70,6 +70,10 @@ tools/era/maspsx/tests/*
 !tools/era/maspsx/tests/test_dispatch_fold.py
 !tools/era/maspsx/tests/test_symbol_load_dest_temp.py
 !tools/era/maspsx/tests/test_symbol_at_temp.py
+!tools/era/maspsx/tests/test_lo_store_passthrough.py
+!tools/era/maspsx/tests/test_fill_branch_delay_slot.py
+!tools/era/maspsx/tests/test_extern_gp_load_delay.py
+!tools/era/maspsx/tests/test_fill_call_delay_slot.py
 build-port/
 pc_port/build/
 pc_port/build-san/

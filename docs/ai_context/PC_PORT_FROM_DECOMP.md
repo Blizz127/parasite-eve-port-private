@@ -39,10 +39,34 @@ python3 tools/analysis/gen_decomp_ports.py --check    # totals + skip histogram
 python3 tools/analysis/gen_decomp_ports.py --check --verbose  # every skip + reason
 python3 tools/analysis/gen_decomp_ports.py --verify   # exit 1 if a TU drifted
 python3 tools/analysis/gen_decomp_ports.py --only func_80123456   # one leaf
+python3 tools/analysis/gen_decomp_ports.py --no-compile-check    # skip the E17 gate
 ```
 
+The whole build — generate, verify, configure, build, run the native suite — is
+one script:
+
+```bash
+scripts/build_pc_port.sh              # generate + configure + build + test
+scripts/build_pc_port.sh --clean      # remove the build dir first
+scripts/build_pc_port.sh --no-tests   # stop after the build
+CMAKE=/path/to/cmake scripts/build_pc_port.sh   # cmake not on PATH
+```
+
+Use it rather than a bare `cmake -S pc_port -B pc_port/build`: the generated
+directory is git-ignored, so on a clean checkout the bare cmake configures
+`0 decomp-derived port TUs` and then **fails at link** with undefined references
+to the leaves those TUs provide.
+
 It is **idempotent**: re-running writes only files whose content changed, so
-`--verify` is a clean drift gate after the matching decomp advances. The build
+`--verify` is a clean drift gate after the matching decomp advances. Note that
+one run may do several internal rounds: whether a callee gets its own prototype
+or a loud boundary depends on whether that callee's TU exists in
+`pc_port/game/decomp/`, so adding or pruning a TU changes the correct content of
+its *callers*. The generator therefore re-runs its own pipeline until the emit
+set stops changing (one round in steady state, ~15 s; four rounds and ~70 s from
+an empty directory), and only then is `--verify` clean. `scripts/build_pc_port.sh`
+still retries generate+verify up to three times, because a `src/` that sibling
+matching lanes are extending *while the build runs* looks the same from outside. The build
 globs `pc_port/game/decomp/*_port.c` (`CMakeLists.txt`, `file(GLOB CONFIGURE_DEPENDS)`),
 so a newly generated TU joins the library with no build-file edit.
 
@@ -160,6 +184,25 @@ a printed reason (`--check --verbose`) — never silently mis-ported.
 | E10 | No pointer-pointer store into a `D_` symbol. |
 | E11 | Every called `func_*` either has a known pc_port definition (linkable) or becomes a loud boundary; an existing definition with a **canonical prototype must accept the same arity** as the matched call site (otherwise the host would reinterpret arguments → reported). |
 | E12 | No assignment to a pointer-global slot (the translate-and-dereference macro cannot represent storing a 32-bit guest address). |
+| E13 | No `func_*` call result bound to a pointer object. A retail callee returning `int *` returns a 32-bit **guest address**; host-side it is either a canonical `pe_addr_t` prototype or a loud boundary returning `int`, so `int *p = func_X();` is not representable. Rejected unless the callee's resolved host return type is itself a pointer. |
+| E14 | No host-pointer expression passed to a callee parameter that is not a host pointer. A local aggregate (`char buf[8]`), a pointer local, or `&local` is *host* stack memory; a canonical prototype taking `pe_addr_t` wants a guest address, and a generated leaf has no guest frame. (A bare `D_` symbol argument is not this case — see the rewrite below; a pointer *parameter* is not either — E7b forwards `pe_<name>`.) |
+| E15 | No guest array/global **of pointers** (`extern T *D_XXXX[];`, `extern T **D_XXXX;`). The slot holds a 32-bit guest address; typing the element as a host pointer reads 8 bytes on a 64-bit host. One level (`extern T *D_XXXX;`) is fine — `PE_DECOMP_PTRGLOBAL` loads the 32-bit slot and translates it. |
+| E16 | No host pointer narrowed to an integer (`(unsigned int)D_XXXX`, `(int)ptr_param`). Retail's value is a 32-bit guest address; the host accessor is a 64-bit pointer, so the cast truncates it. |
+| E17 | **Compile gate.** Every rendered TU is syntax-checked with the host C compiler (pc_port's own `-I` set and `-D` defines) before it is written. A TU that does not compile is reported and not emitted. `--no-compile-check` disables it; a host with no C compiler gets a loud warning, never a silent skip. |
+
+E13–E16 are four angles on one fact: **a 32-bit guest address and a 64-bit host
+pointer are not the same object.** E15 and E16 matter most, because those two
+shapes *compile* (with only a `-Wpointer-to-int-cast`-class warning) and are
+silently wrong at run time. E17 exists because no static rule set can anticipate
+every shape a newly matched leaf takes — it keeps `pc_port/game/decomp/`
+buildable by construction.
+
+**Orphan pruning.** The generator owns every `func_XXXXXXXX_port.c` in
+`pc_port/game/decomp/`, and CMake globs that directory, so a TU left behind
+after its leaf became ineligible (or started colliding with a hand port) would
+still be compiled. Each run removes any `*_port.c` it did not just emit;
+`--verify` reports such a file as `orphan` instead of deleting it. `--only` and
+`--limit` suppress pruning, since they deliberately restrict the emit set.
 
 ### One deterministic rewrite: guest addresses as arguments
 
@@ -233,9 +276,12 @@ The rules that keep it honest:
 2. **Regenerate.** `python3 tools/analysis/gen_decomp_ports.py`. If the leaf is
    eligible you get `pc_port/game/decomp/func_XXXXXXXX_port.c`; if not,
    `--check --verbose` prints the reason and you write a hand adapter instead.
-3. **Build.** `cmake --build pc_port/build -j"$(nproc)"`. A compile error means
-   an eligibility gap: fix the *generator rule*, not the generated file (generated
-   files are overwritten on the next run and must never be hand-edited).
+3. **Build.** `scripts/build_pc_port.sh` (generate + verify + configure + build
+   + test). Since E17 the generator refuses to emit a TU that does not compile,
+   so a leaf that silently disappears from `pc_port/game/decomp/` is reported as
+   `uncompilable <leaf>: <first error>` — that is an eligibility gap: fix the
+   *generator rule*, never the generated file (generated files are overwritten
+   on the next run and must never be hand-edited).
 4. **Test.** Add or extend a case in `pc_port/tests/test_decomp_ports.h` (plain
    leaves) or `pc_port/tests/test_decomp_ptr_params.h` (E7b adapter leaves),
    pinning the retail behavior — especially quirks: exact bit constants

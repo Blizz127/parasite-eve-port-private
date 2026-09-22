@@ -35,6 +35,41 @@ class TestSymbolLoadDestTemp(unittest.TestCase):
         self.assertNotIn("$2,$2,$4", disabled)
         self.assertNotIn("# DEST_TEMP START", disabled)
 
+    def test_dest_equal_to_index_falls_back_to_at(self):
+        # func_80074A44: `lhu $v0,D_800957D8($v0)` -- the destination IS the
+        # index, so it cannot be the address temp (the `lui $2` would clobber
+        # the index before the `addu` read it).  GNU as and retail use $at.
+        lines = ["lhu\t$2,D_800957D8($2)"]
+
+        enabled = self.process(lines, enabled=True)
+
+        self.assertNotIn("# DEST_TEMP START", enabled)
+        self.assertNotIn("lui\t$2,%hi(D_800957D8)", enabled)
+        self.assertNotIn("addu\t$2,$2,$2", enabled)
+        self.assertIn("lui\t$at,%hi(D_800957D8)", enabled)
+        self.assertTrue(any(line.startswith("lhu\t$2,") and "($at)" in line
+                            for line in enabled), enabled)
+
+    def test_dest_equal_to_index_alias_spelling_falls_back_to_at(self):
+        # Canonical register compare: `$v0` and `$2` are the same register.
+        lines = ["lhu\t$v0,D_800957D8($2)"]
+
+        enabled = self.process(lines, enabled=True)
+
+        self.assertNotIn("# DEST_TEMP START", enabled)
+
+    def test_dest_distinct_from_index_still_uses_dest_temp(self):
+        # Same function, the other load: `lhu $v1,D_800957CC($v0)` keeps the
+        # dest-temp form.
+        lines = ["lhu\t$3,D_800957CC($2)"]
+
+        enabled = self.process(lines, enabled=True)
+
+        self.assertIn("# DEST_TEMP START", enabled)
+        self.assertIn("lui\t$3,%hi(D_800957CC)", enabled)
+        self.assertIn("addu\t$3,$3,$2", enabled)
+        self.assertIn("lhu\t$3,%lo(D_800957CC)($3)", enabled)
+
     def test_numeric_operand_is_not_rewritten(self):
         lines = ["lw\t$2,0x8000($4)"]
 

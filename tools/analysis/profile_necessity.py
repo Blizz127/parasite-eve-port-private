@@ -14,9 +14,10 @@ a correctness-of-record hazard in both directions:
     required.
 
 The check compiles each era-toolchain leaf at its retail VMA via
-``tools/analysis/era_link_check.py`` (which honors the profile's flags and the
+``tools/analysis/era_link_check.py`` (which honors the profile's flags, the
 maspsx knobs ``MASPSX_FORCE_ABSOLUTE_SYMBOLS``, ``ERA_ASPSX_VER`` and
-``MASPSX_EXPAND_DIV``) and asserts:
+``MASPSX_EXPAND_DIV``, and the per-leaf cc1 selector ``ERA_CC1_VER``) and
+asserts:
 
     default exact  -> assignment must be absent (or is REDUNDANT)
     default !exact -> assignment must be present, and exact (else MISSING/WRONG)
@@ -60,8 +61,11 @@ def _exact(src: Path, vram: int, size: int, flags: list[str], env: dict[str, str
     if not refresh and cache_key in cache:
         return cache[cache_key]["exact"], cache[cache_key]["out"]
     child = os.environ.copy()
+    # Strip leaked per-leaf knobs (maspsx patches, ERA_ASPSX_VER, ERA_CC1_VER)
+    # so the default run really is the default; the profile's own environment
+    # block is layered back on below.
     for name in list(child):
-        if name.startswith("MASPSX_"):
+        if name.startswith(("MASPSX_", "ERA_")):
             child.pop(name)
     child.update(env)
     child["PATH"] = (

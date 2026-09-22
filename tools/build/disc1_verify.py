@@ -138,7 +138,9 @@ def tracked_sources(plan: dict[str, Any]) -> None:
     file_scope_assembly = []
     for source in sorted(tracked_function_sources):
         text = (ROOT / source).read_text(encoding="utf-8")
-        if re.search(r"(?m)^\s*__asm__\s*\(", text):
+        # file-scope only: an in-function tie/barrier is indented; a real
+        # top-level asm statement starts in column 0.
+        if re.search(r"(?m)^__asm__\s*\(", text):
             file_scope_assembly.append(source)
     if file_scope_assembly:
         raise VerifyError(

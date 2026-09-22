@@ -116,6 +116,70 @@ Snapshot used for the recorded proof:
 script's before/after `git status` snapshots), not a real ignore violation;
 splat itself completed and the artifacts are valid.
 
+## Assembler baseline: ASPSX 2.30 (2026-09-22)
+
+The era pipeline (`cpp` -> `cc1` -> `maspsx` -> `as`) now runs maspsx with
+`--aspsx-version=2.30` by default (`tools/analysis/era_link_check.py`,
+`tools/build/disc1_build.py`, `tools/build/disc1_preflight.py`,
+`tools/analysis/era_leaf_match.sh`; `ERA_ASPSX_VER` in a profile's
+`environment` still overrides per leaf), and every driver now forwards cc1's
+`-G<n>` to maspsx so its small-data classification matches what GNU as will
+do. Evidence (assembler-version study, whole loadable image of
+`SLUS_006.62` decoded minus the two declared rodata pools): the version gate
+in maspsx flips exactly three switches below 2.30 (`nop_at_expansion`,
+`nop_mflo_mfhi`, `addiu_at`). Above it, the only field that changes between
+2.30 and 2.50 is `expand_li` (True -> False), and this build line always
+passes `--dont-expand-li`, which forces `expand_li=False` at every version --
+so **2.30 and 2.56 are the identical configuration for this project** (which
+is why another decomp's 2.56 default agrees with the >= 2.30 evidence here);
+2.60 flips `sltu_at`, 2.70 `gp_allow_offset`, 2.80 `gp_allow_la`, all inert
+for a `-G0` corpus and only `gp_allow_offset` observable for `-G8` leaves
+(one band's 91 leaves match identically at 2.30, 2.56, 2.60 and 2.70). The
+default stays at 2.30 because that is the boundary the evidence pins. All
+three retail signatures are unanimous for
+>= 2.30 -- **34** `mflo`/`mfhi` -> `nop`/`nop` -> `mult` hazard pairs and **0**
+`mult`/`div` within two instructions of a move-from; **138** `load` ->
+`lui $at` -> store macros with no interposed nop and **0** `load`/`nop`/`lui
+$at` anywhere; **1074** three-word `lui $at`/`addu $at,$at,rb`/`op
+rt,%lo($at)` indexed expansions and **0** four-word `addiu $at` forms -- 1246
+positive sites for 2.30, zero for 2.21, uniform across every 64K bucket that
+holds code. The 2x2 over the study's 1045 era leaves was 1023 both / 3
+2.21-only / 19 2.30-only / 0 neither; the three "2.21-only" leaves
+(`func_800339A0`, `func_80046DFC`, `func_80012700`) were a maspsx defect, not
+evidence: each is `load` / `nop` / single-instruction gp-relative store, and
+maspsx skipped `.extern SYM, size` lines so `_uses_gp` never saw the symbol
+as gp-relative and the mandatory MIPS-I load-delay nop survived only through
+the version-gated 2.21 clause. Vendored maspsx local patch 7 records sized
+externs that fit `-G<n>` and feeds them to `_uses_gp` (always on; durable
+test `tools/era/maspsx/tests/test_extern_gp_load_delay.py`, in
+`scripts/setup_era.sh` `MASPSX_TRACKED` and the `.gitignore` negations);
+with it and `-G` forwarding the matrix is 1026 / 0 / 19 / 0. Patches 2 and 5
+(`MASPSX_THREE_WORD_SYMBOL_STORE`, `MASPSX_SYMBOL_AT_TEMP`) emulate the 2.30
+`addiu_at` expansion width under 2.21 and are retained as knobs, but their
+per-leaf assignments were dropped wherever the leaf links exact without them
+(65 leaves, plus the 3 `MASPSX_FILL_INDEXED_STORE_DELAY_SLOT` leaves that
+matched without that knob at both versions; the 7 leaves that keep
+`MASPSX_THREE_WORD_SYMBOL_STORE` are the `MASPSX_DISPATCH_FOLD` profiles,
+where the flag is the gate the fold code requires); the 51 `*_aspsx_230`
+assignments folded into their version-less profiles, and 9 more leaves whose
+profile only existed to dodge 2.21's spurious pre-`$at` nop fell to the
+default. Net: 128 leaves re-homed, 72 -> 56 profiles, no profile carries
+`ERA_ASPSX_VER`. The vendored maspsx log now reads patches 1-9: 6 branch
+fill, **7** the sized-`.extern` load-delay fix above, **8** the call/jump
+delay-slot fill (`MASPSX_FILL_CALL_DELAY_SLOT`, ROM: 90 sites / 45 functions,
+`tests/test_fill_call_delay_slot.py`), **9** the explicit `%lo`-store
+passthrough that the per-leaf `ERA_CC1_VER=2.8.1` compiler needs
+(`tests/test_lo_store_passthrough.py`); a corpus flag-off identity run
+(every `src/*.c` leaf x `-G0`/`-G8` x 2.21/2.30 x 7 knob-off variants,
+merged maspsx vs the pre-merge tree) shows the four additions byte-identical
+together except for patch 7's mandatory nop under `-G8`. Proof on the live
+plan (1549 c spans, plan `2b586facf8b9`, `disc1.yaml` sha256 `dd9ec663…73bf`):
+`python3 tools/analysis/profile_necessity.py --refresh` ->
+`1385/1385 era leaves clean; 0 hard defect(s); 0 redundant`,
+`PROFILE_NECESSITY=PASS`; `python3 tools/build/disc1_preflight.py --deep` ->
+`disc1_preflight: PASS (deep, 1549 c / 350 asm / 2 rodata)`, exit 0.
+Maspsx suite: 238 tests OK.
+
 ## Leaf findings (sibling-owned; NOT edited in this repo)
 
 Running the full link for the first time exposed three integrated C leaves
@@ -142,10 +206,37 @@ All three were fixed in the scratch snapshot only.
 With those three files corrected (and nothing else), `build_us.sh` and
 `verify_us.sh` both succeed and the packed SHA-1 equals retail.
 
+## Per-leaf era cc1 version (`ERA_CC1_VER`)
+
+`scripts/setup_era.sh` installs two stock decompals/old-gcc (release 0.17)
+compiler pairs side by side: `tools/era/gcc-2.7.2-psx/` (the default, Psy-Q
+`ccpsx` fingerprint) and `tools/era/gcc-2.8.1-psx/` (which ships its own `cpp`
+and `cc1`; its `cpp` output is identical to 2.7.2's, the `cc1` differs). The
+knob `ERA_CC1_VER` (`2.7.2` default, `2.8.1`) selects the pair for one leaf
+exactly the way `ERA_ASPSX_VER` selects the maspsx dialect: put it in the
+leaf's build-profile `environment` block and `tools/build/disc1_build.py`
+(the SHA-1 gate), `tools/build/disc1_preflight.py --deep`,
+`tools/analysis/leaf_strong_check.py` and `tools/analysis/profile_necessity.py`
+all compile that leaf with `tools/era/gcc-<ver>-psx/{cpp,cc1}`; the per-leaf
+helpers `tools/analysis/era_link_check.py` and `era_leaf_match.sh` read the
+same variable from the shell (`ERA_CC1_VER=2.8.1 python3
+tools/analysis/era_link_check.py src/func_X.c 0x... 0x... -O2 -G0`). The
+default path is byte-identical to the previous hard-coded 2.7.2 path. The 2.8.1
+`cc1` accepts the same flag set the profiles use (`-quiet`, `-O1`/`-O2`,
+`-G0`/`-G8`, `-fno-delayed-branch`, `-mips1`, `-mcpu=3000`, `-funsigned-char`)
+with no extra flags; it emits absolute stores as explicit `lui $r,%hi` /
+`sw ..,%lo($r)` pairs (in a free temporary, not `$at`) and formats `li` as
+`li $r,<decimal>`, both of which maspsx/GNU as consume unchanged. Why it exists:
+a family of near-miss leaves is exactly "retail fills a `jr`/`jal`/`beqz`
+delay slot that 2.7.2 leaves to a nop"; 2.8.1's scheduler fills those. A leaf
+that uses it must carry an explicit `assignments` entry on a profile whose
+`environment` sets `ERA_CC1_VER`, and `profile_necessity.py` proves the
+assignment is load-bearing.
+
 ## Reproduce from scratch
 
 ```
-scripts/setup_era.sh            # era gcc-2.7.2-psx + vendored maspsx (unchanged)
+scripts/setup_era.sh            # era gcc-2.7.2-psx + gcc-2.8.1-psx + vendored maspsx
 scripts/setup_mipsel_host.sh    # modern GCC 14.2.0 + binutils 2.44 (this doc)
 export PATH="$PWD/tools/mipsel-host/bin:$PATH"
 scripts/split_us.sh && scripts/build_us.sh && scripts/verify_us.sh

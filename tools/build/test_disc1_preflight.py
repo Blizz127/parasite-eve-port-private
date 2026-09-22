@@ -135,6 +135,23 @@ class PreflightTests(unittest.TestCase):
             )
             self.assertTrue(any("duplicates the default" in f.message for f in findings))
 
+    def test_era_cc1_version_is_selected_from_profile_environment(self) -> None:
+        # ERA_CC1_VER mirrors ERA_ASPSX_VER: absent -> the hard-coded 2.7.2
+        # pair (byte-identical default path); 2.8.1 -> the sibling directory.
+        import disc1_build  # noqa: PLC0415
+
+        self.assertEqual(
+            disc1_build.era_compiler({}),
+            (disc1_build.ERA_CPP, disc1_build.ERA_CC1),
+        )
+        self.assertEqual(
+            disc1_build.era_compiler({"ERA_CC1_VER": "2.7.2", "ERA_ASPSX_VER": "2.30"}),
+            (disc1_build.ERA_CPP, disc1_build.ERA_CC1),
+        )
+        cpp, cc1 = disc1_build.era_compiler({"ERA_CC1_VER": "2.8.1"})
+        self.assertEqual(cpp, Path("tools/era/gcc-2.8.1-psx/cpp"))
+        self.assertEqual(cc1, Path("tools/era/gcc-2.8.1-psx/cc1"))
+
     @unittest.skipUnless(
         (REPO_ROOT / "tools/era/gcc-2.7.2-psx/cc1").is_file()
         and (REPO_ROOT / "tools/mipsel-host/bin/mipsel-linux-gnu-as").is_file(),

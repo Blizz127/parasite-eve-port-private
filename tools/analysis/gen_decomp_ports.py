@@ -41,7 +41,45 @@ Eligibility (conservative by construction; a rejected leaf is reported in
       symbol (value parameters used as guest addresses are not representable);
   E9  no `&func_*` (function-pointer values are not host-compatible);
   E10 no store through a pointer-pointer cast of a `D_` symbol (would write a
-      host pointer into guest RAM).
+      host pointer into guest RAM);
+  E11 every called `func_*` with a canonical pc_port prototype is called with
+      that prototype's arity;
+  E12 no assignment to a pointer-global slot;
+  E13 no `func_*` call result bound to a pointer object.  A retail callee that
+      returns `int *` returns a 32-bit *guest* address; host-side that callee
+      is either a canonical `pe_port_compat.h` prototype returning `pe_addr_t`
+      or a loud boundary returning `int`, so binding the result to a host
+      pointer is not representable (it is the same class as E7, one call
+      deeper).  Rejected unless the callee's resolved host return type is
+      itself a pointer;
+  E14 no host-pointer expression passed to a callee parameter that is not a
+      host pointer.  A local aggregate (`char buf[8]`), a pointer local, or
+      `&local` is host stack memory; a canonical prototype taking `pe_addr_t`
+      wants a guest address.  There is no guest frame for a generated leaf, so
+      such a leaf needs a hand-written adapter and is reported, not guessed.
+      (A bare `D_` symbol argument is *not* this case: `fix_argument_addresses`
+      already substitutes the retail guest address.  A pointer *parameter* is
+      not either: the E7b wrapper forwards it as the guest address `pe_<name>`.)
+  E15 no guest array/global *of pointers* (`extern T *D_XXXX[];`,
+      `extern T **D_XXXX;`).  The slot is a 32-bit guest address; typing the
+      element as a host pointer would read 8 bytes on a 64-bit host.  One
+      level (`extern T *D_XXXX;`) is fine — PE_DECOMP_PTRGLOBAL loads the
+      32-bit slot and translates it;
+  E16 no host pointer narrowed to an integer (`(unsigned int)D_XXXX`,
+      `(int)ptr_param`).  Retail's value is a 32-bit guest address; the host
+      accessor is a 64-bit pointer, so the cast truncates it silently.
+
+E13-E16 all describe the same underlying fact from different angles: a 32-bit
+guest address and a 64-bit host pointer are not the same object, so one must
+never be substituted for the other.  E15/E16 matter most, because those two
+shapes *compile* (with only a warning) and are silently wrong at run time.
+
+Final gate (E17, the one that cannot be fooled): every rendered TU is
+syntax-checked with the host C compiler, using pc_port's own include paths and
+defines, before it is written.  A leaf whose TU does not compile is reported
+and not emitted, so `pc_port/game/decomp/` is always buildable even when a new
+matched leaf has a shape no static rule anticipated.  `--no-compile-check`
+disables it; a host with no C compiler is warned about, not silently skipped.
 
 Pointer-parameter adaptation (E7b, opt-in by construction): a leaf whose only
 pointer parameters are address-valued (level-1 primitive or `void`) is ported
@@ -59,9 +97,14 @@ a non-primitive pointee are reported, not guessed.
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import json
+import os
 import re
+import shutil
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -102,6 +145,32 @@ CALL_HEAD_RE = re.compile(r"\b(func_[0-9A-Fa-f]{8})\s*\(")
 PROTO_RE = re.compile(
     r"\b(func_[0-9A-Fa-f]{8})\s*\(([^;{}]*?)\)\s*;", re.MULTILINE
 )
+# Same prototypes as PROTO_RE, but with the return type captured.  Used by the
+# E13/E14 host-pointer screens, which need the callee's host *types*, not only
+# its arity.
+SIG_RE = re.compile(
+    r"(?:^|[;}])[ \t]*((?:extern[ \t]+)?[A-Za-z_][A-Za-z0-9_ \t\*]*?)"
+    r"\b(func_[0-9A-Fa-f]{8})[ \t]*\(([^;{}]*?)\)[ \t]*;",
+    re.MULTILINE,
+)
+# A statement that declares local objects: `int *p;`, `char buf[8];`,
+# `unsigned char *p, *q;`.  The leading keyword filter keeps statements such as
+# `return p[0];` out.
+LOCAL_DECL_RE = re.compile(
+    r"^[ \t]*((?:(?:register|static|const|volatile|unsigned|signed|struct|union|enum)"
+    r"[ \t]+)*[A-Za-z_]\w*(?:[ \t]+[A-Za-z_]\w*)*)[ \t]+([^;{}()\n]+);[ \t]*$",
+    re.MULTILINE,
+)
+# A cast to an *integer* type (no `*`): `(unsigned int)D_800119CC`, `(int)arg0`.
+# Groups: 1 = the integer type, 2 = `&` or empty, 3 = the operand's root name.
+INT_CAST_RE = re.compile(
+    r"\(\s*((?:(?:unsigned|signed|long|short|const|volatile)[ \t]+)*"
+    r"(?:int|long|short|char|unsigned|signed|pe_addr_t|uint32_t|size_t))\s*\)"
+    r"\s*(&?)\s*([A-Za-z_]\w*)")
+STATEMENT_KEYWORDS = {
+    "return", "if", "else", "while", "for", "do", "switch", "case", "goto",
+    "break", "continue", "sizeof", "default", "typedef",
+}
 
 
 def call_args(text: str) -> list[tuple[str, str]]:
@@ -152,6 +221,87 @@ def canonical_protos() -> dict[str, int]:
             for m in PROTO_RE.finditer(strip_comments(text)):
                 proto.setdefault(m.group(1), arity(m.group(2)))
     return proto
+
+
+def shim_header_roots() -> list[Path]:
+    return [REPO_ROOT / "pc_port" / "include", REPO_ROOT / "pc_port" / "platform",
+            REPO_ROOT / "pc_port" / "game"]
+
+
+def canonical_signatures() -> dict[str, dict]:
+    """func_* symbol -> {'ret': <return type>, 'params': [<parameter decls>]}.
+
+    The pc_port shim headers are the host authority for a callee's type.  A
+    leaf's own `extern` declaration describes the *retail* type (where an
+    `int *` is a 32-bit guest address), so the two must be compared before a
+    pointer is allowed to cross a call boundary.
+    """
+    sigs: dict[str, dict] = {}
+    for root in shim_header_roots():
+        if not root.is_dir():
+            continue
+        for path in sorted(root.rglob("*.h")):
+            if "build" in path.parts:
+                continue
+            text = strip_comments(path.read_text(encoding="utf-8", errors="replace"))
+            for m in SIG_RE.finditer(text):
+                name = m.group(2)
+                if name in sigs:
+                    continue
+                ret = re.sub(r"^\s*extern\s+", "", m.group(1)).strip()
+                sigs[name] = {"ret": ret, "params": split_top(m.group(3))}
+    return sigs
+
+
+def split_top(text: str) -> list[str]:
+    """Split a parameter/argument list on top-level commas."""
+    text = text.strip()
+    if not text or text == "void":
+        return []
+    parts: list[str] = []
+    depth = 0
+    cur = ""
+    for ch in text:
+        if ch in "([":
+            depth += 1
+        elif ch in ")]":
+            depth -= 1
+        if ch == "," and depth == 0:
+            parts.append(cur.strip())
+            cur = ""
+        else:
+            cur += ch
+    parts.append(cur.strip())
+    return parts
+
+
+def is_host_pointer_type(decl: str) -> bool:
+    """Does this host declaration denote a pointer (as opposed to pe_addr_t)?"""
+    return "*" in decl or re.search(r"\[\s*\w*\s*\]", decl) is not None
+
+
+def local_objects(body: str) -> tuple[set[str], set[str]]:
+    """(every local declared in the leaf, those that are host memory).
+
+    `int *p;` holds a host address once assigned and `char buf[8];` decays to
+    one; neither is a guest address.  A plain scalar local is only host memory
+    when its address is taken (`&n`), which the caller checks.
+    """
+    every: set[str] = set()
+    pointerish: set[str] = set()
+    for m in LOCAL_DECL_RE.finditer(body):
+        head = m.group(1).split()
+        if head[0] in STATEMENT_KEYWORDS or head[-1] in STATEMENT_KEYWORDS:
+            continue
+        for declarator in split_top(m.group(2)):
+            ident = re.search(r"([A-Za-z_]\w*)", declarator)
+            if not ident:
+                continue
+            every.add(ident.group(1))
+            if declarator.lstrip().startswith("*") or re.search(
+                    r"\[\s*[^\]]*\]", declarator):
+                pointerish.add(ident.group(1))
+    return every, pointerish
 
 
 def strip_comments(text: str) -> str:
@@ -210,6 +360,18 @@ def declared_type(decl: str) -> str:
     cut = DATA_NAME_RE.search(decl)
     body = decl[: cut.start()] if cut else decl
     return re.sub(r"\s+", " ", body).strip() or "unsigned int"
+
+
+def pointer_pointee(etype: str) -> str:
+    """Pointee of a pointer-global declaration.
+
+    `unsigned char *` -> `unsigned char`, and `unsigned int *volatile`
+    (a volatile *slot*, not a volatile pointee) -> `unsigned int`.  Dropping
+    the slot qualifier is behaviour-preserving: PE_DECOMP_PTRGLOBAL re-reads
+    the guest word with PE_LoadU32 on every expansion anyway.
+    """
+    t = re.sub(r"\s*\*\s*(?:(?:const|volatile)\s*)*$", "", etype).strip()
+    return t or "unsigned char"
 
 
 def classify_data(decl: str, sym: str) -> str:
@@ -320,7 +482,7 @@ def wrapper_safe(name: str, stripped: str, inner: str) -> tuple[bool, str]:
 
 def analyze(name: str, src_text: str, matched: dict,
             known: set[str], existing_macros: set[str],
-            proto: dict[str, int]) -> dict:
+            proto: dict[str, int], sigs: dict[str, dict]) -> dict:
     stripped = strip_comments(src_text)
     if ASM_RE.search(stripped):
         return {"eligible": False, "reason": "asm"}
@@ -403,6 +565,70 @@ def analyze(name: str, src_text: str, matched: dict,
             return {"eligible": False,
                     "reason": f"call arity {callee} {arity(args)}!={proto[callee]}"}
 
+    # E13/E14 — a host pointer must not cross a call boundary in either
+    # direction.  Retail passes and returns 32-bit *guest* addresses; host-side
+    # the callee is a canonical `pe_addr_t` prototype or a loud boundary
+    # returning `int`, so either conversion silently reinterprets a host
+    # pointer as a guest address (or vice versa).  The leaf's own `extern`
+    # declaration describes the retail type and is neutralised by the
+    # generator, so it cannot rescue the call site.
+    body_text = extract_body(stripped, name)
+    _all_locals, host_locals = local_objects(
+        body_text if body_text is not None else stripped)
+    # A pointer *parameter* is not host memory at a call site: the E7b wrapper
+    # forwards it as `pe_<name>`, the guest address the callee's `pe_addr_t`
+    # parameter wants.  It is still a host pointer as an assignment *target*
+    # (the wrapper rewrites it to the translated `host_<name>`).
+    assign_targets = host_locals | {
+        p for p, _lvl, _toks, _d in pointer_params(hdr.group(2))}
+
+    def host_return(callee: str) -> bool:
+        """Does the callee's *host* declaration return a pointer?"""
+        if callee in sigs:
+            return is_host_pointer_type(sigs[callee]["ret"])
+        if callee not in known:
+            return False  # becomes a loud boundary macro: returns int
+        return True  # a pc_port definition with no shim prototype: leaf's own
+
+    for m in re.finditer(r"\b([A-Za-z_]\w*)\s*=\s*(func_[0-9A-Fa-f]{8})\s*\(",
+                         stripped):
+        if m.group(1) in assign_targets and not host_return(m.group(2)):
+            return {"eligible": False,
+                    "reason": f"guest-address result of {m.group(2)} bound to "
+                              f"host pointer {m.group(1)}"}
+    for m in re.finditer(
+            r"\*+\s*([A-Za-z_]\w*)\s*=\s*(func_[0-9A-Fa-f]{8})\s*\(", stripped):
+        # `T *p = func_X(...)` — a declaration with an initialiser, which the
+        # local-declaration scan deliberately does not parse.
+        decl_head = stripped[: m.start()].rstrip().rsplit("\n", 1)[-1].strip()
+        if re.fullmatch(r"(?:[A-Za-z_]\w*\s+)+", decl_head + " ") and \
+                not host_return(m.group(2)):
+            return {"eligible": False,
+                    "reason": f"guest-address result of {m.group(2)} bound to "
+                              f"host pointer {m.group(1)}"}
+
+    for callee, args in call_args(stripped):
+        if callee == name or callee not in sigs:
+            continue
+        hparams = sigs[callee]["params"]
+        for i, arg in enumerate(split_top(args)):
+            bare = arg.strip().strip("()").strip()
+            if bare.startswith("&"):
+                # `&local`, `&D_SYM[i]`, `&s.field` — address-of always yields a
+                # *host* address in the generated TU, where retail took a guest
+                # one.  (A bare `D_SYM` argument is not this case;
+                # fix_argument_addresses substitutes the guest address.)
+                pass
+            elif re.fullmatch(r"[A-Za-z_]\w*", bare):
+                if bare not in host_locals:
+                    continue
+            else:
+                continue
+            if i < len(hparams) and not is_host_pointer_type(hparams[i]):
+                return {"eligible": False,
+                        "reason": f"host pointer {bare} passed to {callee} "
+                                  f"parameter {i} ({hparams[i].strip()})"}
+
     # A func_* referenced but never called is a function-address value; those
     # were rejected above.  Everything else is a known definition or becomes a
     # loud boundary.
@@ -421,6 +647,50 @@ def analyze(name: str, src_text: str, matched: dict,
             continue
         if re.search(rf"(?<!\*)\b{sym}\b\s*(=|\+=|-=|\|=|&=|\^=)", stripped):
             return {"eligible": False, "reason": f"pointer-global store {sym}"}
+
+    # E15 — a guest array (or global) *of pointers*.  `extern unsigned char
+    # *D_800B0E38[];` is 4-byte guest slots; the generated accessor types the
+    # element as a host pointer, so `D_800B0E38[i]` would read 8 bytes on a
+    # 64-bit host and yield a host pointer where retail has a guest address.
+    # One level of indirection is fine (PE_DECOMP_PTRGLOBAL loads the 32-bit
+    # slot and translates it); two is not representable.
+    for sym, decl in externs:
+        head = decl[: DATA_NAME_RE.search(decl).start()]
+        stars = head.count("*")
+        if stars >= 2 or (stars >= 1 and "[" in decl):
+            return {"eligible": False,
+                    "reason": f"guest array/global of pointers {sym} "
+                              f"({' '.join(decl.split())[:40]})"}
+
+    # E16 — a host pointer narrowed to an integer.  `(unsigned int)D_800119CC`
+    # is the retail *guest address* of the symbol; host-side the accessor is a
+    # 64-bit host pointer, so the cast truncates it.  The value is then either
+    # returned, stored, or cast back and dereferenced — silently wrong code
+    # (only a -Wpointer-to-int-cast warning), which is worse than a rejection.
+    host_roots = {sym for sym, decl in externs
+                  if classify_data(decl, sym) in ("array", "ptrglobal")}
+    host_roots |= host_locals
+    host_roots |= {p for p, _lvl, _toks, _d in pointer_params(hdr.group(2))}
+    for m in INT_CAST_RE.finditer(stripped):
+        root = m.group(3)
+        if m.group(2) == "&":
+            # `(unsigned int)&D_XXXX[i]` — the address of guest storage, taken
+            # host-side and then truncated.
+            if root not in host_roots and root not in _all_locals \
+                    and root not in {s for s, _ in externs}:
+                continue
+        else:
+            # Without `&` the cast must apply to the object itself, not to a
+            # value read through it: `(signed char)D_XXXX[i].b` casts the
+            # member, which is fine.
+            tail = stripped[m.end():].lstrip()
+            if tail[:1] in ("[", ".", "(") or tail[:2] == "->":
+                continue
+            if root not in host_roots:
+                continue
+        return {"eligible": False,
+                "reason": f"host pointer {root} narrowed to "
+                          f"{m.group(1).strip()}"}
 
     data_types = {sym: decl for sym, decl in externs}
     d_syms_used = [s for s in data_types
@@ -560,7 +830,7 @@ def render(name: str, plan: dict, matched: dict, known_funcs: set[str],
         elif kind == "array":
             lines.append(f"#define {sym} PE_DECOMP_ARRAY(0x{sym[2:]}u, {etype})")
         else:
-            pointee = re.sub(r"\s*\*+\s*$", "", etype).strip() or "unsigned char"
+            pointee = pointer_pointee(etype)
             lines.append(
                 f"#define {sym} PE_DECOMP_PTRGLOBAL(0x{sym[2:]}u, {pointee})")
         emitted_data = True
@@ -827,7 +1097,7 @@ def _host_locals(plan: dict, pparams: list, body: str) -> list[str]:
         elif kind == "array":
             out.append(f"    {etype} *host_{sym} = PE_DECOMP_ARRAY(0x{sym[2:]}u, {etype});")
         else:
-            pointee = re.sub(r"\s*\*+\s*$", "", etype).strip() or "unsigned char"
+            pointee = pointer_pointee(etype)
             out.append(f"    {pointee} *host_{sym} = PE_DECOMP_PTRGLOBAL(0x{sym[2:]}u, {pointee});")
     for pname, _lvl, _toks, decl in pparams:
         if f"host_{pname}" not in body:
@@ -836,6 +1106,60 @@ def _host_locals(plan: dict, pparams: list, body: str) -> list[str]:
         out.append(
             f"    {base} *host_{pname} = ({base} *)PE_Translate(pe_{pname}, 1);")
     return out
+
+
+# Host compile flags, mirroring pc_port/CMakeLists.txt's pe_field_runtime
+# target (`cmake` writes the same set into build/**/flags.make).  A generated
+# TU is only emitted if the host compiler accepts it.
+COMPILE_DEFINES = ["-DPE_PORT_FB_HEIGHT=240", "-DPE_PORT_FB_WIDTH=320",
+                   "-DPE_PORT_HEADLESS=1"]
+COMPILE_INCLUDES = ["pc_port", "pc_port/include", "pc_port/platform",
+                    "pc_port/bootstrap", "pc_port/src"]
+
+
+def find_compiler() -> str | None:
+    for cand in (os.environ.get("CC"), "cc", "gcc", "clang"):
+        if cand and shutil.which(cand):
+            return shutil.which(cand)
+    return None
+
+
+def compile_check(cc: str, items: list[tuple[str, str]]) -> dict[str, str]:
+    """Syntax-check each (name, rendered source); return name -> first error.
+
+    This is the generator's last line of defence and the one that cannot be
+    fooled: the eligibility rules say *why* a leaf is not host-representable,
+    but only the compiler proves the emitted TU actually builds.  A leaf whose
+    TU does not compile is reported and not written, so the generated tree is
+    always buildable.
+    """
+    cmd_head = [cc, "-std=gnu11", "-fsyntax-only", *COMPILE_DEFINES]
+    for inc in COMPILE_INCLUDES:
+        cmd_head += ["-I", str(REPO_ROOT / inc)]
+    failures: dict[str, str] = {}
+
+    def one(item: tuple[str, str]) -> tuple[str, str]:
+        name, content = item
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / f"{name}_port.c"
+            path.write_text(content, encoding="utf-8")
+            proc = subprocess.run(cmd_head + [str(path)],
+                                  capture_output=True, text=True)
+            if proc.returncode == 0:
+                return name, ""
+            first = ""
+            for line in proc.stderr.splitlines():
+                if ": error:" in line:
+                    first = line.split(": error:", 1)[1].strip()
+                    break
+            return name, first or "compile failed"
+
+    workers = min(16, (os.cpu_count() or 4))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
+        for name, err in pool.map(one, items):
+            if err:
+                failures[name] = err
+    return failures
 
 
 def main() -> int:
@@ -855,92 +1179,164 @@ def main() -> int:
                     help="cap the number of leaves emitted (0 = all)")
     ap.add_argument("--verbose", action="store_true",
                     help="with --check, print every skipped leaf and reason")
+    ap.add_argument("--no-compile-check", action="store_true",
+                    help="do not syntax-check each rendered TU with the host "
+                         "compiler before emitting it (the gate that keeps "
+                         "pc_port/game/decomp buildable)")
     args = ap.parse_args()
 
     matched = parse_matched()
-    defs = pc_port_definitions()
-    known = set(defs)
-    shim_macros = pc_port_macros()
-    protos = canonical_protos()
-    out_dir = REPO_ROOT / OUT_DIR
-
-    eligible: list[str] = []
-    skipped: dict[str, str] = {}
-    plans: dict[str, dict] = {}
-
-    for name in sorted(matched):
-        src = REPO_ROOT / SRC_DIR / f"{name}.c"
-        if not src.exists():
-            skipped[name] = "no src file"
-            continue
-        plan = analyze(name, src.read_text(encoding="utf-8", errors="replace"),
-                       matched[name], known, shim_macros, protos)
-        if not plan["eligible"]:
-            skipped[name] = plan["reason"]
-            continue
-        plans[name] = plan
-        eligible.append(name)
-
-    if args.only:
-        wanted = set(args.only)
-        eligible = [n for n in eligible if n in wanted]
-    if args.limit:
-        eligible = eligible[: args.limit]
-
-    if args.json:
-        payload = {
-            "eligible": {n: {"words": matched[n]["words"],
-                             "callees": plans[n]["callees"],
-                             "boundaries": plans[n]["boundaries"]}
-                         for n in eligible},
-            "skipped": skipped,
-        }
-        Path(args.json).write_text(
-            json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-
-    if args.list:
-        for n in eligible:
-            print(n)
-        return 0
-
-    total_words = sum(matched[n]["words"] for n in eligible)
-    if args.check:
-        print(f"gen_decomp_ports: eligible {len(eligible)} leaves "
-              f"({total_words} words); ineligible {len(skipped)}")
-        if args.verbose:
-            for name in sorted(skipped):
-                print(f"  skip {name}: {skipped[name]}")
-        return 0
-
-    out_dir.mkdir(parents=True, exist_ok=True)
+    # Emit to a fixed point.  Whether a callee gets its own prototype or a loud
+    # boundary depends on whether that callee's TU exists in the generated
+    # directory, so adding or pruning a TU changes the correct content of its
+    # callers.  Re-run the whole pipeline until nothing changes (typically one
+    # round in steady state; more from an empty directory).
+    MAX_ROUNDS = 8
     written = 0
     conflicts: list[str] = []
     drift: list[str] = []
-    for name in eligible:
-        target = out_dir / f"{name}_port.c"
-        others = [f for f in defs.get(name, ())
-                  if f != target.relative_to(REPO_ROOT).as_posix()]
-        if others:
-            conflicts.append(f"{name}: also defined in {', '.join(sorted(others))}")
-            continue
-        content = render(name, plans[name], matched, known, protos)
-        if target.exists() and target.read_text(encoding="utf-8") == content:
+    orphans: list[str] = []
+    uncompilable: dict[str, str] = {}
+    for _round in range(MAX_ROUNDS):
+        defs = pc_port_definitions()
+        known = set(defs)
+        shim_macros = pc_port_macros()
+        protos = canonical_protos()
+        sigs = canonical_signatures()
+        out_dir = REPO_ROOT / OUT_DIR
+
+        eligible: list[str] = []
+        skipped: dict[str, str] = {}
+        plans: dict[str, dict] = {}
+
+        for name in sorted(matched):
+            src = REPO_ROOT / SRC_DIR / f"{name}.c"
+            if not src.exists():
+                skipped[name] = "no src file"
+                continue
+            plan = analyze(name, src.read_text(encoding="utf-8", errors="replace"),
+                           matched[name], known, shim_macros, protos, sigs)
+            if not plan["eligible"]:
+                skipped[name] = plan["reason"]
+                continue
+            plans[name] = plan
+            eligible.append(name)
+
+        if args.only:
+            wanted = set(args.only)
+            eligible = [n for n in eligible if n in wanted]
+        if args.limit:
+            eligible = eligible[: args.limit]
+
+        if args.json:
+            payload = {
+                "eligible": {n: {"words": matched[n]["words"],
+                                 "callees": plans[n]["callees"],
+                                 "boundaries": plans[n]["boundaries"]}
+                             for n in eligible},
+                "skipped": skipped,
+            }
+            Path(args.json).write_text(
+                json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+        if args.list:
+            for n in eligible:
+                print(n)
+            return 0
+
+        total_words = sum(matched[n]["words"] for n in eligible)
+        if args.check:
+            print(f"gen_decomp_ports: eligible {len(eligible)} leaves "
+                  f"({total_words} words); ineligible {len(skipped)}")
+            if args.verbose:
+                for name in sorted(skipped):
+                    print(f"  skip {name}: {skipped[name]}")
+            return 0
+
+        out_dir.mkdir(parents=True, exist_ok=True)
+        changed = 0
+        written = 0
+        conflicts: list[str] = []
+        drift: list[str] = []
+        emitted: set[str] = set()
+        rendered: list[tuple[str, str]] = []
+        for name in eligible:
+            target = out_dir / f"{name}_port.c"
+            others = [f for f in defs.get(name, ())
+                      if f != target.relative_to(REPO_ROOT).as_posix()]
+            if others:
+                conflicts.append(f"{name}: also defined in {', '.join(sorted(others))}")
+                continue
+            rendered.append((name, render(name, plans[name], matched, known, protos)))
+
+        uncompilable: dict[str, str] = {}
+        if not args.no_compile_check:
+            cc = find_compiler()
+            if cc is None:
+                print("gen_decomp_ports: WARNING no host C compiler found "
+                      "(set CC); emitting without the compile gate", file=sys.stderr)
+            else:
+                uncompilable = compile_check(cc, rendered)
+                rendered = [(n, c) for n, c in rendered if n not in uncompilable]
+
+        for name, content in rendered:
+            target = out_dir / f"{name}_port.c"
+            if target.exists() and target.read_text(encoding="utf-8") == content:
+                written += 1
+                emitted.add(target.name)
+                continue
+            if args.verify:
+                drift.append(str(target.relative_to(REPO_ROOT)))
+                emitted.add(target.name)
+                continue
+            target.write_text(content, encoding="utf-8")
             written += 1
-            continue
-        if args.verify:
-            drift.append(str(target.relative_to(REPO_ROOT)))
-            continue
-        target.write_text(content, encoding="utf-8")
-        written += 1
+            changed += 1
+            emitted.add(target.name)
+
+        # Orphan pruning.  This directory is generated output that CMake globs, so
+        # a TU left behind after its leaf became ineligible (or was renamed, or now
+        # collides with a hand port) is still compiled and can break the build.
+        # The generator owns every `func_XXXXXXXX_port.c` here, so anything it did
+        # not just emit is removed.  `--only`/`--limit` restrict the emit set, so
+        # pruning is suppressed for those runs.
+        orphans: list[str] = []
+        if out_dir.is_dir() and not args.only and not args.limit:
+            for path in sorted(out_dir.glob("*_port.c")):
+                if not re.fullmatch(r"func_[0-9A-Fa-f]{8}_port\.c", path.name):
+                    continue
+                if path.name in emitted:
+                    continue
+                orphans.append(path.name)
+                if not args.verify:
+                    path.unlink()
+                    changed += 1
+
+        # --verify writes nothing, so a second round would be identical.
+        if args.verify or changed == 0:
+            break
+    else:
+        print(f'gen_decomp_ports: WARNING emit set still changing after '
+              f'{MAX_ROUNDS} rounds', file=sys.stderr)
 
     if args.verify:
         print(f"gen_decomp_ports: verified {written} port TU(s) up to date; "
-              f"{len(drift)} drifted")
+              f"{len(drift) + len(orphans)} drifted")
         for rel in drift:
             print(f"  stale {rel}")
-        return 1 if drift else 0
+        for nm in orphans:
+            print(f"  orphan {(OUT_DIR / nm).as_posix()} "
+                  "(no longer emitted; re-run without --verify to prune)")
+        return 1 if (drift or orphans) else 0
 
     print(f"gen_decomp_ports: wrote {written} port TU(s) to {OUT_DIR}")
+    if uncompilable:
+        print(f"gen_decomp_ports: {len(uncompilable)} leaf/leaves not emitted "
+              "(rendered TU does not compile)")
+        for nm in sorted(uncompilable):
+            print(f"  uncompilable {nm}: {uncompilable[nm]}")
+    if orphans:
+        print(f"gen_decomp_ports: pruned {len(orphans)} orphaned TU(s)")
     print(f"gen_decomp_ports: {len(conflicts)} conflict(s) not emitted "
           "(matched C would collide with an existing pc_port definition)")
     if args.verbose:
