@@ -5,10 +5,15 @@
   "default_profile": "era_o2_g0",
   "assignments": {
     "era_o2_g0_fill_call_delay_slot": [
-      "func_8010C0FC"
+      "func_8010C0FC",
+      "func_8010C308",
+      "func_8010C39C"
     ],
     "era_o2_g0_fill_epilogue_delay_slot": [
-      "func_8010BE3C"
+      "func_8010BE3C",
+      "func_8010C1EC",
+      "func_8010C27C",
+      "func_8010BEFC"
     ],
     "era_o2_g0_no_schedule_insns_no_delayed_branch": [
       "func_8010C448"
