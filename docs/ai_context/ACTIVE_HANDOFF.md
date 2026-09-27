@@ -1,3 +1,13 @@
+## UPDATE 2026-09-27: 2042 gate PASS — func_80031760 closed (park resolved)
+
+`EXACT_REBUILD_GATE=PASS plan=d6f98edc2872d0ad98d519284cb9035c61893792ab2d4494572ef6e3af21f156 yaml=086b772c531061a810992b2ca2b0f614fc00831d5af149d00d0e169a2aa0838f spans=[2042 c, 217 asm, 2 rodata] sha1_orig=452fb033f2eaa4b18aa20a5bca60b8125af3a37b sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=2042` (log `build/tmp/gate-2042.log`).
+
+`func_80031760` (`0x60C`, `era_o2_g0_rodata_fold_80010de4`) is `LINK_EXACT` (aligned 317 → 387/387). **New durable lever — asm-label alias to stop cc1's cross-jump:** retail keeps two if/else arms that differ only in constants and cross-jumps just the final store's `sll/addu/sll/sb`; cc1's jump2 `find_cross_jump` merges every identical tail insn. Reading the index in ONE arm through `extern int D_8009CDDC_b asm("D_8009CDDC");` assembles identically but its SYMBOL_REF name (`*D_8009CDDC`) differs, so the merge stops exactly where retail's does (a `volatile` cast also stops it but materialises the address). Second lever: compute `x ± 35` once into a local before three stores (per-store `x + 35` lets sched1 hoist `idx*3` and swaps the `v0`/`v1`, `a0`/`a1` homes). Evidence `docs/evidence/func-80031760/REPORT.md`.
+
+Tooling: `era_link_check.py` gains `ERA_LINK_CHECK_DUMP=<path>` (writes the linked `.text` for an aligned diff).
+
+Fan-out in progress (lead = this session): EXE lanes `exeA`–`exeD` (128 remaining matchable asm functions split by address, private configs under `build/lanes/<lane>/`, brief `build/lanes/BRIEF.md`, integration `build/lanes/integrate.py`), overlay lane `ovl` (owns `configs/USA/overlays/*`, ~379 distinct non-GTE bodies), port lane `port` (baseline `scripts/build_pc_port.sh --build-dir build/pcbuild-port` → 1569/1569; coverage matched 2042 / from_decomp 861 / hand 1123 / stub 29 / absent 29). `func_800370BC`/`func_800370CC` (trapping `add`) and `func_800D004C` (first word of the spimdisasm-tagged handwritten `func_800D0050`) are non-C.
+
 ## UPDATE 2026-09-27: 2041 gate PASS — five stranded lane leaves integrated
 
 `EXACT_REBUILD_GATE=PASS plan=cda0547790149322a171c09bd36abc8a3817ee1cebbfd3c165c27f9aad10d975 yaml=ca87f884d90962500c72f672e1e6dd0ce046859460ec0857a3607e45c5785ba8 spans=[2041 c, 218 asm, 2 rodata] sha1_orig=452fb033f2eaa4b18aa20a5bca60b8125af3a37b sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=2041`. Command: `TMPDIR=$PWD/build/tmp bash scripts/exact_rebuild.sh` (log `build/tmp/exact-rebuild-2041b.log`). The first run (`exact-rebuild-2041.log`) was already `RESULT=EXACT_MATCH` but failed verify on the staging-gap rule until the five sources were `git add`ed.

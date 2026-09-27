@@ -734,7 +734,7 @@ segments:
       - [0x21094, asm]
       # Battle status panel mode dispatch (switch jtbl_80010E4C).
       - [0x21CE4, c, func_800314E4]
-      - [0x21F60, asm]
+      - [0x21F60, c, func_80031760]
       - [0x2256C, c, func_80031D6C]
       # func_80031E68 — per-target highlight sprites (DR_TPAGE+SPRT entries in D_8009E3B8[side][3]); era -O2 -G0.
       # LEVERS: row+index pointer form (&(T[b] + i)->sp)->f (hoists the table bases into $s1/$s3 like func_80031D6C);

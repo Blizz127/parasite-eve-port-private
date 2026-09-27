@@ -2028,6 +2028,16 @@
         "MASPSX_EXPAND_DIV": "1",
         "MASPSX_RODATA_FOLD": "D_800108E4"
       }
+    },
+    "era_o2_g0_rodata_fold_80010de4": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0"
+      ],
+      "environment": {
+        "MASPSX_RODATA_FOLD": "D_80010DE4"
+      }
     }
   },
   "assignments": {
@@ -3282,6 +3292,9 @@
     ],
     "era_o2_g0_expand_div_rodata_fold_800108e4": [
       "func_80028574"
+    ],
+    "era_o2_g0_rodata_fold_80010de4": [
+      "func_80031760"
     ]
   }
 }

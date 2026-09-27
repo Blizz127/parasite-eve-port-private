@@ -256,6 +256,10 @@ def main():
     exe = retail_path.read_bytes()
     off = vram - load_vram + file_start
     rom = exe[off:off + size]
+    # Optional: keep the linked .text for an alignment-aware diff.
+    dump = os.environ.get("ERA_LINK_CHECK_DUMP")
+    if dump:
+        Path(dump).write_bytes(linked)
 
     n = min(len(rom), len(linked), size)
     mism = 0
