@@ -2681,7 +2681,9 @@
       "func_8004B70C",
       "func_800466C0",
       "func_80061C34",
-      "func_800375E0"
+      "func_800375E0",
+      "func_8006062C",
+      "func_80063E0C"
     ],
     "era_o2_g8_force_d8009d2e8_absolute": [
       "func_800293F4"
@@ -2916,7 +2918,8 @@
       "func_800602D0",
       "func_8005FCAC",
       "func_8001CBA0",
-      "func_80061044"
+      "func_80061044",
+      "func_8001CE88"
     ],
     "era_o2_g0_dispatch_80010080": [
       "func_80012E7C"

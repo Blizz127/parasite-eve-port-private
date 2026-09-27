@@ -547,7 +547,7 @@ segments:
       # lane1: func_8001CAB0 VRAM 0x8001CAB0 size 0xF0.
       - [0xD2B0, c, func_8001CAB0]
       - [0xD3A0, c, func_8001CBA0]
-      - [0xD688, asm]
+      - [0xD688, c, func_8001CE88]
       # -G8 with D_8009D254 forced absolute
       - [0xD970, c, func_8001D170]
       - [0xDA68, c, func_8001D268]
@@ -2091,7 +2091,7 @@ segments:
       - [0x50D90, c, func_80060590]
       - [0x50DC4, c, func_800605C4]
       - [0x50DF8, c, func_800605F8]
-      - [0x50E2C, asm]
+      - [0x50E2C, c, func_8006062C]
       - [0x51844, c, func_80061044]
       - [0x51CA0, c, func_800614A0]
       # colour average packer; LEVER: `register int *p asm("$7")` or cc1 folds the store into an absolut
@@ -2177,7 +2177,7 @@ segments:
       - [0x54530, c, func_80063D30]
       # two negative/limit clamps then the 80063D30 scroll clamp
       - [0x54578, c, func_80063D78]
-      - [0x5460C, asm]
+      - [0x5460C, c, func_80063E0C]
       # list-view row recompute: rows = (n + w - 1) / w (inline signed divide, needs MASPSX_EXPAND_DIV f
       - [0x54FD0, c, func_800647D0]
       # func_80071A24 clear + eight signed-char -1 absolute stores
