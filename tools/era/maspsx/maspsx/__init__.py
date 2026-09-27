@@ -466,6 +466,46 @@
 #      HL2 no label/other instruction between the load and the jal;
 #      HL3 slot must be a single store reading the loaded register; jalr and
 #      branches are refused. Default OFF; flag-off byte-identical.
+#  35. drop_target_dup_li (ctor arg, or env MASPSX_DROP_TARGET_DUP_LI=1):
+#      reorg's "steal from the target thread" that gcc-2.8.1-psx does not do.
+#      cc1 fills a noreorder conditional branch's slot with `li $r,K` (taken
+#      from the fall-through) and leaves the identical `li $r,K` as the first
+#      instruction of the branch target. Retail's compiler instead moved the
+#      target's copy into the slot, so the target starts one word later. The
+#      patch deletes the target's `li` when it is provably redundant:
+#        H1 the label is referenced exactly once in the unit, by a
+#           conditional branch inside a cc1 `.set noreorder` block whose
+#           delay slot is textually the same `li $r,K`;
+#        H2 nothing falls through into the label: the preceding instruction
+#           is the delay slot of a noreorder `j`/`jr` block, or a reorder-mode
+#           `j`/`jr`, with only blank, comment or `.set` lines between;
+#        H3 $r is not $0/$at, and K is a plain literal.
+#      On the only path into the label, $r was already set to K by the slot,
+#      so deleting the target's copy changes no value.
+#      ROM evidence (Parasite Eve disc1): func_80084C4C switch dispatch
+#      0x80084E1C `beq $v1,$v0,.L80084E5C` / `addiu $v0,$zero,0xFF`, target
+#      .L80084E5C = `j .L80084E9C` / `sb $v0,0x46($s0)` (no reload of 0xFF).
+#      Default OFF; flag-off byte-identical.
+#  34. fill_jump_symbol_store (ctor arg, or env
+#      MASPSX_FILL_JUMP_SYMBOL_STORE=1): the plain-`j <label>` sibling of
+#      patch 4's store arm. An indexed symbolic store `op $src,SYM($b)`
+#      (sb/sh/sw) that immediately precedes a reorder-mode `j <label>` is
+#      emitted as ASPSX's 3-word $at form with the store in the jump's slot:
+#        lui $at,%hi(SYM) / addu $at,$at,$b / j L / op $src,%lo(SYM)($at)
+#      instead of the store before the jump plus a `nop` slot.
+#      WHY cc1 cannot: the store is one RTL insn that GNU as expands to three
+#      words; reorg never puts a multi-word macro in a slot, and patch 4
+#      covers `j $31` only. The `lui`/`addu` stay before the jump, so the
+#      slot word is the same store executed at the same point.
+#      ROM evidence (Parasite Eve disc1): func_80076C34 0x80076E04
+#      `lui $at,0x800C` / `addu $at,$at,$a0` / `j .L80076E38` /
+#      `sw $v0,%lo(D_800BD034)($at)` (the `.a1 = &buf` GPU-queue store).
+#      HAZARDS: HS1 only sb/sh/sw with a symbolic (non-numeric) operand and a
+#      base register; HS2 neither the value nor the base register is $at;
+#      HS3 the next input line must be a reorder-mode plain `j <label>`
+#      (patch 11's lookahead: no label, `.set`, jr/jalr, jal or `j $31` in
+#      between); HS4 compound `;` macro lines refused. Patch 4's `j $31` arm
+#      and patch 5 keep priority. Default OFF; flag-off byte-identical.
 #  11. fill_jump_stack_store (ctor arg, or env
 #      MASPSX_FILL_JUMP_STACK_STORE=1): ASPSX's reorder pass fills the delay
 #      slot of a plain `j <label>` with the single-word stack store that
@@ -1072,6 +1112,8 @@ class MaspsxProcessor:
         symbol_at_temp=False,
         dispatch_fold_symbol=None,
         fill_jump_stack_store=False,
+        fill_jump_symbol_store=False,
+        drop_target_dup_li=False,
         return_via_epilogue_jump=False,
         load_delay_call_slot_store=False,
         load_delay_nop_before_label=False,
@@ -1214,6 +1256,16 @@ class MaspsxProcessor:
         self.fill_jump_stack_store = (
             fill_jump_stack_store
             or os.environ.get("MASPSX_FILL_JUMP_STACK_STORE") == "1"
+        )
+        # LOCAL PATCH 34: indexed symbolic store into a plain `j <label>` slot.
+        self.fill_jump_symbol_store = (
+            fill_jump_symbol_store
+            or os.environ.get("MASPSX_FILL_JUMP_SYMBOL_STORE") == "1"
+        )
+        # LOCAL PATCH 35: drop a branch target's `li` duplicated in the slot.
+        self.drop_target_dup_li = (
+            drop_target_dup_li
+            or os.environ.get("MASPSX_DROP_TARGET_DUP_LI") == "1"
         )
         # LOCAL PATCH 12: retarget a frameless function's mid-body return
         # (`j $31` in a cc1 noreorder block) to its final `j $31`.
@@ -1987,7 +2039,81 @@ class MaspsxProcessor:
             out.append(bump_mem(line))
         return out
 
+    def _drop_target_dup_li_pass(self):
+        # LOCAL PATCH 35 (drop_target_dup_li); see the header for H1-H3.
+        lines = self.lines
+        li_re = re.compile(r"^li\t(\$\w+),(-?(?:0x[0-9A-Fa-f]+|\d+))$")
+
+        def instr(i):
+            return strip_comments(lines[i]).strip()
+
+        def is_noise(line):
+            return line == "" or line.startswith("#") or line.startswith(".set\t")
+
+        reorder = []
+        state = True
+        for line in lines:
+            reorder.append(state)
+            if line.startswith(".set\t"):
+                if line.endswith("\tnoreorder"):
+                    state = False
+                elif line.endswith("\treorder"):
+                    state = True
+        for idx, line in enumerate(lines):
+            if not (line.startswith("$L") and line.endswith(":")):
+                continue
+            label = line[:-1]
+            # the target's first instruction
+            j = idx + 1
+            while j < len(lines) and is_noise(lines[j]):
+                j += 1
+            if j >= len(lines) or ";" in lines[j]:
+                continue
+            m = li_re.match(instr(j))
+            if not m or canon_reg(m.group(1)) in (0, 1):  # H3
+                continue
+            want = instr(j)
+            # H1: exactly one reference, a noreorder conditional branch
+            refs = [
+                k for k, x in enumerate(lines)
+                if k != idx and re.search(r"(^|[\s,])" + re.escape(label) + r"$", strip_comments(x).strip())
+            ]
+            if len(refs) != 1:
+                continue
+            k = refs[0]
+            bop = instr(k).split(None, 1)[0] if instr(k) else ""
+            if bop not in cond_branch_mnemonics or reorder[k]:
+                continue
+            s_ = k + 1
+            while s_ < len(lines) and lines[s_] in ("", ".set\tmacro", ".set\tnomacro"):
+                s_ += 1
+            if s_ >= len(lines) or instr(s_) != want:
+                continue
+            # H2: no fall-through into the label
+            q = idx - 1
+            while q >= 0 and is_noise(lines[q]):
+                q -= 1
+            if q < 0:
+                continue
+            prev = instr(q).split(None, 1)
+            ok = False
+            if prev and prev[0] in ("j", "jr") and reorder[q]:
+                ok = True
+            else:
+                q2 = q - 1
+                while q2 >= 0 and lines[q2] in ("", ".set\tmacro", ".set\tnomacro"):
+                    q2 -= 1
+                if q2 >= 0 and not reorder[q2]:
+                    p2 = instr(q2).split(None, 1)
+                    if p2 and p2[0] in ("j", "jr"):
+                        ok = True
+            if not ok:
+                continue
+            lines[j] = "# DROP_TARGET_DUP_LI " + lines[j]
+
     def process_lines(self):
+        if getattr(self, "drop_target_dup_li", False):
+            self._drop_target_dup_li_pass()
         self.is_reorder = True
         self._dispatch_fold_map = None
         self.skip_instructions = 0
@@ -4573,6 +4699,29 @@ class MaspsxProcessor:
                             f"{op}\t{r_dest},%lo({operand})($at)",
                             ".set\tat",
                             "# DEST_TEMP STORE_FILL END",
+                        ]
+                    )
+                    self.skip_instructions = 1
+                elif (
+                    # LOCAL PATCH 34 (fill_jump_symbol_store)
+                    self.fill_jump_symbol_store
+                    and op in ("sb", "sh", "sw")  # HS1
+                    and not is_macro  # HS4
+                    and not re.match(r"^-?(0x[0-9A-Fa-f]+|\d+)$", operand)  # HS1
+                    and canon_reg(r_dest) != 1  # HS2
+                    and canon_reg(r_source) != 1  # HS2
+                    and (jump := self._next_line_is_label_jump()) is not None  # HS3
+                ):
+                    res.extend(
+                        [
+                            "# FILL_JUMP_SYMBOL_STORE START",
+                            ".set\tnoat",
+                            f"lui\t$at,%hi({operand})",
+                            f"addu\t$at,$at,{r_source}",
+                            jump,
+                            f"{op}\t{r_dest},%lo({operand})($at)",
+                            ".set\tat",
+                            "# FILL_JUMP_SYMBOL_STORE END",
                         ]
                     )
                     self.skip_instructions = 1

@@ -67,6 +67,8 @@ MASPSX_TRACKED=(
     "tests/test_dispatch_fold.py"
     "tests/test_dispatch_fold_multi.py"
     "tests/test_fill_jump_stack_store.py"
+    "tests/test_fill_jump_symbol_store.py"
+    "tests/test_drop_target_dup_li.py"
     "tests/test_return_via_epilogue_jump.py"
     "tests/test_load_delay_call_slot_store.py"
     "tests/test_load_delay_nop_before_label.py"

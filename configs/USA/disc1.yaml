@@ -836,7 +836,7 @@ segments:
       - [0x27DB4, c, func_800375B4]
       - [0x27DC4, c, func_800375C4]
       - [0x27DD0, c, func_800375D0]
-      - [0x27DE0, asm]
+      - [0x27DE0, c, func_800375E0]
       - [0x28064, c, func_80037864]
       - [0x28070, asm]
       # func_80038910 — seed a fixed gp-relative record (h at 0x148/0x14C/0x150,
@@ -1130,7 +1130,7 @@ segments:
       # Status-panel draw; a `p = &D_800C0E0A;` pointer local gives retail's single materialised base fo
       - [0x3430C, c, func_80043B0C]
       - [0x34464, c, func_80043C64]
-      - [0x345A4, asm]
+      - [0x345A4, c, func_80043DA4]
       - [0x34974, c, func_80044174]
       - [0x34A74, c, func_80044274]
       # func_80044444 — item-list window input handler (confirm/use with the class-selected handler pointer, move-mode swap,
@@ -1788,7 +1788,7 @@ segments:
       # makes the limits gp-relative. LINK_EXACT each.
       - [0x45EE8, c, func_800556E8]
       - [0x45F24, c, func_80055724]
-      - [0x45F60, asm]
+      - [0x45F60, c, func_80055760]
       # gp-relative table walk
       - [0x46614, c, func_80055E14]
       # Volume campaign: gp-backed bitset setter, era -O2 -G8.
@@ -2547,7 +2547,7 @@ segments:
       # D_8009D1A0&2 gate else zero 0x68/0x6C/0x70 + func_8001A680
       - [0x61834, c, func_80071034]
       - [0x618A4, c, func_800710A4]
-      - [0x61B6C, asm]
+      - [0x61B6C, c, func_8007136C]
       # D_8009D1A0&2 two-arm state sync; the +0x12 byte read hoisted into a $5-pinned local
       - [0x61EA4, c, func_800716A4]
       # D_8009D26C direction cascade + D_8009D254 adjust. NEW LEVER: each arm of the flag cascade must d
@@ -2799,7 +2799,7 @@ segments:
       # *D_80095850 & 0xFFFFFF. era -O2 -G0, LINK_EXACT.
       - [0x673E0, c, func_80076BE0]
       - [0x67410, c, func_80076C10]
-      - [0x67434, asm]
+      - [0x67434, c, func_80076C34]
       # GPU queue drain; 2.8.1, branch-macro split, dest-temp loads
       - [0x676E4, c, func_80076EE4]
       - [0x67944, c, func_80077144]
@@ -3465,7 +3465,7 @@ segments:
       - [0x75344, c, func_80084B44]
       # restored after lane merge (row belongs to another agent)
       - [0x75378, c, func_80084B78]
-      - [0x7544C, asm]
+      - [0x7544C, c, func_80084C4C]
       # per-frame state machine over a0[0x46]/[0x4A]; `goto bump` shares the a0[0x4A] increment between 
       - [0x756B0, c, func_80084EB0]
       - [0x7578C, c, func_80084F8C]

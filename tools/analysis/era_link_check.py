@@ -261,7 +261,9 @@ def main():
     if dump:
         Path(dump).write_bytes(linked)
 
-    n = min(len(rom), len(linked), size)
+    # Compare the whole target span: a SHORT link counts every missing word
+    # as a mismatch (it used to compare min(len) and could print LINK_EXACT).
+    n = min(len(rom), size)
     mism = 0
     first = []
     for i in range(0, n, 4):

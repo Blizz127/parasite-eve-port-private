@@ -1,3 +1,13 @@
+## UPDATE 2026-09-27: batch 3 — 2076 EXE c spans, gate PASS; maspsx patches 34/35
+
+`EXACT_REBUILD_GATE=PASS plan=bc7551f695e2bdf3266c04b5aea5bfe04865a4a3f9052f85cd7bdbf848652324 yaml=8ac7b05e5e65214175b02e8fcf1b79993da4a668a6403eccde9a325308c47fc4 spans=[2076 c, 196 asm, 2 rodata] sha1_orig=sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=2076` (log `build/tmp/gate-2076.log`).
+
+Leaves (each `LEAF_STRONG=EXACT` + deep preflight + `PROFILE_NECESSITY=PASS` on the main config): exeB2 `func_800375E0`; exeB `func_80043DA4` (empty `__asm__ volatile("")` after the arm's `r = 1` stops reorg stealing it into the `j` slot); exeC `func_8007136C`, `func_80055760`; exeD `func_80076C34`, `func_80084C4C`.
+
+**maspsx patch 34 `MASPSX_FILL_JUMP_SYMBOL_STORE`** (indexed symbol store into a plain `j label` delay slot; test `tools/era/maspsx/tests/test_fill_jump_symbol_store.py`) and **patch 35 `MASPSX_DROP_TARGET_DUP_LI`** (drop a branch target's leading `li $r,K` when the delay slot already holds it and the target has that single predecessor; test `test_drop_target_dup_li.py`). Both env-gated; flag-off sweeps 4507/4507 and 4550/4550 identical; suite `cd tools/era/maspsx && python3 -m unittest discover -s tests -t .` → 468 OK. `era_link_check.py` now counts missing words for a link SHORTER than the target (it used to compare `min(len)` and could print `LINK_EXACT` on a truncated link).
+
+Lane state: exeB→exeB2, exeA→exeA2, exeD→exeD2 (owns maspsx: K3 `int>>21`→`lh+2; sra 5` sin-table narrowing for ~75 overlay functions, then K4 colour-`li` hoist for the three HUD ticks `func_8001D340`/`func_8002BC90`/`func_800299CC`, ~4400 words), ovl→ovl2. All lanes paused 07:42 UTC on a server-side rate limit.
+
 ## UPDATE 2026-09-27: batch 2 — 2070 EXE c spans, gate PASS
 
 `EXACT_REBUILD_GATE=PASS plan=15be39463e3f702243b643a80c7a65d4add4981fe9966f12c8e30b535f7a9811 yaml=6f565ac9090d3438f53eb70a581d8582dae3c2e72a10f915864378c4498d231a spans=[2070 c, 202 asm, 2 rodata] sha1_orig=sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=2070` (log `build/tmp/gate-2070.log`).

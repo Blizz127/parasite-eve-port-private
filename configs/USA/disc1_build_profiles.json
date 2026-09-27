@@ -2175,6 +2175,42 @@
       "environment": {
         "ERA_CC1_VER": "2.8.1"
       }
+    },
+    "era_o2_g8_dispatch_80010fcc": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_THREE_WORD_SYMBOL_STORE": "1",
+        "MASPSX_DISPATCH_FOLD": "jtbl_80010FCC"
+      }
+    },
+    "era_o2_g0_cc1_281_fill_call_delay_slot_fill_jump_symbol_store": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-mno-split-addresses"
+      ],
+      "environment": {
+        "ERA_CC1_VER": "2.8.1",
+        "MASPSX_FILL_CALL_DELAY_SLOT": "1",
+        "MASPSX_FILL_JUMP_SYMBOL_STORE": "1"
+      }
+    },
+    "era_o2_g0_cc1_281_drop_target_dup_li": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-mno-split-addresses"
+      ],
+      "environment": {
+        "ERA_CC1_VER": "2.8.1",
+        "MASPSX_DROP_TARGET_DUP_LI": "1"
+      }
     }
   },
   "assignments": {
@@ -2644,7 +2680,8 @@
       "func_800634D4",
       "func_8004B70C",
       "func_800466C0",
-      "func_80061C34"
+      "func_80061C34",
+      "func_800375E0"
     ],
     "era_o2_g8_force_d8009d2e8_absolute": [
       "func_800293F4"
@@ -2853,7 +2890,8 @@
       "func_80052EC0",
       "func_8005401C",
       "func_8005C174",
-      "func_8005409C"
+      "func_8005409C",
+      "func_80055760"
     ],
     "era_o1_g0_no_delayed_branch": [
       "func_80078C94"
@@ -3478,6 +3516,15 @@
     ],
     "era_o2_g0_no_schedule_insns_cc1_281": [
       "func_80073A44"
+    ],
+    "era_o2_g8_dispatch_80010fcc": [
+      "func_80043DA4"
+    ],
+    "era_o2_g0_cc1_281_fill_call_delay_slot_fill_jump_symbol_store": [
+      "func_80076C34"
+    ],
+    "era_o2_g0_cc1_281_drop_target_dup_li": [
+      "func_80084C4C"
     ]
   }
 }

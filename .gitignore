@@ -81,6 +81,8 @@ tools/era/maspsx/tests/*
 !tools/era/maspsx/tests/test_dispatch_fold.py
 !tools/era/maspsx/tests/test_dispatch_fold_multi.py
 !tools/era/maspsx/tests/test_fill_jump_stack_store.py
+!tools/era/maspsx/tests/test_fill_jump_symbol_store.py
+!tools/era/maspsx/tests/test_drop_target_dup_li.py
 !tools/era/maspsx/tests/test_return_via_epilogue_jump.py
 !tools/era/maspsx/tests/test_load_delay_call_slot_store.py
 !tools/era/maspsx/tests/test_load_delay_nop_before_label.py
