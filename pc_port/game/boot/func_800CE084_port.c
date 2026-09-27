@@ -15,13 +15,7 @@ int func_800CE084(pe_addr_t slot)
     return 0;
 }
 
-int func_800CE16C(pe_addr_t slot)
-{
-    int result=func_800C251C(slot,0x800E0FCCu);
-    result|=func_800C2758(slot,0x800E0FB4u,0x800E0FD8u);
-    if (result==-1) PE_StoreU8(slot,4u); /* Matching CE1DC. */
-    return 0;
-}
+/* func_800CE16C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800CE16C_port.c (src/func_800CE16C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 void func_800CE1FC(void)
 {
@@ -37,24 +31,6 @@ void func_800CE1FC(void)
     func_800CEDA8(0);
 }
 
-void func_800CE2B4(pe_addr_t data)
-{
-    uint32_t random=func_80071A54();
-    PE_StoreU16(data+6u,(uint16_t)(PE_LoadU16(0x800E2808u)-40u+(uint32_t)((int32_t)random%80)));
-    random=func_80071A54();
-    PE_StoreU16(data+8u,(uint16_t)(PE_LoadU16(0x800E280Au)-40u+(uint32_t)((int32_t)random%80)));
-    random=func_80071A54();
-    uint32_t z=PE_LoadU16(0x800E280Cu);
-    PE_StoreU8(data+1u,127u);PE_StoreU16(data+4u,0u);PE_StoreU8(data+3u,0u);
-    PE_StoreU16(data+10u,(uint16_t)(z-40u+(uint32_t)((int32_t)random%80)));
-}
+/* func_800CE2B4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800CE2B4_port.c (src/func_800CE2B4.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-void func_800CE3B4(pe_addr_t data)
-{
-    unsigned i;
-    func_800C2EAC(3u);func_800C3098(16);func_800C2FF0(32u,32u);func_800C3238(2u);
-    for (i=0;i<3;i++) PE_StoreU16(0x800E22A8u+i*2u,PE_LoadU16(data+6u+i*2u));
-    PE_StoreU16(0x800E22D0u,(uint16_t)(int16_t)(int8_t)PE_LoadU8(data+1u));
-    PE_StoreU8(0x800E22CCu,(uint8_t)(PE_LoadU8(data+3u)*2u-96u));
-    func_800C3B04(0x800E22A8u);func_800C3098(16);
-}
+/* func_800CE3B4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800CE3B4_port.c (src/func_800CE3B4.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

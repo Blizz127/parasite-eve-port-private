@@ -122,20 +122,7 @@ int func_800155FC(pe_addr_t args)
     return sew8_wait(8u);
 }
 
-int func_80019B08(pe_addr_t args)
-{
-    pe_addr_t task = PE_LoadU32(GA_D_8009D300);
-    uint16_t flags = PE_LoadU16(task + 8u);
-    (void)args;
-    if (flags & 0x20u) {
-        if (PE_LoadU32(PE_LoadU32(GA_D_8009D2F0) + 0x98u) & 8u)
-            return sew8_wait(8u);
-        PE_StoreU16(task + 8u, (uint16_t)(flags & 0xFFDFu));
-        return 1;
-    }
-    PE_StoreU16(task + 8u, (uint16_t)(flags | 0x20u));
-    return sew8_wait(8u);
-}
+/* func_80019B08: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80019B08_port.c (src/func_80019B08.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 int func_80013988(pe_addr_t args)
 {

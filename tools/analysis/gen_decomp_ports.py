@@ -39,7 +39,14 @@ Eligibility (conservative by construction; a rejected leaf is reported in
       reported rather than silently mis-ported);
   E8  no typed pointer cast whose operand does not derive from a `D_` data
       symbol (value parameters used as guest addresses are not representable);
-  E9  no `&func_*` (function-pointer values are not host-compatible);
+  E9  no `&func_*` (function-pointer values are not host-compatible) —
+      except the two shapes `rewrite_code_addresses` turns into the retail
+      VMA: an integer cast `(unsigned int)func_X` and a bare `func_X` call
+      argument whose host parameter takes a guest address;
+      (pointer *returns*: an object-pointer return is adapted by the
+      pointer-return adapter — `static T *pe_host_func_X` + an exported
+      `pe_addr_t func_X` returning PE_HostToGuest(); see
+      PC_PORT_FROM_DECOMP.md E7);
   E10 no store through a pointer-pointer cast of a `D_` symbol (would write a
       host pointer into guest RAM);
   E11 every called `func_*` with a canonical pc_port prototype is called with
@@ -68,6 +75,19 @@ Eligibility (conservative by construction; a rejected leaf is reported in
   E16 no host pointer narrowed to an integer (`(unsigned int)D_XXXX`,
       `(int)ptr_param`).  Retail's value is a 32-bit guest address; the host
       accessor is a 64-bit pointer, so the cast truncates it silently.
+
+Later additions (see docs/ai_context/PC_PORT_FROM_DECOMP.md §3):
+  E2b era register pins and empty-template asm fences are removed (no
+      semantics); a pin read before it is written, or any real instruction,
+      is still rejected;
+  E7c `T **args` guest-pointer-vector parameters whose every use is a
+      dereferenced element become PE_DECOMP_PTRGLOBAL(pe_args + 4u*(k), T);
+  generated TUs' host definitions act as canonical prototypes for their
+      callers (derived_signatures), and whole call arguments `&D_X`,
+      `&D_X[k]`, `D_X + k` become retail guest addresses where the callee's
+      host parameter takes one;
+  E18 no leaf struct with pointer members (guest layout has 4-byte pointers).
+  Unit tests: test_gen_decomp_ports.py.
 
 E13-E16 all describe the same underlying fact from different angles: a 32-bit
 guest address and a 64-bit host pointer are not the same object, so one must
@@ -119,7 +139,23 @@ RAM_LO, RAM_HI = 0x80000000, 0x80200000
 
 C_SPAN_RE = re.compile(r"-\s*\[(0x[0-9A-Fa-f]+),\s*c,\s*(func_[0-9A-Fa-f]{8})\]")
 EDGE_RE = re.compile(r"^[ \t]*-[ \t]*\[(0x[0-9A-Fa-f]+)", re.MULTILINE)
-ASM_RE = re.compile(r"__asm__|\basm\s*\(")
+ASM_RE = re.compile(r"__asm__|\basm\b")
+# E2b — era codegen hints with no semantics.  A register pin
+# `register T x asm("$N")` only fixes retail's register allocation, and an
+# empty-template asm (`asm volatile("" : "=r"(x) : "0"(x))`, `asm("" ::: "memory")`)
+# only hides a value/memory from cc1's optimiser; neither computes anything.
+# Exactly these two forms are removed; any asm with a non-empty template (a
+# real instruction) is still rejected by E2.
+ASM_PIN_RE = re.compile(r"(\bregister\b[^;{}()]*?)\s*(?:__asm__|asm)\s*\(\s*\"\$[0-9A-Za-z]+\"\s*\)")
+ASM_FENCE_RE = re.compile(
+    r"(?:__asm__|\basm)\s*(?:__volatile__|volatile)?\s*"
+    r"\(\s*\"\"\s*(?::[^;()]*(?:\([^;()]*\)[^;()]*)*)?\)\s*;")
+
+
+def strip_era_asm(text: str) -> str:
+    """Remove E2b register pins and empty-template asm fences (see above)."""
+    text = ASM_PIN_RE.sub(r"\1", text)
+    return ASM_FENCE_RE.sub("/* era asm fence removed (E2b) */", text)
 NUM_RE = re.compile(r"0x[0-9A-Fa-f]{8}\b")
 FUNC_NAME_RE = re.compile(r"\b(func_[0-9A-Fa-f]{8})\b")
 CALL_RE = re.compile(r"\b(func_[0-9A-Fa-f]{8})\s*\(")
@@ -167,16 +203,44 @@ INT_CAST_RE = re.compile(
     r"\(\s*((?:(?:unsigned|signed|long|short|const|volatile)[ \t]+)*"
     r"(?:int|long|short|char|unsigned|signed|pe_addr_t|uint32_t|size_t))\s*\)"
     r"\s*(&?)\s*([A-Za-z_]\w*)")
+INT_PAREN_CAST_RE = re.compile(
+    r"\(\s*((?:(?:unsigned|signed|long|short|const|volatile)[ \t]+)*"
+    r"(?:int|long|short|char|unsigned|signed|pe_addr_t|uint32_t|size_t))\s*\)"
+    r"(?=\s*\()")
 STATEMENT_KEYWORDS = {
     "return", "if", "else", "while", "for", "do", "switch", "case", "goto",
     "break", "continue", "sizeof", "default", "typedef",
 }
 
 
+_NOT_TYPE_WORDS = {"return", "else", "case", "do", "sizeof", "goto"}
+
+
+def is_declarator(text: str, start: int) -> bool:
+    """Is the `func_X(` at `start` a declaration (prototype) rather than a
+    call?  A declarator is preceded, within its statement, only by type words
+    and `*` (`extern int func_X();`, `void *func_X(void);`); a call is
+    preceded by an operator, `(`, `,`, `=` or a keyword such as `return`."""
+    j = start - 1
+    while j >= 0 and text[j] in " \t\n*":
+        j -= 1
+    if j < 0 or not (text[j].isalnum() or text[j] == "_"):
+        return False
+    k = j
+    while k >= 0 and (text[k].isalnum() or text[k] == "_"):
+        k -= 1
+    return text[k + 1: j + 1] not in _NOT_TYPE_WORDS
+
+
 def call_args(text: str) -> list[tuple[str, str]]:
-    """Return (callee, argument text) for every call, paren-balanced."""
+    """Return (callee, argument text) for every call, paren-balanced.
+    Prototypes (`extern int func_X();`) are declarations, not calls, and are
+    skipped: an empty retail prototype said nothing about the call's arity
+    (ovl_0700's `extern int func_8006E6A8();` with a 3-argument call)."""
     out: list[tuple[str, str]] = []
     for m in CALL_HEAD_RE.finditer(text):
+        if is_declarator(text, m.start()):
+            continue
         i = m.end()
         depth = 1
         while i < len(text) and depth:
@@ -253,6 +317,73 @@ def canonical_signatures() -> dict[str, dict]:
     return sigs
 
 
+def derived_signatures() -> dict[str, dict]:
+    """func_* -> host signature of a *generated* decomp-derived TU.
+
+    A derived leaf has no canonical header prototype, so its callers used to
+    keep their own verbatim (retail-typed) declaration of it.  That is only
+    sound while the callee's host signature equals the retail one; an E7b
+    adapted callee takes `pe_addr_t` where the retail prototype says
+    `unsigned char *`, so the caller's declaration would disagree with the
+    definition it links against.  The generated definition *is* the host
+    authority, so it is read back here and treated exactly like a canonical
+    prototype (E11 arity, E13/E14 host-pointer screens, and the caller's own
+    declaration is replaced by this host prototype).
+
+    Only files the generator owns (`func_XXXXXXXX_port.c` carrying a
+    `decomp-source:` banner) are read; hand ports keep their headers.
+    """
+    sigs: dict[str, dict] = {}
+    out_dir = REPO_ROOT / OUT_DIR
+    if not out_dir.is_dir():
+        return sigs
+    for path in sorted(out_dir.glob("func_*_port.c")):
+        name = path.name[: -len("_port.c")]
+        text = path.read_text(encoding="utf-8", errors="replace")
+        if f"decomp-source: {name}" not in text:
+            continue
+        stripped = strip_comments(text)
+        for m in WRAPPER_SIG_RE.finditer(stripped):
+            if m.group(2) != name:
+                continue
+            ret = re.sub(r"\s+", " ", m.group(1)).strip()
+            params = re.sub(r"\s+", " ", m.group(3)).strip()
+            sigs[name] = {"ret": ret, "params": split_top(params),
+                          "decl": f"{ret} {name}({params or 'void'});"}
+            break
+    return sigs
+
+
+def _param_types(params: list[str]) -> list[str]:
+    """Parameter types with the parameter name dropped, whitespace-normalised."""
+    out: list[str] = []
+    for p in params:
+        p = re.sub(r"\s+", " ", p).strip()
+        m = re.fullmatch(r"(.*?[\s\*])([A-Za-z_]\w*)", p)
+        if m and m.group(1).strip() and m.group(2) not in C_KEYWORDS:
+            p = m.group(1)
+        out.append(re.sub(r"\s*\*\s*", "*", p).strip())
+    return out
+
+
+def same_host_decl(stripped: str, callee: str, dsig: dict) -> bool:
+    """Does every declaration of `callee` in the leaf already equal its host
+    signature (types only)?  Then the verbatim declaration stays (it is part of
+    the matched unit and may name leaf-local types); otherwise the generated
+    host prototype replaces it."""
+    decls = [m for m in SIG_RE.finditer(stripped) if m.group(2) == callee]
+    if not decls:
+        return False
+    want_ret = re.sub(r"\s*\*\s*", "*", dsig["ret"]).strip()
+    want = _param_types(dsig["params"])
+    for m in decls:
+        ret = re.sub(r"^\s*extern\s+", "", m.group(1))
+        ret = re.sub(r"\s*\*\s*", "*", re.sub(r"\s+", " ", ret)).strip()
+        if ret != want_ret or _param_types(split_top(m.group(3))) != want:
+            return False
+    return True
+
+
 def split_top(text: str) -> list[str]:
     """Split a parameter/argument list on top-level commas."""
     text = text.strip()
@@ -304,6 +435,23 @@ def local_objects(body: str) -> tuple[set[str], set[str]]:
     return every, pointerish
 
 
+def pointer_locals(body: str) -> set[str]:
+    """Locals declared as plain pointers (`T *p`), not arrays: in a generated
+    TU they hold host pointers into guest RAM (or into a host stack object,
+    which PE_HostToGuest rejects loudly)."""
+    out: set[str] = set()
+    for m in LOCAL_DECL_RE.finditer(body):
+        head = m.group(1).split()
+        if head[0] in STATEMENT_KEYWORDS or head[-1] in STATEMENT_KEYWORDS:
+            continue
+        for declarator in split_top(m.group(2)):
+            d = declarator.strip()
+            ident = re.search(r"([A-Za-z_]\w*)", d)
+            if ident and d.startswith("*") and "[" not in d.split("=")[0]:
+                out.add(ident.group(1))
+    return out
+
+
 def strip_comments(text: str) -> str:
     return LINE_COMMENT_RE.sub("", BLOCK_COMMENT_RE.sub("", text))
 
@@ -337,9 +485,18 @@ def pc_port_definitions() -> dict[str, set[str]]:
     for path in (REPO_ROOT / "pc_port").rglob("*.c"):
         if "build" in path.parts:
             continue
+        # Overlay TUs (gen_overlay_ports.py) define `<ovl>__func_X` through a
+        # rename macro; their textual `func_X(...) {` is not a plain symbol.
+        if "decomp_ovl" in path.parts:
+            continue
         rel = path.relative_to(REPO_ROOT).as_posix()
         text = path.read_text(encoding="utf-8", errors="replace")
         for m in DEF_RE.finditer(text):
+            # A `static` definition is file-local: not linkable by a generated
+            # TU (func_800762A0 in pe_libgpu.c made func_80075C04 reference an
+            # undefined symbol).
+            if re.match(r"\s*static\b", m.group(0)):
+                continue
             defined.setdefault(m.group(1), set()).add(rel)
     return defined
 
@@ -446,9 +603,90 @@ def pointer_params(inner: str) -> list[tuple[str, int, list[str], str]]:
     return out
 
 
+# E7c — guest-pointer-vector parameters.  A field-VM opcode handler receives
+# `T **args`: a guest array of 32-bit guest pointers to its operands.  Every use
+# the adapter accepts is a *dereferenced element*, which is exactly retail's
+# `lw` of the element followed by an access through it:
+#     p[k]  /  *(p + k)  /  *p      (each immediately dereferenced)
+# and is rewritten to PE_DECOMP_PTRGLOBAL(pe_p + 4u * (k), T), which loads the
+# 32-bit guest word and translates it.  Anything else (bare element passed on,
+# pointer arithmetic, p stored or reassigned) is reported, not guessed.
+ARGVEC_INDEX_RE = r"(?<![.>\w]){p}\s*\[([^\[\]]+)\]"
+ARGVEC_PLUS_RE = r"\*\s*\(\s*{p}\s*\+\s*(0x[0-9A-Fa-f]+|\d+)\s*\)"
+ARGVEC_DEREF_RE = r"\*\s*(?<![.>\w]){p}\b(?!\s*[\[+(])"
+# What may precede an element for it to count as dereferenced: `*` or
+# `*(T *)` (a requalifying cast of the element pointer, then the deref).
+ARGVEC_PRE_RE = re.compile(r"\*\s*(?:\(\s*(?:[A-Za-z_]\w*\s+)*[A-Za-z_]\w*\s*\*\s*\)\s*)?$")
+
+
+def argvec_params(inner: str) -> dict[str, str]:
+    """Level-2 primitive pointer params: name -> element pointee type T."""
+    out: dict[str, str] = {}
+    for pname, level, toks, decl in pointer_params(inner):
+        if level != 2 or toks or "[" in decl:
+            continue
+        out[pname] = param_base_type(decl, pname)
+    return out
+
+
+def argvec_rewrite(body: str, pname: str, etype: str) -> tuple[str, str]:
+    """Rewrite every use of guest-pointer-vector `pname` in `body`.
+
+    Returns (new body, "" on success | reason).  Each element use must be
+    dereferenced (preceded by `*` / `*(T *)`, or followed by `[` / `->`).
+    """
+    pe = f"pe_{pname}"
+    out: list[str] = []
+    pos = 0
+    pats = [(re.compile(ARGVEC_PLUS_RE.format(p=re.escape(pname))), "plus"),
+            (re.compile(ARGVEC_INDEX_RE.format(p=re.escape(pname))), "index"),
+            (re.compile(ARGVEC_DEREF_RE.format(p=re.escape(pname))), "deref")]
+    hits: list[tuple[int, int, str, str]] = []
+    for rx, kind in pats:
+        for m in rx.finditer(body):
+            if any(not (m.end() <= a or m.start() >= b) for a, b, _, _ in hits):
+                continue
+            idx = m.group(1) if kind in ("plus", "index") else "0"
+            hits.append((m.start(), m.end(), kind, idx))
+    hits.sort()
+    for start, end, kind, idx in hits:
+        # `*(p + k)` / `*p` carry their own dereference, which the element
+        # expression replaces: one more `*` (or `->`/`[`) must still apply.
+        before = body[:start]
+        after = body[end:].lstrip()
+        if not (ARGVEC_PRE_RE.search(before) or after.startswith("[")
+                or after.startswith("->")):
+            return body, f"guest-pointer vector {pname} element used undereferenced"
+        out.append(body[pos:start])
+        out.append(f"PE_DECOMP_PTRGLOBAL({pe} + 4u * ({idx.strip()}), {etype})")
+        pos = end
+    out.append(body[pos:])
+    new = "".join(out)
+    if re.search(rf"(?<![.>\w]){re.escape(pname)}\b", new):
+        return body, f"guest-pointer vector {pname} used as a value"
+    return new, ""
+
+
 def wrapper_safe(name: str, stripped: str, inner: str) -> tuple[bool, str]:
     """Can this pointer-param leaf be adapted by the verbatim-wrapper recipe?"""
-    if DOUBLE_PTR_TOKEN_RE.search(stripped):
+    vecs = argvec_params(inner)
+    if vecs:
+        body = extract_body(stripped, name)
+        if body is None:
+            return False, "no function body"
+        for pname, etype in vecs.items():
+            body, why = argvec_rewrite(body, pname, etype)
+            if why:
+                return False, why
+        # The vector parameters are the only `**` the adapter may absorb.
+        if DOUBLE_PTR_TOKEN_RE.search(body):
+            return False, "pointer-to-pointer value (guest pointer in RAM)"
+        rest = inner
+        for pname in vecs:
+            rest = re.sub(rf"\*\s*\*\s*{re.escape(pname)}\b", pname, rest)
+        if DOUBLE_PTR_TOKEN_RE.search(rest):
+            return False, "pointer-to-pointer value (guest pointer in RAM)"
+    elif DOUBLE_PTR_TOKEN_RE.search(stripped):
         return False, "pointer-to-pointer value (guest pointer in RAM)"
     # A pointer parameter whose address is stored (e.g. `p->link = arg`) writes
     # a host pointer into guest RAM; only value/address uses are adaptable.
@@ -473,7 +711,7 @@ def wrapper_safe(name: str, stripped: str, inner: str) -> tuple[bool, str]:
     if PTR_DEREF_CAST_RE.search(stripped):
         return False, "store through a pointer-dereference cast"
     for pname, level, _toks, _decl in pointer_params(inner):
-        if level > 1:
+        if level > 1 and pname not in vecs:
             return False, f"parameter {pname} is level-{level}"
     if re.search(r"&\s*func_[0-9A-Fa-f]{8}", stripped):
         return False, "address of function"
@@ -483,6 +721,20 @@ def wrapper_safe(name: str, stripped: str, inner: str) -> tuple[bool, str]:
 def analyze(name: str, src_text: str, matched: dict,
             known: set[str], existing_macros: set[str],
             proto: dict[str, int], sigs: dict[str, dict]) -> dict:
+    # E2b guard: a pin *without* an initialiser that is read before it is
+    # written captures a live retail register — that is semantics, not a hint.
+    for m in re.finditer(
+            r"\bregister\b[^;{}()=]*?\b([A-Za-z_]\w*)\s*(?:__asm__|asm)\s*"
+            r"\(\s*\"\$[0-9A-Za-z]+\"\s*\)\s*;", strip_comments(src_text)):
+        rest = strip_comments(src_text)[m.end():]
+        use = re.search(rf"\b{re.escape(m.group(1))}\b", rest)
+        if use and not re.match(r"\s*=(?!=)", rest[use.end():]):
+            return {"eligible": False,
+                    "reason": f"pinned register {m.group(1)} read before written"}
+    src_text = rewrite_code_addresses(strip_era_asm(src_text))
+    src_text, why = rewrite_guest_calls(src_text, name)
+    if why:
+        return {"eligible": False, "reason": why}
     stripped = strip_comments(src_text)
     if ASM_RE.search(stripped):
         return {"eligible": False, "reason": "asm"}
@@ -498,12 +750,35 @@ def analyze(name: str, src_text: str, matched: dict,
     if re.search(r"\(\s*\*\s*\w+\s*\)\s*\(", stripped):
         return {"eligible": False, "reason": "indirect call through local"}
 
+    # E18 — a leaf-defined struct with a pointer member describes guest RAM
+    # whose pointer fields are 32-bit guest addresses; the host compiler lays
+    # the same struct out with 8-byte host pointers, so every field access
+    # through it (and every field after the first pointer) is wrong.
+    for m in re.finditer(r"\bstruct\s*\w*\s*\{([^{}]*)\}", stripped):
+        if re.search(r"\*\s*[A-Za-z_]\w*\s*(?:\[[^\]]*\])?\s*[;,]", m.group(1)):
+            return {"eligible": False,
+                    "reason": "leaf struct with pointer members (guest layout)"}
+
     hdr = HDR_RE.search(stripped)
     if hdr is None:
         return {"eligible": False, "reason": "no function header"}
     ret_type = hdr.group(0)[: hdr.group(0).find(name)]
+    ptr_ret: str | None = None
     if "*" in ret_type:
-        return {"eligible": False, "reason": "pointer return type"}
+        # E7 (relaxed): an object-pointer return is adapted by the
+        # pointer-return host adapter — the verbatim leaf runs as
+        # `static T *pe_host_<name>` and the exported `pe_addr_t <name>`
+        # returns PE_HostToGuest() of its result (a host pointer into guest
+        # RAM, NULL -> 0, anything else aborts loudly).  Function-pointer
+        # returns and recursive leaves stay reported.
+        rt = ret_type.strip()
+        if not PTR_RET_RE.fullmatch(rt):
+            return {"eligible": False, "reason": "pointer return type"}
+        body_only = extract_body(stripped, name)
+        if body_only is None or re.search(rf"\b{re.escape(name)}\s*\(", body_only):
+            return {"eligible": False,
+                    "reason": "pointer return type (recursive self-call)"}
+        ptr_ret = rt
     params, has_ptr_param = parse_params(hdr.group(2))
     wrap: dict | None = None
     if has_ptr_param:
@@ -535,19 +810,40 @@ def analyze(name: str, src_text: str, matched: dict,
         for sym in DATA_NAME_RE.findall(decl):
             externs.append((sym, decl))
 
-    # locals/aggregates assigned from a D_ symbol: a pointer cast whose operand
-    # mentions one of them is demonstrably a guest address, not a value param.
-    from_d = set(re.findall(r"\b(\w+)\s*=\s*[^;{}]*?\bD_[0-9A-Fa-f]{7,8}\b",
-                            stripped))
-    from_d |= {s for s, _ in externs}
-    # A pointer parameter is, by the wrapper's contract, a guest address (it is
-    # translated to a host pointer in the adapter), so a pointer cast applied to
-    # it is an address reinterpretation/harmless requalification, not a value
-    # parameter used as an address.
-    from_d |= {p for p, _lvl, _toks, _d in pointer_params(hdr.group(2))}
-    for m in PTR_CAST_RE.finditer(stripped):
-        operand = m.group(1)
-        if set(re.findall(r"\b\w+\b", operand)) & from_d:
+    # E9b — a cast to a pointer-to-pointer type, `*(T **)(rec + 0x68)`, reads
+    # a *host* pointer (8 bytes on a 64-bit host) out of 4-byte guest RAM.
+    # PTR_CAST_RE never matched these (the second `*` broke it), so they
+    # slipped through E9/E15 (func_80030640, func_80051684, func_800524D0,
+    # func_80017EC4, func_80067B74, func_80067D18).
+    if PTRPTR_CAST_RE.search(stripped):
+        return {"eligible": False,
+                "reason": "pointer-to-pointer cast (guest pointer in RAM)"}
+
+    # E9 — a pointer cast must be rooted at a *host pointer into guest RAM*:
+    # an array / pointer-global D_ symbol, a pointer parameter (the E7b
+    # wrapper translates it), or a local/parameter whose own declaration is
+    # pointer- or array-typed.  An integer — a scalar D_ symbol, an int
+    # parameter, or an int local that merely *holds* a guest address
+    # (`base = D_8009D310`) — is a 32-bit guest address, not a host pointer,
+    # so `(unsigned char *)(D_8009D2F0 + 0xF)` is rejected.  (This replaces
+    # the old "mentions a name assigned from a D_ symbol" test, which also
+    # admitted integer locals and scalar symbols.)
+    ptr_roots = {sym for sym, decl in externs
+                 if classify_data(decl, sym) in ("array", "ptrglobal")}
+    ptr_roots |= {p for p, _lvl, _toks, _d in pointer_params(hdr.group(2))}
+    ptr_roots |= pointer_typed_names(stripped)
+    vec_roots = set(argvec_params(hdr.group(2)))
+    for m in PTR1_CAST_RE.finditer(stripped):
+        nxt = stripped[m.end():].lstrip()[:1]
+        if nxt in ("", ";", ",", ")", "{"):
+            continue            # an abstract declarator `f(void *)`, not a cast
+        operand = cast_operand(stripped, m.end())
+        if is_pointer_expr(operand, ptr_roots):
+            continue
+        # E7c: `(T *)args[k]` on a guest-pointer-vector parameter is the
+        # element E7c rewrites to PE_DECOMP_PTRGLOBAL(pe_args + 4u*k, T).
+        if re.fullmatch(r"(\w+)\s*\[[^\[\]]+\]", _strip_parens(operand)) and \
+                re.match(r"\w+", _strip_parens(operand)).group(0) in vec_roots:
             continue
         return {"eligible": False,
                 "reason": f"pointer cast of non-D_ operand: {operand.strip()[:32]}"}
@@ -575,6 +871,8 @@ def analyze(name: str, src_text: str, matched: dict,
     body_text = extract_body(stripped, name)
     _all_locals, host_locals = local_objects(
         body_text if body_text is not None else stripped)
+    ptr_locals = pointer_locals(body_text if body_text is not None else stripped)
+    hostptr_args: set[tuple[str, int]] = set()
     # A pointer *parameter* is not host memory at a call site: the E7b wrapper
     # forwards it as `pe_<name>`, the guest address the callee's `pe_addr_t`
     # parameter wants.  It is still a host pointer as an assignment *target*
@@ -608,11 +906,38 @@ def analyze(name: str, src_text: str, matched: dict,
                               f"host pointer {m.group(1)}"}
 
     for callee, args in call_args(stripped):
-        if callee == name or callee not in sigs:
+        if callee == name:
+            continue
+        if callee not in sigs:
+            # A loud boundary records guest argument registers: a host stack
+            # object (`&v18`, a local array) has no guest address, and its
+            # truncated host address in the log is meaningless (func_800D5898
+            # recorded a host `&v18` for func_800D27FC).  Report it.
+            if callee in known:
+                continue
+            for arg in split_top(args):
+                bare = arg.strip().strip("()").strip()
+                if address_arg(arg, {d for d, _ in externs}, dict(externs)) is not None:
+                    continue
+                root = re.match(r"&\s*([A-Za-z_]\w*)", bare)
+                if bare in ptr_locals or (
+                        root and root.group(1) in ptr_locals and
+                        re.match(r"&\s*[A-Za-z_]\w*\s*(->|\[)", bare)):
+                    # a pointer local, or &p->f / &p[k] through one: guest
+                    # memory, forwarded as PE_HostToGuest(...)
+                    hostptr_args.add((callee, split_top(args).index(arg)))
+                    continue
+                if (root and root.group(1) in _all_locals) or bare in host_locals:
+                    return {"eligible": False,
+                            "reason": f"host pointer {bare} passed to boundary {callee}"}
             continue
         hparams = sigs[callee]["params"]
         for i, arg in enumerate(split_top(args)):
             bare = arg.strip().strip("()").strip()
+            # `&D_X`, `&D_X[k]`, array/pointer-global `D_X + k`: rewritten to
+            # the retail guest address by fix_argument_addresses.
+            if address_arg(arg, {d for d, _ in externs}, dict(externs)) is not None:
+                continue
             if bare.startswith("&"):
                 # `&local`, `&D_SYM[i]`, `&s.field` — address-of always yields a
                 # *host* address in the generated TU, where retail took a guest
@@ -625,6 +950,11 @@ def analyze(name: str, src_text: str, matched: dict,
             else:
                 continue
             if i < len(hparams) and not is_host_pointer_type(hparams[i]):
+                if bare in ptr_locals:
+                    # a host pointer local into guest RAM: pass its guest
+                    # address (PE_HostToGuest aborts loudly on host stack)
+                    hostptr_args.add((callee, i))
+                    continue
                 return {"eligible": False,
                         "reason": f"host pointer {bare} passed to {callee} "
                                   f"parameter {i} ({hparams[i].strip()})"}
@@ -632,7 +962,11 @@ def analyze(name: str, src_text: str, matched: dict,
     # A func_* referenced but never called is a function-address value; those
     # were rejected above.  Everything else is a known definition or becomes a
     # loud boundary.
-    boundaries = [c for c in callees if c not in known]
+    # Only callees that are actually *called* need a boundary: a name that
+    # only appears in a prototype (its address was rewritten to the retail
+    # VMA by rewrite_code_addresses) keeps its verbatim declaration.
+    called = [c for c, _ in call_args(stripped)]
+    boundaries = [c for c in callees if c not in known and c in called]
     boundary_arity: dict[str, int] = {}
     for callee, args in call_args(stripped):
         if callee in boundaries:
@@ -645,7 +979,8 @@ def analyze(name: str, src_text: str, matched: dict,
     for sym, decl in externs:
         if classify_data(decl, sym) != "ptrglobal":
             continue
-        if re.search(rf"(?<!\*)\b{sym}\b\s*(=|\+=|-=|\|=|&=|\^=)", stripped):
+        # `=` but not `==` (a comparison is not a store).
+        if re.search(rf"(?<!\*)\b{sym}\b\s*(=(?!=)|\+=|-=|\|=|&=|\^=)", stripped):
             return {"eligible": False, "reason": f"pointer-global store {sym}"}
 
     # E15 — a guest array (or global) *of pointers*.  `extern unsigned char
@@ -671,6 +1006,15 @@ def analyze(name: str, src_text: str, matched: dict,
                   if classify_data(decl, sym) in ("array", "ptrglobal")}
     host_roots |= host_locals
     host_roots |= {p for p, _lvl, _toks, _d in pointer_params(hdr.group(2))}
+    # `(unsigned int)(tbl + k)` — the cast applies to a parenthesised
+    # pointer expression, which INT_CAST_RE (identifier right after the cast)
+    # never saw (func_8005DC4C, func_8006EC6C).
+    for m in INT_PAREN_CAST_RE.finditer(stripped):
+        operand = cast_operand(stripped, m.end())
+        if is_pointer_expr(operand, ptr_roots):
+            return {"eligible": False,
+                    "reason": f"host pointer {_strip_parens(operand)[:32]} "
+                              f"narrowed to {m.group(1).strip()}"}
     for m in INT_CAST_RE.finditer(stripped):
         root = m.group(3)
         if m.group(2) == "&":
@@ -692,6 +1036,100 @@ def analyze(name: str, src_text: str, matched: dict,
                 "reason": f"host pointer {root} narrowed to "
                           f"{m.group(1).strip()}"}
 
+    # E19 — a relational compare between two pointers (`dst >= src`)
+    # compares *host* addresses in the generated TU.  Two pointers into the
+    # one guest-RAM allocation order exactly like their KSEG0 guest
+    # addresses, but a scratchpad pointer (separate allocation) or a
+    # KUSEG/KSEG1 alias (folded by the mirror) does not (portverify finding
+    # 9: func_80072334, dst in the scratchpad, src = 0).  Operand classes:
+    #   ram     a guest-RAM array symbol, or a local assigned only from such
+    #           symbols (plus ++/--/+=): host compare is exact, kept;
+    #   exact   a pointer global (its stored word) or a pointer parameter the
+    #           leaf never modifies (pe_<name>): the retail guest value;
+    #   other   anything else (a modified parameter, a pointer loaded from
+    #           RAM, ...): reported.
+    # A compare with an `exact` operand is rewritten to compare guest values
+    # (a `ram` operand then uses PE_HostToGuest, exact inside RAM).
+    body_for_rel = body_text if body_text is not None else stripped
+    pparam_names = {p for p, _l, _t, _d in pointer_params(hdr.group(2))}
+    arrays = {sym for sym, decl in externs if classify_data(decl, sym) == "array"
+              and 0x80000000 <= int(sym[2:], 16) < 0x80200000}
+    ptrglobals = {sym for sym, decl in externs if classify_data(decl, sym) == "ptrglobal"}
+
+    def modified(n: str) -> bool:
+        return bool(re.search(rf"(?<![.>\w])\b{re.escape(n)}\s*(=(?!=)|\+=|-=|\+\+|--)|"
+                              rf"(\+\+|--)\s*{re.escape(n)}\b", body_for_rel))
+
+    def op_class(n: str) -> str:
+        if n in arrays:
+            return "ram"
+        if n in ptrglobals:
+            return "exact"
+        if n in pparam_names:
+            return "other" if modified(n) else "exact"
+        if n in ptr_locals:
+            rhs = re.findall(rf"(?<![.>\w])\b{re.escape(n)}\s*=(?!=)\s*([^;]+);", body_for_rel)
+            if rhs and all(re.match(r"\s*(?:\([^()]*\)\s*)?&?\s*(D_[0-9A-Fa-f]{7,8})", r)
+                           and re.match(r"\s*(?:\([^()]*\)\s*)?&?\s*(D_[0-9A-Fa-f]{7,8})", r).group(1) in arrays
+                           for r in rhs):
+                return "ram"
+        return "other"
+
+    rel_rewrites: list[tuple[str, str, str, str, str]] = []
+    rel_roots = ptr_roots | pparam_names
+    for rm in re.finditer(r"(?<![<>\-=!])(<=|>=|<|>)(?![<>=])", stripped):
+        left = re.search(r"([A-Za-z_]\w*)\s*$", stripped[:rm.start()])
+        right = re.match(r"\s*([A-Za-z_]\w*)\b(?!\s*[\[(]|\s*->|\s*\.)",
+                         stripped[rm.end():])
+        if not left or not right:
+            continue
+        l, r = left.group(1), right.group(1)
+        if l not in rel_roots or r not in rel_roots:
+            continue
+        cl, cr = op_class(l), op_class(r)
+        if cl == "ram" and cr == "ram":
+            continue
+        tail = stripped[rm.end() + right.end():].lstrip()
+        whole = (tail[:1] in (")", ";", ",") or tail[:2] in ("&&", "||")) and \
+            re.search(r"[(&|;,!{]\s*$|\breturn\s*$|^\s*$",
+                      stripped[:left.start()].rstrip()[-6:] or "")
+        if "other" in (cl, cr) or not whole:
+            return {"eligible": False,
+                    "reason": f"relational compare of pointers {l} {rm.group(1)} {r} "
+                              "(host order differs from guest order)"}
+
+        def guest(n: str, c: str) -> str:
+            if n in ptrglobals:
+                return f"PE_LoadU32(0x{n[2:]}u)"
+            if n in pparam_names:
+                return f"pe_{n}"
+            if n in arrays:
+                return f"(pe_addr_t)0x{n[2:]}u"
+            return f"PE_HostToGuest({n})"
+        rel_rewrites.append((l, rm.group(1), r, guest(l, cl), guest(r, cr)))
+
+    # Step 3: guest-call arguments are guest registers.  `&D_X`, `&D_X[k]`,
+    # array/pointer-global `D_X + k` become the retail guest address in
+    # render (fix_argument_addresses); any other host-pointer expression has
+    # no guest meaning and is reported.
+    for gm in re.finditer(r"\bPE_GuestCall\(", stripped):
+        close = _balanced_end(stripped, gm.end() - 1)
+        gargs = split_top(stripped[gm.end(): close - 1])[3:]
+        for ga in gargs:
+            inner = re.sub(r"^\(uintptr_t\)\s*", "", ga.strip())
+            inner = _strip_parens(inner)
+            if inner in ("", "0"):
+                continue
+            if address_arg(inner, {d for d, _ in externs}, dict(externs)) is not None:
+                continue
+            if re.fullmatch(r"D_[0-9A-Fa-f]{7,8}", inner):
+                continue            # bare symbol: fix_argument_addresses
+            if inner in {pp for pp, _l, _t, _d in pointer_params(hdr.group(2))}:
+                continue            # E7b forwards the parameter's guest address
+            if is_pointer_expr(inner, ptr_roots):
+                return {"eligible": False,
+                        "reason": f"host pointer {inner[:32]} passed to a guest call"}
+
     data_types = {sym: decl for sym, decl in externs}
     d_syms_used = [s for s in data_types
                    if re.search(rf"\b{re.escape(s)}\b", stripped)]
@@ -709,6 +1147,10 @@ def analyze(name: str, src_text: str, matched: dict,
         "body": src_text,
         "wrap": wrap,
         "param_inner": hdr.group(2) if wrap else "",
+        "ptr_ret": ptr_ret,
+        "header_params": hdr.group(2),
+        "hostptr_args": sorted(hostptr_args),
+        "rel_rewrites": rel_rewrites,
     }
 
 
@@ -777,7 +1219,38 @@ def neutralize_declarations(body: str, shimmed_data: set[str],
     return "".join(out)
 
 
-def fix_argument_addresses(body: str, data_syms: set[str]) -> str:
+def guest_address_expr(sym: str, decl: str, index: str | None,
+                       amp: bool) -> str | None:
+    """Guest-address expression for a data symbol used as a call argument.
+
+    `&D_X` -> the symbol's address; `&D_X[k]` / array `D_X + k` -> its k-th
+    element; pointer-global `D_X + k` -> the stored guest pointer plus k
+    elements.  A scalar `D_X + k` is arithmetic on the value, not an address,
+    so it is left alone (None).
+    """
+    kind = classify_data(decl, sym)
+    addr = f"0x{sym[2:]}u"
+    if amp:
+        if index is None:
+            return f"(pe_addr_t){addr}"
+        if kind != "array":
+            return None
+        etype = declared_type(decl)
+        return f"(pe_addr_t)({addr} + (uint32_t)({index.strip()}) * sizeof({etype}))"
+    if kind == "array":
+        etype = declared_type(decl)
+        return f"(pe_addr_t)({addr} + (uint32_t)({index.strip()}) * sizeof({etype}))"
+    if kind == "ptrglobal":
+        pointee = pointer_pointee(declared_type(decl))
+        size = "1u" if pointee in ("void", "") else f"sizeof({pointee})"
+        return (f"(pe_addr_t)(PE_LoadU32({addr}) + "
+                f"(uint32_t)({index.strip()}) * {size})")
+    return None
+
+
+def fix_argument_addresses(body: str, data_syms: set[str],
+                           decls: dict[str, str] | None = None,
+                           host_ptr_params: dict[str, set[int]] | None = None) -> str:
     """Pass guest *addresses* where a bare data symbol is a call argument.
 
     In the matched leaf `f(arg0, D_800E0824)` the array decays to the retail
@@ -789,9 +1262,339 @@ def fix_argument_addresses(body: str, data_syms: set[str]) -> str:
         sym = m.group(2)
         if sym not in data_syms:
             return m.group(0)
-        return f"{m.group(1)}(pe_addr_t)0x{sym[2:]}u{m.group(3)}"
+        kind = classify_data(decls[sym], sym) if decls and sym in decls \
+            else "array"
+        if kind == "scalar":
+            # A bare scalar argument is its *value* (retail `lw`/`lh`/`lbu`
+            # of the symbol), which the SCALAR macro already yields.  Passing
+            # the address here handed func_80073E10 0x80095884 instead of
+            # D_80095884's contents (func_80077404).
+            return m.group(0)
+        if kind == "ptrglobal":
+            # A bare pointer global passes the guest address *stored in* the
+            # slot (retail `lui`/`lw`), not the slot's own address.
+            return f"{m.group(1)}(pe_addr_t)PE_LoadU32(0x{sym[2:]}u)"
+        return f"{m.group(1)}(pe_addr_t)0x{sym[2:]}u"
 
-    return re.sub(r"([(,]\s*)(D_[0-9A-Fa-f]{7,8})(\s*[,)])", repl, body)
+    # The closing `,`/`)` is a lookahead: consuming it made the next of two
+    # consecutive bare-symbol arguments unmatchable (room func_8018F09C:
+    # `func_800C2758(o, D_8018FFF8, D_8019001C)` rewrote only the first).
+    body = re.sub(r"([(,]\s*)(D_[0-9A-Fa-f]{7,8})(?=\s*[,)])",
+                  repl, body)
+    if not decls:
+        return body
+    body = rewrite_guest_call_address_args(body, data_syms, decls)
+    return rewrite_call_address_args(body, data_syms, decls, host_ptr_params or {})
+
+
+def rewrite_guest_call_address_args(body: str, data_syms: set[str],
+                                    decls: dict[str, str]) -> str:
+    """`PE_GuestCall(site, fn, n, (uintptr_t)(&D_X), ...)`: the register
+    value retail passes is the guest address of D_X."""
+    out = []
+    i = 0
+    for m in re.finditer(r"\bPE_GuestCall\(", body):
+        if m.start() < i:
+            continue
+        close = _balanced_end(body, m.end() - 1)
+        args = split_top(body[m.end(): close - 1])
+        new_args = args[:3]
+        for a in args[3:]:
+            inner = _strip_parens(re.sub(r"^\(uintptr_t\)\s*", "", a.strip()))
+            e = address_arg(inner, data_syms, decls)
+            new_args.append(f"(uintptr_t)({e})" if e else a.strip())
+        out.append(body[i:m.start()])
+        out.append("PE_GuestCall(" + ", ".join(x.strip() for x in new_args) + ")")
+        i = close
+    out.append(body[i:])
+    return "".join(out)
+
+
+ARG_AMP_FULL_RE = re.compile(
+    r"&\s*(D_[0-9A-Fa-f]{7,8})\s*(?:\[([^\[\](),]+)\])?")
+ARG_PLUS_FULL_RE = re.compile(
+    r"(D_[0-9A-Fa-f]{7,8})\s*\+\s*([A-Za-z_0-9x ]+?|\([^()]*\))")
+
+
+def address_arg(arg: str, data_syms: set[str], decls: dict[str, str]) -> str | None:
+    """Guest-address form of one *whole* call argument, or None.
+
+    Only an argument that is exactly `&D_X`, `&D_X[k]` or `D_X + k` (array or
+    pointer-global D_X) qualifies — never a sub-expression, so a pointer cast
+    such as `*(T *)(D_X + 4)` elsewhere in the body is untouched.
+    """
+    text = arg.strip()
+    while text.startswith("(") and text.endswith(")") and \
+            split_top(text[1:-1]) == [text[1:-1].strip()] and \
+            _balanced(text[1:-1]):
+        text = text[1:-1].strip()
+    m = ARG_AMP_FULL_RE.fullmatch(text)
+    if m:
+        sym, idx, amp = m.group(1), m.group(2), True
+    else:
+        m = ARG_PLUS_FULL_RE.fullmatch(text)
+        if not m:
+            return None
+        sym, idx, amp = m.group(1), m.group(2), False
+    if sym not in data_syms or sym not in decls:
+        return None
+    return guest_address_expr(sym, decls[sym], idx, amp)
+
+
+def _balanced(text: str) -> bool:
+    depth = 0
+    for ch in text:
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+            if depth < 0:
+                return False
+    return depth == 0
+
+
+# Host-signature context for rewrite_call_address_args, refreshed by main()
+# on every round (the canonical headers + generated TUs, and the set of
+# callees with any pc_port definition).
+_ADDR_SIGS: dict[str, dict] = {}
+_ADDR_KNOWN: set[str] = set()
+
+
+def guest_address_param(callee: str, idx: int) -> bool:
+    """Does the host callee take a guest address (not a host pointer) here?
+
+    A loud boundary records guest arguments; a canonical / generated host
+    signature says so per parameter.  A pc_port definition with no visible
+    host signature keeps the leaf's own (retail, pointer-typed) prototype, so
+    it is left alone and the compile gate judges it.
+    """
+    if callee in _ADDR_SIGS:
+        params = _ADDR_SIGS[callee]["params"]
+        return idx < len(params) and not is_host_pointer_type(params[idx])
+    return callee not in _ADDR_KNOWN
+
+
+def rewrite_call_args(body: str, fn) -> str:
+    """Rewrite whole `func_*` call arguments: `fn(callee, idx, arg)` returns a
+    replacement or None.  Calls are visited innermost-last-first; when an
+    inner call changes length, every enclosing call's end offset is shifted
+    so the outer argument split stays on the edited text."""
+    calls = []
+    for m in CALL_HEAD_RE.finditer(body):
+        i = m.end()
+        depth = 1
+        while i < len(body) and depth:
+            if body[i] == "(":
+                depth += 1
+            elif body[i] == ")":
+                depth -= 1
+            i += 1
+        if depth == 0:
+            calls.append([m.group(1), m.end(), i - 1])
+    calls.sort(key=lambda c: c[1], reverse=True)
+    for n, (callee, a, b) in enumerate(calls):
+        args = split_top(body[a:b])
+        if not args:
+            continue
+        new_args = []
+        changed = False
+        for idx, arg in enumerate(args):
+            e = fn(callee, idx, arg)
+            if e is not None:
+                new_args.append(e)
+                changed = True
+            else:
+                new_args.append(arg)
+        if changed:
+            text = ", ".join(new_args)
+            delta = len(text) - (b - a)
+            body = body[:a] + text + body[b:]
+            for outer in calls[n + 1:]:
+                if outer[1] <= a and outer[2] >= b:
+                    outer[2] += delta
+    return body
+
+
+def rewrite_call_address_args(body: str, data_syms: set[str],
+                              decls: dict[str, str],
+                              host_ptr_params: dict[str, set[int]]) -> str:
+    """Apply address_arg to every whole argument of every `func_*` call whose
+    host parameter takes a guest address (guest_address_param)."""
+    return rewrite_call_args(
+        body, lambda callee, idx, arg:
+        address_arg(arg, data_syms, decls)
+        if guest_address_param(callee, idx) else None)
+
+
+CODE_CAST_RE = re.compile(
+    r"\(\s*(unsigned\s+int|unsigned\s+long|unsigned|int|long|"
+    r"u32|s32|uint32_t|int32_t)\s*\)\s*&?\s*(func_[0-9A-Fa-f]{8})\b(?!\s*\()")
+BARE_CODE_ARG_RE = re.compile(r"\(*\s*&?\s*(func_[0-9A-Fa-f]{8})\s*\)*")
+
+
+FNPTR_DECL_RE = re.compile(
+    r"(?P<pre>(?:\b(?:extern|static|register|const|volatile)\s+)*)"
+    r"(?P<ret>[A-Za-z_][\w \t]*?[\s\*]*)"
+    r"\(\s*\*\s*(?:(?:const|volatile)\s+)*(?P<name>[A-Za-z_]\w*)\s*\)"
+    r"\s*\((?P<params>[^()]*)\)")
+FNPTR_CAST_RE = re.compile(r"\(\s*[A-Za-z_][\w \t\*]*?\(\s*\*\s*\)\s*\([^()]*\)\s*\)")
+FNPTR2_CAST_RE = re.compile(r"\(\s*[A-Za-z_][\w \t\*]*?\(\s*\*\s*\*\s*\)\s*\([^()]*\)\s*\)")
+FNPTR_TYPEDEF_RE = re.compile(
+    r"\btypedef\s+[A-Za-z_][\w \t\*]*?\(\s*\*\s*(?P<name>[A-Za-z_]\w*)\s*\)\s*\([^()]*\)\s*;")
+
+
+def rewrite_guest_calls(text: str, leaf: str) -> tuple[str, str]:
+    """Calls through guest code pointers become PE_GuestCall (step 3).
+
+    On the PS1 a function pointer is a 32-bit guest code address.  Every
+    function-pointer declarator (`R (*f)(P)` — locals, parameters, pointer
+    globals, struct members, prototype parameters) becomes `pe_addr_t f`,
+    every function-pointer cast becomes an integer cast (`(R (*)(P))x` ->
+    `(pe_addr_t)x`, `(R (**)(P))p` -> `(pe_addr_t *)p`, so a slot is read as
+    the 32-bit guest word), and every call through such a value becomes
+    `PE_GuestCall("<leaf>:<callee>", addr, n, a0..a3)`, which dispatches to
+    the resolved host implementation or records a loud boundary
+    (pc_port/platform/pe_guestcode.h).  Returns (text, reject_reason)."""
+    names: set[str] = set()
+    tdefs: set[str] = set()
+
+    def tdef(m: re.Match) -> str:
+        tdefs.add(m.group("name"))
+        return f"typedef pe_addr_t {m.group('name')};"
+    text = FNPTR_TYPEDEF_RE.sub(tdef, text)
+
+    def decl(m: re.Match) -> str:
+        names.add(m.group("name"))
+        pre = m.group("pre")
+        return f"{pre}pe_addr_t {m.group('name')}"
+    text = FNPTR_DECL_RE.sub(decl, text)
+    text = FNPTR2_CAST_RE.sub("(pe_addr_t *)", text)
+    text = FNPTR_CAST_RE.sub("(pe_addr_t)", text)
+    for t in tdefs:
+        for m in re.finditer(rf"\b{re.escape(t)}\s+\**\s*([A-Za-z_]\w*)", text):
+            names.add(m.group(1))
+    if not names and "pe_addr_t *)" not in text:
+        return text, ""
+
+    # Call sites: `(*f)(args)`, `f(args)` (f a guest code pointer), and a
+    # parenthesised slot read `(*(pe_addr_t *)(p))(args)`.
+    out = []
+    i = 0
+    pat = re.compile(
+        r"\(\s*\*\s*(?P<a>[A-Za-z_]\w*)\s*\)\s*\("               # (*f)(
+        r"|(?<![\w.>])(?P<m>[A-Za-z_]\w*(?:\s*(?:->|\.)\s*[A-Za-z_]\w*)+)\s*\("  # o->f(
+        r"|(?<![\w.>])(?P<b>[A-Za-z_]\w*)\s*\("                        # f(
+        r"|\(\s*\*\s*\(\s*pe_addr_t\s*\*\s*\)")                 # (*(pe_addr_t *)
+    while True:
+        m = pat.search(text, i)
+        if not m:
+            out.append(text[i:])
+            break
+        if m.group("m"):
+            member = re.split(r"->|\.", m.group("m"))[-1].strip()
+            if member not in names:
+                out.append(text[i:m.end()])
+                i = m.end()
+                continue
+            expr = re.sub(r"\s+", "", m.group("m"))
+            out_args_open = m.end() - 1
+            close_args = _balanced_end(text, out_args_open)
+            args = [a for a in split_top(text[out_args_open + 1: close_args - 1]) if a.strip()]
+            if len(args) > 4:
+                return text, f"guest call with {len(args)} arguments (stack args)"
+            pad = [f"(uintptr_t)({a.strip()})" for a in args] + ["0"] * (4 - len(args))
+            out.append(text[i:m.start()])
+            out.append(f'PE_GuestCall("@{leaf[5:]}:{member}", (pe_addr_t)({expr}), '
+                       f'{len(args)}u, {", ".join(pad)})')
+            i = close_args
+            continue
+        callee = m.group("a") or m.group("b")
+        if m.group("b") and (callee not in names or is_declarator(text, m.start("b"))):
+            out.append(text[i:m.end()])
+            i = m.end()
+            continue
+        if callee:
+            fn_expr = f"(pe_addr_t)({callee})"
+            args_open = m.end() - 1
+            site = f"@{leaf[5:]}:{callee}"   # no bare func_ token (E6)
+        else:
+            # `(*(pe_addr_t *)(EXPR))(args)`: the whole parenthesised callee
+            close = _balanced_end(text, m.start())
+            k = close
+            while k < len(text) and text[k] in " \t\n":
+                k += 1
+            if k >= len(text) or text[k] != "(":
+                out.append(text[i:m.end()])
+                i = m.end()
+                continue
+            inner = text[m.start() + 1: close - 1].strip()
+            fn_expr = f"(pe_addr_t)({inner})"
+            args_open = k
+            site = f"@{leaf[5:]}:indirect"
+        close_args = _balanced_end(text, args_open)
+        args = [a for a in split_top(text[args_open + 1: close_args - 1]) if a.strip()]
+        if len(args) > 4:
+            return text, f"guest call with {len(args)} arguments (stack args)"
+        pad = [f"(uintptr_t)({a.strip()})" for a in args] + ["0"] * (4 - len(args))
+        out.append(text[i:m.start()])
+        out.append(f'PE_GuestCall("{site}", {fn_expr}, {len(args)}u, {", ".join(pad)})')
+        i = close_args
+    return "".join(out), ""
+
+
+def rewrite_code_addresses(text: str) -> str:
+    """A function's address used as a 32-bit *value* is its retail VMA.
+
+    Two shapes are rewritten, both exactly what retail's `lui`/`addiu` pair
+    materialises:
+
+    * an integer cast `(unsigned int)func_X` / `(int)&func_X` (a callback
+      stored into a guest word: `*(unsigned int *)(p + 0x30) = ...`) becomes
+      `(unsigned int)0xXu`;
+    * a bare `func_X` / `&func_X` passed as a whole call argument whose host
+      parameter takes a guest address (a loud boundary, or a canonical /
+      generated signature with a non-pointer parameter) becomes
+      `(pe_addr_t)0xXu` — the convention hand adapters already use for
+      code-pointer arguments (hand_lo_protos.h).
+
+    Anything else (a `void *` store, a pointer-global assignment, a callee
+    that takes a real host function pointer) is left alone and still falls
+    under E6.
+    """
+    text = CODE_CAST_RE.sub(
+        lambda m: f"({m.group(1)})0x{m.group(2)[5:].upper()}u", text)
+
+    def arg(callee: str, idx: int, a: str) -> str | None:
+        m = BARE_CODE_ARG_RE.fullmatch(a.strip())
+        if m is None or m.group(1) == callee:
+            return None
+        if not guest_address_param(callee, idx):
+            return None
+        return f"(pe_addr_t)0x{m.group(1)[5:].upper()}u"
+    return rewrite_call_args(text, arg)
+
+
+def host_to_guest_args(body: str, plan: dict) -> str:
+    """Arguments recorded by analyze() as host pointer locals passed where
+    the callee takes a guest address: forward `PE_HostToGuest(p)`.  Also
+    applies E19's pointer-compare rewrites (compare guest values)."""
+    for l, op, r, lg, rg in plan.get("rel_rewrites", []):
+        body = re.sub(rf"(?<![\w.>])\b{re.escape(l)}\s*{re.escape(op)}\s*{re.escape(r)}\b",
+                      f"({lg} {op} {rg})", body)
+    want = {tuple(x) for x in plan.get("hostptr_args", [])}
+    if not want:
+        return body
+    return rewrite_call_args(
+        body, lambda c, i, a: f"PE_HostToGuest({a.strip()})" if (c, i) in want else None)
+
+
+def canonical_for(plan: dict, proto: dict[str, int]) -> set[str]:
+    """Callees whose leaf declaration is replaced by a host prototype: every
+    canonical header prototype, plus decomp-derived callees whose generated
+    host signature differs from the leaf's own declaration."""
+    derived = set(plan.get("derived_all", ()))
+    return ({c for c in proto if c not in derived}
+            | set(plan.get("host_override", ())))
 
 
 def render(name: str, plan: dict, matched: dict, known_funcs: set[str],
@@ -831,8 +1634,10 @@ def render(name: str, plan: dict, matched: dict, known_funcs: set[str],
             lines.append(f"#define {sym} PE_DECOMP_ARRAY(0x{sym[2:]}u, {etype})")
         else:
             pointee = pointer_pointee(etype)
+            macro = ("PE_DECOMP_PTRGLOBAL_NULLABLE"
+                     if null_tested(plan["body"], sym) else "PE_DECOMP_PTRGLOBAL")
             lines.append(
-                f"#define {sym} PE_DECOMP_PTRGLOBAL(0x{sym[2:]}u, {pointee})")
+                f"#define {sym} {macro}(0x{sym[2:]}u, {pointee})")
         emitted_data = True
     if emitted_data:
         lines.append("")
@@ -859,11 +1664,24 @@ def render(name: str, plan: dict, matched: dict, known_funcs: set[str],
 
     shimmed_data = {s for s, _ in plan["externs"] if s not in plan["shadowed"]}
     body = neutralize_declarations(plan["body"].rstrip("\n"), shimmed_data,
-                                   set(plan["boundaries"]), set(proto))
+                                   set(plan["boundaries"]),
+                                   canonical_for(plan, proto))
+
+    if plan.get("host_protos"):
+        lines.append("/* host prototypes of decomp-derived callees (generated TUs) */")
+        lines.extend(plan["host_protos"])
+        lines.append("")
 
     lines.append("/* ── verbatim matching leaf (src/%s.c) ───────────────────────── */" % name)
     lines.append("")
-    lines.append(fix_argument_addresses(body, shimmed_data) + "\n")
+    body = fix_argument_addresses(body, shimmed_data, plan["data_types"])
+    body = host_to_guest_args(body, plan)
+    if plan.get("ptr_ret"):
+        body = rename_ptr_ret_definition(body, name)
+        hp = plan["header_params"].strip()
+        body += "\n" + ptr_return_thunk(
+            name, hp if hp else "void", param_call_names(hp), ptr_roots_expr(plan))
+    lines.append(body + "\n")
     return "\n".join(lines) + "\n"
 
 
@@ -898,6 +1716,278 @@ def wrapper_casts_ok(stripped: str, inner: str) -> tuple[bool, str]:
             if cbase and cbase != pbase:
                 return False, f"cast {m.group(1)} on {pname} ({decl}) changes width"
     return True, ""
+
+
+PTR_RET_RE = re.compile(
+    r"(?:(?:const|volatile|unsigned|signed|struct|extern|static)\s+)*"
+    r"[A-Za-z_]\w*(?:\s+(?:const|volatile|int|char|short|long))*"
+    r"(?:\s*\*\s*(?:const|volatile)?)+")
+
+
+def param_call_names(param_text: str, pointer_names: set[str] = frozenset()) -> str:
+    """Argument list that forwards a parameter list unchanged (pointer
+    parameters of an E7b wrapper are forwarded as `pe_<name>`)."""
+    names, _ = parse_params(param_text)
+    return ", ".join(f"pe_{n}" if n in pointer_names else n for n in names)
+
+
+def null_tested(text: str, name: str) -> bool:
+    """Does the leaf null-test `name` — directly, or through a plain copy
+    (`p = name;`, `T *p = (T *)name;`)?  Tests recognised: `x == 0`,
+    `x != 0`, `0 == x`, `!x`, `if (x)`, `while (x)`, `x &&`, `x ||`, `x ?`,
+    `&& x)`, `|| x)`.  Only such names get the guest-0 -> host-NULL mapping;
+    every other pointer translates 0 through the retail RAM mirror
+    (portverify: 71 generated TUs segfaulted on a blanket NULL mapping where
+    retail reads low RAM)."""
+    text = strip_comments(text)
+    aliases = {name}
+    changed = True
+    while changed:
+        changed = False
+        for a in list(aliases):
+            for m in re.finditer(
+                    rf"\b([A-Za-z_]\w*)\s*=\s*(?:\([^()]*\)\s*)?{re.escape(a)}\s*[;,)]",
+                    text):
+                if m.group(1) not in aliases:
+                    aliases.add(m.group(1))
+                    changed = True
+    for a in aliases:
+        e = re.escape(a)
+        pats = [
+            rf"(?<![\*.>])(?<!\*\s)\b{e}\s*[!=]=\s*(?:\(\s*[\w\s\*]+\)\s*)?(?:0[xX]?0*|NULL)\b",
+            rf"\b(?:0|NULL)\s*[!=]=\s*{e}\b",
+            rf"!(?!=)\s*{e}\b(?!\s*(?:\[|\.|->|\())",
+            rf"\b(?:if|while)\s*\(\s*{e}\s*\)",
+            rf"\b{e}\s*(?:&&|\|\||\?)",
+            rf"(?:&&|\|\|)\s*{e}\s*(?:\)|&&|\|\||;)",
+        ]
+        if any(re.search(p, text) for p in pats):
+            return True
+    return False
+
+
+def return_root(text: str, roots: set[str]) -> str | None:
+    """The single pointer root every `return` of the leaf derives from,
+    following plain copies (`d = a0;`, `register int *d = a0;`), or None.
+    `return 0;` / `return NULL;` agree with any root."""
+    text = strip_comments(text)
+    alias: dict[str, str] = {}
+    for m in re.finditer(r"\b([A-Za-z_]\w*)\s*=\s*(?:\([^()]*\)\s*)?([A-Za-z_]\w*)\s*[;,)]",
+                         text):
+        alias.setdefault(m.group(1), m.group(2))
+
+    def resolve(n: str) -> str:
+        seen = set()
+        while n in alias and n not in roots and n not in seen:
+            seen.add(n)
+            n = alias[n]
+        return n
+    found: set[str] = set()
+    for m in re.finditer(r"\breturn\b([^;]*);", text):
+        e = _strip_parens(m.group(1))
+        if e in ("", "0", "NULL") or re.fullmatch(r"\(\s*\w[\w\s\*]*\)\s*0", e):
+            continue
+        e = re.sub(r"^\(\s*[A-Za-z_][\w\s]*\*+\s*\)\s*", "", e)   # pointer cast
+        hit = None
+        for t in _top_terms(e):
+            t2 = _strip_parens(t).lstrip("&")
+            mm = re.match(r"[A-Za-z_]\w*", t2)
+            if mm and resolve(mm.group(0)) in roots:
+                hit = resolve(mm.group(0))
+                break
+        if hit is None:
+            return None
+        found.add(hit)
+    return found.pop() if len(found) == 1 else None
+
+
+def ptr_roots_expr(plan: dict, pparams_names: set[str] | None = None) -> list[str]:
+    """Guest-address expression(s) of the pointer root(s) a pointer-return
+    leaf's result derives from, for PE_DecompReturnSegment.  With several
+    roots, the one every `return` traces back to (through plain copies) is
+    chosen (func_80078C94 `d = a0; return d;`, func_80072334 `return dst;`);
+    otherwise all roots are returned and the thunk leaves the result KSEG0."""
+    exprs = {sym: f"PE_LoadU32(0x{sym[2:]}u)" for sym in plan.get("d_syms_used", [])
+             if classify_data(plan["data_types"][sym], sym) == "ptrglobal"}
+    exprs.update({p: f"pe_{p}" for p in sorted(pparams_names or ())})
+    if len(exprs) > 1:
+        r = return_root(plan.get("body", ""), set(exprs))
+        if r is not None:
+            return [exprs[r]]
+    return list(exprs.values())
+
+
+def ptr_return_thunk(name: str, sig_params: str, call_args: str,
+                     roots: list[str] | None = None) -> str:
+    """The exported half of the pointer-return adapter.  With exactly one
+    pointer root, its KUSEG/KSEG1 segment is re-applied to the result
+    (PE_DecompReturnSegment); the root is read before the leaf runs (E12
+    forbids pointer-global stores, and a parameter is a value)."""
+    head = (f"\n/* pointer-return adapter: retail returns a 32-bit guest address */\n"
+            f"pe_addr_t {name}({sig_params})\n{{\n")
+    if roots and len(roots) == 1:
+        return (head + f"    pe_addr_t pe_root = {roots[0]};\n"
+                f"    return PE_DecompReturnSegment(PE_HostToGuest(pe_host_{name}({call_args})), pe_root);\n}}\n")
+    return head + f"    return PE_HostToGuest(pe_host_{name}({call_args}));\n}}\n"
+
+
+def rename_ptr_ret_definition(body: str, name: str) -> str:
+    """`T *func_X(...) {` -> `static T *pe_host_func_X(...) {`."""
+    for m in HDR_RE.finditer(body):
+        if m.group(1) != name:
+            continue
+        head = m.group(0)
+        lead = len(head) - len(head.lstrip())
+        new = head[:lead] + "static " + head[lead:]
+        new = re.sub(rf"\b{re.escape(name)}(?=\s*\()", f"pe_host_{name}", new, count=1)
+        return body[:m.start()] + new + body[m.end():]
+    raise AssertionError(f"no definition header for {name}")
+
+
+PTRPTR_CAST_RE = re.compile(
+    r"\(\s*(?:(?:const|volatile|unsigned|signed|struct)\s+)*[A-Za-z_]\w*"
+    r"(?:\s+(?:const|volatile|int|char|short|long))*\s*\*\s*(?:const|volatile)?"
+    r"\s*\*[\s\*]*\)")
+PTR_DECL_RE = re.compile(
+    r"(?:^|[;{}(,])\s*(?:(?:const|volatile|unsigned|signed|struct|register|"
+    r"static|extern)\s+)*[A-Za-z_]\w*(?:\s+(?:int|char|short|long))*"
+    r"\s*(\**)\s*(?:(?:const|volatile)\s+)*([A-Za-z_]\w*)\s*(\[)?")
+
+
+def pointer_typed_names(text: str) -> set[str]:
+    """Identifiers declared (anywhere in the leaf) with a pointer or array
+    type: `unsigned char *p`, `Rec *r = ...`, `short buf[8]`.  A name that is
+    also declared with a non-pointer type is excluded (ambiguous → not a
+    pointer root)."""
+    ptr: set[str] = set()
+    other: set[str] = set()
+    keywords = {"return", "if", "while", "for", "switch", "case", "else",
+                "do", "goto", "sizeof"}
+    for m in PTR_DECL_RE.finditer(text):
+        name = m.group(2)
+        head = m.group(0)
+        first = re.match(r"[;{}(,]?\s*(\w+)", head)
+        if first and first.group(1) in keywords:
+            continue
+        tail = text[m.end():].lstrip()
+        if tail.startswith("(") and not m.group(3):
+            continue            # a function declarator, not an object
+        stars = len(m.group(1))
+        if (stars == 1 and not m.group(3)) or (stars == 0 and m.group(3)):
+            ptr.add(name)
+        else:
+            other.add(name)
+    return ptr - other
+
+
+PTR1_CAST_RE = re.compile(
+    r"\(\s*(?:(?:const|volatile|unsigned|signed|struct)\s+)*[A-Za-z_]\w*"
+    r"(?:\s+(?:const|volatile|int|char|short|long))*\s*\*\s*"
+    r"(?:(?:const|volatile)\s*)?\)")
+
+
+def _balanced_end(text: str, i: int) -> int:
+    """Index just past the bracket group opening at text[i]."""
+    pairs = {"(": ")", "[": "]"}
+    close = pairs[text[i]]
+    depth = 0
+    j = i
+    while j < len(text):
+        if text[j] == text[i]:
+            depth += 1
+        elif text[j] == close:
+            depth -= 1
+            if depth == 0:
+                return j + 1
+        j += 1
+    return len(text)
+
+
+def cast_operand(text: str, i: int) -> str:
+    """The unary-expression operand of a cast ending at text[i]."""
+    j = i
+    while j < len(text) and text[j] in " \t\n":
+        j += 1
+    start = j
+    while j < len(text) and text[j] in "&*-!~ \t":
+        j += 1
+    if j < len(text) and text[j] == "(":
+        j = _balanced_end(text, j)
+        # a nested cast `(T)(x)` / `(T)x`: include its operand too
+        inner = text[start:j].lstrip("&*-!~ \t")
+        if re.fullmatch(r"\(\s*[A-Za-z_][\w \t]*\**\s*\)", inner):
+            return text[start:j] + cast_operand(text, j)
+    else:
+        m = re.match(r"[A-Za-z_]\w*|0[xX][0-9A-Fa-f]+|\d+|\"[^\"]*\"", text[j:])
+        if not m:
+            return text[start:j]
+        j += m.end()
+    while j < len(text):
+        k = j
+        while k < len(text) and text[k] in " \t":
+            k += 1
+        if k < len(text) and text[k] in "[(":
+            j = _balanced_end(text, k)
+        elif text.startswith("->", k) or (k < len(text) and text[k] == "."):
+            m = re.match(r"(?:->|\.)\s*\w+", text[k:])
+            j = k + m.end() if m else k + 1
+        else:
+            break
+    return text[start:j]
+
+
+def _strip_parens(e: str) -> str:
+    e = e.strip()
+    while e.startswith("(") and _balanced_end(e, 0) == len(e):
+        e = e[1:-1].strip()
+    return e
+
+
+def _top_terms(e: str) -> list[str]:
+    """Split on top-level binary + / -."""
+    terms, depth, cur, prev = [], 0, "", ""
+    for idx, ch in enumerate(e):
+        if ch in "([":
+            depth += 1
+        elif ch in ")]":
+            depth -= 1
+        nxt = e[idx + 1] if idx + 1 < len(e) else ""
+        if depth == 0 and ch in "+-" and nxt not in (">", ch) and \
+                prev not in ("+", "-") and prev and (prev.isalnum() or prev in ")]_"):
+            terms.append(cur)
+            cur = ""
+            prev = ""
+            continue
+        cur += ch
+        if not ch.isspace():
+            prev = ch
+    terms.append(cur)
+    return [t for t in (x.strip() for x in terms) if t]
+
+
+def is_pointer_expr(expr: str, roots: set[str]) -> bool:
+    """Does `expr` evaluate to a *host pointer into guest RAM* in the generated
+    TU?  True for `&lvalue`, a nested pointer cast (checked on its own), a
+    bare pointer-root identifier, or pointer arithmetic on one.  An indexed,
+    dereferenced, member or call result (`base[0x28]`, `*a0`, `func_X()`) is a
+    *value* — a 32-bit guest address — and does not count."""
+    e = _strip_parens(expr)
+    if not e:
+        return False
+    if e.startswith("&") or e.startswith('"'):
+        return True
+    if PTR1_CAST_RE.match(e) or PTRPTR_CAST_RE.match(e):
+        return True
+    terms = _top_terms(e)
+    for t in terms:
+        t2 = _strip_parens(t)
+        if t2 != t.strip() and is_pointer_expr(t2, roots):
+            return True
+        if re.fullmatch(r"[A-Za-z_]\w*", t2) and t2 in roots:
+            return True
+        if t2.startswith("&") or PTR1_CAST_RE.match(t2):
+            return True
+    return False
 
 
 WRAPPER_SIG_RE = re.compile(
@@ -986,8 +2076,10 @@ def render_wrapper(name: str, plan: dict, leaf: dict, report: Path,
     # literal, so the remaining bare forms are array/pointer-global values.
     body = plan["body"].rstrip("\n")
     body = neutralize_declarations(body, set(), set(plan["boundaries"]),
-                                   set(proto))
-    body = fix_argument_addresses(body, set(plan["d_syms_used"]))
+                                   canonical_for(plan, proto))
+    body = fix_argument_addresses(body, set(plan["d_syms_used"]),
+                                  plan["data_types"])
+    body = host_to_guest_args(body, plan)
     for sym in sorted(plan["d_syms_used"], key=len, reverse=True):
         kind = classify_data(plan["data_types"][sym], sym)
         if kind == "scalar":
@@ -996,7 +2088,10 @@ def render_wrapper(name: str, plan: dict, leaf: dict, report: Path,
             body = re.sub(rf"\b{re.escape(sym)}\b", f"(*host_{sym})", body)
         else:
             body = re.sub(rf"\b{re.escape(sym)}\b", f"host_{sym}", body)
+    vecs = argvec_params(plan["param_inner"])
     for pname, _lvl, _toks, decl in pparams:
+        if pname in vecs:
+            continue
         body = re.sub(
             rf"\(\s*{re.escape(re.sub(r'\*+\s*$', '', decl).strip())}\s*\*+\s*\)"
             rf"\s*{re.escape(pname)}\b",
@@ -1012,6 +2107,11 @@ def render_wrapper(name: str, plan: dict, leaf: dict, report: Path,
         body = re.sub(rf"(?<![.>])\b{re.escape(pname)}\b", f"host_{pname}", body)
     body_only = extract_body(body, name)
     assert body_only is not None, name
+    # E7c: guest-pointer-vector parameters (only inside the body; the
+    # signature already became `pe_addr_t pe_<name>`).
+    for pname, etype in vecs.items():
+        body_only, why = argvec_rewrite(body_only, pname, etype)
+        assert not why, (name, why)
 
     lines: list[str] = []
     lines.append(
@@ -1046,10 +2146,16 @@ def render_wrapper(name: str, plan: dict, leaf: dict, report: Path,
             r"\b(func_[0-9A-Fa-f]{8})\s*\([^\n;{]*?\)\s*;[ \t]*$",
             stripped, re.MULTILINE):
         callee = m.group(1)
-        if callee == name or callee in proto or callee in plan["boundaries"]:
+        if callee == name or callee in plan["boundaries"] or \
+                callee in canonical_for(plan, proto):
             continue
         callee_protos.append(re.sub(r"[ \t]+", " ",
                                     m.group(0).strip()))
+    if plan.get("host_protos"):
+        lines.append("/* host prototypes of decomp-derived callees (generated TUs) */\n")
+        for decl in plan["host_protos"]:
+            lines.append(decl + "\n")
+        lines.append("\n")
     if callee_protos:
         lines.append("/* verbatim callee declarations */\n")
         for decl in dict.fromkeys(callee_protos):
@@ -1070,13 +2176,21 @@ def render_wrapper(name: str, plan: dict, leaf: dict, report: Path,
     if plan["boundaries"]:
         lines.append("")
 
-    lines.append(f"{ret_type} {name}({', '.join(sig_params)})\n{{\n")
+    if plan.get("ptr_ret"):
+        lines.append(f"static {ret_type} pe_host_{name}({', '.join(sig_params)})\n{{\n")
+    else:
+        lines.append(f"{ret_type} {name}({', '.join(sig_params)})\n{{\n")
     for decl_line in _host_locals(plan, pparams, body_only):
         lines.append(decl_line + "\n")
     lines.append("    /* verbatim body (src/%s.c) */\n" % name)
     for bl in body_only.split("\n"):
         lines.append(bl + "\n")
     lines.append("}\n")
+    if plan.get("ptr_ret"):
+        lines.append(ptr_return_thunk(
+            name, ", ".join(sig_params) or "void",
+            param_call_names(plan["param_inner"], pnames),
+            ptr_roots_expr(plan, {p for p in pnames if p not in argvec_params(plan["param_inner"])})))
     return "".join(lines)
 
 
@@ -1086,8 +2200,9 @@ def _host_locals(plan: dict, pparams: list, body: str) -> list[str]:
     guest address in the body, so no host pointer local is emitted for it."""
     out: list[str] = []
     for sym in plan["d_syms_used"]:
-        if sym in plan["shadowed"]:
-            continue
+        # A shadowed symbol (the shim header also #defines it) is still
+        # rebound here: the body now names `host_<sym>`, never the macro, and
+        # the local is built from the leaf's own declared type.
         if f"host_{sym}" not in body:
             continue
         kind = classify_data(plan["data_types"][sym], sym)
@@ -1098,13 +2213,29 @@ def _host_locals(plan: dict, pparams: list, body: str) -> list[str]:
             out.append(f"    {etype} *host_{sym} = PE_DECOMP_ARRAY(0x{sym[2:]}u, {etype});")
         else:
             pointee = pointer_pointee(etype)
-            out.append(f"    {pointee} *host_{sym} = PE_DECOMP_PTRGLOBAL(0x{sym[2:]}u, {pointee});")
+            # The wrapper loads the slot once at entry.  A guest 0 either
+            # becomes a host NULL (the leaf null-tests the slot:
+            # PE_DECOMP_PTRGLOBAL_NULLABLE) or low RAM through the retail
+            # mirror (PE_DECOMP_PTRGLOBAL); neither aborts at entry
+            # (func_800136C0 only compares D_8009D254), see null_tested().
+            macro = ("PE_DECOMP_PTRGLOBAL_NULLABLE"
+                     if null_tested(plan["body"], sym) else "PE_DECOMP_PTRGLOBAL")
+            out.append(f"    {pointee} *host_{sym} = {macro}(0x{sym[2:]}u, {pointee});")
     for pname, _lvl, _toks, decl in pparams:
         if f"host_{pname}" not in body:
             continue
         base = param_base_type(decl, pname)
-        out.append(
-            f"    {base} *host_{pname} = ({base} *)PE_Translate(pe_{pname}, 1);")
+        # A guest NULL must stay a host NULL: matched leaves test their
+        # pointer parameters (`if (a0 != 0)`, src/func_80080998.c), and an
+        # eager PE_Translate(0) aborted before that test could run
+        # (portverify: func_80080998 called with dest 0 from func_80080DC4).
+        # Any other address is still bounds-checked by PE_Translate.
+        if null_tested(plan["body"], pname):
+            out.append(
+                f"    {base} *host_{pname} = ({base} *)PE_DecompTranslateOrNull(pe_{pname});")
+        else:
+            out.append(
+                f"    {base} *host_{pname} = ({base} *)PE_Translate(pe_{pname}, 1u);")
     return out
 
 
@@ -1203,6 +2334,18 @@ def main() -> int:
         shim_macros = pc_port_macros()
         protos = canonical_protos()
         sigs = canonical_signatures()
+        # Generated decomp-derived definitions are host authorities too (see
+        # derived_signatures); a canonical header prototype still wins.
+        header_protos = set(protos)
+        dsigs = {n: s for n, s in derived_signatures().items()
+                 if n not in header_protos}
+        for n, s in dsigs.items():
+            protos.setdefault(n, len(s["params"]))
+            sigs.setdefault(n, {"ret": s["ret"], "params": s["params"]})
+        _ADDR_SIGS.clear()
+        _ADDR_SIGS.update(sigs)
+        _ADDR_KNOWN.clear()
+        _ADDR_KNOWN.update(known)
         out_dir = REPO_ROOT / OUT_DIR
 
         eligible: list[str] = []
@@ -1219,6 +2362,14 @@ def main() -> int:
             if not plan["eligible"]:
                 skipped[name] = plan["reason"]
                 continue
+            override = [c for c in plan["callees"]
+                        if c in dsigs and c != name and not same_host_decl(
+                            strip_comments(src.read_text(encoding="utf-8",
+                                                         errors="replace")),
+                            c, dsigs[c])]
+            plan["host_protos"] = [dsigs[c]["decl"] for c in override]
+            plan["host_override"] = override
+            plan["derived_all"] = sorted(dsigs)
             plans[name] = plan
             eligible.append(name)
 
@@ -1277,6 +2428,15 @@ def main() -> int:
                       "(set CC); emitting without the compile gate", file=sys.stderr)
             else:
                 uncompilable = compile_check(cc, rendered)
+                # A shared-header break makes (nearly) every TU fail with the
+                # same error; pruning then would wipe the generated tree.
+                if rendered and len(uncompilable) > len(rendered) // 2:
+                    from collections import Counter
+                    top, cnt = Counter(uncompilable.values()).most_common(1)[0]
+                    raise SystemExit(
+                        f"gen_decomp_ports: {len(uncompilable)}/{len(rendered)} TUs fail "
+                        f"the compile gate ({cnt} with: {top}) — a shared pc_port header "
+                        "is broken; refusing to emit/prune.  Fix the header and re-run.")
                 rendered = [(n, c) for n, c in rendered if n not in uncompilable]
 
         for name, content in rendered:

@@ -38,21 +38,4 @@ extern pe_addr_t func_80071A24(pe_addr_t dst, uint32_t len);
 #define GA_649D0_BYTE6   0x800A3124u
 #define GA_649D0_BYTE7   0x800A3134u
 
-void func_800649D0(int a0)
-{
-    PE_StoreU32(GA_649D0_STATE, (uint32_t)a0);
-
-    if (a0 != 0)
-        return;
-
-    func_80071A24(GA_649D0_BASE, GA_649D0_SIZE);
-
-    PE_StoreU8(GA_649D0_BYTE0, 0xFFu);
-    PE_StoreU8(GA_649D0_BYTE1, 0xFFu);
-    PE_StoreU8(GA_649D0_BYTE2, 0xFFu);
-    PE_StoreU8(GA_649D0_BYTE3, 0xFFu);
-    PE_StoreU8(GA_649D0_BYTE4, 0xFFu);
-    PE_StoreU8(GA_649D0_BYTE5, 0xFFu);
-    PE_StoreU8(GA_649D0_BYTE6, 0xFFu);
-    PE_StoreU8(GA_649D0_BYTE7, 0xFFu);
-}
+/* func_800649D0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800649D0_port.c (src/func_800649D0.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

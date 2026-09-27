@@ -10,19 +10,7 @@ static void status_flags(uint32_t clear,uint32_t set)
     PE_StoreU32(p,(PE_LoadU32(p)&~clear)|set);
 }
 
-void func_800201DC(void)
-{
-    pe_addr_t p=player_record(),actor=PE_LoadU32(0x8009D254u);
-    if (PE_LoadU8(p+58u)>=PE_LoadU8(p+59u)) {
-        unsigned damage=PE_LoadU16(p+56u);
-        PE_StoreU16(p+12u,(uint16_t)(PE_LoadU16(p+12u)-damage));
-        PE_StoreU16(p+14u,(uint16_t)(PE_LoadU16(p+14u)-damage));
-        PE_StoreU8(p+58u,0u);PE_StoreU16(p+96u,(uint16_t)damage);
-        PE_StoreU16(p+98u,PE_LoadU16(actor+528u));PE_StoreU16(p+100u,PE_LoadU16(actor+530u));
-        PE_StoreU8(p+102u,30u);PE_StoreU8(p+103u,3u);
-    }
-    PE_StoreU8(p+58u,(uint8_t)(PE_LoadU8(p+58u)+1u));
-}
+/* func_800201DC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800201DC_port.c (src/func_800201DC.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 static void recovery_effect(unsigned code,unsigned sound)
 {

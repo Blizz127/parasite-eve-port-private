@@ -18,32 +18,4 @@
 #define GA_42CC4_TABLE 0x800A1878u
 #define GA_42CC4_COUNT 0x8009CEE0u /* retail gp 0x8009CD70 + 0x170 */
 
-void func_80042CC4(int a0, int a1)
-{
-    uint32_t base = GA_42CC4_TABLE;
-    uint32_t a2;
-    uint32_t a3;
-    uint32_t t0;
-
-    PE_StoreU8(base, 0u);
-    a2 = base;
-    a3 = 0x100u - (uint32_t)a0;
-    t0 = base + 0xFu;
-
-    /* The initial branch's delay slot shifts the color base by 8. */
-    uint32_t color = (uint32_t)a0 << 8;
-    if (a2 < t0) {
-        do {
-            uint32_t byte = PE_LoadU8(a2);
-            if (!((int32_t)byte < (int32_t)a1))
-                break;
-            uint32_t product = (uint32_t)((int64_t)(int32_t)a3 *
-                                          (int64_t)(int32_t)byte);
-            uint32_t next = (color + product) >> 8;
-            PE_StoreU8(a2 + 1u, (uint8_t)next);
-            a2 += 1u;
-        } while (a2 < t0);
-    }
-
-    PE_StoreU32(GA_42CC4_COUNT, (a2 - base) + 1u);
-}
+/* func_80042CC4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80042CC4_port.c (src/func_80042CC4.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

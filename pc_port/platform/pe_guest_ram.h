@@ -38,6 +38,8 @@ void  PE_RamDestroy(void);    /* free internal allocation  */
 
 bool  PE_AddressIsRam(pe_addr_t address);
 bool  PE_RangeIsRam(pe_addr_t address, size_t size);
+/* KUSEG/KSEG1 alias of main RAM -> KSEG0 address (identity otherwise). */
+pe_addr_t PE_RamCanonical(pe_addr_t address, size_t size);
 /* PS1 fast RAM is a separate 1 KiB authority at 1F800000/9F800000.
  * It is not main RAM or a DMA source; BF800000 is not a valid alias. */
 bool  PE_RangeIsScratchpad(pe_addr_t address, size_t size);
@@ -52,6 +54,14 @@ bool  PE_AddAddress(pe_addr_t base, uint32_t delta, pe_addr_t *result);
  * store operations that might invalidate the translation. */
 void       *PE_Translate(pe_addr_t address, size_t size);
 const void *PE_TranslateConst(pe_addr_t address, size_t size);
+
+/* Reverse translation, for decomp-derived leaves that return a pointer
+ * (gen_decomp_ports.py pointer-return adapter).  A host pointer inside the
+ * guest RAM allocation maps to its KSEG0 guest address, one inside the
+ * scratchpad to 0x1F800000 + offset, and NULL to 0 (retail's null pointer).
+ * Anything else (a host stack or heap address) has no guest meaning and
+ * aborts loudly — it is never silently narrowed. */
+pe_addr_t PE_HostToGuest(const volatile void *host);
 
 /* Checked bulk fill over guest RAM.  The range is validated before any
  * host pointer is obtained; len is an exact unsigned 32-bit guest length. */

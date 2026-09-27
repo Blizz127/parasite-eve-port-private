@@ -5,37 +5,11 @@
 #include "psx_compat.h"
 #include "pe_port_compat.h"
 
-int32_t func_8005186C(int32_t value)
-{
-    uint32_t root=0u, remainder=(uint32_t)value;
-    int shift;
-    for (shift=30;shift>=0;shift-=2) {
-        uint32_t trial=((root<<2u)+1u)<<shift;
-        int take=(int32_t)remainder>=(int32_t)trial;
-        root<<=1u;
-        if (take) { remainder-=trial; root|=1u; }
-    }
-    return (int32_t)root;
-}
+/* func_8005186C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8005186C_port.c (src/func_8005186C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-int32_t func_80030534(pe_addr_t target, pe_addr_t origin)
-{
-    int32_t dx=(int16_t)PE_LoadU16(target+0x268u)-(int16_t)PE_LoadU16(origin+0x2Au);
-    int32_t dz=(int16_t)PE_LoadU16(target+0x26Cu)-(int16_t)PE_LoadU16(origin+0x32u);
-    return func_8005186C((int32_t)((uint32_t)dx*(uint32_t)dx+(uint32_t)dz*(uint32_t)dz));
-}
+/* func_80030534: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80030534_port.c (src/func_80030534.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-void func_80021850(pe_addr_t records, int8_t first, int8_t second)
-{
-    pe_addr_t a=records+(uint32_t)(int32_t)first*12u;
-    pe_addr_t b=records+(uint32_t)(int32_t)second*12u;
-    uint32_t saved[3], other[3];
-    unsigned i;
-    for (i=0;i<3;i++) saved[i]=PE_LoadU32(a+i*4u);
-    for (i=0;i<3;i++) other[i]=PE_LoadU32(b+i*4u);
-    for (i=0;i<3;i++) PE_StoreU32(a+i*4u,other[i]);
-    for (i=0;i<3;i++) PE_StoreU32(b+i*4u,saved[i]);
-}
+/* func_80021850: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80021850_port.c (src/func_80021850.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 void func_800216E4(pe_addr_t records, int8_t first, int8_t last)
 {

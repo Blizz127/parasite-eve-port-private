@@ -152,7 +152,7 @@ extern void func_8007C394(uint32_t sector);
  * (game/boot/func_80070E54_port.c, Phase FTE1). */
 extern void func_80070E54(void);
 extern void func_80042FE8(void);
-extern int  func_8006EBE4(void);
+extern int func_8006EBE4(void);
 /* func_8006E1C0 is REAL (Phase 6E-B51):
  * game/boot/func_8006E1C0_port.c — packed texture-entry LoadImage
  * dispatcher (68 retail words).  Phase 6E-B52 translates its two
@@ -200,7 +200,7 @@ extern int  func_8006EBE4(void);
 /* ── REAL translated functions ────────────────────────────────────── */
 extern void func_800725DC(void);
 extern void func_8001220C(void);
-extern int  func_80038D1C(void);
+extern int func_80038D1C(void);
 extern int  func_800698D4(void);
 extern void func_8006A9E4(void);
 extern int  func_8006AD40(void);
@@ -305,15 +305,15 @@ extern void PE_func_8005B91C_HostOut(int32_t table_number, int32_t key,
                                      int32_t *index_out,
                                      int32_t *fraction_out);
 extern void func_8005CCA4(void);
-extern int func_800438C0(int arg);
+extern int func_800438C0(int arg0);
 extern void func_8005E850(int a0, int a1);
-extern int func_8006A2E8(int a0, int a1);
-extern void func_80052790(int a0);
+extern int func_8006A2E8(int a0, unsigned int a1);
+extern void func_80052790(int value);
 extern void func_800649D0(int a0);
 extern signed char func_8005E884(void);
 extern pe_addr_t func_80071A24(pe_addr_t dst, uint32_t len);
-extern void func_8005E968(uint32_t);
-extern void func_8005F844(int);
+extern void func_8005E968(int a0);
+extern void func_8005F844(int enabled);
 extern int  func_8006E834(void);
 extern int  func_8006E9A0(int);
 extern int  func_80087090(pe_addr_t buffer, int count);

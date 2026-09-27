@@ -48,7 +48,9 @@ def profile_name_for(flags, env):
     dispatch = env.get("MASPSX_DISPATCH_FOLD")
     if dispatch:
         parts.append("dispatch")
-        parts.append(dispatch.replace("jtbl_", "").lower())
+        # A multi-table fold (comma list) names every table in order.
+        for table in dispatch.split(","):
+            parts.append(table.strip().replace("jtbl_", "").lower())
     for k, v in sorted(env.items()):
         if k in ("MASPSX_DISPATCH_FOLD",):
             continue

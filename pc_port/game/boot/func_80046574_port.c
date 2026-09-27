@@ -57,10 +57,10 @@ int32_t func_80054520(uint32_t mask)
     func_80052E30(saved);return (int32_t)count>=2;
 }
 
-void func_80063198(pe_addr_t window) {if (window) PE_StoreU32(window+72u,0u);}
-void func_80050D18(void) {} /* Original executable is jr ra; nop. */
-void func_8004FFD0(pe_addr_t list) {func_800638D8(list,0x80050D18u);}
-void func_8004F978(pe_addr_t list) {func_800638D8(list,0x800509E0u);}
+/* func_80063198: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80063198_port.c (src/func_80063198.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_80050D18: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80050D18_port.c (src/func_80050D18.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_8004FFD0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8004FFD0_port.c (src/func_8004FFD0.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_8004F978: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8004F978_port.c (src/func_8004F978.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 void func_800509E0(uint32_t unused)
 {
@@ -136,7 +136,7 @@ static void equipment_upgrade_boundary(const char *name)
 {
     Bootstrap_ReturnVoid(name,"equipment tool menu");PE_Port_RequestStop(PE_PORT_STOP_UNRESOLVED_BOUNDARY);
 }
-uint32_t func_800631C0(pe_addr_t window) {return window && !PE_LoadU32(window+72u);}
+/* func_800631C0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800631C0_port.c (src/func_800631C0.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 int func_80045D0C(pe_addr_t window,uint32_t event)
 {

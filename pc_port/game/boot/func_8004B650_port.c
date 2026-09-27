@@ -21,30 +21,4 @@
 #include "psx_compat.h"
 #include "pe_port_compat.h"
 
-int func_8004B650(pe_addr_t node, uint32_t event)
-{
-    if (event & 0x1000u) {
-        func_8005E850(0, -1);
-        func_8005267C();
-        return 1;
-    }
-    if (event & 0x4000u) {
-        func_8005E850(0, 1);
-        func_8005267C();
-        return 1;
-    }
-    if (event & 0x10000u) {
-        func_80062F1C(node);
-        func_800525EC();
-        return 1;
-    }
-    if (event & 0x40u) {
-        int32_t delta = (int32_t)(PE_LoadU32(0x8009D264u) -
-                                  (uint32_t)(int32_t)func_8005E884());
-        func_8005E850(0, delta);
-        func_80062F1C(node);
-        func_80052634();
-        return 1;
-    }
-    return 1;
-}
+/* func_8004B650: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8004B650_port.c (src/func_8004B650.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

@@ -5,7 +5,20 @@
 #include "pe_sdk.h"
 #include "pe_gpu.h"
 #include "game_port.h"
+#include "game/decomp_hand/hand_lo_protos.h"
 #include <stdio.h>
+
+/* Decomp-derived list/cell draws (pc_port/game/decomp/, no header
+ * prototype): the generated definitions' host signatures. */
+void func_80050708(int value);
+void func_80050728(int value);
+void func_80050DC0(int a0);
+void func_80050618(int a0);
+
+static void menu_draw_callback(pe_addr_t fn,uint32_t value);
+/* Test hook: the switch below is otherwise reached only through the list
+ * renderer, so tests can prove a VMA dispatches instead of stopping. */
+void PE_Menu_DispatchDrawCallback(pe_addr_t fn,uint32_t value) { menu_draw_callback(fn,value); }
 
 static pe_addr_t list_ram(pe_addr_t address)
 { return address<0x200000u?address|0x80000000u:address; }
@@ -70,7 +83,7 @@ static void menu_draw_callback(pe_addr_t fn,uint32_t value)
     case 0x80064EB4u:func_80064EB4(value);break;
     case 0x80043B0Cu:func_80043B0C(value);break;
     case 0x80043C64u:func_80043C64(value);break;
-    case 0x8004905Cu:func_8004905C(value);break;
+    case 0x8004905Cu:func_8004905C();break; /* retail leaf ignores a0 (src/func_8004905C.c) */
     case 0x80050748u:func_80050748(value);break;
     case 0x8004F838u:func_8004F838(value);break;
     case 0x8004DF74u:func_8004DF74(value);break;
@@ -98,6 +111,18 @@ static void menu_draw_callback(pe_addr_t fn,uint32_t value)
     case 0x80050C70u:func_80050C70(value);break;
     case 0x80050CB4u:func_80050CB4(value);break;
     case 0x8004B5DCu:func_8004B5DC(value);break;   /* modal window draw */
+    /* Draws stored by the port_absent hand adapters (game/decomp_hand/
+     * absent_lo_*): list draws get the node, per-cell draws the cell index. */
+    case 0x80050690u:func_80050690((int32_t)value);break;  /* item cell (live a0) */
+    case 0x800506E8u:func_800506E8((int32_t)value);break;  /* item cell (live a0) */
+    case 0x80050708u:func_80050708((int32_t)value);break;
+    case 0x80050728u:func_80050728((int32_t)value);break;
+    case 0x80050DC0u:func_80050DC0((int32_t)value);break;
+    case 0x80050E70u:func_80050E70((int32_t)value);break;  /* item row cell */
+    case 0x80050618u:func_80050618((int32_t)value);break;
+    case 0x800434C0u:func_800434C0((int32_t)value);break;  /* card slot cell */
+    case 0x8004F2E4u:func_8004F2E4((int32_t)value);break;  /* equip list */
+    case 0x8004FEECu:func_8004FEEC((int32_t)value);break;  /* card slot list */
     default:
         fprintf(stderr,"[MENU] Unported drawing callback %08X\n",fn);
         Bootstrap_ReturnVoid("PE_MenuDrawCallback","menu drawing callback");

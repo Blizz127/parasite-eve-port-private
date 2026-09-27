@@ -26,18 +26,4 @@
  */
 #include "psx_compat.h"
 
-void func_80064964(void)
-{
-    /* 1. BIOS A(28h) bzero — REAL (B21a). */
-    func_80071A24(0x800A3060u, 0x120);
-
-    /* 2. Set 8 flag bytes to 0xFF (retail: addiu $v0,$zero,-1 then sb). */
-    PE_StoreU8(0x800A3078u, 0xFFu);
-    PE_StoreU8(0x800A30A0u, 0xFFu);
-    PE_StoreU8(0x800A30B0u, 0xFFu);
-    PE_StoreU8(0x800A30B8u, 0xFFu);
-    PE_StoreU8(0x800A30C0u, 0xFFu);
-    PE_StoreU8(0x800A30C4u, 0xFFu);
-    PE_StoreU8(0x800A3124u, 0xFFu);
-    PE_StoreU8(0x800A3134u, 0xFFu);
-}
+/* func_80064964: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80064964_port.c (src/func_80064964.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

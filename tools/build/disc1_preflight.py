@@ -30,7 +30,8 @@ Deep check (``--deep``, parallel, ~6s for ~500 leaves):
      must not exceed the compiled ``.text`` (the 0x94-vs-0x90 defect class), any
      bytes past a smaller span must be zero (the gas 16-byte alignment pad), the
      object linked at its retail VMA must match retail word-for-word over the
-     whole span, the span must end on a bare ``jr $ra`` (or a tail ``j``), and
+     whole span, the span must end on a bare ``jr $ra`` (or a tail ``j`` /
+     indirect ``jr $reg``), and
      it must contain **no interior ``jr $ra``** (a swallowed adjacent function
      would leave one).  The weak per-leaf helper ``era_link_check.py`` used by
      ``check_leaf.sh`` does NOT catch an oversized span; this does.
@@ -69,9 +70,10 @@ from disc1_plan import (  # noqa: E402
     PlanError,
     build_plan,
 )
+from overlay_targets import MAIN_TARGET, Target, TargetError, load_target  # noqa: E402
 
-DEFAULT_CONFIG = Path("configs/USA/disc1.yaml")
-DEFAULT_PROFILES = Path("configs/USA/disc1_build_profiles.json")
+DEFAULT_CONFIG = Path(MAIN_TARGET.config)
+DEFAULT_PROFILES = Path(MAIN_TARGET.profiles)
 ERA_CPP = Path("tools/era/gcc-2.7.2-psx/cpp")
 ERA_CC1 = Path("tools/era/gcc-2.7.2-psx/cc1")
 MASPSX = Path("tools/era/maspsx/maspsx.py")
@@ -171,8 +173,11 @@ def parse_rows(config: Path) -> list[Row]:
     return rows
 
 
-def check_geometry(config: Path, rows: list[Row]) -> list[Finding]:
+def check_geometry(
+    config: Path, rows: list[Row], target: Target = MAIN_TARGET
+) -> list[Finding]:
     findings: list[Finding] = []
+    file_start, file_end, load_vram = target.file_start, target.file_end, target.vram
     if not rows:
         return [
             Finding(
@@ -196,24 +201,24 @@ def check_geometry(config: Path, rows: list[Row]) -> list[Finding]:
         else:
             seen[row.offset] = row.line
 
-    if rows[0].offset != LOAD_FILE_START:
+    if rows[0].offset != file_start:
         findings.append(
             Finding(
                 "geometry",
                 f"{config}:{rows[0].line}: first span starts 0x{rows[0].offset:X}, "
-                f"expected 0x{LOAD_FILE_START:X}",
-                f"the loadable image must begin at 0x{LOAD_FILE_START:X}",
+                f"expected 0x{file_start:X}",
+                f"the loadable image must begin at 0x{file_start:X}",
             )
         )
 
-    if rows[-1].offset != EXPECTED_FILE_END or rows[-1].kind or rows[-1].name:
+    if rows[-1].offset != file_end or rows[-1].kind or rows[-1].name:
         findings.append(
             Finding(
                 "geometry",
                 f"{config}:{rows[-1].line}: final row must be "
-                f"`- [0x{EXPECTED_FILE_END:X}]`, got 0x{rows[-1].offset:X}"
+                f"`- [0x{file_end:X}]`, got 0x{rows[-1].offset:X}"
                 f"{' '+rows[-1].kind if rows[-1].kind else ''}",
-                f"terminate the segment list with `- [0x{EXPECTED_FILE_END:X}]`",
+                f"terminate the segment list with `- [0x{file_end:X}]`",
             )
         )
 
@@ -258,7 +263,7 @@ def check_geometry(config: Path, rows: list[Row]) -> list[Finding]:
     for row, following in zip(rows[:-1], rows[1:]):
         if row.kind != "c" or not row.name:
             continue
-        vram = 0x80010000 + row.offset - LOAD_FILE_START
+        vram = load_vram + row.offset - file_start
         match = FUNC_RE.fullmatch(row.name)
         if not match:
             findings.append(
@@ -305,12 +310,14 @@ def check_yaml_sha1(config: Path) -> list[Finding]:
 # ---------------------------------------------------------------------------
 # 4. C sources
 # ---------------------------------------------------------------------------
-def check_c_sources(config: Path, root: Path, rows: list[Row]) -> list[Finding]:
+def check_c_sources(
+    config: Path, root: Path, rows: list[Row], src_dir: str = MAIN_TARGET.src_dir
+) -> list[Finding]:
     findings: list[Finding] = []
     for row in rows[:-1]:
         if row.kind != "c" or not row.name:
             continue
-        source = root / "src" / f"{row.name}.c"
+        source = root / src_dir / f"{row.name}.c"
         if not source.is_file():
             findings.append(
                 Finding(
@@ -327,7 +334,7 @@ def check_c_sources(config: Path, root: Path, rows: list[Row]) -> list[Finding]:
 # 5. Build profiles
 # ---------------------------------------------------------------------------
 def check_profiles(
-    profiles_path: Path, rows: list[Row]
+    profiles_path: Path, rows: list[Row], root: Path | None = None
 ) -> list[Finding]:
     findings: list[Finding] = []
     try:
@@ -351,6 +358,52 @@ def check_profiles(
 
     profiles = manifest.get("profiles")
     default = manifest.get("default_profile")
+    inherited_from = manifest.get("profiles_from")
+    if inherited_from is not None:
+        # Overlay manifests inherit the profile definitions from the EXE
+        # manifest (disc1_plan._load_profiles does the same).
+        base_path = _repo_path(root or REPO_ROOT, Path(inherited_from))
+        try:
+            base = json.loads(base_path.read_text(encoding="utf-8"))
+        except (FileNotFoundError, json.JSONDecodeError) as exc:
+            return [
+                Finding(
+                    "profile-ref",
+                    f"{profiles_path}: profiles_from {inherited_from} unreadable: {exc}",
+                    "point profiles_from at a valid build-profile manifest",
+                )
+            ]
+        if profiles is not None:
+            findings.append(
+                Finding(
+                    "profile-ref",
+                    f"{profiles_path}: has both `profiles` and `profiles_from`",
+                    "keep only one of them",
+                )
+            )
+        profiles = base.get("profiles")
+        if default is None:
+            default = base.get("default_profile")
+        local = manifest.get("local_profiles")
+        if local is not None and not isinstance(local, dict):
+            findings.append(
+                Finding(
+                    "profile-ref",
+                    f"{profiles_path}: local_profiles must be an object",
+                    "make local_profiles a {name: profile} object or remove it",
+                )
+            )
+        elif isinstance(local, dict) and isinstance(profiles, dict):
+            clash = sorted(set(local) & set(profiles))
+            if clash:
+                findings.append(
+                    Finding(
+                        "profile-ref",
+                        f"{profiles_path}: local_profiles shadow inherited {clash}",
+                        "rename the local profile",
+                    )
+                )
+            profiles = {**profiles, **local}
     assignments = manifest.get("assignments")
     if not isinstance(profiles, dict) or not profiles:
         return [
@@ -597,19 +650,35 @@ def _compile_leaf(
         return DeepResult(name, span, None, False, f"{type(exc).__name__}: {exc}")
 
 
+def parse_source_overrides(values: list[str]) -> dict[str, Path]:
+    """``FUNC=PATH`` pairs -> {FUNC: absolute PATH}; fails loudly."""
+    overrides: dict[str, Path] = {}
+    for value in values:
+        name, sep, path = value.partition("=")
+        if not sep or not name or not path:
+            raise SystemExit(f"--source-override expects FUNC=PATH, got {value!r}")
+        resolved = Path(path).resolve()
+        if not resolved.is_file():
+            raise SystemExit(f"--source-override: {resolved} is not a file")
+        overrides[name] = resolved
+    return overrides
+
+
 def check_deep(
     config: Path,
     profiles_path: Path,
     root: Path,
     jobs: int,
     only: set[str] | None,
+    target: Target = MAIN_TARGET,
+    source_overrides: dict[str, Path] | None = None,
 ) -> list[Finding]:
     # Import lazily so the fast path has no toolchain dependency.
     import disc1_build  # noqa: PLC0415
 
     findings: list[Finding] = []
     try:
-        plan = build_plan(root=root, config=config, profiles_path=profiles_path)
+        plan = build_plan(root=root, config=config, profiles_path=profiles_path, target=target)
     except PlanError as exc:
         return [
             Finding(
@@ -631,6 +700,28 @@ def check_deep(
                     "pass YAML C symbols",
                 )
             )
+
+    if source_overrides:
+        # --source-override: compile a draft in place of the YAML leaf's
+        # src/<name>.c (absolute path, so ROOT / source resolves to it). Only
+        # the C file changes; span, profile and retail bytes are the plan's.
+        unknown = set(source_overrides) - {u["name"] for u in units}
+        if unknown:
+            findings.append(
+                Finding(
+                    "deep-size",
+                    f"--source-override names not checked: {', '.join(sorted(unknown))}",
+                    "pass YAML C symbols that are also selected by --only",
+                )
+            )
+        units = [
+            dict(u, source=str(source_overrides[u["name"]]))
+            if u["name"] in source_overrides else u
+            for u in units
+        ]
+        for name, path in sorted(source_overrides.items()):
+            print(f"disc1_preflight: NOTE {name} compiled from override {path}",
+                  file=sys.stderr)
 
     if not units:
         return findings
@@ -682,9 +773,10 @@ def check_deep(
     # helper era_link_check.py cannot.
     strong_error: str | None = None
     try:
-        retail_path = root / "build/extracted/disc1/SLUS_006.62"
+        retail_path = root / target.retail
         if not retail_path.is_file():
-            strong_error = f"missing retail EXE {retail_path} (run scripts/extract_us.sh 1)"
+            remedy = "scripts/extract_us.sh 1" if target.is_main else "scripts/extract_overlays.sh"
+            strong_error = f"missing retail {'EXE' if target.is_main else 'overlay'} {retail_path} (run {remedy})"
         else:
             import json as _json  # noqa: PLC0415
             import shutil as _shutil  # noqa: PLC0415
@@ -711,7 +803,8 @@ def check_deep(
 
                 with contextlib.redirect_stdout(sys.stderr):
                     disc1_build.compile_all(
-                        {"units": build_units, "header": plan["header"]}, tools
+                        {"units": build_units, "header": plan["header"], "target": plan.get("target")},
+                        tools,
                     )
                 ld = tools.linker
                 nm = strong.resolve_nm(root)
@@ -816,7 +909,7 @@ def check_deep(
                     "deep-boundary",
                     f"{name}: span 0x{span:X} (0x{start:X}->0x{start + span:X}) does not "
                     f"end on a function boundary (terminator {strong_result.terminator}); "
-                    "a genuine function ends in a bare `jr $ra` or a tail `j`",
+                    "a genuine function ends in a bare `jr $ra`, a tail `j`, or an indirect `jr $reg`",
                     "re-derive the true function end and fix the span edge",
                 )
             )
@@ -840,8 +933,16 @@ def check_deep(
 # ---------------------------------------------------------------------------
 def run_checks(args: argparse.Namespace) -> tuple[list[Finding], dict[str, Any]]:
     root = args.root.resolve()
-    config = _repo_path(root, args.config)
-    profiles_path = _repo_path(root, args.profiles)
+    # `target` is optional on the namespace so existing callers (and the test
+    # fixtures) that never set it keep the EXE behaviour.
+    try:
+        target = load_target(getattr(args, "target", None), root=root)
+    except TargetError as exc:
+        return [Finding("target", str(exc), "pass a manifest overlay id or omit --target")], {}
+    config_arg = args.config if args.config is not None else Path(target.config)
+    profiles_arg = args.profiles if args.profiles is not None else Path(target.profiles)
+    config = _repo_path(root, config_arg)
+    profiles_path = _repo_path(root, profiles_arg)
 
     findings: list[Finding] = []
     if not config.is_file():
@@ -856,14 +957,14 @@ def run_checks(args: argparse.Namespace) -> tuple[list[Finding], dict[str, Any]]
     findings.extend(check_yaml_syntax(config))
     rows = parse_rows(config)
     findings.extend(check_yaml_sha1(config))
-    findings.extend(check_geometry(config, rows))
-    findings.extend(check_c_sources(config, root, rows))
-    findings.extend(check_profiles(profiles_path, rows))
+    findings.extend(check_geometry(config, rows, target))
+    findings.extend(check_c_sources(config, root, rows, target.src_dir))
+    findings.extend(check_profiles(profiles_path, rows, root))
 
     # Authority cross-check: the real plan builder must also accept the tree.
     # Its message is only used if the granular checks missed something.
     try:
-        plan = build_plan(root=root, config=args.config, profiles_path=args.profiles)
+        plan = build_plan(root=root, config=config_arg, profiles_path=profiles_arg, target=target)
     except PlanError as exc:
         if not findings:
             findings.append(
@@ -880,6 +981,8 @@ def run_checks(args: argparse.Namespace) -> tuple[list[Finding], dict[str, Any]]
                 root,
                 args.jobs,
                 set(args.only) if args.only else None,
+                target,
+                parse_source_overrides(getattr(args, "source_override", None) or []),
             )
         )
 
@@ -896,8 +999,17 @@ def run_checks(args: argparse.Namespace) -> tuple[list[Finding], dict[str, Any]]
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=REPO_ROOT)
-    parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
-    parser.add_argument("--profiles", type=Path, default=DEFAULT_PROFILES)
+    parser.add_argument(
+        "--target",
+        default=None,
+        metavar="ID",
+        help="preflight target: disc1 (default, the EXE) or an overlay id from "
+        "configs/USA/overlays/manifest.yaml",
+    )
+    parser.add_argument("--config", type=Path, default=None,
+                        help="YAML authority (default: the target's config)")
+    parser.add_argument("--profiles", type=Path, default=None,
+                        help="build-profile JSON (default: the target's)")
     parser.add_argument(
         "--deep",
         action="store_true",
@@ -915,6 +1027,14 @@ def main(argv: list[str] | None = None) -> int:
         type=int,
         default=min(12, os.cpu_count() or 4),
         help="parallel compile jobs for --deep (default 12)",
+    )
+    parser.add_argument(
+        "--source-override",
+        action="append",
+        default=[],
+        metavar="FUNC=PATH",
+        help="with --deep: compile PATH instead of the leaf's src/FUNC.c "
+        "(repeatable; verifies a draft re-spelling without touching src/)",
     )
     parser.add_argument("--json", action="store_true", help="emit a JSON summary")
     args = parser.parse_args(argv)

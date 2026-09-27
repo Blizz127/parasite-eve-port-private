@@ -181,5 +181,28 @@ static void test_PORTVERIFY_matched_leaves(void)
         ASSERT(PE_LoadU32(colors + 0u) == 0xDEADBEEFu, "5GB: 6F4C with count 0 is a no-op");
     }
 
+    /* func_8005DC9C (src/func_8005DC9C.c; now also called directly by the
+     * func_8005D6F4 port's D_8009D0C8 != 0 arm): archive base is
+     * &D_800A8028 + D_800A802C; the table sits at base + *(int *)(base+8);
+     * an unsigned index >= the u16 count at table+0 returns NULL, otherwise
+     * table + (short)entry[index] with entries starting at table+2. */
+    {
+        const pe_addr_t base = 0x80140400u, table = base + 0x40u;
+
+        ResetTestState();
+        PE_StoreU32(0x800A802Cu, base - 0x800A8028u);
+        PE_StoreU32(base + 8u, 0x40u);
+        PE_StoreU16(table + 0u, 3u);                 /* count */
+        PE_StoreU16(table + 2u, 0x0010u);
+        PE_StoreU16(table + 4u, (uint16_t)-8);       /* signed entry */
+        PE_StoreU16(table + 6u, 0x0020u);
+
+        ASSERT(func_8005DC9C(0u) == table + 0x10u, "DC9C: entry 0 is table-relative");
+        ASSERT(func_8005DC9C(1u) == table - 8u, "DC9C: entries are signed shorts");
+        ASSERT(func_8005DC9C(2u) == table + 0x20u, "DC9C: last in-range entry");
+        ASSERT(func_8005DC9C(3u) == 0u, "DC9C: index == count yields NULL");
+        ASSERT(func_8005DC9C(0xFFFFFFFFu) == 0u, "DC9C: bound is unsigned");
+    }
+
     PASS();
 }

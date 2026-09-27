@@ -1,0 +1,11 @@
+/* best: 1 word with ERA_CC1_VER=2.8.1 -O2 -G0 -mno-split-addresses (4 words on 2.7.2 -fno-strength-reduce).
+ * Residual @0x80072368: retail `j 0x80072398` (jump to the epilogue jr, move stolen into the slot);
+ * 2.8.1 emits a mid-function `jr $ra` return insn. Needs a maspsx/cc1 knob. */
+char *func_80072334(char *dst, char *src, int n) {
+    if (dst >= src) {
+        while (n-- > 0) dst[n] = src[n];
+    } else {
+        while (n-- > 0) *dst++ = *src++;
+    }
+    return dst;
+}

@@ -39,12 +39,4 @@
 #include "psx_compat.h"
 #include "pe_port_compat.h"
 
-uint32_t func_80077A64(uint32_t tp, uint32_t abr, uint32_t x, uint32_t y)
-{
-    uint32_t v0 = (tp & 0x3u) << 7;
-    v0 |= (abr & 0x3u) << 5;
-    v0 |= (y & 0x0100u) >> 4;
-    v0 |= (x & 0x03FFu) >> 6;
-    v0 |= (y & 0x0200u) << 2;
-    return v0;
-}
+/* func_80077A64: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80077A64_port.c (src/func_80077A64.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

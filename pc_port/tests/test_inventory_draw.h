@@ -26,7 +26,7 @@ static void test_INV3_retail_inventory_draw(void)
         case 6:func_800536B8((int32_t)a[0]);break;
         case 7:func_80043B0C(a[0]);break;
         case 8:func_80043C64(a[0]);break;
-        case 9:func_8004905C(a[0]);break;
+        case 9:func_8004905C(); /* retail leaf ignores a0 */break;
         case 10:func_80050748(a[0]);break;
         case 11:func_8004F838(a[0]);break;
         case 12:result=func_80051E48();break;

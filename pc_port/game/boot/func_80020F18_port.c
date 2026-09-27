@@ -111,11 +111,7 @@ static int32_t clear_effect_pool(unsigned first)
 
 int32_t func_800702DC(void) { return clear_effect_pool(0u); }
 int32_t func_800701B4(void) { return clear_effect_pool(11u); }
-void func_800703F4(void)
-{
-    (void)func_800702DC();
-    (void)func_800701B4();
-}
+/* func_800703F4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800703F4_port.c (src/func_800703F4.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 /* Script 98: find the selected live actor, release its effects and continue.
  * This is used by Eve's first-hit scene before the next animation/dialogue. */
@@ -137,20 +133,9 @@ int func_8001930C(pe_addr_t args)
     return 1;
 }
 
-void func_800374E8(void)
-{
-    unsigned i;
-    for (i=0;i<4;i++) {
-        pe_addr_t text=0x800BCEA8u+i*56u;
-        PE_StoreU8(text,0u);
-        PE_StoreU32(text+12u,PE_LoadU32(text+12u)&0xFDFFFFFFu);
-    }
-}
+/* func_800374E8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800374E8_port.c (src/func_800374E8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-void func_80043240(int32_t value)
-{
-    PE_StoreU32(0x8009CF3Cu,(uint32_t)value);
-}
+/* func_80043240: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80043240_port.c (src/func_80043240.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 void func_80020F18(void)
 {

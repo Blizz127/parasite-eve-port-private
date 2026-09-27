@@ -4,19 +4,9 @@
 #include "pe_port_compat.h"
 #include "game_port.h"
 
-int func_80038D48(void)
-{
-    if(!PE_LoadU32(0x80091A24u))return 255;
-    PE_StoreU32(0x80091A24u,0);return 0;
-}
+/* func_80038D48: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80038D48_port.c (src/func_80038D48.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-int func_800868AC(uint32_t duration,uint32_t volume)
-{
-    PE_StoreU32(0x800BCD80u,0xA9u);
-    PE_StoreU32(0x800BCD84u,duration&255u);
-    PE_StoreU32(0x800BCD88u,volume&127u);
-    return func_8008CBA8();
-}
+/* func_800868AC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800868AC_port.c (src/func_800868AC.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 void func_80192030(void)
 {

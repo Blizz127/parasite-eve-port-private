@@ -11,13 +11,7 @@ static pe_addr_t shot_queue(unsigned i) { return 0x800BE830u+i*8u; }
 static void shot_flags(pe_addr_t base,uint32_t offset,uint32_t clear,uint32_t set)
 { PE_StoreU32(base+offset,(PE_LoadU32(base+offset)&~clear)|set); }
 
-int32_t func_80030584(pe_addr_t model,pe_addr_t position)
-{
-    uint32_t x=(uint32_t)(int32_t)(int16_t)PE_LoadU16(model+0xB4u)<<16u;
-    uint32_t z=(uint32_t)(int32_t)(int16_t)PE_LoadU16(model+0xB8u)<<16u;
-    return (int16_t)(func_80079FB4((int32_t)(x-PE_LoadU32(position)),
-                                  (int32_t)(z-PE_LoadU32(position+8u)))+2048);
-}
+/* func_80030584: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80030584_port.c (src/func_80030584.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 static unsigned shot_elevation(pe_addr_t target)
 {

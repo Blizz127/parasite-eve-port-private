@@ -38,12 +38,7 @@ pe_addr_t func_8006E514(pe_addr_t package, uint32_t id)
     return 0u;
 }
 
-int32_t func_8006DF50(pe_addr_t package, uint32_t id, uint32_t key,
-                     uint32_t pan, uint32_t volume)
-{
-    pe_addr_t sound=func_8006E514(package,id);
-    return sound ? func_80086608(sound,key,pan,volume) : -1;
-}
+/* func_8006DF50: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8006DF50_port.c (src/func_8006DF50.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 static int spatial_sound(int16_t x, int16_t y, int16_t z, uint32_t *pan, uint32_t *volume)
 {
@@ -102,11 +97,7 @@ int32_t func_8006DED4(pe_addr_t dest,int id,int a1,int x,int y,int z)
     return PE_SpatialSoundRequest(dest,id,a1,x,y,z,NULL);
 }
 
-void func_8006DE80(int id, int a1, int x, int y, int z)
-{
-    func_8006DED4(PE_LoadU32(GA_D_800B0E08), id, a1,
-                  (int)(int16_t)x, (int)(int16_t)y, (int)(int16_t)z);
-}
+/* func_8006DE80: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8006DE80_port.c (src/func_8006DE80.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 int32_t func_8006DD38(uint32_t index,uint32_t key,int32_t x,int32_t y,int32_t z)
 {
@@ -117,10 +108,4 @@ int32_t func_8006DD38(uint32_t index,uint32_t key,int32_t x,int32_t y,int32_t z)
     return 0;
 }
 
-/* Paired field-PE sound request, original6DDCC. */
-int32_t func_8006DDCC(int id,int key,int x,int y,int z)
-{
-    int32_t result=func_8006DED4(PE_LoadU32(GA_D_800B0E08),id,key,x,y,z);
-    func_8006DED4(PE_LoadU32(GA_D_800B0E08),(int32_t)((uint32_t)id+1u),key,x,y,z);
-    return result;
-}
+/* func_8006DDCC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8006DDCC_port.c (src/func_8006DDCC.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

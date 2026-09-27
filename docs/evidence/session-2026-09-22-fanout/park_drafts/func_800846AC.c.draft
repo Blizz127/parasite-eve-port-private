@@ -1,0 +1,36 @@
+extern int D_8009B764;
+extern int D_8009B768;
+extern int D_8009B778;
+extern int D_8009B77C[];
+extern unsigned char *D_8009B7BC;
+extern unsigned char D_800A5B70[];
+extern void func_80084EB0(unsigned char *);
+extern void func_800847A0(unsigned char *);
+extern int func_80082E00(unsigned char *);
+
+void func_800846AC(int a0)
+{
+    int done;
+    unsigned char *rec;
+
+    do {
+        rec = D_800A5B70 + D_8009B764 * 0xF0;
+        if (a0 != -9) {
+            if (a0 == 0) {
+                D_8009B77C[D_8009B764] = 0;
+            } else {
+                func_80084EB0(rec);
+                func_800847A0(rec);
+            }
+        }
+        D_8009B768 = 0;
+        *(short *)(D_8009B7BC + 0xA) = 0;
+        D_8009B764++;
+        if (D_8009B778 < D_8009B764) {
+            done = 1;
+        } else {
+            done = func_80082E00(D_800A5B70 + D_8009B764 * 0xF0);
+        }
+        a0 = 0xFFFF;
+    } while (!done);
+}

@@ -1,5 +1,56 @@
 # Non-C-matchable split-asm spans — classification
 
+## Refresh 2026-09-25 (2018 C / 230 asm)
+
+Command: `python3 tools/analysis/nonmatchable_spans.py` on the split after the
+2018 gate (`plan=2eaed0f5a667`). 421 split spans:
+
+| class | spans | words |
+|---|---:|---:|
+| alignment-filler | 81 | 81 |
+| gte-inline (informational; COP2 transfer, no C operator) | 5 | 192 |
+| handwritten-cop | 22 | 123 |
+| handwritten-gte-wrapper | 107 | 19957 |
+| handwritten-jr-t2 | 53 | 163 |
+| handwritten-syscall | 2 | 8 |
+
+151 spans are unclassified. After dropping `jr`/`jalr $t2`, `syscall`, `break`,
+`mfc0`, and handwritten `addi`, 127 ordinary-looking functions remain. The
+five `gte-inline` functions (`func_8003EAC8`, `func_800130B4`, `func_80077F7C`,
+`func_80078004`, `func_80078094`) still contain `mtc2`/`mfc2`/`ctc2`/`swc2`
+tagged handwritten; cc1 has no operator for them. They stay asm. See
+`docs/evidence/gte-inline-block-2026-09-25/REPORT.md`. Route on this image:
+`asm_funcs=126 asm_words=36634`.
+
+## Refresh 2026-09-25 (2007 C / 237 asm)
+
+Command: `python3 tools/analysis/nonmatchable_spans.py` and `--json`.
+Split-asm glabels the tool classified:
+
+| class | spans | words |
+|---|---:|---:|
+| alignment-filler | 81 | 81 |
+| gte-inline (informational, not non-C) | 5 | 192 |
+| handwritten-cop | 22 | 123 |
+| handwritten-gte-wrapper | 107 | 19957 |
+| handwritten-jr-t2 | 53 | 163 |
+| handwritten-syscall | 2 | 8 |
+
+Those glabels were then placed inside the 237 YAML `asm` rows of the 2007 image (plan `fe9249539949`). A row is one class when every glabel that starts inside it shares that class. The terminal row at file `0xD0D1C` is 0 bytes.
+
+| YAML asm row | spans |
+|---|---:|
+| alignment-filler only | 72 |
+| handwritten non-C only (gte-wrapper, jr-t2, cop, syscall) | 61 |
+| gte-inline only | 2 |
+| mixed filler + gte-inline + gte-wrapper (`0x80077F68`, `0xD2C`) | 1 |
+| no classified glabel (still C-expressible) | 100 |
+| terminal 0-byte row at file `0xD0D1C` | 1 |
+
+The C-expressible rows are the matching work. Smallest single-function files among them, from each file's `nonmatching func_*, 0xSIZE` line: `func_8005382C` 79 words (1 `jal`), `func_80046574` 83 (15 `jal`), `func_800534E4` 89 (10 `jal`), `func_80080F98` 94 (7 `jal`), `func_8007CEAC` 106 (1 `jal`). `gte-inline` stays in scope and is not counted as matched C.
+
+## Prior classification (2026-09-24)
+
 This report separates the split asm under `asm/disc1/` into provably
 non-C-matchable spans and real remaining asm, so the "remaining asm" count stops
 overstating the work. Nothing is reclassified without positive per-span
@@ -10,7 +61,44 @@ Tool: `tools/analysis/nonmatchable_spans.py` (idempotent; prints counts,
 `--list`, `--json`). Machine-readable inventory:
 `docs/evidence/non-c-matchable/MANIFEST.json`.
 
-## Resulting counts
+## Current counts (2026-09-24, plan `1b3aad012eeac56180c070676e72dc45d01fc92a2b5c4eded713fc12a9806d06`, 1959 c spans)
+
+Refreshed by tooling2 after the batch-10 gate split (`asm/disc1/*.s` of that
+gate). Commands (read-only): `python3 tools/analysis/nonmatchable_spans.py
+[--json]`; `python3 tools/analysis/route_coverage.py --no-history --quiet`;
+per-span word counts are glabel..endlabel instruction words of the split asm.
+
+EXE, whole image:
+
+| bucket | functions | words |
+|---|---:|---:|
+| matched C (YAML `c` spans) | **1959** | 92999 |
+| `handwritten-gte-wrapper` (non-C) | 107 | 19957 |
+| `handwritten-jr-t2` (non-C) | 53 | 163 |
+| `handwritten-cop` (non-C) | 22 | 123 |
+| `handwritten-syscall` (non-C) | 2 | 8 |
+| **non-C total** | **184** | **20251** |
+| alignment filler (not functions) | 79 spans | 79 |
+| `gte-inline` (liftable; informational) | 5 | 192 |
+| **real remaining asm** | **209** | **47261** |
+| real remaining incl. `gte-inline` | 214 | 47453 |
+
+Real-remaining size profile: 50 functions <= 64 words, 111 <= 256, 48 <= 1024,
+5 > 1024 (largest `func_8001D340` 2149w, `func_8002BC90` 1368w,
+`func_8002DC58` 1302w, `func_800299CC` 1075w, `func_80037870` 1064w).
+
+Boot -> end-of-Day-2 route (`route_coverage.py`): 1397 functions on route,
+1161 matched C (59449 words), 77 non-C (5417 words), **159 asm remaining
+(40622 words)**; tierA 1152, tierB 248, tierB unresolved 0.
+
+Overlays (PE.IMG, 72 targets; `nonmatchable_spans.py` has no `--target`, so
+their asm is unclassified): 6 subsystem overlays hold 82 c / 4374 words and
+22 asm spans / 21872 words; 66 room targets hold 2402 c / 69579 words and
+543 asm spans / 214396 words (room asm spans are whole-blob ranges that still
+include data, so the word figure overstates code). All 72 overlay targets
+pass their exact-rebuild gate (tooling2 Phase B, 2026-09-24).
+
+## Resulting counts (historical, session cont. 19)
 
 | bucket | functions | words |
 |---|---:|---:|

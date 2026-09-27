@@ -28,8 +28,4 @@
 
 extern void func_80086728(int a0);
 
-void func_80052790(int a0)
-{
-    PE_StoreU32(GA_52790_STATE, (uint32_t)a0);
-    func_80086728((unsigned int)a0 < 1u ? 1 : 0);
-}
+/* func_80052790: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80052790_port.c (src/func_80052790.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

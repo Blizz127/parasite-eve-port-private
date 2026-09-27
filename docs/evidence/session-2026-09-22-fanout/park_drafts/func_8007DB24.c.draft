@@ -1,0 +1,23 @@
+extern int D_8009B420;
+extern unsigned int D_8009B428;
+extern unsigned int D_8009B42C;
+extern unsigned int D_8009B424;
+extern unsigned short *D_8009B3FC;
+
+unsigned int func_8007DB24(int a0, unsigned int a1)
+{
+    unsigned int v;
+
+    if (D_8009B420 != 0 && (a1 % D_8009B428) != 0) {
+        a1 = (a1 + D_8009B428) & ~D_8009B42C;
+    }
+    v = a1 >> D_8009B424;
+    if (a0 == -2) {
+        return a1;
+    }
+    if (a0 == -1) {
+        return v & 0xFFFF;
+    }
+    D_8009B3FC[a0] = v;
+    return a1;
+}

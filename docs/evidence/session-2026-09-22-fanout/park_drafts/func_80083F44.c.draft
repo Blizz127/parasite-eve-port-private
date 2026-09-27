@@ -1,0 +1,21 @@
+extern int D_8009B764;
+extern int D_8009B774;
+extern int D_8009B760;
+extern int D_8009B7A4;
+extern void (*D_8009B754)(void);
+extern void (*D_8009B750)(void);
+extern void (*D_8009B73C)(int);
+extern int func_800832B4(unsigned char *a0, int a1);
+
+int func_80083F44(unsigned char *a0)
+{
+    if (D_8009B764 == D_8009B774 && D_8009B760 != 0) {
+        D_8009B754();
+        D_8009B750();
+    }
+    if (D_8009B7A4 != 0) {
+        D_8009B73C(*(int *)(a0 + 0xC));
+        D_8009B73C(*(int *)(a0 + 0xC) + 0xF0);
+    }
+    return func_800832B4(a0, a0[0x36] == 0 ? 0x42 : a0[0x36]);
+}

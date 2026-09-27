@@ -114,6 +114,42 @@ class TestFillCallDelaySlotGuards(unittest.TestCase):
     # ------------------------------------------------------------------
     # `la` arm
     # ------------------------------------------------------------------
+    def test_index_pair_schedule_matches_retail_order(self):
+        lines = [
+            "sll\t$4,$4,2",
+            "sll\t$2,$2,2",
+            "addu\t$2,$2,$16",
+            "lw\t$3,0($2)",
+            "lbu\t$2,D_8009AFD5",
+            "nop",
+            "sll\t$2,$2,2",
+            "addu\t$2,$2,$19",
+            "addu\t$4,$4,$16",
+            "lw\t$6,0($2)",
+            "lw\t$7,0($4)",
+            "la\t$4,D_80011B28",
+            ".set\tnoreorder",
+            "jal\tfunc_80071A74",
+            "sw\t$3,16($sp)",
+            ".set\treorder",
+            "jal\tfunc_8007B9EC",
+            "li\t$3,-1",
+            "$L8:",
+            "bne\t$3,$0,$L12",
+            "li\t$2,-1",
+        ]
+        with patch.dict(os.environ, {"MASPSX_INDEX_PAIR_JAL_SCHEDULE": "1"}):
+            got = MaspsxProcessor(lines).process_lines()
+        text = "\n".join(got)
+        flat = text.replace("\t", "").replace(" ", "")
+        self.assertLess(flat.index("sll$2,$2,2"), flat.index("sll$4,$4,2"))
+        self.assertLess(flat.index("sw$3,16($sp)"), flat.index("lw$6,0($2)"))
+        self.assertIn("addiu$4,$4,%lo(D_80011B28)", flat)
+        self.assertIn("j$L12_join", flat)
+        self.assertIn("addu$2,$zero,$zero", flat)
+        self.assertIn("bne$2,$zero,$L12", flat)
+        self.assertNotIn("li$3,-1", flat)
+
     def test_la_before_jal_is_filled(self):
         lines = [
             "la\t$4,func_80081E70",

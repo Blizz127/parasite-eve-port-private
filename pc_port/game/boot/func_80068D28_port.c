@@ -74,46 +74,4 @@
 
 #define GA_D_800BCF88 0x800BCF88u
 
-void func_80068D28(void)
-{
-    const pe_addr_t base = GA_D_800BCF88;
-    unsigned int i;
-
-    /* Scalar block, retail store order. */
-    PE_StoreU16(base + 0x64u, 0xFFu);
-    PE_StoreU16(base + 0x62u, 0xFFu);
-    PE_StoreU16(base + 0x60u, 0xFFu);
-    PE_StoreU8(base + 0x66u, 1u);
-    PE_StoreU16(base + 0x6Cu, 0u);
-    PE_StoreU16(base + 0x6Au, 0u);
-    PE_StoreU16(base + 0x68u, 0u);
-    PE_StoreU8(base + 0x67u, 2u);
-
-    /* Two iterations: record i at base + i*0x10 (byte/halfword fields),
-     * paired 8-byte record at base + i*0x8 (byte + GP0-shaped word). */
-    for (i = 0; i < 2; i++) {
-        const pe_addr_t a0 = base + i * 0x10u;
-        const pe_addr_t a1 = base + i * 0x8u;
-        uint16_t v1;
-        uint8_t v0;
-
-        PE_StoreU8(a0 + 0x33u, 3u);
-        PE_StoreU8(a0 + 0x37u, 0x60u);
-        PE_StoreU8(a0 + 0x34u, (uint8_t)PE_LoadU16(base + 0x60u));
-        PE_StoreU8(a0 + 0x35u, (uint8_t)PE_LoadU16(base + 0x62u));
-        v1 = PE_LoadU16(base + 0x64u);
-        v0 = PE_LoadU8(a0 + 0x37u);
-        PE_StoreU16(a0 + 0x38u, 0u);
-        PE_StoreU16(a0 + 0x3Au, 0u);
-        PE_StoreU16(a0 + 0x3Cu, 0x140u);
-        PE_StoreU16(a0 + 0x3Eu, 0xE0u);
-        PE_StoreU8(a0 + 0x37u, (uint8_t)(v0 | 2u));
-        PE_StoreU8(a0 + 0x36u, (uint8_t)v1);
-        PE_StoreU8(a1 + 0x53u, 1u);
-        PE_StoreU32(a1 + 0x54u,
-                    0xE1000400u | ((unsigned int)(PE_LoadU8(base + 0x67u) & 3u) << 5));
-    }
-
-    PE_StoreU16(base + 0x6Eu, 0u);
-    PE_StoreU16(base + 0x70u, 0u);   /* retail: in the jr $ra delay slot */
-}
+/* func_80068D28: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80068D28_port.c (src/func_80068D28.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

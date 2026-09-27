@@ -15,6 +15,7 @@ void PE_Timer1_InitializeVBlankCounter(void)
     counter=0;mode=0x507;initialized=1;running=0;
 }
 uint32_t PE_Timer1_ReadCounter(void) {return counter;}
+uint32_t PE_Timer1_PeekMode(void) {return mode;}
 uint32_t PE_Timer1_ReadMode(void)
 {
     uint32_t result=mode;

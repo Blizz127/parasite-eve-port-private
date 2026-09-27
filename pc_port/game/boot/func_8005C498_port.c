@@ -51,12 +51,9 @@ void func_80046334(void)
     }
 }
 
-void func_8004F464(void)
-{
-    if (PE_LoadU32(0x8009D008u)) {menu_boundary("func_8004E97C");return;}
-}
+/* func_8004F464: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8004F464_port.c (src/func_8004F464.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-void func_8005C488(void) {PE_StoreU32(0x8009D034u,1u);}
+/* func_8005C488: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8005C488_port.c (src/func_8005C488.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 void func_80042B6C(void)
 {

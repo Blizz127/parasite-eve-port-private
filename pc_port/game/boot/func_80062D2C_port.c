@@ -3,10 +3,8 @@
 #include "psx_compat.h"
 #include "pe_port_compat.h"
 
-pe_addr_t func_8005DA8C(uint32_t index)
-{ return index<65u?0x80092478u+index*16u:0u; }
-pe_addr_t func_8005DAB4(uint32_t index)
-{ return index<65u?0x80092888u+index*32u:0u; }
+/* func_8005DA8C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8005DA8C_port.c (src/func_8005DA8C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_8005DAB4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8005DAB4_port.c (src/func_8005DAB4.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 void func_80062F9C(void)
 {
@@ -16,21 +14,7 @@ void func_80062F9C(void)
     PE_StoreU32(0x8009D15Cu,0u);PE_StoreU32(0x8009D154u,0u);
 }
 
-/* func_80067CBC — matched C leaf (src/func_80067CBC.c, VRAM 0x80067CBC, 23
- * words, LINK_EXACT on era -O2 -G0). Retail writes D_800BCF88 three times:
- * the OR'd value, the conditional result, and the final mask|set (reloaded
- * from memory first). Preserve all three stores so an interleaved reader sees
- * the same states; the previous folded expression produced the right final
- * word but only one observable write. */
-void func_80067CBC(void)
-{
-    uint32_t v=PE_LoadU32(0x800BCF88u);
-    uint32_t n=v|0x1000u;
-    PE_StoreU32(0x800BCF88u,n);
-    if (n&0x2000u) PE_StoreU32(0x800BCF88u,n&~0x2000u);
-    else           PE_StoreU32(0x800BCF88u,v|0x3000u);
-    PE_StoreU32(0x800BCF88u,(PE_LoadU32(0x800BCF88u)&0xFFFF3FFFu)|0x4000u);
-}
+/* func_80067CBC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80067CBC_port.c (src/func_80067CBC.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 pe_addr_t func_80062A34(uint32_t kind,uint32_t id)
 {
@@ -119,16 +103,7 @@ void func_80064D08(pe_addr_t list)
     PE_StoreU32(node+52u,list);PE_StoreU32(node+64u,PE_LoadU32(list+100u));PE_StoreU32(list+128u,node);
 }
 
-void func_80064A54(pe_addr_t node)
-{
-    uint32_t id=PE_LoadU32(node+112u);
-    if ((PE_LoadU32(0x8009D16Cu) || (PE_LoadU32(node+100u)&32u)) && id<72u) {
-        pe_addr_t saved=0x800A3060u+id*4u;
-        PE_StoreU8(saved,(uint8_t)PE_LoadU32(node+68u));
-        PE_StoreU8(saved+1u,(uint8_t)PE_LoadU32(node+72u));
-        PE_StoreU8(saved+2u,(uint8_t)PE_LoadU32(node+92u));
-    }
-}
+/* func_80064A54: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80064A54_port.c (src/func_80064A54.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 void func_8006269C(pe_addr_t target)
 {

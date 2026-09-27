@@ -115,12 +115,11 @@ static void test_DECOMPPTR_display_node_zero(void)
 static void test_DECOMPPTR_struct_pointer_bittest(void)
 {
     TEST("DECOMPPTR_struct_pointer_bittest");
-    struct { unsigned int *source; unsigned int *bit; unsigned int *destination; } *args;
-
-    args = (void *)PE_Translate(PTR_BASE, sizeof(*args));
-    args->source = (unsigned int *)PE_Translate(PTR_DATA + 0x0u, 4);
-    args->bit = (unsigned int *)PE_Translate(PTR_DATA + 0x4u, 4);
-    args->destination = (unsigned int *)PE_Translate(PTR_DATA + 0x8u, 4);
+    /* Retail Arguments { u32 *source, *bit, *destination; } is three 32-bit
+     * guest pointers (hand adapter since generator rule E18). */
+    PE_StoreU32(PTR_BASE + 0x0u, PTR_DATA + 0x0u);
+    PE_StoreU32(PTR_BASE + 0x4u, PTR_DATA + 0x4u);
+    PE_StoreU32(PTR_BASE + 0x8u, PTR_DATA + 0x8u);
 
     PE_StoreU32(PTR_DATA + 0x0u, 0x00000104u); /* bit 2 set, bit 8 set */
     PE_StoreU32(PTR_DATA + 0x4u, 2u);
@@ -142,12 +141,11 @@ static void test_DECOMPPTR_struct_pointer_bittest(void)
 static void test_DECOMPPTR_field_forwarder(void)
 {
     TEST("DECOMPPTR_field_forwarder");
-    struct { short *first; short *second; unsigned short *third; } *args;
-
-    args = (void *)PE_Translate(PTR_BASE, sizeof(*args));
-    args->first = (short *)PE_Translate(PTR_DATA + 0x0u, 2);
-    args->second = (short *)PE_Translate(PTR_DATA + 0x2u, 2);
-    args->third = (unsigned short *)PE_Translate(PTR_DATA + 0x4u, 2);
+    /* Retail Arguments { short *first, *second; u16 *third; } is three 32-bit
+     * guest pointers (hand adapter since generator rule E18). */
+    PE_StoreU32(PTR_BASE + 0x0u, PTR_DATA + 0x0u);
+    PE_StoreU32(PTR_BASE + 0x4u, PTR_DATA + 0x2u);
+    PE_StoreU32(PTR_BASE + 0x8u, PTR_DATA + 0x4u);
     PE_StoreU16(PTR_DATA + 0x0u, 0xFFF1u); /* -15 as a short */
     PE_StoreU16(PTR_DATA + 0x2u, 0x0007u);
     PE_StoreU16(PTR_DATA + 0x4u, 0x8001u);
@@ -167,8 +165,11 @@ static void test_DECOMPPTR_field_forwarder(void)
            "the third field must forward as an unsigned short");
     ASSERT(PE_LoadU16(0x800BCFA0u) == 1u,
            "the camera request must be committed");
-    ASSERT((PE_LoadU32(0x800BCF88u) & 0xFu) == 1u,
-           "mode 8 must select the pan flag low nibble 1");
+    /* Retail 0x8006624C: `bne a3,8` with `ori 1` in the delay slot, then
+     * `ori 9` on the a3 == 8 fall-through (src/func_800661EC.c); the old
+     * hand port had this inverted (portverify). */
+    ASSERT((PE_LoadU32(0x800BCF88u) & 0xFu) == 9u,
+           "mode 8 must select the pan flag low nibble 9");
     PASS();
 }
 
@@ -220,16 +221,26 @@ static void test_DECOMPPTR_boundary_guest_addresses(void)
     PE_Decomp_ResetBoundaries();
     Bootstrap_ResetArg4CallLog();
 
-    ASSERT(func_800816F4(0x80160000u, 0x80170000u) == 1,
-           "the boundary returns 0, so the == 0 compare must be true");
-    ASSERT(PE_Decomp_BoundaryCount() == 1 &&
-           strcmp(PE_Decomp_BoundaryName(0), "func_80071A04") == 0,
-           "func_80071A04 must be the recorded boundary");
-    ASSERT(g_bootstrap_arg4_call_count == 1 &&
-           g_bootstrap_arg4_calls[0].arg0 == 0x80160000u &&
-           g_bootstrap_arg4_calls[0].arg1 == 0x80170000u &&
-           g_bootstrap_arg4_calls[0].arg2 == 12u,
-           "the forwarded arguments must be the guest addresses and size 12");
+    /* func_800816F4 forwards the two guest addresses and 12 to BIOS A(18h)
+     * strncmp (func_80071A04, pc_port/platform/pe_bios_string.c): the
+     * guest strings at those addresses decide the result, so the guest
+     * addresses (not host pointers) must have been forwarded. */
+    {
+        static const char k[] = "BESLUS-00662";
+        unsigned i;
+        for (i = 0; i < 12u; i++) {
+            PE_StoreU8(0x80160000u + i, (uint8_t)k[i]);
+            PE_StoreU8(0x80170000u + i, (uint8_t)k[i]);
+        }
+        PE_StoreU8(0x80170000u + 12u, 'X');         /* beyond maxlen 12 */
+        ASSERT(func_800816F4(0x80160000u, 0x80170000u) == 1,
+               "equal in the first 12 bytes -> 1");
+        PE_StoreU8(0x80170000u + 11u, '3');
+        ASSERT(func_800816F4(0x80160000u, 0x80170000u) == 0,
+               "byte 11 differs -> 0 (size 12 forwarded)");
+        ASSERT(PE_Decomp_BoundaryCount() == 0 && g_bootstrap_arg4_call_count == 0,
+               "strncmp is a real call, not a boundary");
+    }
     PASS();
 }
 

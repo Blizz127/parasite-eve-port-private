@@ -50,7 +50,4 @@
 #include "psx_compat.h"
 #include "pe_port_compat.h"
 
-void func_8005BCA8(void)
-{
-    /* retail: jr $ra ; nop */
-}
+/* func_8005BCA8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8005BCA8_port.c (src/func_8005BCA8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

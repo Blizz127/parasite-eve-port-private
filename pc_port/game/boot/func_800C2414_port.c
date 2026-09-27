@@ -50,8 +50,8 @@ void PE_WeaponCallback(pe_addr_t fn,pe_addr_t slot,pe_addr_t rec,pe_addr_t data)
     if(PE_M34BossEffectOverlay() && PE_M34BossEffectChild(fn,slot,rec,data))return;
     switch (fn) {
     case 0x800CE1FCu:func_800CE1FC();return;
-    case 0x800CE2B4u:func_800CE2B4(data);return;
-    case 0x800CE3B4u:func_800CE3B4(data);return;
+    case 0x800CE2B4u:func_800CE2B4((int)slot,(int)rec,data);return; /* retail a0/a1/a2 */
+    case 0x800CE3B4u:func_800CE3B4((int)slot,(int)rec,data);return; /* retail a0/a1/a2 */
     case 0x800CE3ACu:return; /* Original empty draw leaf. */
     case 0x800CE464u:func_800CE464(slot,rec);return;
     case 0x800CE470u:func_800CE470(slot,rec,data);return;
@@ -141,13 +141,8 @@ void func_800C2D0C(unsigned index,unsigned code,unsigned size)
     PE_StoreU8(body+6u,(uint8_t)(PE_LoadU8(body+6u)+1u));
 }
 
-int func_800C2DA0(unsigned index)
-{
-    pe_addr_t body;
-    PE_StoreU8(weapon_rec(index&65535u)+1u,0u);
-    body=weapon_body();PE_StoreU8(body+6u,(uint8_t)(PE_LoadU8(body+6u)-1u));
-    return (PE_LoadU32(weapon_body()+4u)&0xFFFF0000u)==0x01000000u?-1:0;
-}
+/* func_800C9B68: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800C9B68_port.c (src/func_800C9B68.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_800C2DA0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800C2DA0_port.c (src/func_800C2DA0.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 int func_800C2E08(void)
 {
@@ -244,19 +239,6 @@ int func_800C2758(pe_addr_t slot,pe_addr_t callbacks,pe_addr_t sizes)
     return result;
 }
 
-int func_800C9B68(pe_addr_t slot) { return func_800C2414(slot,0x800E0A94u); }
-int func_800CD8C8(pe_addr_t slot) { return func_800C2414(slot,0x800E0F28u); }
-int func_800C9B90(pe_addr_t slot)
-{
-    int result=func_800C251C(slot,0x800E0AA4u);
-    result|=func_800C2758(slot,0x800E0A84u,0x800E0AB4u);
-    if (result==-1) PE_StoreU8(slot,4u);
-    return 0;
-}
-int func_800CD8F0(pe_addr_t slot)
-{
-    int result=func_800C251C(slot,0x800E0F38u);
-    result|=func_800C2758(slot,0x800E0F18u,0x800E0F48u);
-    if (result==-1) PE_StoreU8(slot,4u);
-    return 0;
-}
+/* func_800CD8C8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800CD8C8_port.c (src/func_800CD8C8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_800C9B90: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800C9B90_port.c (src/func_800C9B90.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_800CD8F0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800CD8F0_port.c (src/func_800CD8F0.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

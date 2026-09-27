@@ -51,10 +51,7 @@ int32_t func_800328DC(pe_addr_t digits, int16_t x, int16_t y, int16_t number, in
     return last;
 }
 
-uint32_t func_80056C14(uint32_t kind)
-{
-    return kind<3u ? PE_LoadU16(0x800A1E6Eu+kind*32u) : 0u;
-}
+/* func_80056C14: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80056C14_port.c (src/func_80056C14.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 void func_8003205C(void)
 {

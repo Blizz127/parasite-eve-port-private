@@ -1,0 +1,25 @@
+/* best: 12 words (2.8.1 -O2 -G0 -mno-split-addresses, or 2.7.2 -O2 -G0 — same). Residual: retail branches `bnez $v0, <epilogue>` with `li $v0,-1` stolen into the slot (reorg predicted the error exit taken); cc1 fills the slot with the fall-through `lui 0x100` and keeps a separate `li -1` err block. `goto err` beats `return -1` in the loop (36 words). Siblings func_800776D4 (identical but D_800118E0 / slot +0x1C) and func_80077904 share this residual. */
+typedef struct { short x, y, w, h; } RECT;
+extern unsigned int *D_80095860;
+extern unsigned int *D_80095854;
+extern int D_80095888;
+extern int D_8009588C;
+extern unsigned char *D_80095744;
+extern char D_800119BC;
+extern void func_80074E28(char *, RECT *);
+extern int func_80073A44(int);
+extern int func_80077404(void);
+extern void func_80073CF4(int, void (*)());
+extern void func_80077A00();
+
+int func_800775E8(RECT *r, unsigned int *p) {
+    func_80074E28(&D_800119BC, r);
+    D_80095888 = func_80073A44(-1) + 240;
+    D_8009588C = 0;
+    while ((*D_80095860 & 0x1000000) || !(*D_80095854 & 0x4000000)) { if (func_80077404()) goto err; }
+    func_80073CF4(2, func_80077A00);
+    (*(void (**)(RECT *, unsigned int *))(D_80095744 + 0x20))(r, p);
+    return 0;
+err:
+    return -1;
+}

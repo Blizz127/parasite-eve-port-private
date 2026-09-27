@@ -36,12 +36,33 @@ doing anything**.
 
 ## Current phase
 
-**752 matching C leaves** — exact count via
-**785 matching C leaves** — exact count via
+**2036 matching C leaves** (EXE) + **2545 overlay `c` spans** across 72
+PE.IMG targets — exact count via
 `python3 tools/build/disc1_plan.py --check` (prints
-`1133 spans (785 c, 346 asm, 2 rodata)`) or equivalently
-`grep -cE ',[[:space:]]*c,' configs/USA/disc1.yaml`. This count is the
+`2257 spans (2036 c, 219 asm, 2 rodata)`) or equivalently
+`grep -cE ',[[:space:]]*c,' configs/USA/disc1.yaml`; overlays via
+`cat configs/USA/overlays/*.yaml | grep -cE ',[[:space:]]*c,'` (hand-matched
+leaves plus masked-body ports of shared room bodies). This count is the
 authoritative number; re-derive it, do not trust prose here.
+
+**Newest (2026-09-26): 2036 EXE gate PASS** (`plan=b6ebd320af1a…`,
+`yaml=4ba194d202f8…`, retail SHA-1 `452fb033…` reproduced,
+`VERIFY_SWEEP=PASS leaves=2036`) plus per-overlay `EXACT_REBUILD_GATE[<id>]`
+passes; details at the top of `docs/ai_context/ACTIVE_HANDOFF.md`. The five
+`gte-inline` EXE spans stay instruction-blocked (era cc1 emits no COP2
+transfers).
+
+**Newest (2026-09-22 fan-out): 1655 → 1780 EXE leaves + 68 overlay leaves.**
+Six parallel address lanes + a tooling lane + an overlay lane; full record in
+`docs/ai_context/ACTIVE_HANDOFF.md` (top) and
+`docs/evidence/session-2026-09-22-fanout/REPORT.md`. New maspsx knobs:
+multi-table `MASPSX_DISPATCH_FOLD=a,b` (comma list, one symbol per cc1
+switch table in `.rdata` order), patch 11 `MASPSX_FILL_JUMP_STACK_STORE`,
+patch 12 `MASPSX_RETURN_VIA_EPILOGUE_JUMP`, patch 13
+`MASPSX_LOAD_DELAY_CALL_SLOT_STORE`. **Lever: inside the 2.8.1 band
+(0x80071A84–0x8008D610) try `ERA_CC1_VER=2.8.1 -mno-split-addresses` first.**
+Gate hygiene: run `disc1_plan.py --write-status` before the gate, keep
+`TMPDIR` off the /tmp tmpfs (per-user quota), and never run two gates at once.
 
 **Newest (session cont. 23): 33 small leaves (752 → 785).** Carved from former
 pure-`asm` residue across `0x80015xxx`–`0x8008Fxxx`: `func_80019CEC`,

@@ -18,14 +18,16 @@ from disc1_plan import (
     PlanError,
     build_plan,
     matching_status,
+    plan_target,
     verification_manifest,
     write_generated,
 )
+from overlay_targets import MAIN_TARGET, TargetError, load_target
 
 
 ROOT = Path(__file__).resolve().parents[2]
-EXE = Path("build/extracted/disc1/SLUS_006.62")
-CANDIDATE = Path("build/disc1.candidate.exe")
+EXE = Path(MAIN_TARGET.retail)
+CANDIDATE = Path(MAIN_TARGET.candidate)
 
 
 class VerifyError(RuntimeError):
@@ -74,6 +76,22 @@ def tracked_sources(plan: dict[str, Any]) -> None:
     ]
     if missing:
         raise VerifyError("YAML C sources are not tracked: " + ", ".join(missing))
+    if not plan_target(plan).is_main:
+        # The accepted-residual / nonmatching-disposition ledgers are EXE-only
+        # (they enumerate src/func_*.c); an overlay's namespace is its own
+        # src/overlays/<id>/ directory and every tracked file there must be a
+        # YAML C span.
+        src_dir = plan_target(plan).src_dir
+        extra = sorted(
+            path for path in tracked
+            if re.fullmatch(rf"{re.escape(src_dir)}/func_[0-9A-Fa-f]{{8}}\.c", path)
+            and path not in {u["source"] for u in plan["units"] if u["kind"] == "c"}
+        )
+        if extra:
+            raise VerifyError(
+                "tracked overlay sources without a YAML C span: " + ", ".join(extra)
+            )
+        return
 
     yaml_sources = {
         unit["source"] for unit in plan["units"] if unit["kind"] == "c"
@@ -169,7 +187,11 @@ def public_checks(plan: dict[str, Any]) -> None:
 
 
 def local_generated_checks(plan: dict[str, Any]) -> None:
-    expected_sources = [plan["header"]["source"], *(u["source"] for u in plan["units"])]
+    header = plan.get("header")
+    expected_sources = [
+        *([header["source"]] if header else []),
+        *(u["source"] for u in plan["units"]),
+    ]
     missing = [source for source in expected_sources if not (ROOT / source).is_file()]
     if missing:
         raise VerifyError(
@@ -193,13 +215,15 @@ def local_generated_checks(plan: dict[str, Any]) -> None:
 
 
 def exact_checks(plan: dict[str, Any]) -> None:
-    exe = ROOT / EXE
-    candidate = ROOT / CANDIDATE
+    target = plan_target(plan)
+    exe = ROOT / target.retail
+    candidate = ROOT / target.candidate
     if not exe.is_file():
-        raise VerifyError(f"missing retail executable {EXE}")
+        raise VerifyError(f"missing retail {'executable' if target.is_main else 'overlay'} {target.retail}")
     if not candidate.is_file():
+        build_cmd = "scripts/build_us.sh" if target.is_main else f"tools/build/disc1_build.py --target {target.id}"
         raise VerifyError(
-            f"missing candidate {CANDIDATE}; run scripts/build_us.sh first"
+            f"missing candidate {target.candidate}; run {build_cmd} first"
         )
     original_hash = sha1(exe)
     candidate_hash = sha1(candidate)
@@ -232,14 +256,23 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="artifact-independent authority gate (no retail image or split required)",
     )
+    parser.add_argument(
+        "--target",
+        default=None,
+        metavar="ID",
+        help="verify target: disc1 (default, the EXE) or an overlay id from "
+        "configs/USA/overlays/manifest.yaml",
+    )
     args = parser.parse_args(argv)
     total = 4 if args.public else 7
     try:
+        target = load_target(args.target, root=ROOT)
         gate(1, total, "YAML span geometry and build-profile model")
-        plan = build_plan(root=ROOT, require_generated=not args.public)
+        plan = build_plan(root=ROOT, require_generated=not args.public, target=target)
         pass_line(
             f"{plan['counts']['units']} spans = {plan['counts']['c']} c + "
             f"{plan['counts']['asm']} asm + {plan['counts']['rodata']} rodata"
+            + (f" + {plan['counts']['bin']} bin" if plan["counts"].get("bin") else "")
         )
         pass_line(f"load geometry closes at 0x{plan['file']['load_size']:X}")
 
@@ -249,10 +282,13 @@ def main(argv: list[str] | None = None) -> int:
 
         gate(3, total, "Tracked C sources and generated published status")
         tracked_sources(plan)
-        check_status(plan)
         pass_line("every YAML C source is tracked")
-        pass_line("every extra tracked function C has a nonmatching disposition")
-        pass_line("published matching count equals YAML")
+        if target.is_main:
+            check_status(plan)
+            pass_line("every extra tracked function C has a nonmatching disposition")
+            pass_line("published matching count equals YAML")
+        else:
+            pass_line(f"every tracked {target.src_dir}/func_*.c is a YAML C span")
 
         gate(4, total, "Deterministic generated plans")
         # Verification is read-only with respect to the build tree. Emit into
@@ -268,7 +304,7 @@ def main(argv: list[str] | None = None) -> int:
             raise VerifyError("generated verifier manifest is not deterministic")
         pass_line(f"plan SHA-256 {plan['plan_sha256']}")
         if args.public:
-            print("\nPUBLIC_VERIFY=PASS")
+            print("\nPUBLIC_VERIFY=PASS" if target.is_main else f"\nPUBLIC_VERIFY[{target.id}]=PASS")
             print(f"matching-C count: {plan['counts']['c']} (from YAML)")
             return 0
 
@@ -277,27 +313,33 @@ def main(argv: list[str] | None = None) -> int:
         pass_line("all YAML-derived split sources exist and are ignored")
 
         gate(6, total, "Split prerequisite gate")
+        split_command = (
+            [str(ROOT / "scripts/split_us.sh"), "--check"]
+            if target.is_main
+            else [str(ROOT / "scripts/split_overlay.sh"), target.id, "--check"]
+        )
         split = subprocess.run(
-            [str(ROOT / "scripts/split_us.sh"), "--check"],
+            split_command,
             cwd=ROOT,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             check=False,
         )
+        split_label = " ".join(Path(part).name if index == 0 else part for index, part in enumerate(split_command))
         if split.returncode:
             raise VerifyError(
-                "scripts/split_us.sh --check failed:\n"
+                f"scripts/{split_label} failed:\n"
                 + split.stdout.decode(errors="replace")
             )
-        pass_line("scripts/split_us.sh --check")
+        pass_line(f"scripts/{split_label}")
 
         gate(7, total, "Exact candidate and packed-span verification")
         exact_checks(plan)
-    except (PlanError, VerifyError, subprocess.CalledProcessError) as exc:
+    except (PlanError, TargetError, VerifyError, subprocess.CalledProcessError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
-    print("\nVERIFY_US=PASS")
+    print("\nVERIFY_US=PASS" if target.is_main else f"\nVERIFY_TARGET[{target.id}]=PASS")
     print(f"matching-C count: {plan['counts']['c']} (from YAML)")
     return 0
 

@@ -44,11 +44,7 @@ int func_8007BAC0(void)
     return 0;
 }
 
-/* 812F4..81310: unsigned modes0/1 only. */
-void func_800812F4(uint32_t mode)
-{
-    if(mode<2u) PE_StoreU32(0x8009B6B8u,mode);
-}
+/* func_800812F4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800812F4_port.c (src/func_800812F4.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 /* 7BBFC..7BDDC: controller startup and source2 registration.
  * BIOS console diagnostics use the host log. Device commands remain owned
@@ -89,23 +85,7 @@ int func_8007BBFC(void)
     return result==2?0:-1;
 }
 
-/* 7FA2C..7FB04: SDK startup state, including original80B44(0,B582). */
-void func_8007FA2C(void)
-{
-    PE_StoreU32(0x8009B554u,0u);PE_StoreU8(0x8009B558u,0u);
-    for(unsigned i=0;i<4;i++) PE_StoreU8(0x8009B55Cu-i,0u);
-    PE_StoreU32(0x8009B560u,0u);
-    for(unsigned i=0;i<8;i++) PE_StoreU8(0x8009B56Bu-i,0u);
-    PE_StoreU32(0x8009B574u,2u);PE_StoreU32(0x8009B578u,14u);
-    PE_StoreU8(0x8009B56Cu,0u);PE_StoreU32(0x8009B570u,0u);
-    PE_StoreU32(0x8009B57Cu,21u);PE_StoreU8(0x8009B580u,0u);PE_StoreU8(0x8009B581u,0u);
-    /* LBA0 plus the150-sector lead-in is00:02:00. Byte3 is untouched. */
-    PE_StoreU8(0x8009B582u,0u);PE_StoreU8(0x8009B583u,2u);PE_StoreU8(0x8009B584u,0u);
-    for(unsigned i=0;i<6;i++) PE_StoreU8(0x8009B586u+i,0u);
-    PE_StoreU32(0x8009B58Cu,0u);PE_StoreU32(0x8009B590u,1u);
-    PE_StoreU32(0x8009B594u,0u);PE_StoreU32(0x8009B59Cu,0u);
-    PE_StoreU32(0x8009B598u,0u);PE_StoreU32(0x8009B5A0u,0u);
-}
+/* func_8007FA2C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8007FA2C_port.c (src/func_8007FA2C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 /* 7F994..7FA2C: low-level initializer, original helper order.
  * An ordinary7BBFC failure is ignored by retail; an unresolved native stop
@@ -279,10 +259,7 @@ int func_8007B290(uint32_t mode, pe_addr_t result)
     }
 }
 
-int func_8007A488(uint32_t mode, pe_addr_t result)
-{
-    return func_8007B290(mode,result);
-}
+/* func_8007A488: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8007A488_port.c (src/func_8007A488.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 static void StreamStop(const char *name)
 {
@@ -834,45 +811,11 @@ void func_8007C13C(void)
     PE_CdStoreU8(PE_LoadU32(0x8009B27Cu),index);
 }
 
-/* 7A930..7AAB4: signed LBA conversion and inverse BCD arithmetic.
- * Preserve wrapping input+150, signed division and frame/second/minute store
- * order. Invalid BCD digits are arithmetic inputs, not validation failures. */
-pe_addr_t func_8007A930(int32_t lba,pe_addr_t location)
-{
-    int32_t absolute=(int32_t)((uint32_t)lba+150u);
-    int32_t seconds=absolute/75,minutes=seconds/60;
-    int32_t frame=absolute-seconds*75;
-    seconds-=minutes*60;
-    PE_StoreU8(location+2u,(uint8_t)(frame/10*16+frame%10));
-    PE_StoreU8(location+1u,(uint8_t)(seconds/10*16+seconds%10));
-    PE_StoreU8(location,(uint8_t)(minutes/10*16+minutes%10));
-    return location;
-}
-int32_t func_8007AA34(pe_addr_t location)
-{
-    uint32_t minute=PE_LoadU8(location),second=PE_LoadU8(location+1u);
-    uint32_t frame=PE_LoadU8(location+2u);
-    return (int32_t)((((minute>>4u)*10u+(minute&15u))*60u+
-        (second>>4u)*10u+(second&15u))*75u+(frame>>4u)*10u+(frame&15u))-150;
-}
-/* 7C2A0..7C2F8: retry from the sector after the last completed stream DMA.
- * Return the live word after writing the location: aliases affect the result. */
-int32_t func_8007C2A0(pe_addr_t location)
-{
-    if(PE_LoadU32(0x800A8020u)) return -1;
-    int32_t lba=func_8007AA34(0x800A3490u);
-    func_8007A930((int32_t)((uint32_t)lba+1u),location);
-    return (int32_t)PE_LoadU32(0x800A3494u);
-}
-pe_addr_t func_8007A4BC(pe_addr_t callback)
-{
-    pe_addr_t old=PE_LoadU32(0x8009AFB8u);
-    PE_StoreU32(0x8009AFB8u,callback);return old;
-}
-pe_addr_t func_8007A8EC(pe_addr_t callback)
-{
-    return func_80073CF4(3u,callback);
-}
+/* func_8007A930: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8007A930_port.c (src/func_8007A930.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_8007AA34: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8007AA34_port.c (src/func_8007AA34.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_8007C2A0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8007C2A0_port.c (src/func_8007C2A0.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_8007A4BC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8007A4BC_port.c (src/func_8007A4BC.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_8007A8EC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8007A8EC_port.c (src/func_8007A8EC.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 /* 7A2A4..7A324: unregister the selected SDK stream callbacks, then clear
  * the original bank/request registers within the critical section. */
 void func_8007A2A4(void)
@@ -919,16 +862,8 @@ uint32_t func_8007EE84(uint32_t command,pe_addr_t param,uint32_t extra,uint32_t 
     }
     return 0;
 }
-void func_80080998(pe_addr_t dest,pe_addr_t source)
-{
-    if(!dest) return;
-    if(!source) {PE_StoreU8(dest,0u);return;}
-    for(unsigned i=0;i<8u;i++) PE_StoreU8(dest+i,PE_LoadU8(source+i));
-}
-int func_8007FC64(pe_addr_t response)
-{
-    return func_8007B010(1u,response);
-}
+/* func_80080998: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80080998_port.c (src/func_80080998.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_8007FC64: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8007FC64_port.c (src/func_8007FC64.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 /* 7F418..7F608: completed-command ring search and eight response bytes.
  * The signed sequence comparison, reverse search and snapshot/copy order
  * preserve original wrap and alias behavior. */

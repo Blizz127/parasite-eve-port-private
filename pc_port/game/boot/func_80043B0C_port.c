@@ -4,16 +4,15 @@
 #include "pe_port_compat.h"
 #include <limits.h>
 
-pe_addr_t func_80051E48(void) {return 0x800A1B30u;}
+/* func_80051E48: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80051E48_port.c (src/func_80051E48.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 pe_addr_t func_8005DBF8(void) {return 0x800A8028u+PE_LoadU32(0x800A8040u);}
 
-int func_80021080(void)
-{
-    if (PE_LoadU8(0x8009CE3Cu)) return 0;
-    if ((D_8009D1A0&2u) && (PE_LoadU32(PE_LoadU32(0x8009D278u)+76u)&0x10000u)) return 0;
-    return 1;
-}
-int8_t func_80052534(void) {return (int8_t)func_80021080();}
+/* func_800605C4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800605C4_port.c (src/func_800605C4.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_80060590: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80060590_port.c (src/func_80060590.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_8006055C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8006055C_port.c (src/func_8006055C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_80060528: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80060528_port.c (src/func_80060528.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_80021080: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80021080_port.c (src/func_80021080.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_80052534: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80052534_port.c (src/func_80052534.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 void func_800602D0(int32_t value,int32_t digits)
 {
@@ -35,11 +34,7 @@ void func_800602D0(int32_t value,int32_t digits)
     }
 }
 
-void func_80060528(int32_t value) {func_800602D0(value,6);func_8005E8A4(6,0);}
-void func_8006055C(int32_t value) {func_800602D0(value,5);func_8005E8A4(5,0);}
-void func_80060590(int32_t value) {func_800602D0(value,4);func_8005E8A4(4,0);}
-void func_800605C4(int32_t value) {func_800602D0(value,3);func_8005E8A4(3,0);}
-void func_800605F8(int32_t value) {func_800602D0(value,2);func_8005E8A4(2,0);}
+/* func_800605F8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800605F8_port.c (src/func_800605F8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 void func_800536B8(int32_t index)
 {
@@ -90,12 +85,7 @@ void func_80043C64(pe_addr_t node)
     }
 }
 
-void func_8004905C(pe_addr_t node)
-{
-    (void)node;func_8005E8A4(6,4);func_8005EB64(147u);
-    func_8005E8A4((int32_t)(PE_LoadU32(0x8009CF30u)*20u+72u),0);
-    func_8006055C((int32_t)PE_LoadU32(0x8009CF68u));
-}
+/* func_8004905C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8004905C_port.c (src/func_8004905C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 void func_80050748(uint32_t index)
 {

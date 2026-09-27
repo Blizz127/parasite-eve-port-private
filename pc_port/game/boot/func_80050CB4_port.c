@@ -12,8 +12,4 @@
 
 extern int func_80064A48(void);
 
-void func_80050CB4(pe_addr_t node)
-{
-    func_80064C54((uint32_t)(node + 0x31u));
-    if ((uint32_t)func_80064A48() == (uint32_t)node) func_80064C80();
-}
+/* func_80050CB4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80050CB4_port.c (src/func_80050CB4.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

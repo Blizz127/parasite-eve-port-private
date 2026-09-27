@@ -15,20 +15,4 @@
 #define GA_D_800BCEA8 0x800BCEA8u
 #define REC_STRIDE    56u
 
-int func_80037548(int needle)
-{
-    unsigned int i;
-    pe_addr_t rec;
-    int result;
-
-    needle = (int)(int16_t)needle;
-    result = 0;
-    for (i = 0; i < 4u; i++) {
-        rec = GA_D_800BCEA8 + i * REC_STRIDE;
-        if ((int)(int16_t)PE_LoadU16(rec + 0x10u) == needle) {
-            result = (int)(int8_t)PE_LoadU8(rec);
-            break;
-        }
-    }
-    return result;
-}
+/* func_80037548: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80037548_port.c (src/func_80037548.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

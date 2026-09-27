@@ -1,38 +1,18 @@
-# func_80012574 — pointer-table relocation
+# func_80012574
 
-## Target
+- VRAM `0x80012574`, file offset `0x2D74`, size `0x6C` (27 words)
+- Profile: `era_o2_g8`; maspsx env: none
+- Source: `src/func_80012574.c`
 
-VRAM `0x80012574..0x800125E0` (exclusive), file `0x2D74`, size `0x6C`
-(27 words), from `asm/disc1/2D74.s`.
-
-The leaf stores its input pointer to `D_8009CE04` (`gp + 0x94`). If the first
-word is not bit-31 tagged, it adds the record base to word zero and to the
-`+0x08` field of each `record[1]` entries. There are no calls or saved
-registers; retail applies an 8-byte stack adjustment around both exits.
-
-## First bounded attempt — non-match
-
-Era `-O2 -G8` retained the GP-relative `D_8009CE04` accesses and emitted the
-pointer-field loop in retail order, but produced `0x60` bytes (24 words), not
-the required `0x6C` bytes. `scripts/build_us.sh` stopped at its trim guard:
+## Verification (lane-1 private config, session 2026-09-22)
 
 ```
-ERROR: target size 0x6C > current 0x60
+python3 tools/build/disc1_preflight.py --config $S/lanes/lane1/disc1.yaml --profiles $S/lanes/lane1/disc1_build_profiles.json --deep --only func_80012574
+disc1_preflight: PASS (deep, ...)
+python3 tools/analysis/leaf_strong_check.py --config $S/lanes/lane1/disc1.yaml --profiles $S/lanes/lane1/disc1_build_profiles.json func_80012574
+LEAF_STRONG=EXACT func_80012574 span=0x6C vram=0x80012574
 ```
 
-The first differing word is the unsigned tag test: retail uses `lui $v0,
-0x8000; sltu $v0,$v0,$a2`, while era folds it to `bgez $v0`. Retail also has
-the unconditional `addiu $sp,-8` / `addiu $sp,+8` pair that the frameless
-candidate omits. Per the one-attempt cycle stop condition, no further C
-phrasing or flag change was tried, and no verifier run or commit is claimed.
+## Load-bearing levers
 
-## Parked
-
-Three bounded attempts were performed.  The final `0x6C` candidate matched
-the unsigned tag test, empty 8-byte frame, GP access, and loop cursor form,
-but remained non-exact by four bytes in the count/sum setup: retail allocates
-that sequence as `$v1`/`$v0`, while the candidate uses `$v0`/`$a2`.
-
-The leaf is parked: an exact match was not achieved, the candidate source and
-split registration were restored to the exact baseline, and no commit was
-made.  A further attempt requires a new explicit decision.
+`-G8` (D_8009CE04 at 0x94($gp)); load `v = a0[0]` into a named local before the gp store (store-first order costs 3 words). No dummy frame local: cc1 emits the retail 8-byte frame on its own; adding one makes it 0x10.

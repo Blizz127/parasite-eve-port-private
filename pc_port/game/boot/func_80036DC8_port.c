@@ -57,40 +57,10 @@
 #define GA_36DC8_REC1  0x800A76ACu   /* record 1 */
 #define GA_36DC8_REC2  0x800A76B8u   /* record 2 */
 
-/* Record 0 init — retail order: field2 zeroed then preloaded, field1
- * cleared, field0 zeroed then set (15 words / 0x3C). */
-void func_80036DF8(void)
-{
-    PE_StoreU32(GA_36DC8_REC0 + 8u, 0);
-    PE_StoreU32(GA_36DC8_REC0 + 8u, 0x1499700u);
-    PE_StoreU32(GA_36DC8_REC0 + 4u, 0);
-    PE_StoreU32(GA_36DC8_REC0 + 0u, 0);
-    PE_StoreU32(GA_36DC8_REC0 + 0u, 1);
-}
+/* func_80036DF8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80036DF8_port.c (src/func_80036DF8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-/* Record 2 init — retail order: field1, field2 cleared, field0 set
- * (9 words / 0x24). */
-void func_80036E34(void)
-{
-    PE_StoreU32(GA_36DC8_REC2 + 4u, 0);
-    PE_StoreU32(GA_36DC8_REC2 + 8u, 0);
-    PE_StoreU32(GA_36DC8_REC2 + 0u, 1);
-}
+/* func_80036E34: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80036E34_port.c (src/func_80036E34.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-/* Record 1 init — retail order: field1, field2 cleared, field0 set
- * (9 words / 0x24). */
-void func_80036E58(void)
-{
-    PE_StoreU32(GA_36DC8_REC1 + 4u, 0);
-    PE_StoreU32(GA_36DC8_REC1 + 8u, 0);
-    PE_StoreU32(GA_36DC8_REC1 + 0u, 1);
-}
+/* func_80036E58: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80036E58_port.c (src/func_80036E58.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-/* Dispatcher — record init in retail call order: 0, 2, 1
- * (10 words / 0x28).  void(void); sole caller func_8003E680. */
-void func_80036DC8(void)
-{
-    func_80036DF8();
-    func_80036E34();
-    func_80036E58();
-}
+/* func_80036DC8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80036DC8_port.c (src/func_80036DC8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

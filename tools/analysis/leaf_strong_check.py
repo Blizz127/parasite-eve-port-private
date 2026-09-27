@@ -176,7 +176,8 @@ def resolve_nm(root: Path) -> str:
 
 
 def link_and_compare(
-    obj: Path, vram: int, span: int, retail: bytes, ld: str, nm: str
+    obj: Path, vram: int, span: int, retail: bytes, ld: str, nm: str,
+    file_offset: int | None = None,
 ) -> tuple[int | None, int | None, list[list[int]], str | None]:
     """Link ``obj`` at ``vram`` and compare ``span`` bytes to retail.
 
@@ -184,6 +185,10 @@ def link_and_compare(
     weak per-leaf check, a declared span longer than the compiled object is
     *not* silently tolerated: the missing words are counted as mismatches (the
     caller's size check independently rejects it too).
+
+    ``file_offset`` is where the span starts inside ``retail``; it defaults to
+    the EXE mapping (``vram - 0x80010000 + 0x800``) and is passed explicitly for
+    an overlay blob, whose retail bytes start at file offset 0 of its own VRAM.
     """
     try:
         undef_raw = subprocess.run(
@@ -230,7 +235,7 @@ def link_and_compare(
     if linked is None:
         return None, None, [], "no .text in linked ELF"
 
-    off = vram - LOAD_VRAM + LOAD_FILE_START
+    off = file_offset if file_offset is not None else vram - LOAD_VRAM + LOAD_FILE_START
     rom = retail[off:off + span]
     n = min(len(rom), len(linked), span)
     mismatches = 0
@@ -252,16 +257,20 @@ def link_and_compare(
     return mismatches, pad_nonzero, first, None
 
 
-def boundary_check(retail: bytes, vram: int, span: int) -> tuple[str, bool, int, list[int], bool]:
+def boundary_check(
+    retail: bytes, vram: int, span: int, file_offset: int | None = None
+) -> tuple[str, bool, int, list[int], bool]:
     """Inspect the retail words at the span boundary.
 
     Returns ``(terminator_label, terminator_ok, jr_ra_total, interior_offsets,
     interior_ok)``.  A genuine function ends in a bare ``jr $ra`` (with or
-    without a delay-slot word after it) or a tail ``j``.  ``interior_ok`` is
-    true iff there is no ``jr $ra`` before the terminal one — a swallowed
-    adjacent function would leave one.
+    without a delay-slot word after it), a tail ``j``, or an indirect tail
+    ``jr $reg`` (computed goto / tail through a pointer; the delay slot may
+    be the last word).  ``interior_ok`` is true iff there is no ``jr $ra``
+    before the terminal one — a swallowed adjacent function would leave one.
+    ``file_offset`` as in ``link_and_compare``.
     """
-    base = vram - LOAD_VRAM + LOAD_FILE_START
+    base = file_offset if file_offset is not None else vram - LOAD_VRAM + LOAD_FILE_START
     if span < 8:
         # The smallest retail leaf is 0x8 (two words); anything shorter cannot
         # hold a return plus a delay slot, so treat it as trivially bounded.
@@ -278,6 +287,11 @@ def boundary_check(retail: bytes, vram: int, span: int) -> tuple[str, bool, int,
         terminal_jr = False
     elif (head >> 26) == 2 and head != 0:
         label = "tail_j"
+        ok = True
+        terminal_jr = False
+    elif (tail & 0xFC00003F) == 0x08 or (head & 0xFC00003F) == 0x08:
+        # Indirect tail: `jr $tN` / delay. Not `jr $ra` (handled above).
+        label = "tail_jr"
         ok = True
         terminal_jr = False
     else:
@@ -323,8 +337,12 @@ def check_object(
     else:
         result.size_ok = result.compiled >= span and not result.tail_nonzero
 
+    # A plan unit's `start` is its offset in the retail file (for the EXE this
+    # equals vram - 0x80010000 + 0x800; for an overlay blob it is the blob
+    # offset).  Units without it keep the EXE mapping.
+    file_offset = unit.get("start")
     mismatches, pad_nonzero, first, error = link_and_compare(
-        obj, result.vram, span, retail, ld, nm
+        obj, result.vram, span, retail, ld, nm, file_offset
     )
     if error:
         result.error = error
@@ -335,7 +353,7 @@ def check_object(
     result.link_ok = mismatches == 0 and pad_nonzero == 0
 
     label, term_ok, total, interior, interior_ok = boundary_check(
-        retail, result.vram, span
+        retail, result.vram, span, file_offset
     )
     result.terminator = label
     result.terminator_ok = term_ok
@@ -350,7 +368,7 @@ def boundary_only(unit: dict[str, Any], retail: bytes) -> LeafCheck:
     """Cheap boundary check that needs only the retail image (no compile)."""
     result = LeafCheck(name=unit["name"], vram=unit["vram"], span=unit["size"])
     label, term_ok, total, interior, interior_ok = boundary_check(
-        retail, result.vram, result.span
+        retail, result.vram, result.span, unit.get("start")
     )
     result.terminator = label
     result.terminator_ok = term_ok
@@ -381,8 +399,23 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--profiles", type=Path, default=Path("configs/USA/disc1_build_profiles.json")
     )
+    parser.add_argument(
+        "--source-override",
+        action="append",
+        default=[],
+        metavar="FUNC=PATH",
+        help="compile PATH instead of the leaf's src/FUNC.c (repeatable)",
+    )
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
+    overrides: dict[str, Path] = {}
+    for value in args.source_override:
+        name, sep, path = value.partition("=")
+        resolved = Path(path).resolve()
+        if not sep or not name or not resolved.is_file():
+            print(f"leaf_strong_check: bad --source-override {value!r}", file=sys.stderr)
+            return 2
+        overrides[name] = resolved
 
     root = args.root.resolve()
     sanitize_environment(root)
@@ -414,6 +447,17 @@ def main(argv: list[str] | None = None) -> int:
     (root / "build").mkdir(parents=True, exist_ok=True)
     scratch = Path(_tempfile.mkdtemp(prefix="leaf-strong-", dir=(root / "build")))
     selected = [units_by_name[name] for name in args.func]
+    unknown = set(overrides) - set(args.func)
+    if unknown:
+        print(f"leaf_strong_check: --source-override for unchecked {sorted(unknown)}",
+              file=sys.stderr)
+        return 2
+    selected = [
+        dict(u, source=str(overrides[u["name"]])) if u["name"] in overrides else u
+        for u in selected
+    ]
+    for name, path in sorted(overrides.items()):
+        print(f"leaf_strong_check: NOTE {name} compiled from override {path}")
     build_units = json.loads(json.dumps(selected))
     for unit in build_units:
         unit["object"] = str(scratch / Path(unit["object"]).name)

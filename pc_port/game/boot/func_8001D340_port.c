@@ -33,27 +33,7 @@ unsigned int func_80071A54(void)
     return (s_bios_rand_seed >> 16) & 0x7FFFu;
 }
 
-int32_t func_800305C8(pe_addr_t attacker, pe_addr_t target)
-{
-    int32_t dx;
-    int32_t dz;
-    int32_t ang;
-    int32_t wrap;
-    int32_t base;
-
-    dx = (int32_t)PE_LoadU32(attacker + 0x28u) -
-         (int32_t)PE_LoadU32(target + 0x28u);
-    dz = (int32_t)PE_LoadU32(attacker + 0x30u) -
-         (int32_t)PE_LoadU32(target + 0x30u);
-    ang = 2048 - func_80079FB4(dx, dz);
-    ang = (int32_t)(int16_t)ang;
-    ang += (int32_t)(int16_t)PE_LoadU16(target + 0x3Au);
-    wrap = ang;
-    if (ang < 0)
-        wrap = ang + 4095;
-    base = (wrap >> 12) << 12;
-    return (int32_t)(int16_t)(ang - base);
-}
+/* func_800305C8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800305C8_port.c (src/func_800305C8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 int32_t func_8001F814(pe_addr_t actor)
 {

@@ -28,12 +28,4 @@
 #include "psx_compat.h"
 #include "pe_port_compat.h"
 
-void func_80077B34(pe_addr_t p, uint32_t st)
-{
-    uint8_t code = PE_LoadU8(p + 7);
-    if (st != 0)
-        code |= 0x01u;
-    else
-        code &= 0xFEu;
-    PE_StoreU8(p + 7, code);
-}
+/* func_80077B34: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80077B34_port.c (src/func_80077B34.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

@@ -1,0 +1,52 @@
+extern unsigned int D_800BCD50;
+extern unsigned int D_800BCD54;
+extern unsigned int D_800BCD58;
+extern unsigned int D_800BCD5C;
+extern unsigned int D_800BCD60;
+extern unsigned int D_800BCD6C;
+extern unsigned int D_800BCD70;
+extern unsigned int D_800BCD74;
+extern unsigned int D_8009D2DC;
+extern unsigned char D_800BC000[];
+extern void func_80089F58();
+
+void func_8008A750(unsigned char *a0, unsigned char *s, unsigned int m, int a3)
+{
+    unsigned char *p;
+    int c;
+    unsigned char *v;
+
+    v = a0;
+
+    *(int *)(v + 0x28) = *(int *)(s + 4);
+    *(int *)(v + 0x2C) = *(int *)(s + 8);
+    *(unsigned short *)(v + 0x78) = 0;
+    *(unsigned short *)(v + 0x76) = s[0xC] << 8;
+    *(unsigned short *)(v + 0x56) = 2;
+    *(unsigned short *)(v + 0x58) = 1;
+    *(unsigned short *)(v + 0x54) = 1;
+    *(unsigned short *)(v + 0x74) = 0;
+    *(int *)(v + 0x50) = -2;
+    *(unsigned short *)(v + 0xD8) = (*(int *)(s + 0x10) & 0x7F) << 8;
+    func_80089F58(a0, a3);
+    D_800BCD50 |= m;
+    D_800BCD5C |= m;
+    m = ~m;
+    D_800BCD54 &= m;
+    D_800BCD58 &= m;
+    D_800BCD6C &= m;
+    D_800BCD70 &= m;
+    D_800BCD74 &= m;
+    if (D_8009D2DC & 2) {
+        m = 0x1000;
+        p = D_800BC000;
+        for (c = 12; c != 0; c--) {
+            if (!(*(unsigned int *)(p + 0x2C) & 0x2000000)) {
+                D_800BCD50 &= ~m;
+                D_800BCD60 |= m;
+            }
+            p += 0x11C;
+            m <<= 1;
+        }
+    }
+}

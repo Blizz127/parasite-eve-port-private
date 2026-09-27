@@ -1,0 +1,48 @@
+extern int D_8009D124;
+extern int D_8009D128;
+extern void func_8005EB64(int);
+extern void func_8005F874(int);
+
+void func_8005FCAC(int val)
+{
+    int digits;
+    int div;
+    int i;
+    int d;
+    int c;
+
+    digits = 3;
+    div = 1;
+    if (val < 0) {
+        val = -val;
+        c = 0x52;
+        goto sign;
+    }
+    if (val > 0) {
+        c = 0x89;
+    sign:
+        digits = 2;
+        func_8005EB64(c);
+        {
+            int *p = &D_8009D128;
+            D_8009D124 += 5;
+            *p = D_8009D128;
+        }
+    }
+    for (i = 1; i < digits; i++) {
+        div *= 10;
+    }
+    for (i = 0; i < digits; i++) {
+        d = val / div;
+        if (i < digits - 1 && d == 0) {
+            d = -1;
+        }
+        func_8005F874(d);
+        div /= 10;
+        {
+            int *p = &D_8009D128;
+            D_8009D124 += 5;
+            *p = D_8009D128;
+        }
+    }
+}

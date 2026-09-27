@@ -1,0 +1,38 @@
+typedef struct {
+    int f0;
+    int f4;
+    int f8;
+    short fC;
+} Q;
+
+short *func_800CE610(Q *a0)
+{
+    register short *p asm("$4");
+    register short *hit asm("$5");
+    register int n asm("$5");
+    register Q *r asm("$2");
+    register Q *q asm("$8");
+    int i;
+    int stride;
+    int m;
+
+    r = a0;
+    q = a0;
+    p = &a0->fC;
+    n = r->f4;
+    stride = r->f0;
+    m = n;
+    for (i = 0; i < n; i++) {
+        hit = p;
+        if (*p == 0) {
+            break;
+        }
+        p = (short *)((char *)p + stride);
+    }
+    if (i >= q->f4) {
+        return 0;
+    }
+    hit[0] = 1;
+    hit[1] = 0;
+    return p + 2;
+}

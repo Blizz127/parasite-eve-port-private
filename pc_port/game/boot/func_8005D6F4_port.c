@@ -130,13 +130,12 @@ extern void func_800649D0(int a0);
 #define GA_5D6F4_TERM_A4   0x800C20A4u   /* sb 0xFF record base A       */
 #define GA_5D6F4_TERM_B4   0x800C20B4u   /* sb 0xFF record base B       */
 
-/* Phase 6E-B26: func_8005DC4C is now REAL (translated message/string-table
- * lookup, game/boot/func_8005DC4C_port.c).  This degenerate controlled
- * return survives ONLY for the statically dead func_8005DC9C arm, which
- * stays on the centralized boundary: the destination buffer itself, whose
- * first byte is the 0xFF terminator the fill loop just stored, so the
- * retail copy loop runs and transfers no fabricated content. */
-#define PE_5D6F4_DEGEN_SRC GA_5D6F4_BUF_SEL
+/* Phase 6E-B26: func_8005DC4C is REAL (translated message/string-table
+ * lookup, game/boot/func_8005DC4C_port.c).  The statically dead
+ * `D_8009D0C8 != 0` arm now calls the REAL func_8005DC9C (matched leaf
+ * src/func_8005DC9C.c, hand port in func_800236E8_port.c) exactly as the
+ * matched src/func_8005D6F4.c does -- no bootstrap boundary remains. */
+extern pe_addr_t func_8005DC9C(uint32_t index);
 
 /* Retail fill loop: sb 0xFF over [C0, C0+C4) with per-iteration guest
  * reloads of C0/C4 (retail load-after-store). */
@@ -203,9 +202,9 @@ int func_8005D6F4(void)
     if (PE_LoadU32(GA_5D6F4_C8) != 0u) {
         pe_addr_t rec = PE_LoadU32(GA_5D6F4_C8);
         unsigned int idx = (unsigned int)PE_LoadU8(rec + 4u) - 1u;
-        (void)idx;                          /* retail $a0 argument, dead arm */
-        src = (pe_addr_t)Bootstrap_ReturnInt(
-            "func_8005DC9C", "func_8005D6F4", PE_5D6F4_DEGEN_SRC);
+        /* src/func_8005D6F4.c: r = func_8005DC9C(D_8009D0C8[4] - 1);
+         * statically dead here (C8 was just stored 0), ported verbatim. */
+        src = func_8005DC9C(idx);
     } else {
         src = func_8005DC4C(30u);
     }
@@ -227,9 +226,9 @@ int func_8005D6F4(void)
     if (PE_LoadU32(GA_5D6F4_C8) != 0u) {
         pe_addr_t rec = PE_LoadU32(GA_5D6F4_C8);
         unsigned int idx = (unsigned int)PE_LoadU8(rec + 4u) - 1u;
-        (void)idx;                          /* retail $a0 argument, dead arm */
-        src = (pe_addr_t)Bootstrap_ReturnInt(
-            "func_8005DC9C", "func_8005D6F4", PE_5D6F4_DEGEN_SRC);
+        /* src/func_8005D6F4.c: r = func_8005DC9C(D_8009D0C8[4] - 1);
+         * statically dead here (C8 was just stored 0), ported verbatim. */
+        src = func_8005DC9C(idx);
     } else {
         src = func_8005DC4C(30u);           /* retail @0x8005D84C */
     }

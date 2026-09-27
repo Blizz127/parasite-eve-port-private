@@ -147,91 +147,19 @@
 extern int func_80013300(pe_addr_t args);
 extern int func_800144FC(pe_addr_t args);
 
-/*
- * PE-BTL97 — func_80033A2C sb 4D4=1.
- * 5 words 0x80033A2C..0x80033A40, SHA-256
- * 2a210c65…5803. li 1 / lui / sb D244 / jr / nop.
- * Sole TEXT jal is opcode 0xCF at 0x80019D2C. Do not poke 4D4
- * from 299CC or 2CF24.
- */
-void func_80033A2C(void)
-{
-    PE_StoreU8(0x8009D244u, 1u);
-}
+/* func_80033A2C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80033A2C_port.c (src/func_80033A2C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-/*
- * PE-BTL97 — opcode 0xCF wrapper 19D24.
- * 8 words 0x80019D24..0x80019D44, SHA-256
- * 4581b7eb…ba24. D_800910A0[0xCF]. jal 33A2C; v0=1.
- * Retail BTL83 capture: ra=0x80019D34 while dest=M0036I.
- */
-int func_80019D24(pe_addr_t args)
-{
-    (void)args;
-    func_80033A2C();
-    return 1;
-}
+/* func_80019D24: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80019D24_port.c (src/func_80019D24.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-int func_80017294(pe_addr_t args)
-{
-    uint32_t imm;
-    pe_addr_t actor;
-    pe_addr_t base;
+/* func_80017294: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80017294_port.c (src/func_80017294.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-    imm = PE_LoadU32(PE_LoadU32(args));
-    actor = PE_LoadU32(GA_D_8009D2F0);
-    base = PE_LoadU32(actor + 0x9Cu);
-    PE_StoreU32(GA_D_8009CE00, base + (imm << 1));
-    return 1;
-}
+/* func_800172BC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800172BC_port.c (src/func_800172BC.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-int func_800172BC(pe_addr_t args)
-{
-    pe_addr_t actor;
+/* func_800172E0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800172E0_port.c (src/func_800172E0.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-    (void)args;
-    actor = PE_LoadU32(GA_D_8009D2F0);
-    PE_StoreU32(actor + 0x98u, PE_LoadU32(actor + 0x98u) | 0x10u);
-    return 0;
-}
+/* func_800172FC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800172FC_port.c (src/func_800172FC.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-int func_800172E0(pe_addr_t args)
-{
-    pe_addr_t task;
-
-    task = PE_LoadU32(GA_D_8009D300);
-    PE_StoreU32(task + 0x10u, PE_LoadU16(PE_LoadU32(args)));
-    return 0;
-}
-
-int func_800172FC(pe_addr_t args)
-{
-    pe_addr_t task;
-
-    (void)args;
-    task = PE_LoadU32(GA_D_8009D300);
-    PE_StoreU16(task + 8u, (uint16_t)(PE_LoadU16(task + 8u) | 0x10u));
-    return 0;
-}
-
-/*
- * PE-BTL29 — opcode 0x24 task-word copy 1784C.
- *
- * 12 words 0x8001784C..0x8001787C, SHA-256 0a67c25d…17e9.
- * D_800910A0[0x24]. Zero jal. Always v0=1.
- * gp+0x590 is D_8009D300. *arg0 = task+0x18; *arg1 = task+0x1C.
- * Live type-5 +0x2C4: local[2], local[3]. 12700 does not write
- * those words; 124F8 zeros the pool.
- */
-int func_8001784C(pe_addr_t args)
-{
-    pe_addr_t task;
-
-    task = PE_LoadU32(GA_D_8009D300);
-    PE_StoreU32(PE_LoadU32(args), PE_LoadU32(task + 0x18u));
-    PE_StoreU32(PE_LoadU32(args + 4u), PE_LoadU32(task + 0x1Cu));
-    return 1;
-}
+/* func_8001784C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8001784C_port.c (src/func_8001784C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 /*
  * PE-BTL32 — opcode 0x04 task-flag walk 17988.
@@ -264,156 +192,23 @@ int func_80017988(pe_addr_t args)
     return 1;
 }
 
-/*
- * PE-BTL34 — opcode 0x65 pose-group clear 1856C.
- *
- * 11 words 0x8001856C..0x80018598, SHA-256 309d956f…c25f.
- * D_800910A0[0x65]. Zero jal. Always v0=1. argc 0.
- * Zeros D2F0 +0x68/+0x6C/+0x70 and +0x78/+0x7C/+0x80
- * (12C20 codes 2 and 3). Live type-0 after 0xAA/0x40.
- */
-int func_8001856C(pe_addr_t args)
-{
-    pe_addr_t actor;
+/* func_8001856C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8001856C_port.c (src/func_8001856C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-    (void)args;
-    actor = PE_LoadU32(GA_D_8009D2F0);
-    PE_StoreU32(actor + 0x68u, 0u);
-    PE_StoreU32(actor + 0x6Cu, 0u);
-    PE_StoreU32(actor + 0x70u, 0u);
-    PE_StoreU32(actor + 0x78u, 0u);
-    PE_StoreU32(actor + 0x7Cu, 0u);
-    PE_StoreU32(actor + 0x80u, 0u);
-    return 1;
-}
+/* func_80018E58: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80018E58_port.c (src/func_80018E58.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-/*
- * PE-BTL35 — opcode 0x82 view-apply wrapper 18E58.
- *
- * 11 words 0x80018E58..0x80018E84, SHA-256 99b34ecf…def3.
- * D_800910A0[0x82]. jal 66800(*arg0); v0=1.
- * Live type-0 after 0x65/0x2E: imm 1.
- */
-int func_80018E58(pe_addr_t args)
-{
-    func_80066800(PE_LoadU32(PE_LoadU32(args)));
-    return 1;
-}
+/* func_80019410: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80019410_port.c (src/func_80019410.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-/*
- * PE-BTL36 — opcode 0x9C fade-wait 19410.
- *
- * 16 words 0x80019410..0x80019450, SHA-256 ab0d665b…1ce8.
- * D_800910A0[0x9C]. Zero jal.
- * If (CFEE&3) < 2: v0=1 continue.
- * Else: CE00 -= 8, D300+0x10 = 1, v0=0 yield.
- * Live type-0 after 0x86 (CFEE=6) waits.
- */
-int func_80019410(pe_addr_t args)
-{
-    (void)args;
-    if ((PE_LoadU8(0x800BCFEEu) & 3u) < 2u)
-        return 1;
-    PE_StoreU32(GA_D_8009CE00, PE_LoadU32(GA_D_8009CE00) - 8u);
-    PE_StoreU32(PE_LoadU32(GA_D_8009D300) + 0x10u, 1u);
-    return 0;
-}
+/* func_80019638: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80019638_port.c (src/func_80019638.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-/*
- * PE-BTL37 — opcode 0xAB overlay-bit clear 19638.
- *
- * 8 words 0x80019638..0x80019658, SHA-256 03ea9775…7afc.
- * D_800910A0[0xAB]. Zero jal. D_800B0CD8 &= ~0x2000; v0=1.
- * Inverse of 0xAA. Live type-0 after 0x9C fade-wait.
- */
-int func_80019638(pe_addr_t args)
-{
-    (void)args;
-    PE_StoreU32(0x800B0CD8u, PE_LoadU32(0x800B0CD8u) & ~0x2000u);
-    return 1;
-}
+/* func_80019658: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80019658_port.c (src/func_80019658.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-/*
- * PE-BTL39 — opcode 0x1E actor-flag 19658.
- *
- * 9 words 0x80019658..0x8001967C, SHA-256 cadffdfc…6fcd.
- * D_800910A0[0x1E]. Zero jal. D2F0+0x98 |= 0x80; v0=1.
- * Live type-2 after mailbox 0xB from type-0 0x1C.
- */
-int func_80019658(pe_addr_t args)
-{
-    pe_addr_t actor;
+/* func_80018BEC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80018BEC_port.c (src/func_80018BEC.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-    (void)args;
-    actor = PE_LoadU32(GA_D_8009D2F0);
-    PE_StoreU32(actor + 0x98u, PE_LoadU32(actor + 0x98u) | 0x80u);
-    return 1;
-}
+/* func_80019AC0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80019AC0_port.c (src/func_80019AC0.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-/*
- * PE-BTL40 — opcode 0x79 actor-flag 18BEC.
- *
- * 9 words 0x80018BEC..0x80018C10, SHA-256 d373eee2…000c.
- * D_800910A0[0x79]. Zero jal. D2F0+0x98 |= 0x20; v0=1.
- * Live type-2 after 0x1E.
- */
-int func_80018BEC(pe_addr_t args)
-{
-    pe_addr_t actor;
+/* func_80018EB4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80018EB4_port.c (src/func_80018EB4.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-    (void)args;
-    actor = PE_LoadU32(GA_D_8009D2F0);
-    PE_StoreU32(actor + 0x98u, PE_LoadU32(actor + 0x98u) | 0x20u);
-    return 1;
-}
-
-/*
- * PE-BTL94 — opcode 0xC1 actor-flag 19AC0.
- *
- * 9 words 0x80019AC0..0x80019AE4, SHA-256 eac1de42…d666.
- * D_800910A0[0xC1]. Zero jal. D2F0+0x98 |= 0x400; v0=1.
- * Live M0367I type-2/3 after 0x79, before 0x0B / 0x2E(0x09).
- */
-int func_80019AC0(pe_addr_t args)
-{
-    pe_addr_t actor;
-
-    (void)args;
-    actor = PE_LoadU32(GA_D_8009D2F0);
-    PE_StoreU32(actor + 0x98u, PE_LoadU32(actor + 0x98u) | 0x400u);
-    return 1;
-}
-
-/*
- * PE-BTL41 — opcode 0x85 fade-in 18EB4.
- *
- * 11 words 0x80018EB4..0x80018EE0, SHA-256 1a18600c…9d43.
- * D_800910A0[0x85]. jal 66B60(lhu *arg0); v0=1.
- * Type-3 HIT imm 0x1E. Do not invent a region hit.
- * Boot 6E9A0 already jals 66B60(2).
- */
-int func_80018EB4(pe_addr_t args)
-{
-    func_80066B60(PE_LoadU16(PE_LoadU32(args)));
-    return 1;
-}
-
-/*
- * PE-BTL42 — opcode 0xDC actor-flag 1A1F0.
- *
- * 9 words 0x8001A1F0..0x8001A214, SHA-256 65cffdf8…d872.
- * D_800910A0[0xDC]. Zero jal. D2F0+0x98 |= 0x01000000; v0=1.
- * Live type-2 after mailbox 0xFB → 0x0B pose pair.
- */
-int func_8001A1F0(pe_addr_t args)
-{
-    pe_addr_t actor;
-
-    (void)args;
-    actor = PE_LoadU32(GA_D_8009D2F0);
-    PE_StoreU32(actor + 0x98u, PE_LoadU32(actor + 0x98u) | 0x01000000u);
-    return 1;
-}
+/* func_8001A1F0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8001A1F0_port.c (src/func_8001A1F0.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 /*
  * PE-BTL43 — opcode 0x1A RNG write 176FC.
@@ -439,61 +234,11 @@ int func_800176FC(pe_addr_t args)
     return 1;
 }
 
-/*
- * PE-BTL44 — opcode 0x6F slot-alloc wrapper 18954.
- *
- * 10 words 0x80018954..0x8001897C, SHA-256 9dc14475…a5ff.
- * D_800910A0[0x6F]. jal 2F7D8(*D2F0); v0=1.
- * Live type-2 after 0x1A. 2F7D8 is already ported (CH1).
- */
-int func_80018954(pe_addr_t args)
-{
-    (void)args;
-    func_8002F7D8(PE_LoadU32(GA_D_8009D2F0));
-    return 1;
-}
+/* func_80018954: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80018954_port.c (src/func_80018954.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-/*
- * PE-BTL44 — opcode 0x5A tagged-set wrapper 18164.
- *
- * 26 words 0x80018164..0x800181CC, SHA-256 b2d7e11c…9c8f.
- * D_800910A0[0x5A]. If D2F0+0x0C==0: 2FF78(lbu *arg0, *arg1).
- * Else 30220(D2F0, lbu *arg0, *arg1). v0=1.
- * Live type-2 is type!=0 so 30220. Callees already ported (CH1).
- */
-int func_80018164(pe_addr_t args)
-{
-    pe_addr_t actor;
-    uint8_t tag;
-    uint32_t value;
+/* func_80018164: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80018164_port.c (src/func_80018164.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-    actor = PE_LoadU32(GA_D_8009D2F0);
-    tag = PE_LoadU8(PE_LoadU32(args));
-    value = PE_LoadU32(PE_LoadU32(args + 4u));
-    if (PE_LoadU8(actor + 0x0Cu) == 0u)
-        func_8002FF78(tag, value);
-    else
-        func_80030220(actor, tag, value);
-    return 1;
-}
-
-/*
- * PE-BTL45 — opcode 0xB7 formation wrapper 18A48.
- *
- * 21 words 0x80018A48..0x80018A9C, SHA-256 9218163e…d862.
- * D_800910A0[0xB7]. jal 2FAA4(D2F0, lbu*0, lbu*1, lbu*2,
- * lbu*3, lhu*4); v0=1. Live (3,0,6,7,cond[1]).
- */
-int func_80018A48(pe_addr_t args)
-{
-    func_8002FAA4(PE_LoadU32(GA_D_8009D2F0),
-                  PE_LoadU8(PE_LoadU32(args)),
-                  PE_LoadU8(PE_LoadU32(args + 4u)),
-                  PE_LoadU8(PE_LoadU32(args + 8u)),
-                  PE_LoadU8(PE_LoadU32(args + 12u)),
-                  PE_LoadU16(PE_LoadU32(args + 16u)));
-    return 1;
-}
+/* func_80018A48: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80018A48_port.c (src/func_80018A48.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 /*
  * PE-BTL45 — opcode 0x70 formation wrapper 1897C.
@@ -520,29 +265,7 @@ int func_8001897C(pe_addr_t args)
     return 1;
 }
 
-/*
- * PE-BTL46 — opcode 0x59 tagged-read wrapper 18004.
- *
- * 31 words 0x80018004..0x80018080, SHA-256 2993bcdd…f4ac.
- * D_800910A0[0x59]. If D2F0+0x0C==0: 2FE78(lbu *arg0).
- * Else 3010C(D2F0, lbu *arg0). *arg1 = v0; v0=1.
- * Live type-2 tag 44 → local[0xC] via 3010C.
- */
-int func_80018004(pe_addr_t args)
-{
-    pe_addr_t actor;
-    uint8_t tag;
-    int value;
-
-    actor = PE_LoadU32(GA_D_8009D2F0);
-    tag = PE_LoadU8(PE_LoadU32(args));
-    if (PE_LoadU8(actor + 0x0Cu) == 0u)
-        value = func_8002FE78(tag);
-    else
-        value = func_8003010C(actor, tag);
-    PE_StoreU32(PE_LoadU32(args + 4u), (uint32_t)value);
-    return 1;
-}
+/* func_80018004: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80018004_port.c (src/func_80018004.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 /*
  * PE-BTL48 — opcode 0x6A event-start wrapper 18774.
@@ -579,29 +302,7 @@ int func_800187C0(pe_addr_t args)
     return 1;
 }
 
-/*
- * PE-BTL51 — opcode 0x64 clip-wait wrapper 184EC.
- *
- * 32 words 0x800184EC..0x8001856C, SHA-256 9b345fcb…631d.
- * D_800910A0[0x64]. jal 2FAF8(D2F0, lbu *arg0);
- * *arg1 = sign-extend byte of v0. v0==0 rewinds CE00 by
- * 0x10 and sets D300+0x10=1. Live (3, local[6]).
- */
-int func_800184EC(pe_addr_t args)
-{
-    int value;
-
-    value = (int)(int8_t)(uint8_t)func_8002FAF8(
-        PE_LoadU32(GA_D_8009D2F0),
-        PE_LoadU8(PE_LoadU32(args)));
-    PE_StoreU32(PE_LoadU32(args + 4u), (uint32_t)value);
-    if (value == 0) {
-        PE_StoreU32(GA_D_8009CE00, PE_LoadU32(GA_D_8009CE00) - 0x10u);
-        PE_StoreU32(PE_LoadU32(GA_D_8009D300) + 0x10u, 1u);
-        return 0;
-    }
-    return 1;
-}
+/* func_800184EC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800184EC_port.c (src/func_800184EC.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 /*
  * PE-BTL54 — opcode 0x0D message-open 17410.
@@ -648,19 +349,7 @@ int func_800177C8(pe_addr_t args)
     return 0;
 }
 
-/*
- * PE-BTL57 — opcode 0x43 choice-read 17DE4.
- *
- * 15 words 0x80017DE4..0x80017E20, SHA-256
- * 71be0cb334c6b16f99d7e4e13fd8b3411fd488653645cdec22f87e14c76ac405.
- * D_800910A0[0x43]. jal 37864; *arg0 = signed byte. v0=1.
- * 37864 is lb 0x134($gp) = D_8009CEA4. Live type-0 local[5]
- * after 0x22. 375E0 writes -1; FB 09 copies cursor on 0x100.
- */
-int func_80037864(void)
-{
-    return (int)(int8_t)PE_LoadU8(0x8009CEA4u);
-}
+/* func_80037864: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80037864_port.c (src/func_80037864.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 int func_80017DE4(pe_addr_t args)
 {
@@ -668,47 +357,11 @@ int func_80017DE4(pe_addr_t args)
     return 1;
 }
 
-/*
- * PE-BTL58 — opcode 0x52 D1A0-or 17F88.
- *
- * 10 words 0x80017F88..0x80017FB0, SHA-256
- * ed1c623197818f92f87ae1fc3b82baa3d14f84a7bb66e9472a1876bc1348bb2b.
- * D_800910A0[0x52]. D_8009D1A0 |= *arg0; v0=1.
- * Live type-0 Watch +0xC78 imm 0x800. Host scalar, not guest RAM.
- */
-int func_80017F88(pe_addr_t args)
-{
-    D_8009D1A0 |= PE_LoadU32(PE_LoadU32(args));
-    return 1;
-}
+/* func_80017F88: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80017F88_port.c (src/func_80017F88.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-/*
- * PE-BTL58 — opcode 0x53 D1A0-and-not 17FB0.
- *
- * 11 words 0x80017FB0..0x80017FDC, SHA-256
- * 3594551d87ad74ca023d6f16c06a295719ee38c4a07dc9edaa698b6e315f259f.
- * D_800910A0[0x53]. D_8009D1A0 &= ~*arg0; v0=1.
- * Live type-0 +0xCF0 imm 0x800.
- */
-int func_80017FB0(pe_addr_t args)
-{
-    D_8009D1A0 &= ~PE_LoadU32(PE_LoadU32(args));
-    return 1;
-}
+/* func_80017FB0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80017FB0_port.c (src/func_80017FB0.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-/*
- * PE-BTL58 — opcode 0xA6 19484.
- *
- * 11 words 0x80019484..0x800194B0, SHA-256
- * 731901885ba4878c7e07bcaf57d1106489875f5a4dcafb7b08a690dd78b64a3f.
- * D_800910A0[0xA6]. jal 438C0(*arg0); v0=1.
- * Live type-0 persist[8]==0 arm imm 0x7F.
- */
-int func_80019484(pe_addr_t args)
-{
-    func_800438C0((int)PE_LoadU32(PE_LoadU32(args)));
-    return 1;
-}
+/* func_80019484: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80019484_port.c (src/func_80019484.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 /*
  * PE-BTL59 — opcode 0x2A bit-or 17A50.
@@ -750,69 +403,13 @@ int func_800179F8(pe_addr_t args)
     return 1;
 }
 
-/*
- * PE-BTL60 — opcode 0x87 RGB-fade 18F0C.
- *
- * 18 words 0x80018F0C..0x80018F54, SHA-256
- * cb2c045fd48813b66f79f29a11c45d26c3394c02ac40601fb63740f02baed649.
- * D_800910A0[0x87]. jal 66BD8(lhu *arg0..*arg4); v0=1.
- * Live type-0 +0x1020 imms 0x3C / 0xFF / 0xFF / 0xFF / 1.
- */
-int func_80018F0C(pe_addr_t args)
-{
-    func_80066BD8(PE_LoadU16(PE_LoadU32(args)),
-                  PE_LoadU16(PE_LoadU32(args + 4u)),
-                  PE_LoadU16(PE_LoadU32(args + 8u)),
-                  PE_LoadU16(PE_LoadU32(args + 0xCu)),
-                  PE_LoadU16(PE_LoadU32(args + 0x10u)));
-    return 1;
-}
+/* func_80018F0C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80018F0C_port.c (src/func_80018F0C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-/*
- * PE-BTL61 — opcode 0xC7 task-flag 19BE4.
- *
- * 8 words 0x80019BE4..0x80019C04, SHA-256
- * ad1774026537b3de2fff5adfa0b0815f0460a0d1b5de64e3bf860c7519fa043a.
- * `lw $v1, 0x590($gp)` is D300. D300+8 |= 0x80; v0=1.
- * Live type-6 after 0x12 when scratch[0]&4 is clear (the wait
- * is while the bit is set).
- */
-int func_80019BE4(pe_addr_t args)
-{
-    pe_addr_t task;
+/* func_80019BE4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80019BE4_port.c (src/func_80019BE4.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-    (void)args;
-    task = PE_LoadU32(GA_D_8009D300);
-    PE_StoreU16(task + 8u, (uint16_t)(PE_LoadU16(task + 8u) | 0x80u));
-    return 1;
-}
+/* func_80019748: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80019748_port.c (src/func_80019748.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-/*
- * PE-BTL61 — opcode 0xAD D2E8-and-not-4 19748.
- *
- * 8 words 0x80019748..0x80019768, SHA-256
- * 6776e7ebd6583acc0c697c7b4f19ddcffcbbd726fe217f2a582e216d611e4327.
- * D_8009D2E8 &= ~4; v0=1.
- */
-int func_80019748(pe_addr_t args)
-{
-    (void)args;
-    PE_StoreU32(GA_D_8009D2E8, PE_LoadU32(GA_D_8009D2E8) & ~4u);
-    return 1;
-}
-
-/*
- * PE-BTL108 — opcode 0xB2 / 19798. 13 words.
- * jal 392EC; *arg0 = v0 & 0xFF; v0=1.
- * 392EC: 8 words. lbu 0x80091A1C==0 → 1, else lbu 0x80091A1D.
- * m0005i +0x3A18 after mode-9 0x40/0xAD/0xAA.
- */
-int func_800392EC(void)
-{
-    if (PE_LoadU8(0x80091A1Cu) == 0u)
-        return 1;
-    return (int)PE_LoadU8(0x80091A1Du);
-}
+/* func_800392EC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800392EC_port.c (src/func_800392EC.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 int func_80019798(pe_addr_t args)
 {
@@ -820,21 +417,7 @@ int func_80019798(pe_addr_t args)
     return 1;
 }
 
-/*
- * PE-BTL82 — opcode 0xAE D2E8-or-4 19728.
- *
- * 8 words 0x80019728..0x80019748, SHA-256
- * a0eb25f922ee3ac811b0dd66b37bbef3dcbf67d46084f8ae04e0856831407e2b.
- * D_800910A0[0xAE]. Zero jal. D_8009D2E8 |= 4; v0=1.
- * Set twin of 0xAD. Type-6 +0x1100 after 0x55(2); not the
- * scratch[0]&4 setter (that is 0x2A[0,2] at +0x1850).
- */
-int func_80019728(pe_addr_t args)
-{
-    (void)args;
-    PE_StoreU32(GA_D_8009D2E8, PE_LoadU32(GA_D_8009D2E8) | 4u);
-    return 1;
-}
+/* func_80019728: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80019728_port.c (src/func_80019728.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 /* AC/196E8 and E3/1A3FC, 16 retail words each (9EE8.s, AB74.s).
  * Register halfword-offset lists in the current actor's script and their
@@ -897,49 +480,11 @@ int func_80018080(pe_addr_t args)
     return 1;
 }
 
-/*
- * PE-BTL62 — opcode 0x89 mode-6 store 17FF0.
- *
- * 5 words 0x80017FF0..0x80018004, SHA-256
- * 117504bf5c4fa6434b3703c4e26d350c077de797af2ab6dbbb56366c64e9115c.
- * D_800910A0[0x89]. Zero jal. addiu v0,6 / lui+sw D28C / jr /
- * addiu v0,1. Matching src/func_80017FF0.c writes the host
- * symbol; this cut writes guest RAM so 0x94/299CC/2CF24 agree.
- * Live type-6 +0x394 after persist[0xA]&1 clear and mode==0.
- * argc 0. Always v0=1.
- */
-int func_80017FF0(pe_addr_t args)
-{
-    (void)args;
-    PE_StoreU32(GA_D_8009D28C, 6u);
-    return 1;
-}
+/* func_80017FF0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80017FF0_port.c (src/func_80017FF0.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-/*
- * PE-BTL98 — opcode 0x95 mode-0 store 192B8.
- *
- * 4 words 0x800192B8..0x800192C8, SHA-256
- * cf7731ec…6897. D_800910A0[0x95]. Zero jal.
- * lui $at,0x800A / sw $zero,D28C / jr / addiu v0,1.
- * Matching src/func_800192B8.c writes the host symbol; this
- * cut writes guest RAM so 0x89/0x94/299CC agree. Retail BTL83
- * capture: ra=0x80017248 immediately before first 1D340
- * (mode already 0). Not a mode-7 store.
- */
-int func_800192B8(pe_addr_t args)
-{
-    (void)args;
-    PE_StoreU32(GA_D_8009D28C, 0u);
-    return 1;
-}
+/* func_800192B8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800192B8_port.c (src/func_800192B8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-/* VM96 requests the scripted battle exit; 2DC58 completes it as mode12. */
-int func_800192C8(pe_addr_t args)
-{
-    (void)args;
-    PE_StoreU32(GA_D_8009D28C,8u);
-    return 1;
-}
+/* func_800192C8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800192C8_port.c (src/func_800192C8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 /*
  * opcode 0x97 — handler 0x800192DC..0x8001930C (retail 14 words).
@@ -983,28 +528,7 @@ int func_800193D8(pe_addr_t args)
     return 1;
 }
 
-/*
- * opcode 0x71 — handler 0x80018A9C..0x80018B00 (retail 25 words).
- *
- *   container = *(D_800B1624)
- *   rec = container + *(container+0x14) + *arg0 * 56      ; 3*8*7 = 56
- *   a1 = (int16)*arg1 ; a2 = (int16)*arg2 ; a3 = (int16)*arg3
- *   jal func_800671C8(rec, a1, a2, a3) ; v0=1
- *
- * Live M0191I module 1 (park lane, not on the M0042I route).
- * Evidence: docs/evidence/field-vm-opcode-coverage/REPORT.md.
- */
-int func_80018A9C(pe_addr_t args)
-{
-    pe_addr_t container = PE_LoadU32(0x800B1624u);
-    pe_addr_t rec = container + PE_LoadU32(container + 0x14u)
-                  + PE_LoadU32(PE_LoadU32(args)) * 56u;
-    int32_t x = (int16_t)PE_LoadU16(PE_LoadU32(args + 4u));
-    int32_t y = (int16_t)PE_LoadU16(PE_LoadU32(args + 8u));
-    int32_t page = (int16_t)PE_LoadU16(PE_LoadU32(args + 12u));
-    (void)func_800671C8(rec, x, y, page);
-    return 1;
-}
+/* func_80018A9C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80018A9C_port.c (src/func_80018A9C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 /*
  * PE-BTL64 — opcode 0x03 camera-request 17C54.
@@ -1200,7 +724,7 @@ static int pe_17018_dispatch_body(pe_addr_t fn, pe_addr_t args)
         fn == 0x80019FE0u || fn == 0x8001A064u)
         return pe_attachment_command(fn, args);
     if (fn == 0x800192C8u)
-        return func_800192C8(args);
+        return func_800192C8();
     if (fn == 0x800192DCu)
         return func_800192DC(args);
     if (fn == 0x800193D8u)
@@ -1330,11 +854,11 @@ static int pe_17018_dispatch_body(pe_addr_t fn, pe_addr_t args)
     if (fn == GA_OP0)
         return func_80017294(args);
     if (fn == GA_OP1)
-        return func_800172BC(args);
+        return func_800172BC();
     if (fn == GA_OP2)
         return func_800172E0(args);
     if (fn == GA_OP20)
-        return func_800172FC(args);
+        return func_800172FC();
     if (fn == GA_OP1C)
         return func_80017764(args);
     if (fn == GA_OP1F)
@@ -1354,9 +878,9 @@ static int pe_17018_dispatch_body(pe_addr_t fn, pe_addr_t args)
     if (fn == GA_OP14)
         return func_80017588(args);
     if (fn == GA_OP40)
-        return func_80017D7C(args);
+        return func_80017D7C();
     if (fn == GA_OP3F)
-        return func_80017D5C(args);
+        return func_80017D5C();
     if (fn == GA_OPED)
         return func_80016910_key2900_cut(args);
     if (fn == GA_OPE1)
@@ -1364,13 +888,13 @@ static int pe_17018_dispatch_body(pe_addr_t fn, pe_addr_t args)
     if (fn == GA_OP84)
         return func_80018E84(args);
     if (fn == GA_OP88)
-        return func_80018F54(args);
+        return func_80018F54();
     if (fn == GA_OP8)
         return func_8001735C(args);
     if (fn == GA_OPB)
         return func_80012C20(args);
     if (fn == GA_OP41)
-        return func_80017D9C(args);
+        return func_80017D9C();
     if (fn == GA_OP2E)
         return func_80017AE8(args);
     if (fn == GA_OP4E)
@@ -1378,7 +902,7 @@ static int pe_17018_dispatch_body(pe_addr_t fn, pe_addr_t args)
     if (fn == GA_OP2F)
         return func_80017B34(args);
     if (fn == GA_OP30)
-        return func_80017B74(args);
+        return func_80017B74();
     if (fn == GA_OP5E)
         return func_80014694(args);
     if (fn == GA_OP77)
@@ -1400,29 +924,29 @@ static int pe_17018_dispatch_body(pe_addr_t fn, pe_addr_t args)
     if (fn == GA_OP4)
         return func_80017988(args);
     if (fn == GA_OPAA)
-        return func_80019618(args);
+        return func_80019618();
     if (fn == GA_OP65)
-        return func_8001856C(args);
+        return func_8001856C();
     if (fn == GA_OP82)
         return func_80018E58(args);
     if (fn == GA_OP9C)
-        return func_80019410(args);
+        return func_80019410();
     if (fn == GA_OPAB)
-        return func_80019638(args);
+        return func_80019638();
     if (fn == GA_OP1E)
-        return func_80019658(args);
+        return func_80019658();
     if (fn == GA_OP79)
-        return func_80018BEC(args);
+        return func_80018BEC();
     if (fn == GA_OPC1)
-        return func_80019AC0(args);
+        return func_80019AC0();
     if (fn == GA_OP85)
         return func_80018EB4(args);
     if (fn == GA_OPDC)
-        return func_8001A1F0(args);
+        return func_8001A1F0();
     if (fn == GA_OP1A)
         return func_800176FC(args);
     if (fn == GA_OP6F)
-        return func_80018954(args);
+        return func_80018954();
     if (fn == 0x8001A390u)
         return func_8001A390(args);
     if (fn == GA_OP5A)
@@ -1486,13 +1010,13 @@ static int pe_17018_dispatch_body(pe_addr_t fn, pe_addr_t args)
     if (fn == GA_OP94)
         return func_80019154(args);
     if (fn == GA_OPC7)
-        return func_80019BE4(args);
+        return func_80019BE4();
     if (fn == GA_OPAD)
-        return func_80019748(args);
+        return func_80019748();
     if (fn == GA_OPB2)
         return func_80019798(args);
     if (fn == GA_OPAE)
-        return func_80019728(args);
+        return func_80019728();
     if (fn == GA_OPAC)
         return func_800196E8(args);
     if (fn == GA_OPE3)
@@ -1500,9 +1024,9 @@ static int pe_17018_dispatch_body(pe_addr_t fn, pe_addr_t args)
     if (fn == GA_OP8B)
         return func_80018080(args);
     if (fn == GA_OP89)
-        return func_80017FF0(args);
+        return func_80017FF0();
     if (fn == GA_OP95)
-        return func_800192B8(args);
+        return func_800192B8();
     if (fn == GA_OP3)
         return func_80017C54(args);
     if (fn == GA_OPB8)
@@ -1512,7 +1036,7 @@ static int pe_17018_dispatch_body(pe_addr_t fn, pe_addr_t args)
     if (fn == GA_OP55)
         return func_800144FC(args);
     if (fn == GA_OPCF)
-        return func_80019D24(args);
+        return func_80019D24();
     if (fn == 0x800182C0u) { /* 5C: matching src/func_800182C0.c */
         PE_StoreU32(0x800BCF88u, PE_LoadU32(0x800BCF88u) | 0xC0u);
         return 1;
@@ -1742,7 +1266,7 @@ static int pe_17018_dispatch_body(pe_addr_t fn, pe_addr_t args)
     if (fn == 0x80013E84u) return func_80013E84(args);   /* 36 */
     if (fn == 0x80014FD8u) return func_80014FD8(args);   /* 92 */
     if (fn == 0x800155FCu) return func_800155FC(args);   /* A5 */
-    if (fn == 0x80019B08u) return func_80019B08(args);   /* C3 */
+    if (fn == 0x80019B08u) return func_80019B08();   /* C3 */
     if (fn == 0x80013988u) return func_80013988(args);   /* DB */
     if (fn == 0x80017CE8u) return func_80017CE8(args);   /* 48 */
     if (fn == 0x800199CCu) { /* BF: 199CC (11w) actor+0x250 |= 0x10; u16 actor+0x24E = *a0 */

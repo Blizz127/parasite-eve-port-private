@@ -69,13 +69,4 @@
 
 #define GA_D_80091A20 0x80091A20u
 
-int func_80038D1C(void)
-{
-    /* Retail: lbu; bnez (delay slot v0=0); j (delay slot v0=0xFF);
-     * taken path sb 0.  Test-and-clear. */
-    if (PE_LoadU8(GA_D_80091A20) != 0u) {
-        PE_StoreU8(GA_D_80091A20, 0u);
-        return 0;
-    }
-    return 0xFF;
-}
+/* func_80038D1C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80038D1C_port.c (src/func_80038D1C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

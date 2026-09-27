@@ -1,0 +1,74 @@
+# room_m0188i: masked-body ports (2026-09-23)
+
+Room target `room_m0188i` (PE.IMG room m0188i chunk 2, VRAM base `0x8018EFE8`).
+46 C spans: 0 hand-written here, 46 ported;
+27 distinct masked bodies in this room. Across all 72 overlay
+targets there are 193 distinct masked bodies behind 2484 C spans (the honest metric; a shared
+body counts once per room that contains it).
+
+Provenance: every ported leaf is a masked-body twin of <room> <func>, re-targeted by symbol address.
+No room source is shared by reference: each room has its own copy under `src/overlays/room_<r>/`.
+
+A ported leaf is the C of a matched leaf in another room target whose body is identical
+once `jal`/`j` targets and `lui`/`%lo` immediates are masked. `tools/analysis/room_lane/port.py`
+renames the function and remaps every `func_`/`D_` token by comparing the two bodies
+word by word. A dispatch leaf also gets its jump table remapped and a local
+`MASPSX_DISPATCH_FOLD` profile. Each port is then `era_link_check.py --target` `LINK_EXACT`
+at this room's VMA before it is carved (`tools/analysis/room_lane/doroom.sh`), and the
+deep preflight and the gate below cover all of them.
+
+| offset | leaf | source | profile |
+| --- | --- | --- | --- |
+| 0x220 | `func_8018F208` | room_m0022i `func_8018F1D4` | era_o2_g0 |
+| 0x2C0 | `func_8018F2A8` | room_m0022i `func_8018F274` | room_m0188i_dispatch_8018EFF4 |
+| 0x544 | `func_8018F52C` | room_m0022i `func_8018F1CC` | era_o2_g0 |
+| 0x54C | `func_8018F534` | room_m0022i `func_8018F500` | era_o2_g0 |
+| 0x5D4 | `func_8018F5BC` | room_m0022i `func_8018F588` | era_o2_g0 |
+| 0xBC4 | `func_8018FBAC` | room_m0022i `func_8018FB78` | era_o2_g0 |
+| 0xEE4 | `func_8018FECC` | room_m0022i `func_8018FE98` | era_o2_g0 |
+| 0xF80 | `func_8018FF68` | room_m0022i `func_8018F1CC` | era_o2_g0 |
+| 0xF88 | `func_8018FF70` | room_m0022i `func_8018F1CC` | era_o2_g0 |
+| 0xF90 | `func_8018FF78` | room_m0022i `func_8018FF44` | era_o2_g0 |
+| 0x100C | `func_8018FFF4` | room_m0022i `func_8018FFC0` | room_m0188i_dispatch_8018F074 |
+| 0x1284 | `func_8019026C` | room_m0022i `func_8018F1CC` | era_o2_g0 |
+| 0x128C | `func_80190274` | room_m0022i `func_8018F500` | era_o2_g0 |
+| 0x1314 | `func_801902FC` | room_m0022i `func_801902C8` | era_o2_g0 |
+| 0x1948 | `func_80190930` | room_m0022i `func_801908FC` | era_o2_g0 |
+| 0x19CC | `func_801909B4` | room_m0022i `func_80190980` | era_o2_g0 |
+| 0x1A24 | `func_80190A0C` | room_m0022i `func_8018F1CC` | era_o2_g0 |
+| 0x1A2C | `func_80190A14` | room_m0022i `func_8018F1CC` | era_o2_g0 |
+| 0x1A34 | `func_80190A1C` | room_m0022i `func_801909E8` | era_o2_g0 |
+| 0x1AD0 | `func_80190AB8` | room_m0022i `func_80190A84` | room_m0188i_dispatch_8018F0FC |
+| 0x1D18 | `func_80190D00` | room_m0022i `func_8018F1CC` | era_o2_g0 |
+| 0x1D20 | `func_80190D08` | room_m0022i `func_80190CD4` | era_o2_g0 |
+| 0x1D48 | `func_80190D30` | room_m0022i `func_80190CFC` | era_o2_g0 |
+| 0x2144 | `func_8019112C` | room_m0022i `func_801910F8` | era_o2_g0 |
+| 0x24EC | `func_801914D4` | room_m0022i `func_801914A0` | era_o2_g0 |
+| 0x2548 | `func_80191530` | room_m0022i `func_8018F1CC` | era_o2_g0 |
+| 0x2550 | `func_80191538` | room_m0022i `func_8018F1CC` | era_o2_g0 |
+| 0x2558 | `func_80191540` | room_m0022i `func_8019150C` | era_o2_g0 |
+| 0x25E8 | `func_801915D0` | room_m0022i `func_8019159C` | room_m0188i_dispatch_8018F164 |
+| 0x2830 | `func_80191818` | room_m0022i `func_8018F1CC` | era_o2_g0 |
+| 0x2838 | `func_80191820` | room_m0022i `func_80190CD4` | era_o2_g0 |
+| 0x2860 | `func_80191848` | room_m0022i `func_80191814` | era_o2_g0 |
+| 0x2D4C | `func_80191D34` | room_m0022i `func_801910F8` | era_o2_g0 |
+| 0x30DC | `func_801920C4` | room_m0022i `func_801914A0` | era_o2_g0 |
+| 0x3138 | `func_80192120` | room_m0022i `func_8018F1CC` | era_o2_g0 |
+| 0x3140 | `func_80192128` | room_m0022i `func_8018F1CC` | era_o2_g0 |
+| 0x3148 | `func_80192130` | room_m0022i `func_801920FC` | era_o2_g0 |
+| 0x3184 | `func_8019216C` | room_m0022i `func_80192138` | era_o2_g0 |
+| 0x321C | `func_80192204` | room_m0022i `func_8018F1CC` | era_o2_g0 |
+| 0x3224 | `func_8019220C` | room_m0022i `func_80190CD4` | era_o2_g0 |
+| 0x324C | `func_80192234` | room_m0022i `func_80192200` | era_o2_g0 |
+| 0x327C | `func_80192264` | room_m0022i `func_80192230` | era_o2_g0 |
+| 0x3510 | `func_801924F8` | room_m0022i `func_801924C4` | era_o2_g0 |
+| 0x352C | `func_80192514` | room_m0022i `func_8018F1CC` | era_o2_g0 |
+| 0x6D90 | `func_80195D78` | room_m0123i `func_801953D4` | era_o2_g0 |
+| 0x6DA0 | `func_80195D88` | room_m0123i `func_801953D4` | era_o2_g0 |
+
+Gate line from the last serial run after this YAML's last change (overlays2 pass 3, 2026-09-24):
+
+```
+$ scripts/exact_rebuild_overlay.sh room_m0188i
+EXACT_REBUILD_GATE[room_m0188i]=PASS plan=f06a3b2908afe42bed395b633cf1592ea1639c781eff39ceca7969503e1426dc yaml=1af895da207d7773deb363132818c01f417aa09a5cf2f0e78af7c02832d5e824 spans=[46 c, 10 asm, 1 rodata, 2 bin] sha1_orig=80f620421f1394d2e7de02265f484c54b98a9284 sha1_cand=80f620421f1394d2e7de02265f484c54b98a9284 sha1=80f620421f1394d2e7de02265f484c54b98a9284
+```

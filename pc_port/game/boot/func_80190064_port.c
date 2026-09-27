@@ -32,41 +32,7 @@ static pe_addr_t title_find_type(unsigned type)
     return 0u;
 }
 
-uint32_t func_8003FFCC(void)
-{
-    pe_addr_t base = 0x800A0ED4u;
-    pe_addr_t end = base + 0x830u;
-    pe_addr_t a0;
-    uint32_t found = 0u;
-
-    if (base >= end)
-        return 0u;
-
-    a0 = base + 0x418u;
-    do {
-        if (PE_LoadU8(a0 - 0x417u) == 0xFu && base + 0x1Cu < a0) {
-            pe_addr_t v1 = base + 0x1Cu;
-            pe_addr_t limit = a0;
-
-            found = 0u;
-            do {
-                if (PE_LoadU8(v1) == 1u)
-                    found = PE_LoadU8(v1 + 0x29u) != 0u ? 1u : 0u;
-                else
-                    found = 0u;
-                if (found)
-                    break;
-                v1 += 0x44u;
-            } while (v1 < limit);
-        }
-        base += 0x418u;
-        a0 += 0x418u;
-        if (base >= end)
-            break;
-    } while (found == 0u);
-
-    return found;
-}
+/* func_8003FFCC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8003FFCC_port.c (src/func_8003FFCC.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 void func_80190064(void)
 {

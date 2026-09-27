@@ -1,0 +1,42 @@
+extern int D_8009D24C;
+extern unsigned char D_800B2900[];
+extern void func_80085174(void);
+extern int func_80085084(int *);
+extern void func_80085EB4(int);
+extern void func_800850F4(unsigned char *, int);
+
+int func_800851A8(int *a0, int a1)
+{
+    int *p;
+    int x;
+    int base;
+    int n;
+    int *src;
+    int *dst;
+    int k;
+
+    func_80085174();
+    if (func_80085084(a0) != 0) {
+        D_8009D24C = -1;
+        return -1;
+    }
+    p = a0 + 4;
+    func_80085EB4(*p++);
+    x = *p++;
+    base = *p++;
+    n = *p;
+    src = p + 9;
+    if (n == 0) {
+        n = 0x100;
+    }
+    n -= base;
+    func_800850F4((unsigned char *)src + (n << 6), x);
+    dst = (int *)(D_800B2900 + (base << 6));
+    for (k = n << 4; k != 0; k--) {
+        *dst++ = *src++;
+    }
+    if (a1 != 0) {
+        func_80085174();
+    }
+    return 0;
+}

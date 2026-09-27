@@ -1,0 +1,40 @@
+typedef struct {
+    unsigned int lo;
+    unsigned int hi;
+} S64;
+
+extern S64 func_80072EA4(int dir, S64 v, int n);
+extern int func_800739C4(int a0, int a1);
+
+int func_80073354(unsigned int lo, int hi)
+{
+    int e;
+    int sh;
+    S64 m;
+    int r;
+
+    if ((hi & 0x7FFFFFFF) == 0 && lo == 0) {
+        return hi & 0x80000000;
+    }
+    e = (hi >> 20) & 0x7FF;
+    sh = e - 0x41D;
+    if (sh > 0) {
+        func_800739C4(0x22, 0x11);
+        if (hi >= 0) {
+            return 0x7FFFFFFF;
+        }
+        return 0x80000000;
+    }
+    m.lo = lo;
+    m.hi = (hi & 0xFFFFF) | 0x100000;
+    m = func_80072EA4(0, m, 10);
+    if ((unsigned int)(e - 0x3FE) < 0x20 && m.hi != 0) {
+        r = (int)m.hi >> -sh;
+    } else {
+        return 0;
+    }
+    if (hi < 0) {
+        r = -r;
+    }
+    return r;
+}

@@ -1,0 +1,32 @@
+/* best: 9 words, ERA_CC1_VER=2.8.1 -O2 -G0 -mno-split-addresses + MASPSX_FILL_CALL_DELAY_SLOT=1.
+ * Residual only in the final 5-arg D_80095748 call: retail loads x,y,w into a1-a3 then h into $v1 last and
+ * puts `sw $v1,0x10($sp)` in the jalr slot; cc1 loads h first and stores it before the call. Pointer local
+ * p=&D_8009574E and r-first compares are load-bearing (41 -> 26 -> 9). */
+typedef struct { short x, y, w, h; } RECT;
+typedef struct { unsigned char level; unsigned char pad; short w; short h; } GpuDbg;
+extern GpuDbg D_8009574E;
+extern void (*D_80095748)();
+extern char D_80011898;
+extern char D_800118B8;
+extern char D_800118A4;
+void func_80074E28(char *name, RECT *r) {
+    GpuDbg *p = &D_8009574E;
+    char *fmt;
+    switch (p->level) {
+    case 1:
+        if (r->w > p->w || r->w + r->x > p->w ||
+            r->y > p->h || r->y + r->h > p->h ||
+            r->w <= 0 || r->x < 0 || r->y < 0 || r->h <= 0) {
+            fmt = &D_80011898;
+            break;
+        }
+        return;
+    case 2:
+        fmt = &D_800118B8;
+        break;
+    default:
+        return;
+    }
+    D_80095748(fmt, name);
+    D_80095748(&D_800118A4, r->x, r->y, r->w, r->h);
+}

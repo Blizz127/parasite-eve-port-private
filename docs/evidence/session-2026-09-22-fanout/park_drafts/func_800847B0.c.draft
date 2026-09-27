@@ -1,0 +1,29 @@
+int func_800847B0(unsigned char *a0)
+{
+    int i = a0[0x45] - 3;
+    unsigned char *p;
+
+    switch (a0[0x36]) {
+    case 0:
+        if (i < 6 && a0[0x57 + i] == 0) {
+            return 0;
+        }
+        if (i >= a0[0x34]) {
+            return 0;
+        }
+        p = *(unsigned char **)(a0 + 0x28);
+        break;
+    case 0x4D:
+        if (i >= a0[0x35]) {
+            return 0xFF;
+        }
+        p = *(unsigned char **)(a0 + 0x2C);
+        break;
+    default:
+        if (i >= a0[0x35]) {
+            return 0;
+        }
+        return (*(unsigned char **)(a0 + 0x2C))[i];
+    }
+    return p[i];
+}

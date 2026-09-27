@@ -49,10 +49,4 @@ int func_80087090(pe_addr_t buffer, int count)
     return ret;
 }
 
-/* func_800870E0, 4 retail words at 0x800870E0..0x800870F0.
- * lui/lw D_8009D24C; jr. Does not store. Writers are 850C0 (1),
- * 85098 (0 after DMA), and 851A8 magic-fail (-1). */
-int func_800870E0(void)
-{
-    return (int)PE_LoadU32(0x8009D24Cu);
-}
+/* func_800870E0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800870E0_port.c (src/func_800870E0.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

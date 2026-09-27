@@ -1,0 +1,22 @@
+/* best: 24 words, ERA_CC1_VER=2.8.1 -O2 -G0 -mno-split-addresses. Residual: s0/s1 swap and CHCR sw in jal slot. */
+extern volatile unsigned int *D_80095864;
+extern volatile unsigned int *D_80095868;
+extern volatile unsigned int *D_8009586C;
+extern volatile unsigned int *D_80095870;
+extern void func_800773D0(void);
+extern int func_80077404(void);
+
+int func_80076354(unsigned int *ot, int n) {
+    *D_80095870 |= 0x8000000;
+    *D_8009586C = 0;
+    *D_80095864 = (unsigned int)&ot[n - 1];
+    *D_80095868 = n;
+    *D_8009586C = 0x11000002;
+    func_800773D0();
+    while (*D_8009586C & 0x1000000) {
+        if (func_80077404()) {
+            return -1;
+        }
+    }
+    return n;
+}

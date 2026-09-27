@@ -30,11 +30,6 @@
  */
 #include "psx_compat.h"
 
-extern int func_8006A2E8(int a0, int a1);
 
-void func_8005E850(int a0, int a1)
-{
-    int db0 = (int)D_800B0DB0;
-    int db1 = (int)D_800B0DB1;
-    (void)func_8006A2E8(db0 + a0, db1 + a1);
-}
+
+/* func_8005E850: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8005E850_port.c (src/func_8005E850.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

@@ -47,39 +47,4 @@
 #define GA_3E974_GP4FC   0x8009D26Cu
 #define GA_D_800A76F0    0x800A76F0u
 
-void func_8003E974(void)
-{
-    int i;
-
-    PE_StoreU32(GA_3E974_GP474, 0);
-    PE_StoreU32(GA_3E974_GP484, 0);
-    PE_StoreU32(GA_3E974_GP564, 0);
-    PE_StoreU32(GA_3E974_GP4C8, 0);
-    PE_StoreU32(GA_3E974_GP4FC, 0);
-
-    for (i = 0; i < 0x20; i++)
-        PE_StoreU32(GA_D_800A76F0 + (unsigned int)i * 4u, 0);
-
-    func_8003EAC8(0x1,         0x4000);
-    func_8003EAC8(0x80,        0x1000);
-    func_8003EAC8(0x100,       0x2000);
-    func_8003EAC8(0x8,         0x10);
-    func_8003EAC8(0x20,        0x40);
-    func_8003EAC8(0x40,        0x80);
-    func_8003EAC8(0x10,        0x20);
-    func_8003EAC8(0x2,         0x1);
-    func_8003EAC8(0x4,         0x8);
-    func_8003EAC8(0x200,       0x2000);
-    func_8003EAC8(0x400,       0x4000);
-    func_8003EAC8(0x2000,      0x8000);
-    func_8003EAC8(0x1000000,   0x100);
-    func_8003EAC8(0x2000000,   0x200);
-    func_8003EAC8(0x4000000,   0x400);
-    func_8003EAC8(0x8000000,   0x800);
-    func_8003EAC8(0x10000000,  0x1000);
-    func_8003EAC8(0x20000000,  0x2000);
-    func_8003EAC8(0x40000000,  0x4000);
-    func_8003EAC8((int)0x80000000, 0x8000);
-
-    D_8009D1A0 |= 0x4000;
-}
+/* func_8003E974: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8003E974_port.c (src/func_8003E974.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

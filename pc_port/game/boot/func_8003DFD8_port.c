@@ -14,28 +14,4 @@
 #include "psx_compat.h"
 #include "pe_port_compat.h"
 
-void func_8003DFD8(pe_addr_t src, pe_addr_t dst, int count)
-{
-    int i;
-
-    count = (int)(int16_t)count;
-    if (count <= 0 || src == 0u || dst == 0u)
-        return;
-
-    for (i = 0; i < count; i++) {
-        PE_StoreU16(dst + 0x00u, PE_LoadU16(src + 0x00u));
-        PE_StoreU16(dst + 0x02u, PE_LoadU16(src + 0x02u));
-        PE_StoreU16(dst + 0x04u, PE_LoadU16(src + 0x04u));
-        PE_StoreU16(dst + 0x06u, PE_LoadU16(src + 0x06u));
-        PE_StoreU16(dst + 0x08u, PE_LoadU16(src + 0x08u));
-        PE_StoreU16(dst + 0x0Au, PE_LoadU16(src + 0x0Au));
-        PE_StoreU16(dst + 0x0Cu, PE_LoadU16(src + 0x0Cu));
-        PE_StoreU16(dst + 0x0Eu, PE_LoadU16(src + 0x0Eu));
-        PE_StoreU16(dst + 0x10u, PE_LoadU16(src + 0x10u));
-        PE_StoreU32(dst + 0x14u, PE_LoadU32(src + 0x14u));
-        PE_StoreU32(dst + 0x18u, PE_LoadU32(src + 0x18u));
-        PE_StoreU32(dst + 0x1Cu, PE_LoadU32(src + 0x1Cu));
-        src += 32u;
-        dst += 32u;
-    }
-}
+/* func_8003DFD8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8003DFD8_port.c (src/func_8003DFD8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

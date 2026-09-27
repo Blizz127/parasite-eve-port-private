@@ -83,12 +83,7 @@ int func_80074A44(int mode)
     return 0;
 }
 
-int func_80074BB8(int level)
-{
-    int old = PE_LoadU8(0x8009574Eu);
-    PE_StoreU8(0x8009574Eu, (uint8_t)level);
-    return old;
-}
+/* func_80074BB8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80074BB8_port.c (src/func_80074BB8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 /* Phase 6E-B54K-S — DrawSync wrapper plus the execution-proven behavior of
  * func_80077294.  Retail hardware progresses independently between calls to
@@ -237,20 +232,7 @@ pe_addr_t func_80074924(pe_addr_t env, int x, int y, int w, int h)
     return env;
 }
 
-pe_addr_t func_800749D8(pe_addr_t env, int x, int y, int w, int h)
-{
-    PE_StoreU16(env + 0x00, (uint16_t)x);       /* disp.x */
-    PE_StoreU16(env + 0x02, (uint16_t)y);       /* disp.y */
-    PE_StoreU16(env + 0x04, (uint16_t)w);       /* disp.w */
-    PE_StoreU16(env + 0x06, (uint16_t)h);       /* disp.h */
-    PE_StoreU32(env + 0x08, 0);                 /* screen zeroed @0x08..0x0F */
-    PE_StoreU32(env + 0x0C, 0);
-    PE_StoreU8(env + 0x11, 0);                  /* isrgb24 */
-    PE_StoreU8(env + 0x10, 0);                  /* isinter */
-    PE_StoreU8(env + 0x13, 0);                  /* pad1 */
-    PE_StoreU8(env + 0x12, 0);                  /* pad0 */
-    return env;
-}
+/* func_800749D8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800749D8_port.c (src/func_800749D8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 /* PE-BTL88 — DrawOTagEnv software: 75EE0 SetDrawEnv + 71A34 memcpy.
  * 76C34(76B98) GPU enqueue is not this cut (B53 deferred). */

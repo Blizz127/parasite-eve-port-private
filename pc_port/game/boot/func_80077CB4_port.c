@@ -39,14 +39,4 @@
 #include "psx_compat.h"
 #include "pe_port_compat.h"
 
-int32_t func_80077CB4(pe_addr_t head, pe_addr_t tail)
-{
-    uint32_t sum = (uint32_t)PE_LoadU8(head + 3) + (uint32_t)PE_LoadU8(tail + 3);
-    uint32_t len = sum + 1;
-    if (len < 17u) {
-        PE_StoreU8(head + 3, (uint8_t)len);
-        PE_StoreU32(tail, 0);
-        return 0;
-    }
-    return -1;
-}
+/* func_80077CB4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80077CB4_port.c (src/func_80077CB4.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

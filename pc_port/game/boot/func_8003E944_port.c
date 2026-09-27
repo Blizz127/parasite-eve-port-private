@@ -9,8 +9,4 @@
 #include "psx_compat.h"
 #include "pe_sdk.h"
 
-void func_8003E944(void)
-{
-    func_800844E4(0x800BE9A0u, 0x800BE9A0u + 0x22u);
-    func_80082534();
-}
+/* func_8003E944: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8003E944_port.c (src/func_8003E944.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

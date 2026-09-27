@@ -5,6 +5,13 @@ The YAML owns span membership, order, and geometry.  The JSON build-profile
 file owns only compiler behavior that cannot be inferred from a span.  This
 module deliberately uses only the Python standard library so the public
 consistency gate does not need the retail image, splat, or PyYAML.
+
+Every function is parametrized over a rebuild ``Target`` (``overlay_targets``):
+the default, ``MAIN_TARGET``, is the Disc 1 executable with its historical
+geometry (0x800 PS-X header, VRAM 0x80010000, file end 0x1EE800, ``src/``), so
+the default behaviour and the plan hash are unchanged; ``--target <id>`` selects
+a PE.IMG overlay from ``configs/USA/overlays/manifest.yaml`` (no header, fixed
+VRAM, sources under ``src/overlays/<id>/``).
 """
 
 from __future__ import annotations
@@ -20,15 +27,23 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+_THIS_DIR = Path(__file__).resolve().parent
+if str(_THIS_DIR) not in sys.path:
+    sys.path.insert(0, str(_THIS_DIR))
+
+from overlay_targets import MAIN_TARGET, Target, TargetError, load_target  # noqa: E402
+
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_CONFIG = Path("configs/USA/disc1.yaml")
-DEFAULT_PROFILES = Path("configs/USA/disc1_build_profiles.json")
+DEFAULT_CONFIG = Path(MAIN_TARGET.config)
+DEFAULT_PROFILES = Path(MAIN_TARGET.profiles)
 DEFAULT_STATUS = Path("docs/generated/DISC1_MATCHING_STATUS.md")
-EXPECTED_FILE_END = 0x1EE800
-LOAD_FILE_START = 0x800
-LOAD_VRAM = 0x80010000
-ALLOWED_KINDS = {"asm", "c", "rodata"}
+EXPECTED_FILE_END = MAIN_TARGET.file_end
+LOAD_FILE_START = MAIN_TARGET.file_start
+LOAD_VRAM = MAIN_TARGET.vram
+# `bin` is a raw byte span (splat `bin` subsegment, reassembled with .incbin);
+# overlays use it for their container header and data tail.
+ALLOWED_KINDS = {"asm", "c", "rodata", "bin"}
 ALLOWED_TOOLCHAINS = {"era", "modern"}
 SUBSEGMENT_RE = re.compile(
     r"^\s*- \[(0x[0-9A-Fa-f]+)"
@@ -78,7 +93,11 @@ def _repo_path(root: Path, path: Path | str) -> Path:
     return candidate if candidate.is_absolute() else root / candidate
 
 
-def _parse_rows(config_path: Path) -> tuple[str, list[tuple[int, int, str, str]]]:
+def _parse_rows(
+    config_path: Path,
+    file_start: int = LOAD_FILE_START,
+    file_end: int = EXPECTED_FILE_END,
+) -> tuple[str, list[tuple[int, int, str, str]]]:
     text = config_path.read_text(encoding="utf-8")
     sha_match = SHA1_RE.search(text)
     if not sha_match:
@@ -96,9 +115,9 @@ def _parse_rows(config_path: Path) -> tuple[str, list[tuple[int, int, str, str]]
 
     if not rows:
         raise PlanError(f"{config_path}: no bracket-form subsegments found")
-    if rows[-1][2] or rows[-1][1] != EXPECTED_FILE_END:
+    if rows[-1][2] or rows[-1][1] != file_end:
         raise PlanError(
-            f"{config_path}:{rows[-1][0]}: final row must be [0x{EXPECTED_FILE_END:X}]"
+            f"{config_path}:{rows[-1][0]}: final row must be [0x{file_end:X}]"
         )
     for line_number, offset, kind, name in rows[:-1]:
         if kind not in ALLOWED_KINDS:
@@ -111,38 +130,87 @@ def _parse_rows(config_path: Path) -> tuple[str, list[tuple[int, int, str, str]]
             raise PlanError(
                 f"{config_path}:{line_number}: {kind} span unexpectedly names {name}"
             )
-        if offset < LOAD_FILE_START:
+        if offset < file_start:
             raise PlanError(
-                f"{config_path}:{line_number}: loadable span starts before 0x800"
+                f"{config_path}:{line_number}: loadable span starts before 0x{file_start:X}"
             )
     return sha_match.group(1).lower(), rows
 
 
-def _unit_paths(kind: str, start: int, name: str) -> tuple[str, str, str]:
+def _unit_paths(
+    kind: str, start: int, name: str, target: Target = MAIN_TARGET
+) -> tuple[str, str, str]:
     stem = f"{start:X}"
     if kind == "c":
-        return f"src/{name}.c", f"build/src/{name}.c.o", ".text"
+        return (
+            f"{target.src_dir}/{name}.c",
+            f"build/{target.src_dir}/{name}.c.o",
+            ".text",
+        )
     if kind == "asm":
-        return f"asm/disc1/{stem}.s", f"build/asm/disc1/{stem}.s.o", ".text"
+        return (
+            f"{target.asm_dir}/{stem}.s",
+            f"build/{target.asm_dir}/{stem}.s.o",
+            ".text",
+        )
+    if kind == "bin":
+        # splat writes a `bin` subsegment to <asset_path>/<start hex>.bin; the
+        # build wraps it in a .incbin unit so the bytes round-trip verbatim.
+        return (
+            f"{target.asset_dir}/{stem}.bin",
+            f"build/{target.asm_dir}/{stem}.bin.o",
+            ".data",
+        )
     return (
-        f"asm/disc1/data/{stem}.rodata.s",
-        f"build/asm/disc1/data/{stem}.rodata.s.o",
+        f"{target.asm_dir}/data/{stem}.rodata.s",
+        f"build/{target.asm_dir}/data/{stem}.rodata.s.o",
         ".rodata",
     )
 
 
-def _load_profiles(path: Path, c_names: set[str]) -> tuple[dict[str, Any], dict[str, str]]:
+def _read_profile_manifest(path: Path) -> dict[str, Any]:
     try:
         manifest = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError as exc:
         raise PlanError(f"missing build-profile manifest: {path}") from exc
     except json.JSONDecodeError as exc:
         raise PlanError(f"{path}:{exc.lineno}: invalid JSON: {exc.msg}") from exc
-
     if manifest.get("schema_version") != 1:
         raise PlanError(f"{path}: schema_version must be 1")
-    profiles = manifest.get("profiles")
-    default = manifest.get("default_profile")
+    return manifest
+
+
+def _load_profiles(
+    path: Path, c_names: set[str], root: Path = REPO_ROOT
+) -> tuple[dict[str, Any], dict[str, str]]:
+    manifest = _read_profile_manifest(path)
+    # An overlay manifest may inherit the profile DEFINITIONS from the EXE
+    # manifest (`profiles_from`) so a compiler-era fix lands once; it always
+    # owns its own `assignments`.
+    inherited_from = manifest.get("profiles_from")
+    if inherited_from is not None:
+        if "profiles" in manifest:
+            raise PlanError(f"{path}: use either `profiles` or `profiles_from`, not both")
+        base_path = _repo_path(root, inherited_from)
+        if base_path.resolve() == path.resolve():
+            raise PlanError(f"{path}: profiles_from refers to itself")
+        base = _read_profile_manifest(base_path)
+        profiles = base.get("profiles")
+        default = manifest.get("default_profile", base.get("default_profile"))
+        # Overlay-only: target-specific profiles (e.g. a MASPSX_DISPATCH_FOLD
+        # naming this overlay's own jtbl_ pool) are added next to the
+        # inherited ones; they may never shadow an inherited name.
+        local = manifest.get("local_profiles")
+        if local is not None:
+            if not isinstance(local, dict) or not isinstance(profiles, dict):
+                raise PlanError(f"{path}: local_profiles must be an object")
+            clash = sorted(set(local) & set(profiles))
+            if clash:
+                raise PlanError(f"{path}: local_profiles shadow inherited {clash}")
+            profiles = {**profiles, **local}
+    else:
+        profiles = manifest.get("profiles")
+        default = manifest.get("default_profile")
     assignments = manifest.get("assignments")
     if not isinstance(profiles, dict) or not profiles:
         raise PlanError(f"{path}: profiles must be a non-empty object")
@@ -204,14 +272,22 @@ def _load_profiles(path: Path, c_names: set[str]) -> tuple[dict[str, Any], dict[
 
 def build_plan(
     root: Path = REPO_ROOT,
-    config: Path = DEFAULT_CONFIG,
-    profiles_path: Path = DEFAULT_PROFILES,
+    config: Path | None = None,
+    profiles_path: Path | None = None,
     require_generated: bool = False,
+    target: Target = MAIN_TARGET,
 ) -> dict[str, Any]:
     root = root.resolve()
+    config = Path(target.config) if config is None else config
+    profiles_path = Path(target.profiles) if profiles_path is None else profiles_path
     config_path = _repo_path(root, config)
     profile_path = _repo_path(root, profiles_path)
-    expected_sha1, rows = _parse_rows(config_path)
+    expected_sha1, rows = _parse_rows(config_path, target.file_start, target.file_end)
+    if target.expected_sha1 is not None and expected_sha1 != target.expected_sha1:
+        raise PlanError(
+            f"{config_path}: sha1 {expected_sha1} != manifest sha1 "
+            f"{target.expected_sha1} for target {target.id}"
+        )
 
     typed = rows[:-1]
     for current, following in zip(rows, rows[1:]):
@@ -227,14 +303,14 @@ def build_plan(
     duplicates = [name for name, count in Counter(c_names).items() if count != 1]
     if duplicates:
         raise PlanError(f"{config_path}: duplicate C symbols: {', '.join(duplicates)}")
-    profiles, resolved = _load_profiles(profile_path, set(c_names))
+    profiles, resolved = _load_profiles(profile_path, set(c_names), root)
 
     units: list[Unit] = []
     for index, ((_, start, kind, name), (_, end, _, _)) in enumerate(
         zip(rows, rows[1:])
     ):
-        source, obj, section = _unit_paths(kind, start, name)
-        vram = LOAD_VRAM + start - LOAD_FILE_START
+        source, obj, section = _unit_paths(kind, start, name, target)
+        vram = target.vram + start - target.file_start
         profile_name = None
         toolchain = None
         flags: tuple[str, ...] = ()
@@ -273,12 +349,17 @@ def build_plan(
             )
         )
 
-    if units[0].start != LOAD_FILE_START or units[-1].end != EXPECTED_FILE_END:
+    if units[0].start != target.file_start or units[-1].end != target.file_end:
         raise PlanError("YAML spans do not close over the complete loadable image")
-    if sum(unit.size for unit in units) != EXPECTED_FILE_END - LOAD_FILE_START:
+    if sum(unit.size for unit in units) != target.load_size:
         raise PlanError("YAML span sizes do not sum to the loadable-image size")
 
-    required_sources = ["asm/disc1/header.s", *(unit.source for unit in units)]
+    split_script = "scripts/split_us.sh" if target.is_main else f"scripts/split_overlay.sh {target.id}"
+    header_source = target.header_source
+    required_sources = [
+        *([header_source] if header_source else []),
+        *(unit.source for unit in units),
+    ]
     missing_c = [unit.source for unit in units if unit.kind == "c" and not (root / unit.source).is_file()]
     if missing_c:
         raise PlanError("missing tracked C source(s): " + ", ".join(missing_c))
@@ -286,7 +367,7 @@ def build_plan(
         missing = [source for source in required_sources if not (root / source).is_file()]
         if missing:
             raise PlanError(
-                "missing split-generated source(s); run scripts/split_us.sh: "
+                f"missing split-generated source(s); run {split_script}: "
                 + ", ".join(missing[:12])
                 + (f" (+{len(missing)-12} more)" if len(missing) > 12 else "")
             )
@@ -294,7 +375,7 @@ def build_plan(
         for unit in units:
             if unit.kind != "c":
                 continue
-            asm_at_c_edge = root / f"asm/disc1/{unit.start:X}.s"
+            asm_at_c_edge = root / f"{target.asm_dir}/{unit.start:X}.s"
             if asm_at_c_edge.exists():
                 stale.append(str(asm_at_c_edge.relative_to(root)))
         if stale:
@@ -310,11 +391,11 @@ def build_plan(
         "build_profiles": str(profiles_path),
         "expected_sha1": expected_sha1,
         "file": {
-            "header_size": LOAD_FILE_START,
-            "load_start": LOAD_FILE_START,
-            "load_end": EXPECTED_FILE_END,
-            "load_size": EXPECTED_FILE_END - LOAD_FILE_START,
-            "load_vram": LOAD_VRAM,
+            "header_size": target.file_start,
+            "load_start": target.file_start,
+            "load_end": target.file_end,
+            "load_size": target.load_size,
+            "load_vram": target.vram,
         },
         "counts": {
             "units": len(units),
@@ -323,17 +404,44 @@ def build_plan(
             "rodata": kind_counts["rodata"],
         },
         "profile_counts": dict(sorted(profile_counts.items())),
-        "header": {
-            "source": "asm/disc1/header.s",
-            "object": "build/asm/disc1/header.s.o",
-            "section": ".data",
-            "size": LOAD_FILE_START,
-        },
+        "header": (
+            {
+                "source": header_source,
+                "object": f"build/{header_source}.o",
+                "section": ".data",
+                "size": target.file_start,
+            }
+            if header_source
+            else None
+        ),
         "units": [unit.serializable() for unit in units],
     }
+    if kind_counts["bin"]:
+        # Only overlay plans carry raw spans; the EXE plan's key set (and so
+        # its hash) is untouched when the count is zero.
+        plan["counts"]["bin"] = kind_counts["bin"]
     canonical = json.dumps(plan, sort_keys=True, separators=(",", ":")).encode()
     plan["plan_sha256"] = hashlib.sha256(canonical).hexdigest()
+    # The target descriptor comes from the CLI / manifest, not from the YAML
+    # authority, so it is attached AFTER hashing: the plan hash of a given
+    # YAML is the same as before targets existed.
+    plan["target"] = target.serializable()
     return plan
+
+
+def plan_target(plan: dict[str, Any]) -> Target:
+    """Recover the descriptor a plan was built for (MAIN_TARGET if absent)."""
+    data = plan.get("target")
+    if not data:
+        return MAIN_TARGET
+    return Target(
+        **{
+            key: value
+            for key, value in data.items()
+            if key not in ("vram_hex",)
+        }
+        | {"derive_symbol_prefixes": tuple(data.get("derive_symbol_prefixes", ("D_",)))}
+    )
 
 
 def remove_stale_generated_asm_units(root: Path, plan: dict[str, Any]) -> list[Path]:
@@ -346,7 +454,7 @@ def remove_stale_generated_asm_units(root: Path, plan: dict[str, Any]) -> list[P
     ``git check-ignore`` so tracked or user-owned paths are never touched.
     """
 
-    asm_dir = root / "asm/disc1"
+    asm_dir = root / plan_target(plan).asm_dir
     if not asm_dir.is_dir():
         return []
 
@@ -387,17 +495,23 @@ def remove_stale_generated_asm_units(root: Path, plan: dict[str, Any]) -> list[P
 
 def render_linker_script(plan: dict[str, Any]) -> str:
     units = plan["units"]
+    geometry = plan["file"]
     lines = [
-        "/* Generated by tools/build/disc1_plan.py from configs/USA/disc1.yaml.",
+        f"/* Generated by tools/build/disc1_plan.py from {plan['authority']}.",
         " * Do not edit: YAML owns order and span geometry. */",
         "SECTIONS",
         "{",
-        "    .header : AT(0)",
-        "    {",
-        f"        {plan['header']['object']}({plan['header']['section']})",
-        "    }",
-        "",
-        "    .main 0x80010000 : AT(0x800)",
+    ]
+    if plan.get("header"):
+        lines += [
+            "    .header : AT(0)",
+            "    {",
+            f"        {plan['header']['object']}({plan['header']['section']})",
+            "    }",
+            "",
+        ]
+    lines += [
+        f"    .main 0x{geometry['load_vram']:08X} : AT(0x{geometry['load_start']:X})",
         "    {",
     ]
     for unit in units:
@@ -467,8 +581,17 @@ def write_generated(plan: dict[str, Any], output_dir: Path) -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=REPO_ROOT)
-    parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
-    parser.add_argument("--profiles", type=Path, default=DEFAULT_PROFILES)
+    parser.add_argument(
+        "--target",
+        default=None,
+        metavar="ID",
+        help="rebuild target: disc1 (default, the EXE) or an overlay id from "
+        "configs/USA/overlays/manifest.yaml",
+    )
+    parser.add_argument("--config", type=Path, default=None,
+                        help="YAML authority (default: the target's config)")
+    parser.add_argument("--profiles", type=Path, default=None,
+                        help="build-profile JSON (default: the target's)")
     parser.add_argument("--emit-dir", type=Path)
     parser.add_argument("--require-generated", action="store_true")
     parser.add_argument("--cleanup-stale-asm", action="store_true")
@@ -479,11 +602,18 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     try:
+        target = load_target(args.target, root=args.root.resolve())
+        if not target.is_main and (args.write_status or args.check_status):
+            raise PlanError(
+                "the generated matching status is EXE-only; overlay counts are "
+                "reported by --check per target"
+            )
         plan = build_plan(
             root=args.root,
             config=args.config,
             profiles_path=args.profiles,
             require_generated=args.require_generated,
+            target=target,
         )
         if args.cleanup_stale_asm:
             removed = remove_stale_generated_asm_units(args.root.resolve(), plan)
@@ -507,15 +637,17 @@ def main(argv: list[str] | None = None) -> int:
                     f"stale generated status: {status_path}; run "
                     "python3 tools/build/disc1_plan.py --write-status"
                 )
-    except PlanError as exc:
+    except (PlanError, TargetError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
     print(
-        "disc1 plan: "
+        f"{target.id} plan: "
         f"{plan['counts']['units']} spans "
         f"({plan['counts']['c']} c, {plan['counts']['asm']} asm, "
-        f"{plan['counts']['rodata']} rodata), "
+        f"{plan['counts']['rodata']} rodata"
+        + (f", {plan['counts']['bin']} bin" if plan["counts"].get("bin") else "")
+        + "), "
         f"geometry=0x{plan['file']['load_size']:X}, "
         f"plan={plan['plan_sha256'][:12]}"
     )

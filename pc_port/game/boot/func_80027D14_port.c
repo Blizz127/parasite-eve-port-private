@@ -342,13 +342,7 @@ int func_80024A3C(void)
 /* Original target pulse reset. Command completion is in26824_port.c. */
 #define GA_D_8009D2B0 0x8009D2B0u
 
-void func_80026FD0(void)
-{
-    if ((int8_t)PE_LoadU8(GA_D_8009D2B0) == 0)
-        return;
-    PE_StoreU8(0x8009CE68u, 0x80u);
-    PE_StoreU8(0x8009CE6Cu, (uint8_t)-8);
-}
+/* func_80026FD0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80026FD0_port.c (src/func_80026FD0.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 static void pe_27d14_atb(pe_addr_t actor, pe_addr_t body)
 {

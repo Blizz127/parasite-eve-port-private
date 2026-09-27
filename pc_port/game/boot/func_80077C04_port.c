@@ -30,8 +30,4 @@
 #include "psx_compat.h"
 #include "pe_port_compat.h"
 
-void func_80077C04(pe_addr_t p)
-{
-    PE_StoreU8(p + 3, 4);
-    PE_StoreU8(p + 7, 0x64);
-}
+/* func_80077C04: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80077C04_port.c (src/func_80077C04.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

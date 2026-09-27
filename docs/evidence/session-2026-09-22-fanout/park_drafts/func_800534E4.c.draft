@@ -1,0 +1,52 @@
+extern void func_8005E8C4(void);
+extern void func_8005EB64(int);
+extern void func_8005E8A4(int, int);
+extern void func_8005F27C(unsigned char *);
+extern void func_8005FB74(int);
+extern void func_8005E914(void);
+
+static inline int icon(unsigned int t)
+{
+    if (t != 0 && t < 8) {
+        if ((int)(t - 4) > 0) {
+            return t + 0x1A;
+        }
+        return 0x1F;
+    }
+    if (t < 0x13) {
+        return 0x1E;
+    }
+    return t + 0xC;
+}
+
+void func_800534E4(unsigned char *rec, unsigned char *txt)
+{
+    int n;
+    int v;
+
+    func_8005E8C4();
+    if (rec[6] < 8) {
+        n = rec[9] + *(short *)(rec + 0x12);
+        v = *(unsigned short *)(rec + 0xA);
+        if (n < 1000) {
+            if (v == n) {
+                goto hit;
+            }
+        } else if (v == 999) {
+        hit:
+            func_8005EB64(0x69);
+        }
+    }
+    func_8005EB64(rec[0] - 1);
+    func_8005E8A4(0x12, 0);
+    if (txt != 0) {
+        func_8005F27C(txt);
+    }
+    if (icon(rec[6]) != 0x1E) {
+        func_8005E8A4(0x56, 0);
+        func_8005EB64(icon(rec[6]));
+        func_8005E8A4(0, 5);
+        func_8005FB74(*(unsigned short *)(rec + 0xA));
+    }
+    func_8005E914();
+}

@@ -1,0 +1,45 @@
+void func_800CFD50(unsigned short *a0, unsigned short *a1, unsigned short speed)
+{
+    volatile short x;
+    int a;
+    int b;
+    int v;
+    int s;
+
+    a = a0[0] & 0xFFF;
+    b = a1[0] & 0xFFF;
+    s = -1;
+    if ((unsigned int)b < (unsigned int)a) {
+        s = 1;
+    }
+    a = a - b;
+    if (a < 0) {
+        a = -a;
+    }
+    if (a > 0x800) {
+        s = -(short)s;
+        a = 0x1000 - a;
+    }
+    x = a;
+    v = (short)a * speed / 4096;
+    x = v;
+    a1[0] += (short)v * (short)s;
+    a = a0[1] & 0xFFF;
+    b = a1[1] & 0xFFF;
+    s = -1;
+    if ((unsigned int)b < (unsigned int)a) {
+        s = 1;
+    }
+    a = a - b;
+    if (a < 0) {
+        a = -a;
+    }
+    if (a > 0x800) {
+        s = -(short)s;
+        a = 0x1000 - a;
+    }
+    x = a;
+    v = (short)a * speed / 4096;
+    x = v;
+    a1[1] += (short)v * (short)s;
+}

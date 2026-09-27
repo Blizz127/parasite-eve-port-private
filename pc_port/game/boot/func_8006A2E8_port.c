@@ -25,13 +25,4 @@
 #define GA_A2E8_HW2  0x800BCE8Au   /* sh $v0 target 2 */
 #define GA_A2E8_SB   0x800B0DB1u   /* sb $v0 target 3 */
 
-int func_8006A2E8(int a0, int a1)
-{
-    (void)a0;
-    if ((unsigned int)a1 >= 16u)
-        return 0;
-    PE_StoreU16(GA_A2E8_HW1, (uint16_t)(unsigned int)a1);
-    PE_StoreU16(GA_A2E8_HW2, (uint16_t)(unsigned int)a1);
-    PE_StoreU8(GA_A2E8_SB, (uint8_t)(unsigned int)a1);
-    return 0;  /* retail jr delay slot: addu $v0,$zero,$zero */
-}
+/* func_8006A2E8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8006A2E8_port.c (src/func_8006A2E8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

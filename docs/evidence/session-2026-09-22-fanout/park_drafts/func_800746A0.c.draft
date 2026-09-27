@@ -1,0 +1,15 @@
+extern int D_800956C0[];
+extern unsigned int *D_800956BC;
+int func_800746A0(int ch, int handler) {
+    int *slot = &D_800956C0[ch];
+    int old = *slot;
+    if (handler == old) return old;
+    if (handler != 0) {
+        *slot = handler;
+        *D_800956BC = (*D_800956BC & 0xFFFFFF) | (1 << (ch + 16)) | 0x800000;
+        return old;
+    }
+    *slot = 0;
+    *D_800956BC = ((*D_800956BC & 0xFFFFFF) | 0x800000) & ~(1 << (ch + 16));
+    return old;
+}

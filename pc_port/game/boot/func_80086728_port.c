@@ -37,20 +37,7 @@
 
 #define GA_D_800BCD80 0x800BCD80u
 
-void func_80086728(int a0)
-{
-    uint32_t cmd;
-
-    if (a0 == 1)
-        cmd = 0x81;
-    else if (a0 == 2)
-        cmd = 0x82;
-    else
-        cmd = 0x80;
-
-    PE_StoreU32(GA_D_800BCD80, cmd);
-    func_8008CBA8();
-}
+/* func_80086728: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80086728_port.c (src/func_80086728.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 #define GA_D_800BCD84 0x800BCD84u
 #define GA_D_800BCD90 0x800BCD90u
@@ -68,70 +55,17 @@ int func_80086464(pe_addr_t a0)
     return func_8008CBA8();
 }
 
-/* 86498..864C8: cmd 0x11, CD84=handle, jal 8CBA8. */
-int func_80086498(pe_addr_t a0)
-{
-    PE_StoreU32(GA_D_800BCD80, 0x11u);
-    PE_StoreU32(GA_D_800BCD84, a0);
-    return func_8008CBA8();
-}
+/* func_80086498: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80086498_port.c (src/func_80086498.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-/* 864F8..86564: cmd 0x19 then volume 0xC0 with handle 0.
- * Returns the first 8CBA8 result. */
-int func_800864F8(pe_addr_t bank, uint32_t volume)
-{
-    int handle;
+/* func_800864F8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800864F8_port.c (src/func_800864F8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-    PE_StoreU32(GA_D_800BCD80, 0x19u);
-    PE_StoreU32(GA_D_800BCD84, bank);
-    handle = func_8008CBA8();
-    PE_StoreU32(GA_D_800BCD80, 0xC0u);
-    PE_StoreU32(GA_D_800BCD84, volume & 0x7Fu);
-    PE_StoreU32(GA_D_800BCD90, 0);
-    (void)func_8008CBA8();
-    return handle;
-}
+/* func_80086770: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80086770_port.c (src/func_80086770.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-/* 86770..867AC: cmd 0x90, CD84=a0&0xFFFFFF. */
-int func_80086770(uint32_t a0)
-{
-    PE_StoreU32(GA_D_800BCD80, 0x90u);
-    PE_StoreU32(GA_D_800BCD84, a0 & 0x00FFFFFFu);
-    return func_8008CBA8();
-}
+/* func_80086C1C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80086C1C_port.c (src/func_80086C1C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-/*
- * func_80086C1C is 16 words (0x80086C1C..0x80086C5C):
- * D_800BCD80=0xC0, D_800BCD84=a1&0x7F, D_800BCD90=a0, jal 8CBA8.
- * 0xC0 is the default ring-enqueue path.
- */
-void func_80086C1C(int a0, int a1)
-{
-    PE_StoreU32(GA_D_800BCD80, 0xC0u);
-    PE_StoreU32(GA_D_800BCD84, (unsigned int)a1 & 0x7Fu);
-    PE_StoreU32(GA_D_800BCD90, (unsigned int)a0);
-    (void)func_8008CBA8();
-}
+/* func_80086C5C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80086C5C_port.c (src/func_80086C5C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-/* SEW21: original86C5C..86CF8, timed music-volume queue producers. */
-int func_80086C5C(int handle,uint32_t duration,uint32_t volume)
-{
-    PE_StoreU32(0x800BCD80u,0xC1u);
-    PE_StoreU32(0x800BCD84u,duration);
-    PE_StoreU32(0x800BCD88u,volume&0x7Fu);
-    PE_StoreU32(0x800BCD90u,(uint32_t)handle);
-    return func_8008CBA8();
-}
-
-int func_80086CA4(int handle,uint32_t duration,uint32_t first,uint32_t last)
-{
-    PE_StoreU32(0x800BCD80u,0xC2u);
-    PE_StoreU32(0x800BCD84u,duration);
-    PE_StoreU32(0x800BCD88u,first&0x7Fu);
-    PE_StoreU32(0x800BCD8Cu,last&0x7Fu);
-    PE_StoreU32(0x800BCD90u,(uint32_t)handle);
-    return func_8008CBA8();
-}
+/* func_80086CA4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80086CA4_port.c (src/func_80086CA4.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 /* 866A4..866F0: enqueue the battle-ready volume command. */
 void func_800866A4(unsigned int a0, unsigned int a1)

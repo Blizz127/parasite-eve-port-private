@@ -1,0 +1,32 @@
+/*
+ * func_8007BF44 - vram 0x8007BF44, size 0x100. Draft by lane5.
+ * era: ERA_CC1_VER=2.8.1  cc1 -O2 -G0 -mno-split-addresses
+ *      MASPSX_LOAD_DELAY_NOP_BEFORE_LABEL=1 (maspsx patch 14; 1 word without it:
+ *      retail has the load-delay nop before the volatile poll-loop label).
+ */
+extern volatile unsigned char *D_8009B27C;
+extern volatile unsigned char *D_8009B288;
+extern volatile unsigned int *D_8009B2B0;
+extern volatile unsigned int *D_8009B28C;
+extern volatile unsigned int *D_8009B2B4;
+extern volatile unsigned int *D_8009B2B8;
+extern volatile unsigned int *D_8009B2BC;
+extern volatile unsigned int *D_8009B2C0;
+
+int func_8007BF44(unsigned int a0, unsigned int a1)
+{
+    *D_8009B27C = 0;
+    *D_8009B288 = 0x80;
+    *D_8009B2B0 = 0x20943;
+    *D_8009B28C = 0x1323;
+    *D_8009B2B4 |= 0x8000;
+    *D_8009B2B8 = a0;
+    *D_8009B2BC = a1 | 0x10000;
+    while (!(*D_8009B27C & 0x40)) {
+    }
+    *D_8009B2C0 = 0x11000000;
+    while (*D_8009B2C0 & 0x1000000) {
+    }
+    *D_8009B28C = 0x1325;
+    return 0;
+}

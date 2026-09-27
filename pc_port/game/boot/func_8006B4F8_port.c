@@ -63,35 +63,9 @@ extern int func_80072714(void);
 extern void func_800726C4(void);
 extern void func_80072724(void);
 
-void func_8006E2D0(pe_addr_t dest, uint32_t token)
-{
-    unsigned int i;
-    unsigned int shift;
-    unsigned int idx;
-    uint8_t ch;
+/* func_8006E2D0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8006E2D0_port.c (src/func_8006E2D0.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-    for (i = 0; i < 6u; i++) {
-        shift = (5u - i) * 5u + 2u;
-        idx = (token >> shift) & 0x1Fu;
-        ch = PE_LoadU8(GA_CHARSET + idx);
-        if ((unsigned int)(ch - 97u) < 26u)
-            ch = (uint8_t)(ch - 32u);
-        PE_StoreU8(dest + i, ch);
-    }
-    PE_StoreU8(dest + 6u, 0u);
-}
-
-int func_8006E454(pe_addr_t name)
-{
-    int hundreds;
-    int tens;
-    int ones;
-
-    hundreds = (int)(int8_t)PE_LoadU8(name + 2u) - 48;
-    tens = (int)(int8_t)PE_LoadU8(name + 3u) - 48;
-    ones = (int)(int8_t)PE_LoadU8(name + 4u);
-    return hundreds * 100 + tens * 10 + ones - 48;
-}
+/* func_8006E454: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8006E454_port.c (src/func_8006E454.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 static pe_addr_t pe_6b4f8_rel(pe_addr_t base, uint32_t packed)
 {
@@ -348,9 +322,14 @@ void func_8006B35C(void)
     PE_StoreU8(GA_OVERLAY + 0xE1u, 13u);
     PE_StoreU8(GA_OVERLAY + 0x11u, 0u);
     PE_StoreU8(GA_OVERLAY + 0x12u, 0u);
-    PE_StoreU16(0x80094488u, 0u);
-    for (i = 0; i < 4u; i++)
+    /* src/func_8006B35C.c: p = D_80094488; for (k = 0; k < 0x20; k += 8)
+     * { *(short *)(p + 6) = 0; *(short *)(D_8009448C + k) = 0; p += 8; }
+     * -- the +6 halfword of each of the four 8-byte records, interleaved
+     * with the +4 halfword.  (Was one store to 0x80094488; portverify.) */
+    for (i = 0; i < 4u; i++) {
+        PE_StoreU16(0x80094488u + i * 8u + 6u, 0u);
         PE_StoreU16(0x8009448Cu + i * 8u, 0u);
+    }
     PE_StoreU8(GA_OVERLAY + 0xF6u, 48u);
     PE_StoreU8(GA_OVERLAY + 0xF7u, 127u);
     PE_StoreU16(GA_OVERLAY + 0xF8u, 256u);
@@ -437,34 +416,4 @@ int func_8003F074_dest_ready_cut(uint32_t token)
     return 1;
 }
 
-/*
- * PE-BTL127 — func_8006BE4C dest-enter CE2/CE3 gate.
- * 32 words 0x8006BE4C..0x8006BECC, SHA-256 fb4091da…306b.
- * Sole TEXT jal 3F074@0x8003F204, after 1266C and before 6BECC.
- * CE2 in [10,15): if CE2!=CE3, overlay|=0x200000. Then if
- * (CE2-10)>>1 != ((CE3-10 srl 31)+CE3)>>1, overlay+0x0E|=4.
- * Always v0=0. Writes B0CD8/B0CE6, not D_800B6A80.
- */
-int func_8006BE4C(void)
-{
-    uint8_t ce2;
-    uint8_t ce3;
-    uint32_t left;
-    uint32_t right;
-    int32_t delta;
-
-    ce2 = PE_LoadU8(GA_OVERLAY + 0x0Au);
-    if ((uint32_t)(ce2 - 10u) >= 5u)
-        return 0;
-    ce3 = PE_LoadU8(GA_OVERLAY + 0x0Bu);
-    if (ce2 != ce3)
-        PE_StoreU32(GA_OVERLAY, PE_LoadU32(GA_OVERLAY) | 0x200000u);
-    left = (uint32_t)(ce2 - 10u) >> 1;
-    delta = (int32_t)ce3 - 10;
-    right = ((uint32_t)delta >> 31) + (uint32_t)ce3;
-    right = (uint32_t)((int32_t)right >> 1);
-    if (left != right)
-        PE_StoreU8(GA_OVERLAY + 0x0Eu,
-                   (uint8_t)(PE_LoadU8(GA_OVERLAY + 0x0Eu) | 4u));
-    return 0;
-}
+/* func_8006BE4C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8006BE4C_port.c (src/func_8006BE4C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

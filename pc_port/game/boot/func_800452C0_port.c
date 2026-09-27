@@ -4,7 +4,7 @@
 #include "pe_port_compat.h"
 
 static pe_addr_t ammo_ram(pe_addr_t p) {return p<0x200000u?p|0x80000000u:p;}
-int32_t func_8005E120(void) {return (int32_t)PE_LoadU32(0x8009D0F4u);}
+/* func_8005E120: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8005E120_port.c (src/func_8005E120.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 pe_addr_t func_80051098(void)
 {
@@ -24,19 +24,7 @@ pe_addr_t func_80051098(void)
     return entry;
 }
 
-int func_80056B24(int32_t amount)
-{
-    pe_addr_t from=amount>0?0x800A1F94u:0x800A1FB4u,to=amount>0?0x800A1FB4u:0x800A1F94u;
-    uint32_t count=amount>0?(uint32_t)amount:0u-(uint32_t)amount;
-    uint32_t remaining=PE_LoadU16(from+10u)-count,next=PE_LoadU16(to+10u)+count;
-    int32_t capacity;int result=0;
-    if ((int32_t)remaining<0) {next+=remaining;remaining=0u;result=1;}
-    capacity=PE_LoadU8(to+9u)+(int16_t)PE_LoadU16(to+18u);if (capacity>=1000) capacity=999;
-    if (capacity<(int32_t)next) {remaining+=next-(uint32_t)capacity;next=(uint32_t)capacity;result=2;}
-    PE_StoreU16(from+10u,(uint16_t)remaining);PE_StoreU16(to+10u,(uint16_t)next);
-    if (!remaining && PE_LoadU16(from+12u)) {PE_StoreU16(from+10u,PE_LoadU16(from+12u));PE_StoreU16(from+12u,0u);}
-    return result;
-}
+/* func_80056B24: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80056B24_port.c (src/func_80056B24.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 void func_80057094(void)
 {
@@ -84,24 +72,7 @@ void func_800453E8(pe_addr_t window)
     func_8005E8A4(-56,-14);func_80056FB8();
 }
 
-int func_800452C0(pe_addr_t window,uint32_t event)
-{
-    if (event&0x1000u) {
-        int result=func_80056B24((int32_t)(0u-(uint32_t)func_8005E120()));
-        if (result) func_800526C4();else func_8005267C();PE_StoreU32(0x8009CFACu,1u);
-    } else if (event&0x4000u) {
-        int result=func_80056B24(func_8005E120());
-        if (result) func_800526C4();else func_8005267C();PE_StoreU32(0x8009CFACu,0u);
-    } else if (event&0x10000u) {
-        func_80057094();PE_StoreU32(0x8009CF94u,UINT32_MAX);PE_StoreU32(0x8009CF8Cu,UINT32_MAX);
-        func_80055760();func_80062F1C(window);func_800525EC();
-    }
-    if (event&64u) {
-        PE_StoreU32(0x8009CF94u,UINT32_MAX);PE_StoreU32(0x8009CF8Cu,UINT32_MAX);
-        func_80055760();func_80062F1C(window);func_80052634();
-    }
-    return 1;
-}
+/* func_800452C0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800452C0_port.c (src/func_800452C0.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 void func_80044274(int32_t index)
 {

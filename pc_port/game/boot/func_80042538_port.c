@@ -7,22 +7,4 @@
  */
 #include "psx_compat.h"
 
-void func_80042538(void)
-{
-    (void)func_80071A24(0x800A0ED4u, 0x830u);
-    PE_StoreU32(0x800A12F8u, 0xFFFFFFFFu);
-    PE_StoreU32(0x800A0EE0u, 0xFFFFFFFFu);
-    PE_StoreU32(0x800A183Cu, 0u);
-    PE_StoreU32(0x800A1840u, 0u);
-    PE_StoreU32(0x800A1844u, 0u);
-    PE_StoreU32(0x800A184Cu, 0u);
-    PE_StoreU32(0x800A1848u, 0u);
-    PE_StoreU32(0x800A1838u, 0u);
-    PE_StoreU32(0x800A1854u, 0u);
-    PE_StoreU32(0x800A1860u, 0u);
-    PE_StoreU32(0x800A1864u, 0u);
-    PE_StoreU32(0x800A1868u, 0u);
-    PE_StoreU32(0x800A1704u, 0u);
-    PE_StoreU32(0x800A185Cu, 0u);
-    PE_StoreU32(0x800A186Cu, 0u);
-}
+/* func_80042538: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80042538_port.c (src/func_80042538.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

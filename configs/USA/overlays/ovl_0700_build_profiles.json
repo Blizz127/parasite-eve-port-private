@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "_comment": "Build profiles for the ovl_0700 overlay target. The profile DEFINITIONS are inherited from the EXE manifest via profiles_from (same Psy-Q GCC 2.7.2 era, -G0: overlays use no $gp-relative access), so a compiler-era fix lands once. Only the ASSIGNMENTS are owned here and may name only C spans of configs/USA/overlays/ovl_0700.yaml.",
+  "profiles_from": "configs/USA/disc1_build_profiles.json",
+  "default_profile": "era_o2_g0",
+  "assignments": {
+    "era_o2_g0_expand_div": ["func_80190254"]
+  }
+}

@@ -29,14 +29,7 @@
 #define GA_D_8009B418 0x8009B418u
 #define GA_D_8009B424 0x8009B424u
 
-/* func_80085098, 10 retail words at 0x80085098..0x800850BF.
- * func_80085F44(0) is the first observable operation; it only changes the
- * guest callback slot.  Busy is cleared by the following store. */
-void func_80085098(void)
-{
-    PE_StoreU32(GA_D_8009B434, 0);
-    PE_StoreU32(GA_D_8009D24C, 0);
-}
+/* func_80085098: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80085098_port.c (src/func_80085098.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 /* func_800850C0, 13 retail words at 0x800850C0..0x800850F3. */
 static void PE_func_800850C0(void)

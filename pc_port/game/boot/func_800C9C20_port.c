@@ -12,17 +12,7 @@ static void quad_page(void)
         PE_LoadU8(0x800E224Cu),PE_LoadU16(0x800F3424u),PE_LoadU16(0x800F3426u)));
 }
 
-void func_800C2EAC(unsigned page)
-{
-    static const uint16_t y[]={256,352,256,256},clut[]={471,475,470,456};
-    page&=255u;
-    if (page<4u) {
-        PE_StoreU16(0x800F3424u,page==3u?896u:832u);PE_StoreU16(0x800F3426u,y[page]);
-        PE_StoreU16(0x800F341Cu,0u);PE_StoreU16(0x800F341Eu,clut[page]);
-        PE_StoreU8(0x800F3422u,page==1u?96u:0u);
-    }
-    quad_page();
-}
+/* func_800C2EAC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800C2EAC_port.c (src/func_800C2EAC.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 void func_800C3098(int32_t colors)
 {
@@ -35,17 +25,7 @@ void func_800C3098(int32_t colors)
     quad_page();
 }
 
-void func_800C2FF0(unsigned width,unsigned height)
-{
-    unsigned i;
-    for (i=0;i<4;i++) {
-        pe_addr_t p=0x800F3310u+i*8u;
-        unsigned x=(width&255u)<<4u,y=(height&255u)<<4u;
-        PE_StoreU16(p,(uint16_t)((i&1u)?x:0u-x));
-        PE_StoreU16(p+2u,(uint16_t)((i&2u)?y:0u-y));PE_StoreU16(p+4u,0u);
-    }
-    PE_StoreU8(0x800F345Cu,(uint8_t)(width-1u));PE_StoreU8(0x800F345Du,(uint8_t)(height-1u));
-}
+/* func_800C2FF0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800C2FF0_port.c (src/func_800C2FF0.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 void func_800C3238(unsigned blend)
 {
@@ -57,15 +37,7 @@ void func_800C3238(unsigned blend)
     quad_page();
 }
 
-void func_800C608C(int32_t level,pe_addr_t source,pe_addr_t dest)
-{
-    unsigned i;
-    for (i=0;i<3;i++) {
-        int value=PE_LoadU8(source+i)*(int16_t)level;
-        if (value>32767) value=32767;
-        PE_StoreU8(dest+i,(uint8_t)(value>>7));
-    }
-}
+/* func_800C608C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800C608C_port.c (src/func_800C608C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 static void quad_load_matrix(const PeEffectMatrix *m)
 {

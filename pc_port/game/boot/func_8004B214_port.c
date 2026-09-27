@@ -26,29 +26,4 @@
 
 extern int func_8005E54C(void);
 
-void func_8004B214(pe_addr_t node)
-{
-    int32_t index = func_80063428(func_80062A20(node, 0u));
-    uint32_t focus = (uint32_t)func_8005E54C() & 0x1000u;
-
-    func_8005E8A4(0x12, 5);
-    func_8005EB58((index != 0 || focus == 0u) ? 1u : 0u);
-    func_8005EB64(0x4Au);
-    func_8005E8A4(0x20, 0);
-    func_8005EB58((index != 1 || focus == 0u) ? 1u : 0u);
-    func_8005EB64(0x4Au);
-    func_8005E8A4(0x20, 0);
-    func_8005EB58((index != 2 || focus == 0u) ? 1u : 0u);
-    func_8005EB64(0x4Au);
-
-    focus = (uint32_t)func_8005E54C() & 0x4000u;
-    func_8005E8A4(-0x40, 0x19);
-    func_8005EB58((index != 0 || focus == 0u) ? 1u : 0u);
-    func_8005EB64(0x4Bu);
-    func_8005E8A4(0x20, 0);
-    func_8005EB58((index != 1 || focus == 0u) ? 1u : 0u);
-    func_8005EB64(0x4Bu);
-    func_8005E8A4(0x20, 0);
-    func_8005EB58((index != 2 || focus == 0u) ? 1u : 0u);
-    func_8005EB64(0x4Bu);
-}
+/* func_8004B214: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8004B214_port.c (src/func_8004B214.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

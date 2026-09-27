@@ -26,7 +26,4 @@
  */
 #include "psx_compat.h"
 
-signed char func_8005E884(void)
-{
-    return D_800B0DB1;
-}
+/* func_8005E884: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8005E884_port.c (src/func_8005E884.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

@@ -20,21 +20,12 @@ void func_800C6D5C(pe_addr_t mesh,uint32_t u,uint32_t v)
     PE_StoreU16(0x800F3420u,0u);
 }
 
-void func_800C6EC0(uint32_t page,uint32_t clut)
-{ PE_StoreU16(0x800F346Cu,(uint16_t)page);PE_StoreU16(0x800F3414u,(uint16_t)clut); }
-void func_800C6ED8(uint32_t semi) { PE_StoreU16(0x800F33E4u,(uint16_t)semi); }
+/* func_800C6EC0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800C6EC0_port.c (src/func_800C6EC0.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_800C6ED8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800C6ED8_port.c (src/func_800C6ED8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-void func_800C6EF8(pe_addr_t mesh)
-{
-    pe_addr_t colors=mesh+PE_LoadU16(mesh+8u);unsigned i;
-    for (i=0;i<PE_LoadU16(mesh+10u);i++) PE_StoreU32(0x800E2370u+i*4u,PE_LoadU32(colors+i*4u));
-}
+/* func_800C6EF8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800C6EF8_port.c (src/func_800C6EF8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-void func_800C6F4C(pe_addr_t mesh)
-{
-    pe_addr_t colors=mesh+PE_LoadU16(mesh+8u);unsigned i;
-    for (i=0;i<PE_LoadU16(mesh+10u);i++) PE_StoreU32(colors+i*4u,PE_LoadU32(0x800E2370u+i*4u));
-}
+/* func_800C6F4C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800C6F4C_port.c (src/func_800C6F4C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 void func_800C6FA0(pe_addr_t mesh,uint32_t level)
 {
@@ -47,14 +38,7 @@ void func_800C6FA0(pe_addr_t mesh,uint32_t level)
     }
 }
 
-void func_800C70EC(pe_addr_t mesh,int32_t r,int32_t g,int32_t b)
-{
-    const int32_t delta[3]={r,g,b};pe_addr_t colors=mesh+PE_LoadU16(mesh+8u);unsigned i,j;
-    for (i=0;i<PE_LoadU16(mesh+10u);i++) for (j=0;j<3;j++) {
-        int16_t value=(int16_t)(PE_LoadU8(colors+i*4u+j)+(uint32_t)delta[j]);
-        PE_StoreU8(colors+i*4u+j,value<0?0u:value>255?255u:(uint8_t)value);
-    }
-}
+/* func_800C70EC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800C70EC_port.c (src/func_800C70EC.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 void PE_EffectReadMatrix(pe_addr_t address,PeEffectMatrix *out)
 {

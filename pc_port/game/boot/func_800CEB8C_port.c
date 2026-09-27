@@ -29,12 +29,7 @@ void PE_EffectDirectionCFAA8(const int16_t from[3],const int16_t to[3],pe_addr_t
     PE_StoreU16(out+2u,(uint16_t)(PE_LoadU16(out+2u)&4095u));
 }
 
-void func_800CFAA8(pe_addr_t from,pe_addr_t to,pe_addr_t out)
-{
-    int16_t a[3],b[3];unsigned i;
-    for (i=0;i<3;i++) {a[i]=(int16_t)PE_LoadU16(from+i*2u);b[i]=(int16_t)PE_LoadU16(to+i*2u);}
-    PE_EffectDirectionCFAA8(a,b,out);
-}
+/* func_800CFAA8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800CFAA8_port.c (src/func_800CFAA8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 void PE_ActorJointDirectionCE9D4(pe_addr_t actor,uint32_t joint,int16_t out[3])
 {

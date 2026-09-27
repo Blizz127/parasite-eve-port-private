@@ -1,0 +1,26 @@
+/* best: 1 word-class residual (ERA_CC1_VER=2.8.1 -O2 -G0 -mno-split-addresses, 11 words from a missing load-delay nop between `lw $v0,0x34($s0)` and the `jal` whose slot holds `sw $v0`). Needs assembler/maspsx behaviour: nop when a filled jal slot reads the preceding load dest. */
+typedef struct {
+    unsigned short active;
+    char pad2[0x30];
+    unsigned short mask;
+    int f34;
+    int f38;
+} IntrState;
+extern IntrState D_800945E4;
+extern unsigned short *D_80095674;
+extern int *D_80095678;
+extern void func_800743A4(void *);
+extern void func_80072724(void);
+
+void *func_800742B8(void) {
+    IntrState *s = &D_800945E4;
+    if (s->active != 0) {
+        return 0;
+    }
+    func_800743A4(&s->f38);
+    s->active = 1;
+    *D_80095674 = s->mask;
+    *D_80095678 = s->f34;
+    func_80072724();
+    return s;
+}

@@ -13,13 +13,11 @@
 
 extern void func_80070D10(void);
 extern unsigned int func_80070D6C(void);
-extern void func_8003E974(void);
 extern void func_80036DC8(void);
 extern void func_8003E91C(void);
 extern void func_800371A4(int);
 extern void func_80029388(void);
 extern void func_8005BCA8(void);
-extern void func_80068D28(void);
 extern void func_800124F8(void);
 extern void func_8001A890(void);
 extern void func_80034F10(void);

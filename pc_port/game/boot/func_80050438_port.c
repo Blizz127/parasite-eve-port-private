@@ -21,17 +21,4 @@
 #include "psx_compat.h"
 #include "pe_port_compat.h"
 
-void func_80050438(pe_addr_t index)
-{
-    unsigned shift = ((unsigned)index * 8u) & 31u;
-    int32_t lane;
-
-    func_8005E8C4();
-    func_8005E968(0x80u << shift);
-    func_8005F5B8((uint32_t)index + 0x35u);
-    func_8005E968(0x808080u);
-    func_8005E8A4(0xA, 3);
-    lane = (int32_t)(((uint32_t)func_800614A0() >> shift) & 0xFFu) - 0x20;
-    func_8005FB74(lane >> 1);
-    func_8005E914();
-}
+/* func_80050438: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80050438_port.c (src/func_80050438.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

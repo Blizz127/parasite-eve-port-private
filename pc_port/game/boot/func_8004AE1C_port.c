@@ -46,36 +46,4 @@
 #include "pe_port_compat.h"
 #include "game_port.h"
 
-int func_8004AE1C(pe_addr_t node, uint32_t event)
-{
-    pe_addr_t list = func_80062A20(node, 0u);
-
-    if (event & 0x10000u) {
-        uint32_t index = (uint32_t)func_80063428(list);
-
-        if (index < 6u) {
-            switch (index) {
-            case 0: func_8004AF3C(list); break;
-            case 1: func_8004B03C(list); break;
-            case 2: func_8004B13C(list); break;
-            case 3: func_8004B584(list); break;
-            default:
-                /* 4 and 5 share 0x8004AEC4: close the page and commit. */
-                func_8005D994((int32_t)index - 4);
-                func_80062F1C(node);
-                func_800439D8();
-                func_800525EC();   /* 0x8004AEE4: falls through */
-                break;
-            }
-        }
-        func_800525EC();
-        return 1;
-    }
-
-    if (event & 0x40u) {
-        func_80062F1C(node);
-        func_800439D8();
-        func_80052634();
-    }
-    return 1;
-}
+/* func_8004AE1C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8004AE1C_port.c (src/func_8004AE1C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

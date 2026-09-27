@@ -335,6 +335,7 @@ poll5:
         register unsigned int v1 asm("$3");
         register int a0 asm("$4");
         v1 = -1;
+        asm volatile("" : "=r"(v1) : "0"(v1));
         v0 = *(unsigned int *)s5;
         a0 = -1;
         *(unsigned short *)(s5 + 6) = (unsigned short)v1;

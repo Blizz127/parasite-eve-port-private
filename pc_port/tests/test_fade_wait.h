@@ -33,7 +33,7 @@ static void test_DAY1_fade_wait(void)
         FADE_CHECK(n<8?func_80018EB4(0x80150060u):func_80018EE0(0x80150060u));
         for(unsigned frame=0;frame<=ticks;frame++) {
             PE_StoreU32(0x8009CE00u,0x801910DCu);PE_StoreU32(0x80150090u,0xBAD);
-            FADE_CHECK(func_80019410(0x80150060u));
+            FADE_CHECK(func_80019410());
             if(frame==ticks)break;
             PE_StoreU32(0x8009CDDCu,frame&1);PE_StoreU32(0x8015000Cu+(frame&1)*32,0xFFFFFF);
             FADE_CHECK(func_80068E24());

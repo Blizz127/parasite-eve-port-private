@@ -2,34 +2,7 @@
 #include "psx_compat.h"
 #include "pe_port_compat.h"
 
-void func_80022210(void)
-{
-    pe_addr_t actor, record=PE_LoadU32(0x8009D278u);
-    if (PE_LoadU32(record+76u)&0x200000u) {
-        func_8001A680_command_cut(PE_LoadU32(0x8009D254u),14u);
-        actor=PE_LoadU32(0x8009D254u);
-        func_8006DE80(0x4B3,0,(int16_t)PE_LoadU16(actor+42u),
-            (int16_t)PE_LoadU16(actor+46u),(int16_t)PE_LoadU16(actor+50u));
-        record=PE_LoadU32(0x8009D278u);
-        D_8009D1A0|=0x100u;
-        PE_StoreU32(record+76u,PE_LoadU32(record+76u)&~0x200000u);
-    }
-    actor=PE_LoadU32(0x8009D254u);
-    if (PE_LoadU8(actor+15u)==PE_LoadU16(actor+26u)) {
-        uint8_t index;
-        uint16_t next;
-        func_8001A680_command_cut(actor,PE_LoadU8(PE_LoadU32(0x8009D278u)+18u));
-        record=PE_LoadU32(0x8009D278u);
-        PE_StoreU32(record+76u,PE_LoadU32(record+76u)|0x200000u);
-        func_80023E14((int16_t)PE_LoadU16(0x800BE834u+PE_LoadU8(0x8009D1D4u)*8u)-3);
-        (void)func_8006F39C(0x55u,PE_LoadU32(0x8009D254u));
-        index=(uint8_t)(PE_LoadU8(0x8009D1D4u)+1u);
-        next=PE_LoadU16(0x800BE834u+index*8u);
-        PE_StoreU8(0x8009D1D4u,index);
-        if ((uint32_t)next-3u>=0x194u || PE_LoadU8(PE_LoadU32(0x8009D254u)+14u)<4u)
-            D_8009D1A0&=~0x100u;
-    }
-}
+/* func_80022210: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80022210_port.c (src/func_80022210.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 int8_t func_800255E4(void)
 {

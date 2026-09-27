@@ -28,6 +28,8 @@
 
 #include "psx_compat.h"
 #include "pe_port_compat.h"
+#include "game/decomp_hand/decomp_hand_protos.h"  /* hand-adapter host prototypes */
+#include "pe_guestcode.h"                          /* PE_GuestCall (guest code pointers) */
 
 #include <stdint.h>
 
@@ -54,13 +56,43 @@ extern "C" {
 #define PE_DECOMP_ARRAY(addr, type) \
     ((type *)PE_Translate((pe_addr_t)(addr), 1u))
 
+/* Guest address -> host pointer for a pointer the matched leaf itself
+ * null-tests (`if (p)`, `p != 0`, `!p`, `p && ...`, directly or through a
+ * plain copy).  The generator uses this only for those names: a guest 0
+ * becomes a host NULL so the leaf's own test sees "null" (func_80080998's
+ * guard).  Every other pointer translates 0 through the retail RAM mirror
+ * (PE_Translate folds KUSEG 0x00000000.. onto 0x80000000..), because on the
+ * PS1 a dereference of guest 0 reads low RAM and retail does exactly that. */
+static inline void *PE_DecompTranslateOrNull(pe_addr_t addr)
+{
+    return addr ? PE_Translate(addr, 1u) : (void *)0;
+}
+
 /* A pointer *global*: the word at the named slot holds a 32-bit guest address
  * (retail emits lui+lw for these bases).  The generated expression loads that
- * word and translates it, yielding a host pointer into guest RAM.  A null or
- * out-of-range stored value aborts loudly in PE_Translate — the intended
- * "unported subsystem" boundary, not a silent zero. */
+ * word and translates it (0 -> low RAM through the mirror, like retail); the
+ * _NULLABLE form is emitted for slots the leaf null-tests. */
 #define PE_DECOMP_PTRGLOBAL(addr, type) \
     ((type *)PE_Translate(PE_LoadU32((pe_addr_t)(addr)), 1u))
+#define PE_DECOMP_PTRGLOBAL_NULLABLE(addr, type) \
+    ((type *)PE_DecompTranslateOrNull(PE_LoadU32((pe_addr_t)(addr))))
+
+/* Pointer-return adapter: the leaf's result is a host pointer; PE_HostToGuest
+ * yields its KSEG0 address.  When the leaf has a single pointer root whose
+ * guest value is a KUSEG/KSEG1 alias of main RAM, retail's result is in that
+ * same segment (func_800C2B10: D_800E2248 = 0x65 -> returns 0x6D, not
+ * 0x8000006D), so the root's segment is re-applied. */
+static inline pe_addr_t PE_DecompReturnSegment(pe_addr_t result, pe_addr_t root)
+{
+    uint32_t seg = root & 0xE0000000u;
+
+    if (result == 0u || (result & 0xE0000000u) != 0x80000000u)
+        return result;
+    if ((seg == 0x00000000u || seg == 0xA0000000u) &&
+        (root & 0x1FFFFFFFu) < PE_RAM_SIZE && (result & 0x1FFFFFFFu) < PE_RAM_SIZE)
+        return (result & 0x1FFFFFFFu) | seg;
+    return result;
+}
 
 /* ── Boundary registry ──────────────────────────────────────────────── */
 

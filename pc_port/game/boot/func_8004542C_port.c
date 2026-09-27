@@ -33,11 +33,7 @@ void func_80059EC8(uint32_t slot,int32_t index)
     PE_StoreU32(0x8009D098u+slot*4u,D_8009D048!=0x800C0E48u);
 }
 
-void func_80064C20(pe_addr_t list)
-{
-    pe_addr_t address=list<0x200000u?list|0x80000000u:list;
-    PE_StoreU32(address+112u,~0u);PE_StoreU32(address+68u,~0u);
-}
+/* func_80064C20: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80064C20_port.c (src/func_80064C20.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 void func_80064B74(pe_addr_t list,int32_t index)
 {
@@ -116,11 +112,7 @@ void func_80050AD8(int32_t index)
     func_8005EB64(glyph);
 }
 
-void func_8005E988(int32_t old_value,int32_t new_value)
-{
-    uint32_t color=old_value<new_value?0x408080u:old_value>new_value?0x404080u:0x808080u;
-    PE_StoreU32(0x8009D110u,color);PE_StoreU32(0x8009D114u,color>>1u);
-}
+/* func_8005E988: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8005E988_port.c (src/func_8005E988.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 static int32_t equipment_total(pe_addr_t item,unsigned stat)
 {return PE_LoadU8(item+7u+stat)+(int16_t)PE_LoadU16(item+14u+stat*2u);}
@@ -230,5 +222,5 @@ static void equipment_small_number(int32_t value,unsigned show_plus)
         func_8005F874(i+1u<digits && !digit?-1:digit);func_8005E8A4(5,0);
     }
 }
-void func_8005FDF0(int32_t value) {equipment_small_number(value,0u);}
+/* func_8005FDF0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8005FDF0_port.c (src/func_8005FDF0.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 void func_8005FF28(int32_t value) {equipment_small_number(value,1u);}

@@ -7,7 +7,12 @@ its retail address (the repo's address-named-symbol convention), then compares
 the linked `.text` word-for-word against the extracted retail EXE.
 
 Usage:
-  tools/analysis/era_link_check.py <src.c> <vram_hex> <size_hex> [cc1 flags...]
+  tools/analysis/era_link_check.py [--target <ovl>] [--all-mismatches]
+      <src.c> <vram_hex> <size_hex> [cc1 flags...]
+
+`--all-mismatches` (or env ERA_LINK_CHECK_ALL_MISMATCHES=1) lists every
+mismatched word instead of the first 12. The option may appear anywhere
+before or after the positional arguments.
 
 Prints `LINK_EXACT` and exits 0 when every word matches, else prints the
 mismatch count / first offsets and exits 1.
@@ -29,12 +34,22 @@ ERA = ROOT / "tools" / "era"
 CC1_VER = os.environ.get("ERA_CC1_VER", "2.7.2")
 CC1 = ERA / f"gcc-{CC1_VER}-psx" / "cc1"
 CPP = ERA / f"gcc-{CC1_VER}-psx" / "cpp"
-MASPSX = ERA / "maspsx" / "maspsx.py"
+# ERA_LINK_CHECK_MASPSX=<path/to/maspsx.py> runs a development copy instead
+# of the live tools/era/maspsx (e.g. while the live tree is frozen for a gate).
+MASPSX = Path(os.environ.get("ERA_LINK_CHECK_MASPSX") or ERA / "maspsx" / "maspsx.py").resolve()
 HOST = ROOT / "tools" / "mipsel-host"
 AS = HOST / "usr" / "bin" / "mipsel-linux-gnu-as"
 LD = HOST / "usr" / "bin" / "mipsel-linux-gnu-ld"
 OBJCOPY = HOST / "usr" / "bin" / "mipsel-linux-gnu-objcopy"
 NM = HOST / "usr" / "bin" / "mipsel-linux-gnu-nm"
+# The vendored host binutils are relocated Debian packages: their shared
+# libraries (libopcodes/libbfd) live beside them, not on the system search
+# path, so every host-tool call runs with that directory prefixed.
+HOST_LIB = HOST / "usr" / "lib" / "x86_64-linux-gnu"
+HOST_ENV = dict(os.environ)
+HOST_ENV["LD_LIBRARY_PATH"] = str(HOST_LIB) + (
+    ":" + os.environ["LD_LIBRARY_PATH"] if os.environ.get("LD_LIBRARY_PATH") else ""
+)
 EXE = ROOT / "build" / "extracted" / "disc1" / "SLUS_006.62"
 
 SYM_TAIL_RE = re.compile(r"([0-9A-Fa-f]{6,8})$")
@@ -98,8 +113,26 @@ def sym_address(name: str):
 
 
 def main():
-    src, vram_s, size_s = sys.argv[1], sys.argv[2], sys.argv[3]
-    flags = sys.argv[4:] or ["-O2", "-G0"]
+    argv = sys.argv[1:]
+    # `--all-mismatches` is removed wherever it appears so it never reaches
+    # cc1's flag list; cc1 has no option of that name.
+    show_all = os.environ.get("ERA_LINK_CHECK_ALL_MISMATCHES") == "1"
+    if "--all-mismatches" in argv:
+        show_all = True
+        argv = [a for a in argv if a != "--all-mismatches"]
+    # Retail bytes default to the EXE at its PS-X mapping. `--target <id>`
+    # (first argument) points the comparison at a PE.IMG overlay blob from
+    # configs/USA/overlays/manifest.yaml, whose file offset 0 is its VRAM.
+    retail_path, load_vram, file_start = EXE, 0x80010000, 0x800
+    if argv[:1] == ["--target"]:
+        sys.path.insert(0, str(ROOT / "tools" / "build"))
+        from overlay_targets import load_target  # noqa: PLC0415
+        target = load_target(argv[1], root=ROOT)
+        retail_path = ROOT / target.retail
+        load_vram, file_start = target.vram, target.file_start
+        argv = argv[2:]
+    src, vram_s, size_s = argv[0], argv[1], argv[2]
+    flags = argv[3:] or ["-O2", "-G0"]
     vram = int(vram_s, 0)
     size = int(size_s, 0)
     src_path = Path(src)
@@ -146,11 +179,11 @@ def main():
         assert r.returncode == 0, "maspsx failed"
         r = subprocess.run([str(AS), "-EL", "-mips1", "-mabi=32",
                             "-I", str(ROOT / "include"), "-o", str(d / "x.o"),
-                            str(d / "xm.s")])
+                            str(d / "xm.s")], env=HOST_ENV)
         assert r.returncode == 0, "as failed"
 
         nm = subprocess.run([str(NM), "-u", str(d / "x.o")],
-                            capture_output=True, text=True).stdout
+                            capture_output=True, text=True, env=HOST_ENV).stdout
         undef = []
         for line in nm.splitlines():
             parts = line.split()
@@ -182,14 +215,14 @@ def main():
         )
         ldargs = [str(LD), "-T", str(script), "-o", str(d / "x.elf"),
                   str(d / "x.o"), "--defsym", "_gp=0x8009CD70", *defsyms]
-        r = subprocess.run(ldargs, capture_output=True, text=True)
+        r = subprocess.run(ldargs, capture_output=True, text=True, env=HOST_ENV)
         if r.returncode != 0:
             print("LD FAILED\n" + r.stdout + r.stderr)
             return 1
         elf = (d / "x.elf").read_bytes()
         linked = elf_section(elf, ".text")
         nmall = subprocess.run([str(NM), str(d / "x.elf")],
-                               capture_output=True, text=True).stdout
+                               capture_output=True, text=True, env=HOST_ENV).stdout
         func_addr = None
         for line in nmall.splitlines():
             parts = line.split()
@@ -205,8 +238,8 @@ def main():
             return 1
         linked = linked[lead:]
 
-    exe = EXE.read_bytes()
-    off = vram - 0x80010000 + 0x800
+    exe = retail_path.read_bytes()
+    off = vram - load_vram + file_start
     rom = exe[off:off + size]
 
     n = min(len(rom), len(linked), size)
@@ -217,7 +250,7 @@ def main():
         lw_ = struct.unpack_from("<I", linked, i)[0] if i + 4 <= len(linked) else None
         if lw_ is None or rw != lw_:
             mism += 1
-            if len(first) < 12:
+            if show_all or len(first) < 12:
                 first.append((vram + i, rw, lw_))
     # trailing linked bytes beyond target must be zero pad
     extra = linked[size:]
@@ -225,6 +258,8 @@ def main():
                         if struct.unpack_from("<I", extra, i)[0] != 0)
     print(f"linked .text {len(linked)} bytes, target {size:#x}, word mismatches={mism}, "
           f"nonzero_pad={extra_nonzero}")
+    if mism > len(first):
+        print(f"  (first {len(first)} of {mism}; --all-mismatches lists all)")
     for a, rw, lw_ in first:
         print(f"  {a:#x}: ROM {rw:08x}  LNK {lw_:08x}" if lw_ is not None
               else f"  {a:#x}: ROM {rw:08x}  LNK --------")

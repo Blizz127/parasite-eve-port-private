@@ -1,0 +1,8 @@
+/* best: 4 words (-O2 -G0). Residual: retail has an 8-byte frame with no stores and
+ * `move $v1,$v0` for the re-test; cc1 emits `sll $3,$2,24` (QImode test) and no frame. */
+extern signed char D_800B0DBA;
+extern signed char D_800B0DBB;
+extern unsigned short D_800B0DBC;
+static inline signed char get_a(void) { return D_800B0DBA; }
+static inline short get_b(void) { if (get_a()) { return D_800B0DBC; } return -1; }
+int func_8006EC08(void) { if (get_a() != 0) { if (get_b() > 0) { if (D_800B0DBB) return 2; return 1; } } return 0; }

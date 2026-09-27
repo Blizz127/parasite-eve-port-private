@@ -39,29 +39,6 @@ void func_8007B964(pe_addr_t p)
     PE_CdStoreU8(PE_LoadU32(0x8009B288u), 0x20u);
 }
 
-/* func_8007A88C proper is 8 words (0x8007A88C..0x8007A8AC, from the
- * splitter gap): call 7B964, return 1.  The 870F0 caller ignores
- * the result. */
-int func_8007A88C(pe_addr_t p)
-{
-    func_8007B964(p);
-    return 1;
-}
+/* func_8007A88C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8007A88C_port.c (src/func_8007A88C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-void func_800870F0(uint32_t a0)
-{
-    if ((PE_LoadU32(MV_D2C0) & 2u) == 0u) {
-        uint8_t v = (uint8_t)a0;
-        PE_StoreU8(MV_D1CA, v);
-        PE_StoreU8(MV_D1C8, v);
-        PE_StoreU8(MV_D1CB, 0u);
-        PE_StoreU8(MV_D1C9, 0u);
-    } else {
-        uint8_t v = (uint8_t)(((uint32_t)(2903u * a0)) >> 13);
-        PE_StoreU8(MV_D1CB, v);
-        PE_StoreU8(MV_D1C9, v);
-        PE_StoreU8(MV_D1CA, v);
-        PE_StoreU8(MV_D1C8, v);
-    }
-    func_8007A88C(MV_D1C8);
-}
+/* func_800870F0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800870F0_port.c (src/func_800870F0.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

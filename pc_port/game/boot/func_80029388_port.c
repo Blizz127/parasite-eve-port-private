@@ -88,50 +88,8 @@
 #define GA_D_8009D2D8 0x8009D2D8u
 #define GA_D_8009D1F0 0x8009D1F0u
 
-/* Default-record init — retail store order: 0x70-byte record block by
- * block (4 words each), then the 0x18-byte record word by word, then the
- * two zero words (69 words / 0x114). */
-void func_8002F658(void)
-{
-    unsigned int i, w;
+/* func_8002F658: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8002F658_port.c (src/func_8002F658.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-    for (i = 0; i < 7; i++) {
-        for (w = 0; w < 4; w++) {
-            PE_StoreU32(GA_D_800B8A20 + i * 16u + w * 4u,
-                        PE_LoadU32(GA_D_80010928 + i * 16u + w * 4u));
-        }
-    }
-    for (w = 0; w < 6; w++) {
-        PE_StoreU32(GA_D_800B0CB0 + w * 4u, PE_LoadU32(GA_D_80010998 + w * 4u));
-    }
-    PE_StoreU32(GA_D_8009D1B0, 0);
-    PE_StoreU32(GA_D_8009D1B4, 0);
-}
+/* func_80020EFC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80020EFC_port.c (src/func_80020EFC.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-/* Five $gp-relative byte clears in retail source order (matched decomp
- * leaf). */
-void func_80020EFC(void)
-{
-    PE_StoreU8(GA_D_8009CE3C, 0);
-    PE_StoreU8(GA_D_8009D1D4, 0);
-    PE_StoreU8(GA_D_8009D1DC, 0);
-    PE_StoreU8(GA_D_8009D2D8, 0);
-    PE_StoreU8(GA_D_8009D1F0, 0);
-}
-
-/* void(void); sole caller func_8003E680.  Retail order: record init,
- * seven slot-table in-use clears (i = 0..6, stride 220 — the andi 0xFF
- * counter and sltiu bound make the trip count exactly 7), two byte
- * clears, then the 20EFC byte clears (27 words / 0x6C). */
-void func_80029388(void)
-{
-    unsigned char i;
-
-    func_8002F658();
-    for (i = 0; i < 7; i++) {
-        PE_StoreU32(GA_D_800A5D58 + (unsigned int)i * 220u, 0);
-    }
-    PE_StoreU8(GA_D_8009D2A0, 0);
-    PE_StoreU8(GA_D_8009D2EC, 0);
-    func_80020EFC();
-}
+/* func_80029388: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80029388_port.c (src/func_80029388.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

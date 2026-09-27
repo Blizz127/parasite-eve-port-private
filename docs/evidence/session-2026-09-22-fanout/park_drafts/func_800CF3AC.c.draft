@@ -1,0 +1,63 @@
+typedef struct {
+    unsigned char b0;
+    unsigned char b1;
+    unsigned char b2;
+    unsigned char b3;
+    unsigned short f4;
+    unsigned short f6;
+} E;
+
+typedef struct {
+    int total;
+    int count;
+    E e[1];
+} H;
+
+extern void func_80078554();
+
+void func_800CF3AC(H *h, int a1, int t)
+{
+    register E *e asm("$4");
+    register H *hh asm("$9");
+    int count;
+    int acc;
+    int i;
+    int frac;
+
+    hh = h;
+    count = hh->count;
+    e = h->e;
+    if (hh->total == 0) {
+        E *q = e;
+        count = 0;
+        acc = 0;
+        for (;;) {
+            int d;
+
+            d = q->b3;
+            if (d == 0) {
+                break;
+            }
+            q->f6 = acc;
+            acc += d;
+            count++;
+            q->f4 = d;
+            q++;
+        }
+        e = hh->e;
+        hh->total = acc;
+        hh->count = count;
+    }
+    if (hh->total < t) {
+        t = hh->total;
+    }
+    e += count - 1;
+    for (i = 0; i < count; i++) {
+        if (t >= e->f6) {
+            break;
+        }
+        e--;
+    }
+    frac = ((t - e->f6) << 12) / e->f4;
+    func_80078554(e, e + 1, 0x1000 - frac, frac, a1);
+}

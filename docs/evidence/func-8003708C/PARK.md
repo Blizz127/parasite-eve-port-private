@@ -1,3 +1,7 @@
+# func_8003708C — resolved
+
+Matched. See `REPORT.md`. The note below is the park this leaf closed.
+
 # func_8003708C — PARKED (mflo/mfhi order + unsigned multiply)
 
 7 words, VRAM `0x8003708C`, file `0x2788C.s`. `(a0 * a1) >> 16` — the high half

@@ -15,15 +15,4 @@
 
 extern void func_80042CC4(int a0, int a1);
 
-void func_80042C78(void)
-{
-    PE_StoreU32(0x8009CED8u, 0u); /* $gp + 0x168 */
-    PE_StoreU32(0x8009CEE0u, 0u); /* $gp + 0x170 */
-    PE_StoreU32(0x8009CEE4u, 0u); /* $gp + 0x174 */
-    PE_StoreU32(0x8009CEDCu, 0x20u); /* $gp + 0x16C */
-
-    /* jal func_80042CC4; delay slot establishes a1=0xFF. */
-    func_80042CC4(0x90, 0xFF);
-
-    PE_StoreU32(0x8009CEECu, 0x48u); /* $gp + 0x17C */
-}
+/* func_80042C78: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80042C78_port.c (src/func_80042C78.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

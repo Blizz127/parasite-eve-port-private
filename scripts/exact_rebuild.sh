@@ -257,7 +257,8 @@ say "  expected:  SHA-1 $EXPECTED_SHA1"
 say ""
 
 logs="$(mktemp -d)"
-trap 'rm -rf "$logs"' EXIT
+# Keep the logs when the gate fails, so a FAIL stays diagnosable.
+trap 'rc=$?; if [[ $rc -eq 0 ]]; then rm -rf "$logs"; else echo "gate logs kept in $logs" >&2; fi' EXIT
 
 H_START="$(yaml_sha)"
 

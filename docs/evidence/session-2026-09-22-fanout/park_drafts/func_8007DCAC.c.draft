@@ -1,0 +1,10 @@
+void func_8007DCAC(void)
+{
+    volatile int i;
+    volatile int v;
+
+    v = 13;
+    for (i = 0; i < 60; i++) {
+        v = v * 13;
+    }
+}

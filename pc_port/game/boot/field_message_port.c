@@ -111,11 +111,7 @@ int func_80051684(uint32_t value)
     return 0;
 }
 
-/* ---- func_800629B0: "a message node is queued" flag --------------------- */
-int func_800629B0(void)
-{
-    return PE_LoadU32(GM_D_8009D154) != 0u;
-}
+/* func_800629B0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800629B0_port.c (src/func_800629B0.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 /* ---- func_80057E14: window-id remap table + func_80055760 --------------- */
 int32_t func_80057E14(pe_addr_t list)
@@ -154,26 +150,9 @@ int32_t func_80057E14(pe_addr_t list)
     return count;
 }
 
-/* ---- func_8005270C: message window fade target -------------------------- */
-int func_8005270C(void)
-{
-    pe_addr_t package = PE_LoadU32(0x800B0E08u);
-    int32_t result = 0;
-    if (package)
-        result = func_8006DF50(package, 0x450u, 0x100u, 0x80u, 0x7Fu);
-    PE_StoreU32(GM_D_8009D01C, (uint32_t)result); /* gp+0x2AC */
-    return result;
-}
+/* func_8005270C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8005270C_port.c (src/func_8005270C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-/* ---- func_8004BF08: clear the two 8-word message tables ----------------- */
-void func_8004BF08(void)
-{
-    int i;
-    for (i = 0; i < 8; i++) {
-        PE_StoreU32(0x800A1940u + (uint32_t)i * 4u, 0u); /* retail stores this word first */
-        PE_StoreU32(0x800A1920u + (uint32_t)i * 4u, 0u);
-    }
-}
+/* func_8004BF08: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8004BF08_port.c (src/func_8004BF08.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 /* ---- func_8004BE4C: build the "item get" window node pair --------------- */
 void func_8004BE4C(void)
@@ -194,12 +173,7 @@ void func_8004BE4C(void)
     func_8004BF08();
 }
 
-/* ---- func_8005C144: snapshot the encounter style byte ------------------- */
-void func_8005C144(void)
-{
-    PE_StoreU32(GM_D_8009D02C, func_80033A20() & 0xFFu);
-    func_800339A0(0);
-}
+/* func_8005C144: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8005C144_port.c (src/func_8005C144.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 /* ---- func_8004BCE8: close/commit the active message window -------------- */
 void func_8004BCE8(int32_t arg0)

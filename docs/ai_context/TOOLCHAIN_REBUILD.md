@@ -170,15 +170,18 @@ delay-slot fill (`MASPSX_FILL_CALL_DELAY_SLOT`, ROM: 90 sites / 45 functions,
 `tests/test_fill_call_delay_slot.py`), **9** the explicit `%lo`-store
 passthrough that the per-leaf `ERA_CC1_VER=2.8.1` compiler needs
 (`tests/test_lo_store_passthrough.py`); a corpus flag-off identity run
-(every `src/*.c` leaf x `-G0`/`-G8` x 2.21/2.30 x 7 knob-off variants,
-merged maspsx vs the pre-merge tree) shows the four additions byte-identical
-together except for patch 7's mandatory nop under `-G8`. Proof on the live
-plan (1549 c spans, plan `2b586facf8b9`, `disc1.yaml` sha256 `dd9ec663…73bf`):
+(every `src/*.c` leaf x `-G0`/`-G8` x 2.21/2.30 x 7 knob variants, 1605
+leaves / 44940 pairs, merged maspsx vs the reconstructed patches-1-6 tree)
+shows the additions byte-identical together: 0 diffs with every knob off, the
+only knob-on diffs being the 40 leaves whose `MASPSX_SYMBOL_LOAD_DEST_TEMP`
+output changes by design (the `dest == index` fallback to `$at`) and patch
+7's mandatory nop under `-G8` (285 sites). Proof on the live plan (1650 c
+spans, plan `d93bd0c660ba`, `disc1.yaml` sha256 `aef392ff…a0e1`):
 `python3 tools/analysis/profile_necessity.py --refresh` ->
-`1385/1385 era leaves clean; 0 hard defect(s); 0 redundant`,
+`1486/1486 era leaves clean; 0 hard defect(s); 0 redundant`,
 `PROFILE_NECESSITY=PASS`; `python3 tools/build/disc1_preflight.py --deep` ->
-`disc1_preflight: PASS (deep, 1549 c / 350 asm / 2 rodata)`, exit 0.
-Maspsx suite: 238 tests OK.
+`disc1_preflight: PASS (deep, 1650 c / 345 asm / 2 rodata)`, exit 0.
+Maspsx suite: 241 tests OK.
 
 ## Leaf findings (sibling-owned; NOT edited in this repo)
 
@@ -232,6 +235,40 @@ delay slot that 2.7.2 leaves to a nop"; 2.8.1's scheduler fills those. A leaf
 that uses it must carry an explicit `assignments` entry on a profile whose
 `environment` sets `ERA_CC1_VER`, and `profile_necessity.py` proves the
 assignment is load-bearing.
+
+## Band-compiler search: negative result (2026-09-24)
+
+Question: is the 0x80071A84-0x8008D610 band compiled by a cc1 that is neither
+our 2.7.2 nor our 2.8.1 build? Parked band drafts show "mixed traits"
+(2.8.1-style reorg slot steals, 2.7.2-style epilogue scheduling).
+Every cc1 decompals/old-gcc publishes (latest release 0.17; no SN/Psy-Q
+builds exist there) was installed side by side under
+`tools/era/gcc-<ver>-psx/` (`ERA_CC1_VER=<ver>`; NOT fetched by
+`scripts/setup_era.sh`, no build code changed) and each best draft was
+link-checked at `-O2 -G0` (+ `-mno-split-addresses` where accepted, best of
+the two, marked `m`), with each leaf's own maspsx knobs, ASPSX 2.30.
+
+| leaf (draft) | 2.6.3 | 2.7.2 | 2.7.2-cdk | 2.7.2.3 | 2.8.0 | 2.8.0 plain | 2.8.1 | 2.91.66 | 2.95.2 |
+|---|---|---|---|---|---|---|---|---|---|
+| func_8007D1D4 (Q6, 2.7.2-tuned) | 15 | 15 | 116 | 15 | 62m | 62 | 62m | 151m | 136m |
+| func_8007D1D4 (M5) | 22 | 22 | 115 | 22 | 62m | 62 | 62m | 151m | 136m |
+| func_8007E964 (G1, 2.8.1-tuned) | 31 | 31 | 128 | 31 | 9m | 9 | 9m | 129 | 125 |
+| func_8007E964 (E2, structural) | 66 | 66 | 128 | 66 | 86m | 86 | 86m | 129 | 124 |
+| func_8007D778 (U1) | 142 | 142 | 139 | 142 | 43m | 43 | 43m | 130m | 83m |
+| func_8007D074 (lane-5 draft) | 41 | 41 | 39 | 41 | 16m | 16 | 16m | 16m | 50m |
+| func_800844E4 (lane-5 draft) | 53 | 53 | 64 | 53 | 35m | 35 | 35m | 79m | 78m |
+
+Findings: 2.6.3 / 2.7.2 / 2.7.2.3 are code-identical on these leaves, and so
+are 2.8.0 / 2.8.0-plain / 2.8.1; the 2.7.2 CDK build, 2.91.66 and 2.95.2 are
+worse everywhere (2.91.66 ties only on func_8007D074). No version wins across
+the board: func_8007D1D4 is best on the 2.7 family, the other four on the
+2.8 family. So there is no better single band compiler among the published
+builds; keep `ERA_CC1_VER` per leaf (2.7.2 or 2.8.1) and try both on every
+band leaf. Also verified the same day: ASPSX 2.30 and 2.56 produce
+byte-identical maspsx output in our pipeline (the only switch between them,
+`expand_li`, is already forced off by `--dont-expand-li`), so khasinski's 2.56
+default is not a separate dialect for us. Drafts and the matrix script:
+`build/fanout/tooling2/` (drafts/, w/vmatrix.py; git-ignored).
 
 ## Reproduce from scratch
 

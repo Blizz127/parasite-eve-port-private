@@ -1,0 +1,22 @@
+typedef struct {
+    unsigned char pad0[0x28];
+    int x;
+    int pad2C;
+    int z;
+    unsigned char pad34[0x6];
+    short angle;
+} State;
+
+extern State *D_8009D2F0;
+
+extern int func_80077CF4(int a0);
+extern int func_80077DC4(int a0);
+extern int func_8003708C(int a0, int a1);
+
+int func_80019810(int **a0) {
+    int n = -*a0[0];
+
+    *a0[1] = D_8009D2F0->x + func_8003708C(n, func_80077CF4(D_8009D2F0->angle) << 4);
+    *a0[2] = D_8009D2F0->z + func_8003708C(n, func_80077DC4(D_8009D2F0->angle) << 4);
+    return 1;
+}

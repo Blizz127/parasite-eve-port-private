@@ -33,11 +33,4 @@
 
 #define GA_D_8009D28C 0x8009D28Cu
 
-int func_80019154(pe_addr_t args)
-{
-    pe_addr_t dest;
-
-    dest = PE_LoadU32(args);
-    PE_StoreU32(dest, PE_LoadU32(GA_D_8009D28C));
-    return 1;
-}
+/* func_80019154: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80019154_port.c (src/func_80019154.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

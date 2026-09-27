@@ -121,13 +121,9 @@ void func_800299CC_after_consume_cut(void)
         return;
 }
 
-/* Original menu focus leaves, 62CB8..62CD0. Reward windows now live in
- * battle_reward_port.c and use the original window allocator. */
-void func_80062CB8(pe_addr_t obj)
-{ PE_StoreU32(0x8009D15Cu, obj); }
+/* func_80062CB8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80062CB8_port.c (src/func_80062CB8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-pe_addr_t func_80062CC4(void)
-{ return PE_LoadU32(0x8009D15Cu); }
+/* func_80062CC4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80062CC4_port.c (src/func_80062CC4.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 void func_800512AC_cmd10_cut(void)
 {

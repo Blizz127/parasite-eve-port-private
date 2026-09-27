@@ -1,0 +1,71 @@
+/* VRAM 0x80046574 / file 0x36D74 / size 0x14C. */
+extern int D_8009CF18;
+extern int D_8009CFB0;
+
+extern unsigned char *func_80062A34(int, int);
+extern int func_80063428(unsigned char *);
+extern void func_80059534(int);
+extern int func_8005968C(int);
+extern void func_8004CC50(int, int);
+extern void func_80062CB8(unsigned char *);
+extern void func_80062F3C(int);
+extern void func_800542A0(int);
+extern unsigned char *func_80062CC4(void);
+extern void func_8005E114(int);
+
+/* VRAM 0x80046574 / file 0x36D74 / size 0x14C. */
+extern int D_8009CF18;
+extern int D_8009CFB0;
+
+extern unsigned char *func_80062A34(int, int);
+extern int func_80063428(unsigned char *);
+extern void func_80059534(int);
+extern int func_8005968C(int);
+extern void func_8004CC50(int, int);
+extern void func_80062CB8(unsigned char *);
+extern void func_80062F3C(int);
+extern void func_800542A0(int);
+extern unsigned char *func_80062CC4(void);
+extern void func_8005E114(int);
+
+void func_80046574(int a0, int a1) {
+    unsigned char *p;
+    unsigned char *q;
+
+    if (a1 == 0) {
+        return;
+    }
+    p = func_80062A34(2, 7);
+    if (D_8009CF18 != 0) {
+        func_80059534(func_80063428(p));
+        *(int *)(p + 0x44) = -1;
+        q = func_80062A34(2, 5);
+        if (*(int *)(q + 0x44) < 0) {
+            goto alt;
+        }
+    } else {
+        if (func_8005968C(func_80063428(p)) == 0) {
+            func_8004CC50(0x1D, 0);
+            goto tail;
+        }
+        *(int *)(p + 0x44) = -1;
+        q = func_80062A34(2, 5);
+        if (*(int *)(q + 0x44) < 0) {
+alt:
+            q = func_80062A34(2, 6);
+        }
+    }
+    func_80062CB8(q);
+    func_80062F3C(0x35);
+tail:
+    func_800542A0(D_8009CF18 != 0 ? 0x1FE : 0x200);
+    p = func_80062A34(2, 6);
+    if (p == func_80062CC4()) {
+        *(int *)(p + 0x48) = 0;
+        *(int *)(p + 0x44) = 0;
+    }
+    if (D_8009CF18 != 0) {
+        func_8005E114(1);
+        D_8009CFB0 = 1;
+    }
+}

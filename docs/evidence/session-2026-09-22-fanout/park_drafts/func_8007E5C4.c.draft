@@ -1,0 +1,46 @@
+typedef struct {
+    int w0;
+    unsigned char b[8];
+    int wC;
+    int w10;
+    int w14;
+} Rec7E5C4;
+
+extern Rec7E5C4 D_800A3540[8];
+extern int D_800A3600;
+extern int D_800A3604;
+
+void func_8007E5C4(void)
+{
+    int *s = &D_800A3600;
+    int *cnt = s + 2;
+    Rec7E5C4 *tbl = (Rec7E5C4 *)((unsigned char *)s - 0xC0);
+    int first = D_800A3540[*s].w0;
+
+    while (*cnt > 0) {
+        Rec7E5C4 *r = &tbl[D_800A3600];
+        unsigned char *q;
+        int i;
+
+        r->w0 = 0;
+        r->b[0] = 0;
+        i = 3;
+        q = (unsigned char *)r + 3;
+        do {
+            q[5] = 0;
+            i--;
+            q--;
+        } while (i >= 0);
+        r->wC = 0;
+        r->w10 = 0;
+        r->w14 = 0;
+        if (++*s >= 8) {
+            *s = 0;
+        }
+        s[2]--;
+        if (D_800A3540[*s].w0 != first) {
+            break;
+        }
+    }
+    D_800A3604 = D_800A3600;
+}

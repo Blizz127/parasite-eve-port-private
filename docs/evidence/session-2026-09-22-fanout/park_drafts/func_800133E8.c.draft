@@ -1,0 +1,63 @@
+typedef struct {
+    unsigned char pad0[0x8];
+    unsigned short flags;
+    unsigned char padA[0x6];
+    int f10;
+} Task;
+
+typedef struct {
+    unsigned char pad0[0xF];
+    unsigned char fF;
+    unsigned char pad10[0x2];
+    unsigned short f12;
+    int f14;
+    unsigned char pad18[0x4];
+    int f1C;
+} State;
+
+extern State *D_8009D2F0;
+extern Task *D_8009D300;
+extern int D_8009CE00;
+
+int func_800133E8(void) {
+    State *s = D_8009D2F0;
+    int cur = s->f14;
+    int t = s->f12;
+    int nxt;
+    int n;
+    int v;
+    int m;
+
+    D_8009D300->f10 = 1;
+    if ((cur >> 16) == t) {
+        return 0;
+    }
+    t <<= 16;
+    nxt = cur + s->f1C;
+    if (cur < t && t < nxt) {
+        return 0;
+    }
+    if (t < cur && nxt < t) {
+        return 0;
+    }
+    n = D_8009D2F0->fF;
+    v = nxt >> 16;
+    m = n + 1;
+    if (n < v) {
+        v %= m;
+        nxt = v << 16;
+        if (t < nxt) {
+            return 0;
+        }
+    } else if (nxt < 0) {
+        v %= m;
+        m += v;
+        nxt = m << 16;
+        n <<= 16;
+        if (!(n < t) && nxt < t) {
+            return 0;
+        }
+    }
+    D_8009CE00 -= 8;
+    return 0;
+}

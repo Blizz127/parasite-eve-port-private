@@ -5,8 +5,7 @@
 #include "pe_port_compat.h"
 
 void func_80051244(void) {PE_StoreU32(0x8009D014u,0x800A1AA0u);}
-void func_8005D970(void)
-{PE_StoreU32(0x8009D0D4u,(int32_t)PE_LoadU32(0x8009CDACu)<300?4u:0xFFFFFFFCu);}
+/* func_8005D970: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8005D970_port.c (src/func_8005D970.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 /* Native callers pass an original stack-local command value directly. */
 void PE_MenuCommitResult(uint32_t result)

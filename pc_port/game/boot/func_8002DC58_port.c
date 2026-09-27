@@ -107,11 +107,7 @@ void func_800295E4(void)
     func_80051510();
 }
 
-void func_8002F9CC(void)
-{
-    unsigned i;
-    for (i=0;i<7;i++) PE_StoreU32(0x800A5D58u+i*220u,0u);
-}
+/* func_8002F9CC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8002F9CC_port.c (src/func_8002F9CC.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 static void exit_pulse(pe_addr_t record)
 {

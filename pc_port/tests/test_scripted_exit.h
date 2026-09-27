@@ -23,7 +23,7 @@ static void test_ATK20_retail_scripted_exit(void)
         case 4:func_800703F4();break;
         case 5:result=(uint32_t)func_800702DC();break;
         case 6:result=(uint32_t)func_800701B4();break;
-        case 7:result=(uint32_t)func_800192C8(0u);break;
+        case 7:result=(uint32_t)func_800192C8();break;
         }
         /* Normalize the established native-owned inventory globals. */
         PE_StoreU32(0x8009D048u,D_8009D048);PE_StoreU32(0x8009D050u,D_8009D050);

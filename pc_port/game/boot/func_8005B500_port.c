@@ -45,13 +45,7 @@ int32_t func_8005B124(pe_addr_t first,pe_addr_t second)
     xi=PE_LoadU8(sort_ram(x+4u));yi=PE_LoadU8(sort_ram(y+4u));return xi>yi?1:-(int32_t)(xi<yi);
 }
 
-void func_800724F4(pe_addr_t a,pe_addr_t b,uint32_t size)
-{
-    uint32_t i;for (i=0;i<size;i++) {
-        uint8_t x=PE_LoadU8(sort_ram(a+i)),y=PE_LoadU8(sort_ram(b+i));
-        PE_StoreU8(sort_ram(a+i),y);PE_StoreU8(sort_ram(b+i),x);
-    }
-}
+/* func_800724F4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800724F4_port.c (src/func_800724F4.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 static int32_t sort_compare(pe_addr_t callback,pe_addr_t a,pe_addr_t b)
 {

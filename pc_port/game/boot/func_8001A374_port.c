@@ -39,77 +39,16 @@
 #define GA_D_800BCFF6 0x800BCFF6u
 #define GA_D_800BCFF8 0x800BCFF8u
 
-int func_8001A374(pe_addr_t args)
-{
-    PE_StoreU8(0x800BCFFCu, (uint8_t)PE_LoadU32(PE_LoadU32(args)));
-    return 1;
-}
+/* func_8001A374: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8001A374_port.c (src/func_8001A374.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-/* SEW22: E2, original1A390..1A3FC (27 words). Test a fixed-point
- * position against an embedded script polygon; arg3 is a halfword offset
- * from the current actor's script base, arg2 is the vertex count. */
-int func_8001A390(pe_addr_t args)
-{
-    pe_addr_t actor=PE_LoadU32(0x8009D2F0u);
-    pe_addr_t polygon=PE_LoadU32(actor+0x9Cu)+
-                     (PE_LoadU32(PE_LoadU32(args+12u))<<1u);
-    int result=func_8001CAB0((int32_t)PE_LoadU32(PE_LoadU32(args)),
-                            (int32_t)PE_LoadU32(PE_LoadU32(args+4u)),
-                            polygon,PE_LoadU16(PE_LoadU32(args+8u)));
-    PE_StoreU32(PE_LoadU32(args+16u),(uint32_t)result);
-    return 1;
-}
+/* func_8001A390: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8001A390_port.c (src/func_8001A390.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-int func_80018E84(pe_addr_t args)
-{
-    PE_StoreU16(0x800BD020u, (uint16_t)PE_LoadU32(PE_LoadU32(args)));
-    PE_StoreU16(0x800BD022u, (uint16_t)PE_LoadU32(PE_LoadU32(args + 4u)));
-    return 1;
-}
+/* func_80018E84: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80018E84_port.c (src/func_80018E84.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-int func_80018F54(pe_addr_t args)
-{
-    (void)args;
-    PE_StoreU8(0x800BCFEEu, (uint8_t)(PE_LoadU8(0x800BCFEEu) & 0xBFu));
-    return 1;
-}
+/* func_80018F54: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80018F54_port.c (src/func_80018F54.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-int func_80066C7C(unsigned int a0)
-{
-    uint16_t s0;
-    uint16_t s1;
-    uint16_t s2;
+/* func_80066C7C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80066C7C_port.c (src/func_80066C7C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-    s0 = PE_LoadU16(GA_D_800BCFE8);
-    s1 = PE_LoadU16(GA_D_800BCFEA);
-    s2 = PE_LoadU16(GA_D_800BCFEC);
-    PE_StoreU8(GA_D_800BCFEE, 6u);
-    PE_StoreU16(GA_D_800BCFE8, 0u);
-    PE_StoreU16(GA_D_800BCFEA, 0u);
-    PE_StoreU16(GA_D_800BCFEC, 0u);
-    PE_StoreU16(GA_D_800BCFF6, (uint16_t)a0);
-    PE_StoreU16(GA_D_800BCFF8, 0u);
-    PE_StoreU16(GA_D_800BCFF0, s0);
-    PE_StoreU16(GA_D_800BCFF2, s1);
-    PE_StoreU16(GA_D_800BCFF4, s2);
-    return 0;
-}
+/* func_80018EE0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80018EE0_port.c (src/func_80018EE0.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-int func_80018EE0(pe_addr_t args)
-{
-    func_80066C7C(PE_LoadU16(PE_LoadU32(args)));
-    return 1;
-}
-
-/*
- * PE-BTL33 — opcode 0xAA overlay bit 19618.
- * 8 words 0x80019618..0x80019638, SHA-256 5eb9bc4a…c537.
- * D_800910A0[0xAA]. Zero jal. D_800B0CD8 |= 0x2000; v0=1.
- * Live type-0 after 0xFF 0x04 / 0x01.
- */
-int func_80019618(pe_addr_t args)
-{
-    (void)args;
-    PE_StoreU32(0x800B0CD8u, PE_LoadU32(0x800B0CD8u) | 0x2000u);
-    return 1;
-}
+/* func_80019618: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80019618_port.c (src/func_80019618.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

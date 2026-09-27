@@ -15,16 +15,4 @@
  */
 #include "psx_compat.h"
 
-void func_8004F808(void)
-{
-    PE_StoreU32(0x8009CF1Cu, 0u);
-    PE_StoreU32(0x8009CF30u, 0u);
-    PE_StoreU32(0x8009CF3Cu, 0u);
-    PE_StoreU32(0x8009CEFCu, 0u);
-    PE_StoreU32(0x8009CF00u, 0u);
-    PE_StoreU32(0x8009CF0Cu, 0u);
-    PE_StoreU32(0x8009CF34u, 0u);
-    PE_StoreU32(0x8009CF38u, 0u);
-    PE_StoreU32(0x8009CFB0u, 0u);
-    PE_StoreU32(0x8009CFF8u, 0u);
-}
+/* func_8004F808: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8004F808_port.c (src/func_8004F808.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

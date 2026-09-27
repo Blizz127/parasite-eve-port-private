@@ -31,13 +31,4 @@
 
 #define GA_D_8009D300 0x8009D300u
 
-int func_800177AC(pe_addr_t args)
-{
-    pe_addr_t task;
-    pe_addr_t dest;
-
-    task = PE_LoadU32(GA_D_8009D300);
-    dest = PE_LoadU32(args);
-    PE_StoreU32(dest, PE_LoadU32(task + 0x14u));
-    return 1;
-}
+/* func_800177AC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800177AC_port.c (src/func_800177AC.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

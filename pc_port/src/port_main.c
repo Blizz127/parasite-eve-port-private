@@ -5,6 +5,7 @@
  * Direct-clear shortcut requires explicit --direct-clear-test flag.
  */
 
+#include "pe_guestcode.h"
 #include "psx_compat.h"
 #include "host_framebuffer.h"
 #include "host_vram.h"
@@ -591,6 +592,7 @@ int main(int argc, char **argv) {
 
     /* Phase 6D-S: initialize host-safe subsystems */
     PE_RamInit();
+    PE_GuestCode_InstallGenerated();   /* guest-code dispatch registry */
     PE_Callback_Init();
     Bootstrap_Init();
     HostFB_Init();

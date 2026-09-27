@@ -31,16 +31,20 @@
  *     include 8CA84, whose command and channel RAM effects are native.
  *   - func_80085C44 (SPU control-register wait with "SPU:T/O" diagnostic),
  *     func_80085DC4 (SPU transfer-mode sequence in func_80085D84).
- *   - func_80085814/func_800858E8 retry loops (DMA acquire/release): their
- *     state tables D_8009B7CC/D_8009B7D0/D_8009B7D4 have no writer outside
- *     collapsed libsnd internals; modeled as host-synchronous (first poll
- *     succeeds).  The OpenEvent/EnableEvent retry loops use the real host
+ *   - func_80085814/func_800858E8 (libapi SetRCnt/StartRCnt for root
+ *     counter 2): the SetRCnt register program goes to the pe_rcnt2.h
+ *     model; the StartRCnt I_MASK bit is not reproduced (counter IRQ not
+ *     modeled).  The OpenEvent/EnableEvent retry loops use the real host
  *     event shims and also terminate on the first iteration.
  */
 #include "psx_compat.h"
 #include "game_port.h"
 #include "pe_sdk.h"
 #include "pe_spu_dma.h"
+#include "pe_rcnt2.h"
+
+int func_80085814(unsigned short a0, short a1, int a2);   /* generated TU */
+int func_800858E8(unsigned int a0);                      /* generated TU */
 #include "stub_registry.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -406,24 +410,11 @@ int func_8008CBA8(void)
 
 /* ── Command issuers ──────────────────────────────────────────────────── */
 
-void func_80086FF8(void)
-{
-    PE_StoreU32(0x800BCD80u, 0xF0u);
-    func_8008CBA8();
-}
+/* func_80086FF8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80086FF8_port.c (src/func_80086FF8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-void func_80087024(void)
-{
-    PE_StoreU32(0x800BCD80u, 0xF1u);
-    func_8008CBA8();
-}
+/* func_80087024: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80087024_port.c (src/func_80087024.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-void func_8008682C(int a)
-{
-    uint32_t v = (a == 1) ? 0x9Au : (a == 2) ? 0x9Cu : 0x98u;
-    PE_StoreU32(0x800BCD80u, v);
-    func_8008CBA8();
-}
+/* func_8008682C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8008682C_port.c (src/func_8008682C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 /* ── func_80085644 — streaming bring-up ───────────────────────────────── */
 
@@ -467,8 +458,19 @@ void func_80085644(void)
         /* func_80085DC4 — SPU transfer-mode sequence: collapsed */
     }
 
-    /* func_80085814/func_800858E8 DMA acquire/release retry loops:
-     * host-synchronous, succeed on first poll (see header) */
+    /* func_80085814(0xF2000002, 0x44E8, 0x1000) is libapi SetRCnt for root
+     * counter 2 (src/func_80085814.c: D_8009B7D0 = 0x1F801100, record i = 2):
+     * mode = 0, target = 0x44E8, mode = 0x248 | 0x10 (!(0x1000 & 1) and
+     * 0x1000 & 0x1000).  The retry loop ends on the first call (i = 2 < 3
+     * returns 1).  func_800858E8 (StartRCnt) ORs D_8009B7D4[2] into I_MASK;
+     * the counter's IRQ itself is not modeled (pe_rcnt2.h). */
+    /* The generated SetRCnt / StartRCnt run as retail: their stores go
+     * through D_8009B7D0 (0x1F801100) / D_8009B7CC (0x1F801070) into the
+     * modelled registers (pe_mmio.h: RCNT2 mode/target, I_MASK). */
+    while (func_80085814(0xF2000002u & 0xFFFFu, 0x44E8, 0x1000) == 0) {
+    }
+    while (func_800858E8(0xF2000002u) == 0) {
+    }
 
     /* OpenEvent retry loop: real host event handle, != -1 immediately */
     PE_StoreU32(0x8009CDE0u,

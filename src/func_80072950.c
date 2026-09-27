@@ -1,4 +1,6 @@
-/* NON-MATCHING. 27 word mismatches at -O2 -G0 (vram 0x80072950, size 0x100),
+/* MATCHING as of 2026-09-24 on profile era_o2_g0_fill_call_delay_slot_fill_epilogue_delay_slot (LEAF_STRONG=EXACT; the
+ * macro-split delay-slot residual below was closed by the maspsx call-slot fill patch).
+ * Historical note — formerly NON-MATCHING. 27 word mismatches at -O2 -G0 (vram 0x80072950, size 0x100),
  * all downstream of ONE word: residual class (a), macro-split into a delay
  * slot. Retail emits `lui $a1,%hi(D_800A32D8)` / `jal func_80072A54` /
  * `addiu $a1,$a1,%lo(D_800A32D8)` (delay); maspsx emits both halves of the

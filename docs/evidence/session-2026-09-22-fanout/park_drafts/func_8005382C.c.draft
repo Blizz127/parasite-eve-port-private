@@ -1,0 +1,40 @@
+extern unsigned char D_800C0E48[];
+extern unsigned char D_8009D05C[];
+extern short *D_8009D048;
+extern int D_8009D050;
+extern unsigned char *D_8009D058;
+extern int D_8009D064;
+extern int func_80052F70(void);
+
+int func_8005382C(int n)
+{
+    short *p;
+    short *end;
+    int k;
+
+    D_8009D048 = (short *)D_800C0E48;
+    D_8009D050 = func_80052F70();
+    D_8009D058 = D_8009D05C;
+    D_8009D064 = 2;
+    p = D_8009D048;
+    end = D_8009D048 + D_8009D050 - n + 1;
+    while (p < end) {
+        while (*p != 0) {
+            p++;
+            if (p >= end) {
+                break;
+            }
+        }
+        if (p < end) {
+            k = 1;
+            while (k < n && p[k] == 0) {
+                k++;
+            }
+            if (k >= n) {
+                return p - D_8009D048;
+            }
+        }
+        p++;
+    }
+    return -1;
+}

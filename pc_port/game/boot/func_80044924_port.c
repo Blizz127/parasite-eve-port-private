@@ -5,22 +5,11 @@
 
 static pe_addr_t item_ram(pe_addr_t p) {return p<0x200000u?p|0x80000000u:p;}
 
-int func_800210D4(void)
-{
-    if (PE_LoadU8(0x8009CE3Cu)) return 0;
-    return !(D_8009D1A0&2u) || !(PE_LoadU32(item_ram(PE_LoadU32(0x8009D278u)+76u))&0x10000u);
-}
-int8_t func_80052558(void) {return (int8_t)func_800210D4();}
+/* func_800210D4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800210D4_port.c (src/func_800210D4.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_80055724: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80055724_port.c (src/func_80055724.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_80052558: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80052558_port.c (src/func_80052558.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-void func_80055724(void)
-{
-    int32_t i;for (i=0;i<(int32_t)D_8009D064;i++) PE_StoreU32(D_8009D058+(uint32_t)i*4u,0u);
-}
-void func_80055FB4(int32_t index)
-{
-    pe_addr_t p=D_8009D058+(uint32_t)(index>>5)*4u;
-    PE_StoreU32(p,PE_LoadU32(p)|(1u<<((uint32_t)index&31u)));
-}
+/* func_80055FB4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80055FB4_port.c (src/func_80055FB4.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 static uint32_t ammunition_class(uint32_t kind)
 {
@@ -97,11 +86,7 @@ void func_80056C40(uint32_t first_bank,int32_t first,uint32_t second_bank,int32_
     PE_StoreU16(0x800A1FC0u,0u);PE_StoreU16(0x800A1FA0u,0u);
 }
 
-int32_t func_80057D18(int32_t index)
-{
-    pe_addr_t p=D_8009D048+(uint32_t)index*2u;int32_t value=(int16_t)PE_LoadU16(p);
-    PE_StoreU16(p,0u);return value;
-}
+/* func_80057D18: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80057D18_port.c (src/func_80057D18.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 int func_80057654(int32_t index)
 {

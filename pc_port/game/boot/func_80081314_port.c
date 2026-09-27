@@ -17,12 +17,7 @@
 #include "game_port.h"
 #include "pe_sdk.h"
 
-pe_addr_t func_800824C8(pe_addr_t callback)
-{
-    pe_addr_t old = PE_LoadU32(0x800B8AB4u);
-    PE_StoreU32(0x800B8AB4u, callback);
-    return old;
-}
+/* func_800824C8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800824C8_port.c (src/func_800824C8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 pe_addr_t func_800824F0(pe_addr_t callback)
 {

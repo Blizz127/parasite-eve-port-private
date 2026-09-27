@@ -18,8 +18,4 @@
  */
 #include "psx_compat.h"
 
-void func_8005BC98(int a0_ignored)
-{
-    (void)a0_ignored;
-    PE_StoreU32(0x8009D218u, 1u);
-}
+/* func_8005BC98: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8005BC98_port.c (src/func_8005BC98.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

@@ -5,11 +5,7 @@
 
 static pe_addr_t pe_menu_ram(pe_addr_t p) {return p<0x200000u?p|0x80000000u:p;}
 
-int32_t func_8006346C(pe_addr_t node)
-{
-    int32_t index=func_80063428(node);
-    return (PE_LoadU32(pe_menu_ram(node+116u))>>((uint32_t)index&31u))&1u?index:-1;
-}
+/* func_8006346C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8006346C_port.c (src/func_8006346C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 void func_80046ABC(pe_addr_t owner)
 {
@@ -19,18 +15,7 @@ void func_80046ABC(pe_addr_t owner)
     func_80055610();func_800647D0(list,func_80054288());
 }
 
-int func_80046B58(pe_addr_t window,uint32_t event)
-{
-    pe_addr_t list=func_80062A20(window,0u);
-    if (event&0x10000u) {
-        if (func_8006346C(list)>=0) {func_80046C20();func_800525EC();}
-        else func_800526C4();
-        return 1;
-    }
-    if (!(event&64u)) return 0;
-    func_80062F1C(window);func_80062F1C(func_80062A34(1u,29u));
-    func_800439D8();func_80052634();return 1;
-}
+/* func_80046B58: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80046B58_port.c (src/func_80046B58.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 void func_80046C20(void)
 {
@@ -61,15 +46,9 @@ void func_80057B70(int32_t ability)
     } else if (PE_LoadU8(pe_menu_ram(item+14u))==1u) func_80051770(ability);
 }
 
-void func_80046DBC(pe_addr_t window,uint32_t confirmed)
-{
-    (void)window;if (!confirmed) return;
-    if (func_8005B89C()) func_80062F3C(8u);
-    func_80057B70((int32_t)PE_LoadU32(0x8009CFB4u));
-}
+/* func_80046DBC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80046DBC_port.c (src/func_80046DBC.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-int func_8004FC3C(int32_t index)
-{return index<func_80054288()?func_8004324C(func_800556E8(index)):0;}
+/* func_8004FC3C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8004FC3C_port.c (src/func_8004FC3C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 void func_80050B48(uint32_t index)
 {if ((int32_t)index<func_80054288()) func_8005F27C(func_8005DC9C((uint32_t)func_800556E8((int32_t)index)+235u));}

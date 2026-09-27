@@ -6,6 +6,8 @@
  * Output: PPM (Portable Pixmap) file on request.
  */
 
+#include "pe_rcnt2.h"
+#include "pe_mmio.h"
 #include "host_framebuffer.h"
 #include "game_port.h"
 #include "host_vram.h"
@@ -138,6 +140,8 @@ static void HostFB_DeviceTime(uint32_t cycles)
     /* NTSC host approximation:33868800 CPU cycles/60 frames. Device
      * responses are serviced before the next generated VBlank edge. */
     PE_CdReg_ServiceDevice(cycles);HostFB_ServiceDeviceIrq();
+    PE_MMIO_Commit();           /* host-pointer MMIO writes (pe_mmio.h) */
+    PE_Rcnt2_Advance(cycles);   /* root counter 2 (pe_rcnt2.h) */
     if(PE_Port_ShouldStop()) return;
     fb_device_cycles+=cycles;
     while(fb_device_cycles>=564480u) {

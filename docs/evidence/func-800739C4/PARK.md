@@ -1,3 +1,5 @@
+> **RESOLVED (2026-09-22, lane 4):** matched — see [REPORT.md](REPORT.md). The text below is the historical park record.
+
 # func_800739C4 — 0x64 bytes — PARKED
 
 Retail VRAM `0x800739C4` (file offset `0x641C4`, size `0x64`), in

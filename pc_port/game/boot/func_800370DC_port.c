@@ -42,13 +42,4 @@
 #include "psx_compat.h"
 #include "pe_port_compat.h"
 
-void func_800370DC(pe_addr_t p, uint32_t mode)
-{
-    func_80077C84(p, 0, 1, mode);
-
-    pe_addr_t s = p + 8;
-    func_80077C04(s);
-
-    if (func_80077CB4(p, s) != 0)
-        func_800719E4((uint32_t)-1);
-}
+/* func_800370DC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800370DC_port.c (src/func_800370DC.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

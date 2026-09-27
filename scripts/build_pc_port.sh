@@ -12,6 +12,7 @@
 #
 # Stages (each one fails loudly):
 #   1. generate  — tools/analysis/gen_decomp_ports.py writes pc_port/game/decomp
+#                  and gen_overlay_ports.py writes pc_port/game/decomp_ovl
 #   2. verify    — the same tool re-checks that every emitted TU matches src/
 #   3. configure — cmake -S pc_port -B <build dir>
 #   4. build     — cmake --build <build dir>
@@ -139,14 +140,17 @@ echo "   jobs      : $JOBS"
 # between the two passes); that is transient, so retry a bounded number of
 # times and only then call it a generator bug.
 GEN="$ROOT/tools/analysis/gen_decomp_ports.py"
+GEN_OVL="$ROOT/tools/analysis/gen_overlay_ports.py"
 settled=0
 for attempt in 1 2 3; do
     echo
     echo "-- [1/5] generating decomp-derived port TUs (attempt $attempt)"
     python3 "$GEN"
+    # Overlay leaves -> pc_port/game/decomp_ovl/<ovl>/ (namespaced symbols).
+    python3 "$GEN_OVL"
     echo
     echo "-- [2/5] verifying generated TUs against src/"
-    if python3 "$GEN" --verify; then
+    if python3 "$GEN" --verify && python3 "$GEN_OVL" --verify; then
         settled=1
         break
     fi

@@ -24,32 +24,9 @@ void func_8005F874(int32_t value)
     PE_MenuPacketLink(packet);
 }
 
-void func_8005FB74(int32_t value)
-{
-    int digits=3,divisor=100,i;
-    if (value<0) {
-        value=(int32_t)(0u-(uint32_t)value);func_8005EB64(82u);func_8005E8A4(5,0);digits=2;divisor=10;
-    }
-    for (i=0;i<digits;i++) {
-        int32_t digit=value/divisor;
-        func_8005F874(i<digits-1 && !digit?-1:digit);func_8005E8A4(5,0);divisor/=10;
-    }
-}
+/* func_8005FB74: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8005FB74_port.c (src/func_8005FB74.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-void func_8006006C(int32_t seconds,uint32_t small)
-{
-    if (seconds>360000) seconds=359999;
-    PE_StoreU32(0x8009D13Cu,small?0x3A1Cu:0x395Du);PE_StoreU32(0x8009D140u,small?204u:132u);
-    PE_StoreU32(0x8009D144u,164u);
-    func_8005F874(seconds/36000);func_8005E8A4(5,0);
-    func_8005F874(seconds/3600);func_8005E8A4(5,0);
-    func_8005EB64(small?155u:79u);func_8005E8A4(small?3:5,0);
-    func_8005F874((seconds/600)%6);func_8005E8A4(5,0);
-    func_8005F874(seconds/60);func_8005E8A4(5,0);
-    func_8005EB64(small?155u:79u);func_8005E8A4(small?3:5,0);
-    func_8005F874((seconds/10)%6);func_8005E8A4(5,0);func_8005F874(seconds);
-    PE_StoreU32(0x8009D13Cu,0x395Du);PE_StoreU32(0x8009D140u,132u);PE_StoreU32(0x8009D144u,164u);
-}
+/* func_8006006C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8006006C_port.c (src/func_8006006C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 uint32_t func_80052894(uint32_t index)
 { return PE_LoadU32(0x800A76A4u+index*12u)/60u; }

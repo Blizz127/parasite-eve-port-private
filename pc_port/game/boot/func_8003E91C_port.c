@@ -20,6 +20,7 @@ void func_80036F7C(void)
         }
     }
 }
+
 void func_8003E91C(void)
 {
     uint32_t epoch=PE_Port_StopEpoch();

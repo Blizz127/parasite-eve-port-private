@@ -28,9 +28,4 @@
 #include "psx_compat.h"
 #include "pe_port_compat.h"
 
-uint32_t func_80077AA4(int32_t x, uint32_t y)
-{
-    uint32_t v0 = y << 6;
-    v0 |= ((uint32_t)(x >> 4)) & 0x3Fu;
-    return v0 & 0xFFFFu;
-}
+/* func_80077AA4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80077AA4_port.c (src/func_80077AA4.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

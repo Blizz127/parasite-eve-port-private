@@ -1,0 +1,11 @@
+/* best: 11 words (-O2 -G0). Residual: cc1 if-converts the last `a.lo < b.lo ? -1 : 0` into
+ * sltu/subu; retail keeps a bnez to the shared exit (sltu into $v1). Tried ~20 spellings,
+ * long long / double / union params, flag sweep, 2.8.1. */
+typedef struct { unsigned int lo; unsigned int hi; } U64;
+int func_80073244(U64 a, U64 b) {
+    if (a.hi > b.hi) return 1;
+    if (a.hi < b.hi) return -1;
+    if (a.lo > b.lo) return 1;
+    if (a.lo < b.lo) return -1;
+    return 0;
+}

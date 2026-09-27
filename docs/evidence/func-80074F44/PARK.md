@@ -1,3 +1,5 @@
+> **RESOLVED (2026-09-22, lane 4):** matched — see [REPORT.md](REPORT.md). The text below is the historical park record.
+
 # func_80074F44 — PARKED (prologue-interleave scheduling residual)
 
 **Status:** not C-matchable with the current toolchain. Not registered in

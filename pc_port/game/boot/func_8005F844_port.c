@@ -29,9 +29,4 @@
 #define GA_F844_B   (0x8009CD70u + 0x3D0u)   /* D_8009D140 */
 #define GA_F844_C   (0x8009CD70u + 0x3D4u)   /* D_8009D144 */
 
-void func_8005F844(int a0)
-{
-    PE_StoreU32(GA_F844_A, a0 ? 0x3A1Cu : 0x395Du);
-    PE_StoreU32(GA_F844_B, a0 ? 0xCCu   : 0x84u);
-    PE_StoreU32(GA_F844_C, 0xA4u);
-}
+/* func_8005F844: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8005F844_port.c (src/func_8005F844.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

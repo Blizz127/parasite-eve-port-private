@@ -70,14 +70,15 @@ static int func_80051E58(void) {
  * changed since the first call) and adds the byte to the new return.
  * Returns the capped value (0..50). */
 unsigned int func_80052F70(void) {
-    unsigned int b = PE_LoadU8(GA_800C0E0C);
-    unsigned int v = func_80051E58();
-    unsigned int sum = b + v;
-    if (sum < 51u) {
-        unsigned int v2 = func_80051E58();
-        return b + v2;
-    }
-    return 50u;
+    /* Retail 0x80052F78..0x80052FB0 (src/func_80052F70.c): call first, then
+     * `lbu`; the cap test is the SIGNED `slti v1,v1,51`, and the byte is
+     * reloaded after the second call.  (Was unsigned with the byte read
+     * once up front: a negative D_8009D018 returned 50; portverify.) */
+    int v = func_80051E58();
+    if ((int)PE_LoadU8(GA_800C0E0C) + v >= 0x33)
+        return 50u;
+    v = func_80051E58();
+    return (unsigned int)((int)PE_LoadU8(GA_800C0E0C) + v);
 }
 
 /* Retail 52F24..52F70: publish base inventory capacity and refresh the active

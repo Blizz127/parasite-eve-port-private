@@ -27,7 +27,4 @@
 #include "psx_compat.h"
 #include "pe_sdk.h"
 
-int func_8006E6A8(int lba, pe_addr_t dest, int sectors)
-{
-    return func_8006E6D4(lba, 0, dest, sectors);
-}
+/* func_8006E6A8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8006E6A8_port.c (src/func_8006E6A8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

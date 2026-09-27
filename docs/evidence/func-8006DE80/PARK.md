@@ -1,3 +1,5 @@
+> **RESOLVED (2026-09-22, lane 4):** matched — see [REPORT.md](REPORT.md). The text below is the historical park record.
+
 # `func_8006DE80` — PARKED (argument-forwarding shim; alloca/schedule residual)
 
 Outcome: **PARKED**. No C committed to `src/` (an unmatched draft would violate

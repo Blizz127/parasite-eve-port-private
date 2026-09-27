@@ -1,0 +1,23 @@
+extern int D_8009B44C;
+extern volatile unsigned short *D_8009B3FC;
+extern void (*volatile D_8009B434)();
+extern void func_8007DCAC(void);
+extern void func_80073A34(int, int);
+
+void func_8007D614(void)
+{
+    volatile unsigned short *p;
+    unsigned int i;
+
+    if (D_8009B44C == 0) {
+        func_8007DCAC();
+    }
+    p = D_8009B3FC;
+    p[0xD5] &= 0xFFCF;
+    for (i = 0; p[0xD5] & 0x30; ) { if (++i >= 0xF01) break; }
+    if (D_8009B434 != 0) {
+        D_8009B434();
+    } else {
+        func_80073A34(0xF0000009, 0x20);
+    }
+}

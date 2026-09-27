@@ -27,7 +27,4 @@
 
 #define GA_D_8009CE94 0x8009CE94u
 
-void func_800371A4(int a0)
-{
-    PE_StoreU8(GA_D_8009CE94, (uint8_t)a0);
-}
+/* func_800371A4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800371A4_port.c (src/func_800371A4.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

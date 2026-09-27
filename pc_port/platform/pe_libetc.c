@@ -20,6 +20,10 @@
  * replaces the retail callback queue: ResetCallback's first guard-passing
  * call zeroes the 8 guest slots at D_8009568C and the dispatch counter.
  */
+#include "pe_rcnt2.h"
+#include "pe_sio0.h"
+#include "pe_mmio.h"
+#include "pe_guestcode.h"
 #include "psx_compat.h"
 #include "pe_sdk.h"
 #include "pe_spu_dma.h"
@@ -348,6 +352,10 @@ void PE_Sdk_ResetState(void)
     g_spu_event_delivered = 0;
     PE_IRQ_Reset();
     PE_Timer1_Reset();
+    PE_Rcnt2_Reset();
+    PE_Sio0_Reset();
+    PE_MMIO_Reset();
+    PE_Overlay_ResetResidency();   /* guest RAM no longer holds a known overlay */
     PE_IRQ_DeliveryTraceReset();
     ResetSource0BiosState();
 

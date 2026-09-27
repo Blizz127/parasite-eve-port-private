@@ -5,10 +5,8 @@
 #include "pe_port_compat.h"
 #include "game_port.h"
 
-pe_addr_t func_80084B20(uint32_t port)
-{ return 0x800A5B70u+((port&0xF0u)?0xF0u:0u); }
-int func_80084F8C(pe_addr_t record)
-{ return !PE_LoadU16(record+0xE6u) || PE_LoadU8(record+0x46u)!=255u; }
+/* func_80084B20: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80084B20_port.c (src/func_80084B20.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_80084F8C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80084F8C_port.c (src/func_80084F8C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 static pe_addr_t controller_record(uint32_t port)
 {
     if(PE_LoadU32(0x8009B738u)!=0x80084B20u) {
@@ -51,10 +49,7 @@ uint32_t func_80082680(uint32_t port,int32_t info,int32_t index)
     default:return 0;
     }
 }
-void func_800835A4(pe_addr_t record,pe_addr_t motors,uint32_t count)
-{
-    PE_StoreU32(record+0x28u,motors);PE_StoreU8(record+0x34u,(uint8_t)count);
-}
+/* func_800835A4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800835A4_port.c (src/func_800835A4.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 void func_80082974(uint32_t port,pe_addr_t motors,uint32_t count)
 {
     pe_addr_t p=controller_record(port);if(!p)return;

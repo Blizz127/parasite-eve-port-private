@@ -1,3 +1,576 @@
+## UPDATE 2026-09-26: room_m0418i func_80192704 gated
+
+`func_80192704` (`room_m0418i`, `0x84`) is `LINK_EXACT` on default `-O2 -G0`. The early half stays in `$a2`: an empty `asm` barrier on a `$a2`-pinned base stops the `+0x28` store from following the pointer copy. The copy into `$a0` is written in both arms of `v < 0x960`, so it fills that `beqz` delay and later halfword updates use `$a0`. The same barrier leaves an 8-byte frame with no stack store; `addiu $sp,-8` stays at the entry. Linked size `0x90` against span `0x84`; the extra 12 bytes are a zero alignment pad (`nonzero_pad=0`). `disc1_preflight.py --target room_m0418i --deep --only func_80192704` passed before the rebuild.
+
+`EXACT_REBUILD_GATE[room_m0418i]=PASS plan=b4bacce518c2613dfa24c7268644c1bb1e7debfe45f9e3e40ad1696fbaf2743c yaml=7f3f0c83e78459168012c11df9b9711bbf417b5bcd6ec10bba4130535c517857 spans=[93 c, 26 asm, 1 rodata, 2 bin] sha1_orig=03c8f1c6d2d439c08811fa94cf78e56cca8ca9ca sha1_cand=03c8f1c6d2d439c08811fa94cf78e56cca8ca9ca`
+
+EXE stays 2036. The five `gte-inline` spans stay instruction-blocked. The native port is not started.
+
+## UPDATE 2026-09-26: ovl_039F func_8010C448 gated
+
+`func_8010C448` (`ovl_039F`, `0x7C`) is `LINK_EXACT`. Flags `-O2 -G0 -fno-schedule-insns -fno-delayed-branch` (overlay-local profile `era_o2_g0_no_schedule_insns_no_delayed_branch`). It passes the caller through `func_80071A74(D_8010BD38, a0)`, stores `0x80000000` through `D_8010DB50`, clears `D_8010DB24` and `D_8010DB30`, then reloads `D_8010DB30` into `$v1` and `D_8010DB50` into `$a0` and stores `0x60000000`. The dead `*D_8010DB30` read is kept with an empty `asm` barrier, and `$v1` is pinned so that reload is `lw $v1,0($v1)`. Sched1 off keeps `move $v0,$zero` after the clear; `-fno-delayed-branch` keeps the `0x60000000` store ahead of the epilogue and leaves the `jr` delay empty. Linked size `0x80` against span `0x7C`; the extra 4 bytes are a zero alignment pad (`nonzero_pad=0`). `disc1_preflight.py --target ovl_039F --deep --only func_8010C448` passed before the rebuild.
+
+`EXACT_REBUILD_GATE[ovl_039F]=PASS plan=6b31e4b6057641d581acc5fa4ec189c106ea8325d1036fc7b56e94bfa0ea7ab8 yaml=bdb95d859ebc8a524df1333d9613a99067b9b67fcb658ce42f2054f3d39e0fcd spans=[11 c, 4 asm, 0 rodata, 2 bin] sha1_orig=e7331867b4d1464da4d5f386d9137eaa1c98422b sha1_cand=e7331867b4d1464da4d5f386d9137eaa1c98422b`
+
+EXE stays 2036. The five `gte-inline` spans stay instruction-blocked. The native port is not started.
+
+## UPDATE 2026-09-26: room init twins gated
+
+`func_8018FBE8` (`room_m0075i`, `0x78`) and the identical body `func_8018FC2C` (`room_m0419i`, `0x78`) are `LINK_EXACT` on default `-O2 -G0`. `$v0` and `$v1` are pinned and rewritten in retail's constant order (`0x80`, `0x10`, `0xC8`, `0xFF`, `0x40`, `0x80`, `0x4B0`), and the `func_800C4E50` argument pointer is pinned to `$a0` so `sw` of `a2+0x14` lands in the `jal` delay. Linked size `0x80` against span `0x78`; the extra 8 bytes are a zero alignment pad (`nonzero_pad=0`).
+
+`EXACT_REBUILD_GATE[room_m0075i]=PASS plan=a6f54082f927a0a4a0ff2de534993f0e31678967948d0d68589c88f3e51da2d7 yaml=fd77f9af259c328f1dabffddb29f7eb00fca3260baa7c68e99e3f599ce96711f spans=[59 c, 13 asm, 1 rodata, 2 bin] sha1_orig=ca34d1321e158763e9ee8b3cc9df0b3d94d28978 sha1_cand=ca34d1321e158763e9ee8b3cc9df0b3d94d28978`
+
+`EXACT_REBUILD_GATE[room_m0419i]=PASS plan=f4f2bd922eb0de5c8cba7ab477411cbdb36b54de80a8c3f82f43e3208cb19076 yaml=e94f520a0406c225673e4360fd1248fb9cd8ebbbf0fee064edd04d6202740004 spans=[60 c, 14 asm, 1 rodata, 2 bin] sha1_orig=3583c4ecd060f5d4ef6b8c7f7a65c58b4e65492a sha1_cand=3583c4ecd060f5d4ef6b8c7f7a65c58b4e65492a`
+
+`func_801925B0` (`room_m0273i`, `0x58`) matches as a `switch` on `0x19` / `0x1D` (nested `if` was 17 words off). `EXACT_REBUILD_GATE[room_m0273i]=PASS plan=d8fe836d815ef00be232350dfa082a99113d5a5e420923134fafbad1cbc8f0d0 yaml=92f481f9f3acaf021bb3c2f837fc25d72902169790d36ded4e82fdfe87f89232 spans=[59 c, 18 asm, 1 rodata, 2 bin] sha1_orig=692fdf1477e29d8eb1e2e6c8a7e1cc8ac51dda3a sha1_cand=692fdf1477e29d8eb1e2e6c8a7e1cc8ac51dda3a`
+
+`func_80199048` (`room_m0432i`, `0x78`) is `LINK_EXACT` on `-O2 -G0`. The `a0 == 1` arm loads `D_8009D254` into `$a0` and `&D_801994F4` into `$a2` before `func_800CE870`. `EXACT_REBUILD_GATE[room_m0432i]=PASS plan=1c904d496c26ebb5f31050c113a626b52b49a0ace748f431d7aa80347bfe476c yaml=192adee385b58655439aff79d24460b30db715c43a4ef16b7d48373faff53276 spans=[48 c, 11 asm, 1 rodata, 2 bin] sha1_orig=e13a8b54116474ab22fa0ae909a264442944ae4f sha1_cand=e13a8b54116474ab22fa0ae909a264442944ae4f`
+
+`func_80193400` (`room_m0418i`, `0x80`) is `LINK_EXACT` on `-O2 -G0`. The two `+0x50` half updates are written at `0x10` then `0x14`; cc1 emits `0x14` then `0x10`. `EXACT_REBUILD_GATE[room_m0418i]=PASS plan=dfd9a295f85531b46564f1655c917a45ba2ea7a397878253d45bb74172d4abd1 yaml=8649766e69833114d8913f102aa8eef3bbc3c46fd3bb731c8729a181d289a2b7 spans=[92 c, 26 asm, 1 rodata, 2 bin] sha1_orig=03c8f1c6d2d439c08811fa94cf78e56cca8ca9ca sha1_cand=03c8f1c6d2d439c08811fa94cf78e56cca8ca9ca`
+
+EXE stays 2036. The five `gte-inline` spans stay instruction-blocked. The native port is not started.
+
+## UPDATE 2026-09-26: overlay batch gates PASS
+
+Twenty-five overlay leaves are `LINK_EXACT` on `-O2 -G0` over the full declared span (`nonzero_pad=0`) unless a profile is named, and each one's overlay exact-rebuild gate passed. EXE image stays 2036. The five `gte-inline` spans stay instruction-blocked. The native port is not started.
+
+Passed gates (scratch logs `ovl-gate-<id>.log` and `ovl-gate2-<id>.log`):
+
+- `room_m0269i` `func_8018F060` — `plan=9aeb4d9cce484c584445fdca56678634a939f27ca6f2cd47121f5053d7087e33` spans `[8 c, 4 asm, 0 rodata, 2 bin]` sha1 `06c90576dba22ef80781421d5e9c0e802c0a339a`
+- `room_m0086i` first `func_80190A90` then `func_80190A44` — final `plan=35ecc218c8c67491ca6886d748e10d1a8301fee183757c4a79436b2245f8ad8b` spans `[2 c, 1 asm, 0 rodata, 2 bin]` sha1 `1ebeb226defaf851ce2735245f028d4b63b1ec24`
+- `ovl_039F` final (`func_8010BE3C` on `era_o2_g0_fill_epilogue_delay_slot`, `func_8010BFA0`) — `plan=c3760f0346c445ad936898660d16b2a44e1eaaa6e85d2f6ce81225cd557855bc` spans `[10 c, 4 asm, 0 rodata, 2 bin]` sha1 `e7331867b4d1464da4d5f386d9137eaa1c98422b`
+- `room_m0089i` `func_80193FF0` — `plan=a13ee08fca9c19381448c879f749260671d334af27a548efae74c654c772bb0d` spans `[45 c, 10 asm, 1 rodata, 2 bin]` sha1 `06bee6ec7422f225a5ea845d3ff33937736253ca`
+- `room_m0419i` `func_8018F228` — `plan=0b6d944caea885209fd6bf67557ae1f00f15422c836fbe2914e8aecfa7694293` spans `[59 c, 14 asm, 1 rodata, 2 bin]` sha1 `3583c4ecd060f5d4ef6b8c7f7a65c58b4e65492a`
+- `room_m0273i` final (`func_801930E8`, `func_80192D50`, `func_8019A5D4` on `era_o2_g0_no_schedule_insns`) — `plan=dd5d69bc1906adf68ce278441a5bf29b71b6148265ac53bef1d3da1a6c9ff017` spans `[58 c, 18 asm, 1 rodata, 2 bin]` sha1 `692fdf1477e29d8eb1e2e6c8a7e1cc8ac51dda3a`
+- `room_m0256i` final (`func_80192584`, `func_80195CD8`, `func_80192654`, `func_80192808`, `func_801925AC`) — `plan=ee40defbcb41d9d3c98dabd630ae8734805d7329f2cc4a3a4a7577f3e7100833` spans `[54 c, 11 asm, 1 rodata, 2 bin]` sha1 `618fb891329d4ac903ec617a210c4b1e0af742d1`
+- `room_m0429i` (`func_80192630`, `func_80192BC0`) — `plan=2e277cc5d819031f816b11bb5d2ff6375cf890e2997f221e2bfee5c715636901` spans `[58 c, 13 asm, 1 rodata, 2 bin]` sha1 `1487c56a4d420ebe6a13bb261622428226a66034`
+- `room_m0418i` final (`func_80193114`, `func_80192C84`, `func_80194C04`, `func_80194988`) — `plan=05bce7e41a158329110d57f277313b0205dba1acf71ca3723e1cd152cfe23a02` spans `[91 c, 25 asm, 1 rodata, 2 bin]` sha1 `03c8f1c6d2d439c08811fa94cf78e56cca8ca9ca`
+- `ovl_0700` `func_8019959C` — `plan=45bda1071c02d7b2d4f92501c4aa33d40e191744a51c6b274c8479beb44beb68` spans `[35 c, 11 asm, 0 rodata, 2 bin]` sha1 `9f8786a9d6f8b11548a14680d34fc540d8e909de`
+- `room_m0350i` `func_80199D2C` — `plan=58171ee0dc8f1389287c2ffb7a771689f1271b036be776ac44a8565e6b2e1e63` spans `[47 c, 13 asm, 1 rodata, 2 bin]` sha1 `e9597b000d287033f981cee44f3db65deb8696e1`
+- `room_m0349i` `func_801900D0` — `plan=10eef88c15b4b5605510550a0fd388566deb0ffd2f1940d3153b981553c476df` spans `[1 c, 1 asm, 0 rodata, 2 bin]` sha1 `09410ce75c6fcf88e6f06a9259bc9e7dc1c11b8c`
+- `room_m0123i` `func_8019537C` — `plan=5184530740bf32886df749f7a91c4e142790a51c17da66c6e6469bff0b576499` spans `[47 c, 10 asm, 1 rodata, 2 bin]` sha1 `7dbc62ff99461836f22d884ef04718af387e04cd`
+
+`func_8019959C` keeps the scaled index in `$a1` and the cursor in `$v0`. `func_8019A5D4` needs `-fno-schedule-insns` so the `(a1+1)*6` shift-add stays after the two half stores, with that product pinned to `$v0`. `func_80193114` keeps `0x270` live with an empty `asm` barrier. `func_8010BE3C` needs the epilogue delay-slot fill. `func_800D8978` was not copied into `src/`.
+
+## UPDATE 2026-09-26: 2036 gate PASS
+
+`EXACT_REBUILD_GATE=PASS plan=b6ebd320af1a9d36194e3bb6b8f00d8bbe225604986a08203f777394df0717dc yaml=4ba194d202f83fea71d0694a320b12028fb81ae9c0b3ca9856a9604f4c745845 spans=[2036 c, 219 asm, 2 rodata] sha1_orig=452fb033f2eaa4b18aa20a5bca60b8125af3a37b sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=2036`. Log: session scratch `exact-rebuild-2036.log`. Route totals are unchanged from 2035 (`funcs=1261/1453 c_words=68845 asm_funcs=115 asm_words=35567`) because `func_8007BDDC` is off that route set.
+
+`func_8007BDDC` (`0x168`, `-O2 -G0 -mno-split-addresses`, cc1 2.8.1, `MASPSX_BEQZ_SYM_STORE_DELAY` + `MASPSX_FILL_CALL_DELAY_SLOT` + `MASPSX_INDEX_PAIR_JAL_SCHEDULE`) is `LEAF_STRONG=EXACT` (`compiled=0x170`). Every word of the declared span matches. The linked section is 8 bytes longer because `.text` is 16-byte aligned, and those bytes are zero (`nonzero_pad=0`). It polls until a deadline or a counter cap, and on the failure path prints two indexed words. The new schedule pass puts the byte-1 shift first, the stack argument before the result loads, the format address in the `jal` delay, and a jump over `$v0 = 0`. `disc1_preflight.py --deep --only func_8007BDDC` passed before the rebuild. `profile_necessity.py --only func_8007BDDC` printed `PROFILE_NECESSITY=PASS`. Evidence: `docs/evidence/func-8007BDDC/REPORT.md`.
+
+The five `gte-inline` EXE spans remain instruction-blocked. The native port is still not started.
+
+## UPDATE 2026-09-26: 2035 gate PASS
+
+`EXACT_REBUILD_GATE=PASS plan=7ad63f09fbe9139dd7b81dec2ae48991c962e95fb34e28031cbe404ac226b0d3 yaml=f934e788532ec4cb0ad5c091a3647c90439c217a0639aa77a9e0604c504f9ec7 spans=[2035 c, 220 asm, 2 rodata] sha1_orig=452fb033f2eaa4b18aa20a5bca60b8125af3a37b sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=2035`. Log: session scratch `exact-rebuild-2035.log`. Route: `funcs=1261/1453 c_words=68845 nonc_funcs=77 nonc_words=5417 asm_funcs=115 asm_words=35567` (`c_words` +7, the `func_8003708C` span).
+
+`func_8003708C` (`0x1C`, `-O2 -G0`, `MASPSX_MFLO_BEFORE_MFHI`, profile `era_o2_g0_mflo_before_mfhi`) is `LEAF_STRONG=EXACT` (`compiled=0x20`). Every word of the declared span matches. The linked section is 4 bytes longer because `.text` is 16-byte aligned, and those bytes are zero (`nonzero_pad=0`). It is the signed product `(a0 * a1)` with the low half shifted right 16 and the high half shifted left 16. cc1 emits `mfhi` before `mflo` and copies each half through the shift. The knob now also folds that `srl`/`sll` copy so the halves are read straight into `$v0` and `$v1`. Without the knob the leaf is 4 words off. `disc1_preflight.py --deep --only func_8003708C` passed before the rebuild. `profile_necessity.py --only func_8003708C` printed `PROFILE_NECESSITY=PASS`. Evidence: `docs/evidence/func-8003708C/REPORT.md`.
+
+The five `gte-inline` EXE spans remain instruction-blocked. The native port is still not started.
+
+## UPDATE 2026-09-25: 2034 gate PASS
+
+`EXACT_REBUILD_GATE=PASS plan=8e957f330ed4000c6688a3e38ba7a0d0e6010fb0000f2d885e18df8343b25781 yaml=d8831b362293879fdaec2804a0a8d163f8e286aabe2b473a4e22b71ad2b01812 spans=[2034 c, 221 asm, 2 rodata] sha1_orig=452fb033f2eaa4b18aa20a5bca60b8125af3a37b sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=2034`. Log: session scratch `exact-rebuild-2034.log`. Route totals are unchanged from 2033 (`funcs=1260/1453 c_words=68838 asm_funcs=116 asm_words=35574`) because `func_80070FAC` is off that route set.
+
+`func_80070FAC` (`0x88`, `-O1 -G0`, `MASPSX_MFLO_BEFORE_MFHI`, profile `era_o1_g0_mflo_before_mfhi`) is `LEAF_STRONG=EXACT` (`compiled=0x90`). Every word of the declared span matches. The linked section is 8 bytes longer because `.text` is 16-byte aligned, and those bytes are zero (`nonzero_pad=0`). The three inputs are squared and summed as 64-bit values, then shifted right by 20. cc1 emits `mfhi` before `mflo` and copies each half; the knob writes `mflo` then `mfhi` into those destinations and keeps the two hazard `nop`s only before another `mult`. Without the knob the leaf is 22 words off. `disc1_preflight.py --deep --only func_80070FAC` passed before the rebuild. Evidence: `docs/evidence/func-80070FAC/REPORT.md`.
+
+The five `gte-inline` EXE spans remain instruction-blocked. The native port is still not started.
+
+## UPDATE 2026-09-25: ovl_039F gate PASS (func_8010C0FC)
+
+`EXACT_REBUILD_GATE[ovl_039F]=PASS plan=9ef98b2f7f9c828efb54299aa95e87643c17a27761d1e1ba32e68d8eae4430d7 yaml=e043cf6dfcfe478c90a768905b201a4eb3f0697c588ae863acddcc5cdfa1f54e spans=[8 c, 4 asm, 0 rodata, 2 bin] sha1_orig=e7331867b4d1464da4d5f386d9137eaa1c98422b sha1_cand=e7331867b4d1464da4d5f386d9137eaa1c98422b`. Log: session scratch `overlay-ovl_039F-c0fc.log`.
+
+`func_8010C0FC` (`0xF0`, profile `era_o2_g0_fill_call_delay_slot`) is `LINK_EXACT`. The linked section is 240 bytes, equal to the declared span. `a0 == 0` and `a0 == 1` update `D_8010DB50`, `D_8010DB24`, and `D_8010DB30`; zero also calls `func_8010C1EC` twice. Any other value calls `func_80071A74(D_8010BCFC)`. The call-delay knob moves that `la` into the `jal` delay. Without it the leaf is 8 words off. `disc1_preflight.py --target ovl_039F --deep --only func_8010C0FC` passed before the rebuild. Evidence: `docs/evidence/func-8010C0FC/REPORT.md`.
+
+The five `gte-inline` EXE spans remain instruction-blocked. The native port is still not started.
+
+## UPDATE 2026-09-25: ovl_039F gate PASS (func_8010C03C)
+
+`EXACT_REBUILD_GATE[ovl_039F]=PASS plan=a6baf725e463bd241e43fad0507b592ed219e39e407f581585d2847c085c3c22 yaml=ce72baf4bc5dc44fe083779a85fd22dd88df26b02c936a68767935c31b77555d spans=[7 c, 4 asm, 0 rodata, 2 bin] sha1_orig=e7331867b4d1464da4d5f386d9137eaa1c98422b sha1_cand=e7331867b4d1464da4d5f386d9137eaa1c98422b`. Log: session scratch `overlay-ovl_039F-c03c.log`.
+
+`func_8010C03C` and `func_8010C078` (`0x3C` each, default `-O2 -G0`) are `LINK_EXACT`. A nonzero `a0` returns one bit of `func_8010C430()` (bit 29, then bit 24). Zero calls `func_8010C308()` or `func_8010C39C()`. The nonzero arm is written first; the zero-arm-first spelling is 11 words off. The linked section is 64 bytes; the extra 4 are a zero alignment pad (`nonzero_pad=0`). `disc1_preflight.py --target ovl_039F --deep --only` passed for both before the rebuild. Evidence: `docs/evidence/func-8010C03C/REPORT.md`.
+
+The five `gte-inline` EXE spans remain instruction-blocked. The native port is still not started.
+
+## UPDATE 2026-09-25: ovl_039F gate PASS
+
+`EXACT_REBUILD_GATE[ovl_039F]=PASS plan=ae2526b073b761fdb96bd2a8ca2087da24641ed6598298ad56cd250facff47d8 yaml=8d583a3261437163b0735c43b1d4e0ef2186db8f2a0f049cd855912bc7dccbce spans=[5 c, 5 asm, 0 rodata, 2 bin] sha1_orig=e7331867b4d1464da4d5f386d9137eaa1c98422b sha1_cand=e7331867b4d1464da4d5f386d9137eaa1c98422b`. Log: session scratch `overlay-ovl_039F-c0b4.log`.
+
+`func_8010C0B4` and `func_8010C0D8` (`0x24` each, default `-O2 -G0`) are `LINK_EXACT`. They call `func_80073CF4(0, a0)` and `func_80073CF4(1, a0)`. The constant is in the `jal` delay. The linked section is 48 bytes; the extra 12 are a zero alignment pad (`nonzero_pad=0`). `disc1_preflight.py --target ovl_039F --deep --only` passed for both before the rebuild. Evidence: `docs/evidence/func-8010C0B4/REPORT.md`.
+
+The five `gte-inline` EXE spans remain instruction-blocked. The native port is still not started.
+
+## UPDATE 2026-09-25: room_m0429i gate PASS
+
+`EXACT_REBUILD_GATE[room_m0429i]=PASS plan=b88d1be31e4f03a040cb81c2e835170f3b7d030f3ef5f06d17439caf8192c9f2 yaml=b1b75074340000b93db1c9edda11a0edcf9e2759c8fdf7c53fb7e305e64b63d6 spans=[56 c, 12 asm, 1 rodata, 2 bin] sha1_orig=1487c56a4d420ebe6a13bb261622428226a66034 sha1_cand=1487c56a4d420ebe6a13bb261622428226a66034`. Log: session scratch `overlay-room_m0429i-9b1e8.log`.
+
+`func_8019B1E8` (`0x1C`, default `-O2 -G0`) is `LINK_EXACT`. The first argument is unused. `a1` is stored through a pointer to `D_8019B66C`; `a2` goes to `D_8019B66E`. An empty `asm` on the pointer keeps the `la` in `$v0`. The linked section is 32 bytes; the extra 4 are a zero alignment pad (`nonzero_pad=0`). `disc1_preflight.py --target room_m0429i --deep --only func_8019B1E8` passed before the rebuild. Evidence: `docs/evidence/func-8019B1E8/REPORT.md`.
+
+The five `gte-inline` EXE spans remain instruction-blocked. The native port is still not started.
+
+## UPDATE 2026-09-25: gte-inline blocked; room_m0318i 50 C
+
+The 2033 EXE image is not done. Five `gte-inline` spans stay asm because era cc1 2.7.2 and 2.8.1 emit no `mtc2` / `mfc2` / `ctc2` / `swc2` / `mfc0` / `mtc0`. `func_80078004` and `func_80078094` also use trapping `sub` / `addi`. Evidence: `docs/evidence/gte-inline-block-2026-09-25/REPORT.md`. Native port stays unstarted.
+
+`EXACT_REBUILD_GATE[room_m0318i]=PASS plan=426aa2b342382f4eb5f9be88092c4631fc601afb5435ba7471bd5703317312f2 yaml=0934341a10d15b735d5b5d0e64cd0310a50ca2a9c915ef0b993702127200d4a9 spans=[50 c, 10 asm, 1 rodata, 2 bin] sha1_orig=3deebe65a4bb7eb5d1a9ececd8296a47ea7b9e4b sha1_cand=3deebe65a4bb7eb5d1a9ececd8296a47ea7b9e4b`. Log: session scratch `overlay-room_m0318i-99250.log`.
+
+`func_80199250` (`0x44`, default `-O2 -G0`) is `LINK_EXACT`. `if (a0 == 1)` stores `a1` to `D_80199914`; the other arm stores `a1` / `a2` / `a3` to `D_80199918` / `D_8019991C` / `D_80199920`; both return `&D_80199914`. Linked section is 80 bytes; the extra 12 are a zero alignment pad (`nonzero_pad=0`). `disc1_preflight.py --target room_m0318i --deep --only func_80199250` passed before the rebuild. Evidence: `docs/evidence/func-80199250/REPORT.md`.
+
+Fresh `nonmatchable_spans.py --json` after the 2033 split: `alignment-filler` 83 / 83w, `gte-inline` 5 / 192w, `handwritten-cop` 22 / 123w, `handwritten-gte-wrapper` 107 / 19957w, `handwritten-jr-t2` 53 / 163w, `handwritten-syscall` 2 / 8w. Unclassified split functions outside those classes: 136 / 39180w.
+
+## UPDATE 2026-09-25: 2033 gate PASS
+
+`EXACT_REBUILD_GATE=PASS plan=a7538b408efafc10d69e1db11f4e9ae6ddc46a6183a93b11ab52f74ad8b88690 yaml=0d87c2a1b5b176f16839a26085189c117d1b640dadacdf7a0de5163983935b03 spans=[2033 c, 222 asm, 2 rodata] sha1_orig=452fb033f2eaa4b18aa20a5bca60b8125af3a37b sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=2033`. Log: session scratch `exact-rebuild-2033.log`. Route totals are unchanged from 2032 (`funcs=1260/1453 c_words=68838 asm_funcs=116 asm_words=35574`) because `func_80078CC4` is off that route set.
+
+`func_80078CC4` (`0x138`, `-O2 -G0`, `MASPSX_MULT_MFLO_TO_MULTU`, profile `era_o2_g0_mult_mflo_to_multu`) is `LEAF_STRONG=EXACT` (`compiled=0x140`). Every word of the declared span matches. The linked section is 8 bytes longer because `.text` is 16-byte aligned, and those bytes are zero (`nonzero_pad=0`). cc1 emits `mult` when only `mflo` is used; retail writes `multu` at all nine products. Without the knob those 9 words miss. `disc1_preflight.py --deep --only func_80078CC4` passed before the rebuild. Evidence: `docs/evidence/func-80078CC4/REPORT.md`.
+
+`nonmatchable_spans.py` on this image: `handwritten-gte-wrapper` 107 / 19957w, `alignment-filler` 82 / 82w, `handwritten-jr-t2` 53 / 163w, `handwritten-cop` 22 / 123w, `handwritten-syscall` 2 / 8w, `gte-inline` 5 / 192w. The five `gte-inline` spans are still asm.
+
+## UPDATE 2026-09-25: room_m0318i gate PASS
+
+`EXACT_REBUILD_GATE[room_m0318i]=PASS plan=2f721bc9ae7024202951d307a68db802893288c7b77960c61fb05c9925c993da yaml=ae98e16b1575a5fd1f4ef73d7478b975a62dfd88614f463d6a60989259b978c6 spans=[49 c, 11 asm, 1 rodata, 2 bin] sha1_orig=3deebe65a4bb7eb5d1a9ececd8296a47ea7b9e4b sha1_cand=3deebe65a4bb7eb5d1a9ececd8296a47ea7b9e4b`. Log: session scratch `overlay-room_m0318i.log`.
+
+`func_80199218` and `func_80199234` (`0x1C` each, default `-O2 -G0`) are `LINK_EXACT`. Each keeps the first symbol address in `$v0` with an empty `asm` on the pointer, then stores the second symbol separately. Without the barrier both are 6 words off. The linked section is 32 bytes; the extra 4 are a zero alignment pad (`nonzero_pad=0`). `disc1_preflight.py --target room_m0318i --deep --only` passed for both before the rebuild. Evidence: `docs/evidence/func-80199218/REPORT.md`.
+
+## UPDATE 2026-09-25: 2032 gate PASS
+
+`EXACT_REBUILD_GATE=PASS plan=b1cc0ed01e12b30d6ca3fccedee313ec04a246e90daeceabe729240123b25b5c yaml=c16468e3ed3fd537f2aaf1fdfc571e1179c3e7326c345c9839dc8b1e25079ca8 spans=[2032 c, 221 asm, 2 rodata] sha1_orig=452fb033f2eaa4b18aa20a5bca60b8125af3a37b sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=2032`. Log: session scratch `exact-rebuild-2032.log`. Route: `funcs=1260/1453 c_words=68838 nonc_funcs=77 nonc_words=5417 asm_funcs=116 asm_words=35574` (`c_words` +25, the `func_8006EC08` span).
+
+`func_8006EC08` (`0x64`, `-O2 -G0`, `MASPSX_DUP_HALF_SHIFT`, profile `era_o2_g0_dup_half_shift`) is `LEAF_STRONG=EXACT` (`compiled=0x70`). Every word of the declared span matches. The linked section is 12 bytes longer because `.text` is 16-byte aligned, and those bytes are zero (`nonzero_pad=0`). The knob rewrites the signed-char zero test so retail's `beq $v1` / `addiu $v0,-1` / dual `sll` window is what links. Without it the leaf is 6 words off. `disc1_preflight.py --deep --only func_8006EC08` passed before the rebuild. Evidence: `docs/evidence/func-8006EC08/REPORT.md`.
+
+`func_800D004C` stays asm. Its declared span is one word, `addiu $sp,$sp,-0xF0`. The next span `func_800D0050` is the rest of that frame (saves at `0xD4($sp)`, epilogue `addiu $sp,$sp,0xF0` / `jr $ra`) and has no external reference. Callers `jal func_800D004C`. Evidence: `docs/evidence/func-800D004C/REPORT.md`.
+
+## UPDATE 2026-09-25: 2031 gate PASS
+
+`EXACT_REBUILD_GATE=PASS plan=9571a1e0bbda22ec4ed9f0185e8f417950edade7d8d1cfc8303e424cc41305e3 yaml=a8983d3d8014083a7a6ba3c2071f7883485aba2be405291b18be66d85ebffb04 spans=[2031 c, 222 asm, 2 rodata] sha1_orig=452fb033f2eaa4b18aa20a5bca60b8125af3a37b sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=2031`. Log: session scratch `exact-rebuild-2031.log`. Route: `funcs=1259/1453 c_words=68813 nonc_funcs=77 nonc_words=5417 asm_funcs=117 asm_words=35599` (`c_words` +20, the `func_80073244` span).
+
+`func_80073244` (`0x50`, `-O2 -G0`, `MASPSX_SLTU_A0_LT_A2_DEST_V1`, profile `era_o2_g0_sltu_a0_lt_a2_dest_v1`) is `LEAF_STRONG=EXACT` (`compiled=0x50`, linked 80 bytes equals the declared span). It is the unsigned 64-bit compare. The knob moves only `sltu $a0,$a2` and its `bnez` from `$v0` to `$v1`. Without it those two words miss. `disc1_preflight.py --deep --only func_80073244` passed before the rebuild. Evidence: `docs/evidence/func-80073244/REPORT.md`.
+
+Post-gate `nonmatchable_spans.py` on the rebuilt asm: `handwritten-gte-wrapper` 107 / 19957w, `alignment-filler` 82 / 82w, `handwritten-jr-t2` 53 / 163w, `handwritten-cop` 22 / 123w, `handwritten-syscall` 2 / 8w, `gte-inline` 5 / 192w. Of the 222 YAML asm spans, 120 contain only those five non-C classes. 102 still hold unclassified or `gte-inline` functions (143 functions).
+
+## UPDATE 2026-09-25: 2030 gate PASS
+
+`EXACT_REBUILD_GATE=PASS plan=5d3cf792f321e2c5aa6182e897444751a6ad486eda55a71d7d5a91e9a546edb3 yaml=6646aa5ba5f973603d74981df1f1f016edfef7ec47412f09071bf96de95350b9 spans=[2030 c, 222 asm, 2 rodata] sha1_orig=452fb033f2eaa4b18aa20a5bca60b8125af3a37b sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=2030`. Log: session scratch `exact-rebuild-2030.log`. Route totals are unchanged from 2029 (`funcs=1258/1453 c_words=68793 asm_funcs=118 asm_words=35619`) because `func_8007E160` is off that route set.
+
+`func_8007E160` (`0x40`, `-O2 -G0`, `MASPSX_DROP_JUMP_TO_EPILOGUE`, profile `era_o2_g0_drop_jump_to_epilogue`) is `LEAF_STRONG=EXACT` (`compiled=0x40`, linked 64 bytes equals the declared span). The knob deletes cc1's `j $Lepi` whose delay is `addu $v0,$zero,$zero` and whose target is the next `j $31`. Without it the leaf is 5 words off. `disc1_preflight.py --deep --only func_8007E160` passed before the rebuild. Evidence: `docs/evidence/func-8007E160/REPORT.md`.
+
+## UPDATE 2026-09-25: 2029 gate PASS
+
+`EXACT_REBUILD_GATE=PASS plan=2845def2799bc34b87817e21d28ecd1dec9869642e72be80ab0e558247742785 yaml=12866f4e5d81d73cefa6a8bbaf5bc852326b926e3418bd3352c82b590a716447 spans=[2029 c, 222 asm, 2 rodata] sha1_orig=452fb033f2eaa4b18aa20a5bca60b8125af3a37b sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=2029`. Log: session scratch `exact-rebuild-2029.log`. Route: `funcs=1258/1453 c_words=68793 nonc_funcs=77 nonc_words=5417 asm_funcs=118 asm_words=35619` (`c_words` +75, the `func_800133E8` span).
+
+`func_800133E8` (`0x12C`, `-O2 -G8`, `MASPSX_FORCE_ABSOLUTE_SYMBOLS=D_8009D2F0` + `MASPSX_EXPAND_DIV` + `MASPSX_DIV_DELAY_REUSE_V0`, profile `era_o2_g8_div_delay_reuse_v0_expand_div_force_d8009d2f0_absolute`) is `LEAF_STRONG=EXACT`. The new knob rewrites one window: cc1 parks `b + 1` in `$a3` because `$v0` still holds the consumed `slt`, and retail reuses `$v0` for the divisor in that delay. The sum of the words at `+0x14` and `+0x1C` stays in `$a0`. The first `mfhi $v1` / `sll $a0,$v1,16` stay. Dropping the knob is 15 words; dropping expand-div is 30; dropping the forced-absolute symbol is 73. `compiled=0x130`: the linked section is 4 bytes longer than `0x12C` because `.text` is 16-byte aligned, and those bytes are zero (`nonzero_pad=0`). `disc1_preflight.py --deep --only func_800133E8` passed before the rebuild. Evidence: `docs/evidence/func-800133E8/REPORT.md`.
+
+## UPDATE 2026-09-25: 2028 gate PASS
+
+`EXACT_REBUILD_GATE=PASS plan=42bb76c22835d5ce8828f85a58ac632bb0214b760dac62d45db4d73b64c9369f yaml=00078d9fbd98516b9b1cd746375a31d7f1dbd735b3df7bcb5a7b29e6c1db49ab spans=[2028 c, 223 asm, 2 rodata] sha1_orig=452fb033f2eaa4b18aa20a5bca60b8125af3a37b sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=2028`. Log: session scratch `exact-rebuild-2028.log`. Route: `funcs=1257/1453 c_words=68718 nonc_funcs=77 nonc_words=5417 asm_funcs=119 asm_words=35694` (`c_words` +143, the `func_80062A7C` span).
+
+`func_80062A7C` (`0x23C`, `-O2 -G8`, existing profile `era_o2_g8`) is `LEAF_STRONG=EXACT`. Every word of the declared span matches. `compiled=0x240`: the linked section is 4 bytes longer than `0x23C` because `.text` is 16-byte aligned, and those bytes are zero (`nonzero_pad=0`). `disc1_preflight.py --deep --only func_80062A7C` passed before the rebuild. Evidence: `docs/evidence/func-80062A7C/REPORT.md`.
+
+## UPDATE 2026-09-25: 2027 gate PASS
+
+`EXACT_REBUILD_GATE=PASS plan=8b3efd2b5686a14d4d920b2c9f7e34648c3f6b9cd2ecc9375975f6b51332892f yaml=3be1b6adc450eb8044dece63a955f5860c9edb25a5f35accd376054108fb39a8 spans=[2027 c, 224 asm, 2 rodata] sha1_orig=452fb033f2eaa4b18aa20a5bca60b8125af3a37b sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=2027`. Log: session scratch `exact-rebuild-2027.log`. Route: `funcs=1256/1453 c_words=68575 nonc_funcs=77 nonc_words=5417 asm_funcs=120 asm_words=35837` (`c_words` +137, the `func_8007E964` span).
+
+`func_8007E964` (`0x224`, cc1 2.8.1, `-O2 -G0 -mno-split-addresses`, `MASPSX_ADDU_NEG1_BEQ_DELAY`, profile `era_o2_g0_cc1_281_addu_neg1_beq_delay`) is `LEAF_STRONG=EXACT`. The knob rewrites the `beq` against `-1` so the delay is `addiu $v0,$v1,-1` instead of cc1's `addu $v0,$v1,$v0`. Without it that one word at `0x8007EA94` misses. `compiled=0x230`: the linked section is 12 bytes longer than `0x224` because `.text` is 16-byte aligned, and those bytes are zero (`nonzero_pad=0`). `disc1_preflight.py --deep --only func_8007E964` passed before the rebuild. Evidence: `docs/evidence/func-8007E964/REPORT.md`.
+
+## UPDATE 2026-09-25: 2026 gate PASS
+
+`EXACT_REBUILD_GATE=PASS plan=ed1147954c5be97c4c43752ae131dbc8bccea17009c353cd6aafffc5e8da3eb0 yaml=0e8393e3cadad34dec0b70904859e9ab8138ed256884a52e7a49466060f1abce spans=[2026 c, 225 asm, 2 rodata] sha1_orig=452fb033f2eaa4b18aa20a5bca60b8125af3a37b sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=2026`. Log: session scratch `exact-rebuild-2026.log`. Route: `funcs=1255/1453 c_words=68438 nonc_funcs=77 nonc_words=5417 asm_funcs=121 asm_words=35974` (`c_words` +152, the `func_80076EE4` span).
+
+`func_80076EE4` (`0x260`, cc1 2.8.1, `-O2 -G0 -mno-split-addresses`, `MASPSX_FILL_BRANCH_MACRO_SPLIT` + `MASPSX_SYMBOL_LOAD_DEST_TEMP`, profile `era_o2_g0_cc1_281_fill_branch_macro_split_symbol_load_dest_temp`) is `LEAF_STRONG=EXACT` (`compiled=0x260`, linked 608 bytes equals the declared span). The split knob alone is 135 words off; dest-temp alone is 9; `-mno-split-addresses` alone is 144. `disc1_preflight.py --deep --only func_80076EE4` passed before the rebuild. Evidence: `docs/evidence/func-80076EE4/REPORT.md`.
+
+`func_80062A7C` matches every word of `0x23C` and the linked section is 576 bytes because `.text` is 16-byte aligned. It was not integrated. `func_8007E964` is one word off (`addiu $v0,$v1,-1` vs `addu $v0,$v1,$v0` at `0x8007EA94`). `func_8003D94C` is 145 words off. Neither was integrated.
+
+## UPDATE 2026-09-25: 2025 gate PASS
+
+`EXACT_REBUILD_GATE=PASS plan=f83d2aaaf1e7c70dfe1f663794bc9b5f3d3472496e51a65d63eea10c358b286c yaml=64dcb63ea234a3d5eae126f54226a9c86ac4e342530a545736e6b496db8afd52 spans=[2025 c, 225 asm, 2 rodata] sha1_orig=452fb033f2eaa4b18aa20a5bca60b8125af3a37b sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=2025`. Log: session scratch `exact-rebuild-2025.log`. Route totals are unchanged from 2024 (`funcs=1254/1453 c_words=68286 asm_funcs=122 asm_words=36126`) because `func_8008A92C` is off that route set.
+
+`func_8008A92C` (`0x1F0`, default `-O2 -G0`) is `LEAF_STRONG=EXACT` (`compiled=0x1F0`, linked 496 bytes equals the declared span). `disc1_preflight.py --deep --only func_8008A92C` passed before the rebuild. Evidence: `docs/evidence/func-8008A92C/REPORT.md`.
+
+## UPDATE 2026-09-25: 2024 gate PASS
+
+`EXACT_REBUILD_GATE=PASS plan=f208ed62972824a50e67b1d476cbb57b057552e469d1a7b378f63541649dde0b yaml=73282a0c3e5883b2d388810a2d2e0c859ad2becdf5a0bdf6d761dacc6ac26118 spans=[2024 c, 226 asm, 2 rodata] sha1_orig=452fb033f2eaa4b18aa20a5bca60b8125af3a37b sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=2024`. Log: session scratch `exact-rebuild-2024.log`. Route totals are unchanged from 2023 (`funcs=1254/1453 c_words=68286 asm_funcs=122 asm_words=36126`) because `func_8008AC40` is off that route set.
+
+`func_8008AC40` (`0x254`, default `-O2 -G0`) is `LEAF_STRONG=EXACT` (`compiled=0x260`, three trailing zero words, `nonzero_pad=0`). `-O1 -G0` is 143 words off. `disc1_preflight.py --deep --only func_8008AC40` passed before the rebuild. Evidence: `docs/evidence/func-8008AC40/REPORT.md`.
+
+## UPDATE 2026-09-25: 2023 gate PASS
+
+`EXACT_REBUILD_GATE=PASS plan=4c1c2594a9f07e2071fa5a0a2f69449c053575c4841968f8645e05608171e8e6 yaml=c5485eb56dd657f8bec2e84771cd3b9bab787867f33b23c9f9a40a00a3d1cfa6 spans=[2023 c, 227 asm, 2 rodata] sha1_orig=452fb033f2eaa4b18aa20a5bca60b8125af3a37b sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=2023`. Log: session scratch `exact-rebuild-2023.log`. Route: `funcs=1254/1453 c_words=68286 nonc_funcs=77 nonc_words=5417 asm_funcs=122 asm_words=36126 asm_words_unknown=0 native_c=674/1453 native_c_words=17659 nonmatchable=present tierA=1208 tierB=248 tierB_unresolved=0`.
+
+`func_8007E704` (`0x1F0`, `-O2 -G0`, `MASPSX_SYMBOL_LOAD_DEST_TEMP` + `MASPSX_FILL_EPILOGUE_DELAY_SLOT`) is `LEAF_STRONG=EXACT` (`compiled=0x1F0`). Dest-temp alone is 2 words; epilogue-fill alone is 6. `disc1_preflight.py --deep --only func_8007E704` passed before the rebuild. Evidence: `docs/evidence/func-8007E704/REPORT.md`.
+
+`func_8007EE84` was not continued: putting the counter store's `%lo` half in the `bne` delay required a `.set noreorder` bracket that grew the object (576 → 608). It stays asm.
+
+## UPDATE 2026-09-25: no leaf after the 2022 gate
+
+`func_8004B70C`, `func_80066F60`, and `func_8007EE84` were drafted and linked. None reached 0 mismatches (`func_8007EE84` prologue matches; best is 111 words, branch displacement `0x3e` vs `0x3c`). They were not integrated. The image is still the 2022 gate. Maspsx patch 33 `MASPSX_SINK_REG_SW_INTO_BNEZ` is tested and default-off; it is not assigned to a leaf.
+
+## UPDATE 2026-09-25: 2022 gate PASS
+
+`EXACT_REBUILD_GATE=PASS plan=5bd84786d181dfbba66972b94965c59dab8f89914f9bdfe6fdd59d4c58f12fcd yaml=15e910584fd80c17ae98c3116204ee33805b0d5f5025a52c6968d31209b82050 spans=[2022 c, 228 asm, 2 rodata] sha1_orig=452fb033f2eaa4b18aa20a5bca60b8125af3a37b sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=2022`. Log: session scratch `exact-rebuild-2022.log`. Route: `funcs=1253/1453 c_words=68162 nonc_funcs=77 nonc_words=5417 asm_funcs=123 asm_words=36250 asm_words_unknown=0 native_c=674/1453 native_c_words=17659 nonmatchable=present tierA=1208 tierB=248 tierB_unresolved=0`.
+
+Four leaves, each `LEAF_STRONG=EXACT` before the gate:
+
+- `func_800677FC` (`0x1C8`, `-O2 -G0`, `MASPSX_FRAME48_S5_AFTER_S2`, profile `era_o2_g0_frame48_s5_after_s2`). Knob off is 17 words. `compiled=0x1D0`. `docs/evidence/func-800677FC/REPORT.md`.
+- `func_80055E14` (`0x1A0`, `-O2 -G8`, existing `era_o2_g8`). `-G0` is 101 words. `compiled=0x1A0`.
+- `func_8007F418` (`0x1F0`, `-O2 -G0`, `MASPSX_SYMBOL_LOAD_DEST_TEMP` + `MASPSX_FILL_EPILOGUE_DELAY_SLOT`). Dest-temp alone is 2 words; fill alone is 21. `compiled=0x1F0`.
+- `func_8003CCB0` (`0x248`, default `-O2 -G0`). `compiled=0x250`.
+
+`disc1_preflight.py --deep --only` passed on each before the rebuild (`2022 c / 228 asm / 2 rodata`). Unclassified EXE asm and the five `gte-inline` spans are still in the plan. The native port was not started.
+
+## UPDATE 2026-09-25: next leaf after func_8007BDDC not carved
+
+`func_8007BDDC` stayed asm. The next ordinary functions were compiled and were not full-span matches: `func_80083944` (`0x274`, 0 jal) best 136 words at `-O2 -G0`; `func_8008486C` (`0x27C`, 1 jal) best 112 words, frame `0x28` against retail `0x18`. Neither was integrated. `disc1_preflight --deep --only` and `leaf_strong_check` were not re-run. The image is still the 2018 gate.
+
+## UPDATE 2026-09-25: func_8007BDDC not carved
+
+Best link is 25 words on cc1 2.8.1 `-O2 -G0 -mno-split-addresses` with `MASPSX_BEQZ_SYM_STORE_DELAY` (linked 368, target `0x168`, `nonzero_pad=0`). The counter `sw` now sits in the `beqz` delay. The bad-path `func_80071A74` address order and the `$v0`/`$v1` status join remain. Not integrated; the 2018 image was not rebuilt. `docs/evidence/func-8007BDDC/PARK.md`.
+
+## UPDATE 2026-09-25: 2018 asm classification
+
+`python3 tools/analysis/nonmatchable_spans.py` on the post-2018 split: 421 spans, alignment-filler 81/81w, gte-inline 5/192w, handwritten-cop 22/123w, handwritten-gte-wrapper 107/19957w, handwritten-jr-t2 53/163w, handwritten-syscall 2/8w. 151 unclassified. The five `gte-inline` functions still have handwritten `mtc2`/`mfc2`/`ctc2`/`swc2` and were not carved. `func_800740D0` (`0x148`) is the next ordinary leaf; best link is 64 words (`docs/evidence/func-800740D0/PARK.md`), so it was not integrated and no new gate was run. Counts: `docs/evidence/non-c-matchable/REPORT.md`.
+
+## UPDATE 2026-09-25: 2018 gate PASS
+
+`EXACT_REBUILD_GATE=PASS plan=2eaed0f5a66750c4ac165e22aa1d23576ace25a6b20d816d7c09cce813c6e4cf yaml=fd59cbfb28191d54acb36882c2c29bd0e0179fb7a291db835d9b75fc9588cac3 spans=[2018 c, 230 asm, 2 rodata] sha1_orig=452fb033f2eaa4b18aa20a5bca60b8125af3a37b sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=2018`. Log: session scratch `exact-rebuild-2018.log`. Route: `funcs=1250/1453 c_words=67778 nonc_funcs=77 nonc_words=5417 asm_funcs=126 asm_words=36634 asm_words_unknown=0 native_c=674/1453 native_c_words=17659 nonmatchable=present tierA=1208 tierB=248 tierB_unresolved=0`.
+
+`func_80070D10` (`0x5C`, `-O1 -G0`, `MASPSX_ORI_SMALL_LI` + `MASPSX_BNEZ_POSTDEC_FROM_MINUS_ONE`) is `LEAF_STRONG=EXACT` (`compiled=0x60`). Without the ori knob, 5 words; without the post-decrement rewrite, 16 words. Evidence: `docs/evidence/func-80070D10/REPORT.md`. Profile: `era_o1_g0_bnez_postdec_from_minus_one_ori_small_li`.
+
+## UPDATE 2026-09-25: 2017 gate PASS
+
+`EXACT_REBUILD_GATE=PASS plan=3e02a9770c967a2afe5634826b7b52a13270f1119c749c90da6c653a84345097 yaml=eb7f2446b7fc5b4cc9e6c1f818a2c4dcd8e597f5721a4a28dc79e80eb1fe200d spans=[2017 c, 230 asm, 2 rodata] sha1_orig=452fb033f2eaa4b18aa20a5bca60b8125af3a37b sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=2017`. Log: session scratch `exact-rebuild-2017.log`. Route: `funcs=1249/1453 c_words=67755 nonc_funcs=77 nonc_words=5417 asm_funcs=127 asm_words=36657 native_c=674/1453 native_c_words=17682 tierA=1208 tierB=248 tierB_unresolved=0`.
+
+`func_800CFD50` (`0x144`, `-O2 -G0`, `MASPSX_LOAD_BEFORE_STACK_HALF`) is `LEAF_STRONG=EXACT`. Without the knob the first multiply delay is `sh` then `lhu` (2 words). Evidence: `docs/evidence/func-800CFD50/REPORT.md`. Profile: `era_o2_g0_load_before_stack_half`.
+
+## UPDATE 2026-09-25: 2016 gate PASS
+
+`EXACT_REBUILD_GATE=PASS plan=89e1b59e76bdad66ea81ef4dc53aa38a541f339b9790a781f7bbfca32bea0508 yaml=915ebf70f3531400850badcd63f053411f1cc9f20189705148a74226d815ef4d spans=[2016 c, 231 asm, 2 rodata] sha1_orig=452fb033f2eaa4b18aa20a5bca60b8125af3a37b sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=2016`. Log: session scratch `exact-rebuild-2016.log`. Route: `funcs=1249/1453 c_words=67755 nonc_funcs=77 nonc_words=5417 asm_funcs=127 asm_words=36657 native_c=674/1453 native_c_words=17682 tierA=1208 tierB=248 tierB_unresolved=0`.
+
+`func_8001C614` (`0x1C8`, `-O2 -G8`; `-G0` is 109 words off) and `func_8003999C` (`0x1D8`, `-O2 -G0 -fno-strength-reduce`; without that flag, 116 words) are `LEAF_STRONG=EXACT`. New profile: `era_o2_g0_no_strength_reduce`.
+
+## UPDATE 2026-09-25: 2014 gate PASS
+
+`EXACT_REBUILD_GATE=PASS plan=248ac0b2742c1a152edd019f9ce3e0b5568713c182819c7f03037beb9ad4335e yaml=a9da6ffc53d071492a0b9bbd2976a9c6d711d88d18d6a6c3e5d8c563127a8d78 spans=[2014 c, 232 asm, 2 rodata] sha1_orig=452fb033f2eaa4b18aa20a5bca60b8125af3a37b sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=2014`. Log: session scratch `exact-rebuild-2014.log`. Route: `funcs=1248/1453 c_words=67641 asm_funcs=128 asm_words=36771`.
+
+`func_80083644` (`0x14C`, `-O2 -G0`, `MASPSX_FILL_EPILOGUE_DELAY_SLOT`) is `LEAF_STRONG=EXACT`. Without the fill, `jr` and `addiu $sp` are swapped.
+
+## UPDATE 2026-09-25: 2011 gate PASS
+
+`EXACT_REBUILD_GATE=PASS plan=269b11050cd85b42941d08c1dbfca143af8aa884435b2feb1d4dfee263a87b15 yaml=eca4c30d9a1f587dc2547855070fbedf6daf933c160db99fc31abe48e4954cd5 spans=[2011 c, 235 asm, 2 rodata] sha1_orig=452fb033f2eaa4b18aa20a5bca60b8125af3a37b sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=2011`. Log: session scratch `exact-rebuild-2011.log`. Route: `funcs=1245/1453 c_words=67385 nonc_funcs=77 nonc_words=5417 asm_funcs=131 asm_words=37027 native_c=674/1453 native_c_words=17682 tierA=1208 tierB=248 tierB_unresolved=0`.
+
+`func_80046574` (`0x14C`, `-O2 -G8`) and `func_8007D454` (`0x1C0`, `-O2 -G0`, `MASPSX_FILL_CALL_DELAY_SLOT` + `MASPSX_FILL_EPILOGUE_DELAY_SLOT`) are `LEAF_STRONG=EXACT` on this image. No new profiles.
+
+## UPDATE 2026-09-25: 2009 gate PASS
+
+`EXACT_REBUILD_GATE=PASS plan=06452d63c6e414c36437c7a6ae9286141606a77b3ee16668081e473db13de286 yaml=5a94d242765100429ab317148339c1c8e8a3d30373adb624c5da048cca82ac9f spans=[2009 c, 236 asm, 2 rodata] sha1_orig=452fb033f2eaa4b18aa20a5bca60b8125af3a37b sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=2009`. Log: session scratch `exact-rebuild-2009.log`. Route: `funcs=1243/1453 c_words=67190 asm_funcs=133 asm_words=37222`.
+
+`func_800534E4` (`0x164`, default `-O2 -G0`) is `LEAF_STRONG=EXACT`.
+
+## UPDATE 2026-09-25: 2013 gate PASS
+
+`EXACT_REBUILD_GATE=PASS plan=d7a74359c8fb064f20554c0a533a67759f5466c06870f19af0715903609c7242 yaml=d13202d6afae082b440cc6b3783db95ce832861a60e046e495944271052dc705 spans=[2013 c, 233 asm, 2 rodata] sha1_orig=452fb033f2eaa4b18aa20a5bca60b8125af3a37b sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=2013`. Log: session scratch `exact-rebuild-2013.log`. Route: `funcs=1247/1453 c_words=67558 nonc_funcs=77 nonc_words=5417 asm_funcs=129 asm_words=36854 native_c=674/1453 native_c_words=17682 tierA=1208 tierB=248 tierB_unresolved=0`.
+
+Both near misses are `LEAF_STRONG=EXACT` on this image. `func_8005382C` (`0x13C`, `-O2 -G8`, `MASPSX_DROP_UNUSED_VAR8`) drops the unused 8-byte frame slot. `func_80080F98` (`0x178`, cc1 2.8.1, `-mno-split-addresses`, prologue `$s2`/`$s1` swap, load-delay nop before the label, empty-`#APP` skip). Evidence: `docs/evidence/func-8005382C/REPORT.md`, `docs/evidence/func-80080F98/REPORT.md`. Profiles: `era_o2_g8_drop_unused_var8`, `era_o2_g0_cc1_281_load_delay_nop_before_label_nop_before_label_skip_empty_app_swap_s2_s1_save_pairs`.
+
+## UPDATE 2026-09-25: 2008 gate PASS
+
+`EXACT_REBUILD_GATE=PASS plan=2d32a44db8a664ba9c7b9a8dff3c2e8faf34b2fe5abbe2d3fc9ac5242c350016 yaml=68212c848105587f273ca17c23cc802317cdb9d1847d40bdc88b100a86770c0c spans=[2008 c, 237 asm, 2 rodata] sha1_orig=452fb033f2eaa4b18aa20a5bca60b8125af3a37b sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=2008`. Log: session scratch `exact-rebuild-2008.log`. Route: `funcs=1242/1453 c_words=67101 nonc_funcs=77 nonc_words=5417 asm_funcs=134 asm_words=37311 native_c=674/1453 native_c_words=17765 tierA=1208 tierB=248 tierB_unresolved=0`.
+
+`func_8007BBFC` (`0x1E0`) is `LEAF_STRONG=EXACT`. cc1 2.8.1, `-O2 -G0 -mno-split-addresses`, `MASPSX_FILL_CALL_DELAY_SLOT`, `MASPSX_UNFILL_EPILOGUE_DELAY_SLOT`. Argument zeros are pinned so 2.8.1 emits `addu rd,$0,$0`. Profile: `era_o2_g0_cc1_281_fill_call_delay_slot_unfill_epilogue_delay_slot`.
+
+## UPDATE 2026-09-25: remaining 237 asm rows classified
+
+`python3 tools/analysis/nonmatchable_spans.py` on the 2007 split: alignment-filler 81/81w, gte-inline 5/192w (informational), handwritten-cop 22/123w, handwritten-gte-wrapper 107/19957w, handwritten-jr-t2 53/163w, handwritten-syscall 2/8w. Placed into the 237 YAML asm rows: filler-only 72, handwritten-only 61, gte-inline-only 2, one mixed row at `0x80077F68` (`0xD2C`), 100 rows with no classified glabel (still C-expressible), and one 0-byte terminal row. Detail: `docs/evidence/non-c-matchable/REPORT.md`. Native port is still waiting on those 100 rows and the gte-inline rows.
+
+## UPDATE 2026-09-25: 2007 gate PASS
+
+`EXACT_REBUILD_GATE=PASS plan=fe9249539949585ae3c510296cc533cc8c25172fdf448deb3b9a2704eaf4c576 yaml=4b365b54e4fe6828e6a6a4aad9494fd99f3d6caaa5164057674150a5ff5382d2 spans=[2007 c, 237 asm, 2 rodata] sha1_orig=452fb033f2eaa4b18aa20a5bca60b8125af3a37b sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=2007`. Log: session scratch `exact-rebuild-2007.log`. Route: `funcs=1240/1452 c_words=66927 nonc_funcs=77 nonc_words=5417 asm_funcs=135 asm_words=37431 native_c=674/1452 native_c_words=17765 tierA=1207 tierB=248 tierB_unresolved=0`.
+
+`func_8008A750` (`0x17C`, cc1 2.8.1, `-mno-split-addresses`, `MASPSX_UNFILL_EPILOGUE_DELAY_SLOT`) and `func_800746A0` (`0xAC`, `-O2 -G0 -fno-schedule-insns -fno-schedule-insns2`) are `LEAF_STRONG=EXACT` on this image. New profile: `era_o2_g0_no_schedule_insns_no_schedule_insns2`.
+
+## UPDATE 2026-09-25: 2005 gate PASS
+
+`EXACT_REBUILD_GATE=PASS plan=f11bd7ab290ffec0a3a98c35e8bbb5578d47f6c93f7a00f20c44eed03393c3ce yaml=8f48c3bd224157f883f89a2dc63d8c4fb5880da90dd9def50f6dcf9414b3468c spans=[2005 c, 239 asm, 2 rodata] sha1_orig=452fb033f2eaa4b18aa20a5bca60b8125af3a37b sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=2005`. Log: session scratch `exact-rebuild-2005.log`.
+
+`func_80080E34` (`0x130`) is `LEAF_STRONG=EXACT`. cc1 2.8.1, `-mno-split-addresses`, `MASPSX_FILL_CALL_DELAY_SLOT`, and new patch 24 `MASPSX_UNALIGNED_WORD_COPY_RETURN_TEMP` (renames the `$t0` movstrsi scratch to `$v1` when the base is `$v0`, otherwise `$v0`). Without patch 24 the leaf is 8 words off. Evidence: `docs/evidence/func-80080E34/REPORT.md`. Profile: `era_o2_g0_cc1_281_fill_call_delay_slot_unaligned_word_copy_return_temp`.
+
+## UPDATE 2026-09-25: 2004 gate PASS
+
+`EXACT_REBUILD_GATE=PASS plan=6e090c3652d7487d40b8a40c49a8a6c0d7eaf95e472222746d55f7b6ebf9a86a yaml=d2dd284a54f0f92588183c6b3bd7ad10dda3815d64405048e3186cd0ae1bf5c3 spans=[2004 c, 239 asm, 2 rodata] sha1_orig=452fb033f2eaa4b18aa20a5bca60b8125af3a37b sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=2004`. Log: session scratch `exact-rebuild-2004.log`. Route: `funcs=1235/1447 c_words=66718 nonc_funcs=77 nonc_words=5417 asm_funcs=135 asm_words=37413 native_c=672/1447 native_c_words=17765 tierA=1202 tierB=248 tierB_unresolved=0`.
+
+Five leaves are `LEAF_STRONG=EXACT` on that image: `func_80039D24` (`0x1B0`) and `func_80039ED4` (`0x1B4`) on `era_o2_g0_no_schedule_insns`; `func_800844E4` (`0x160`) on `era_o2_g0_cc1_281`; `func_800846AC` (`0xF4`) on `era_o2_g0_no_schedule_insns_fill_epilogue_delay_slot`; `func_800847B0` (`0xBC`) on default `-O2 -G0`. No new profiles.
+
+## UPDATE 2026-09-25: 1999 gate PASS
+
+`EXACT_REBUILD_GATE=PASS plan=f26da68726e565d405c97193055cc09371cbdfc859ee18e3a609f5e2115c3031 yaml=6bbf2eaeb3d9b85974984be15f1ffd16fd6dabc0e5db656f77555133f41976b5 spans=[1999 c, 241 asm, 2 rodata] sha1_orig=452fb033f2eaa4b18aa20a5bca60b8125af3a37b sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=1999`. Log: session scratch `exact-rebuild-1999.log`. Route: `funcs=1225/1439 c_words=66198 nonc_funcs=77 nonc_words=5417 asm_funcs=137 asm_words=37559 native_c=669/1439 native_c_words=17765 tierA=1194 tierB=248 tierB_unresolved=0`.
+
+`func_8007C484` (`0xB8`, `-O2 -G0`, `MASPSX_SINK_ZERO_STORE_INTO_BEQZ`) is `LEAF_STRONG=EXACT` (compiled `0xC0`, zero pad). The empty `"=r"` barrier after the status-1 block is load-bearing. Evidence: `docs/evidence/func-8007C484/REPORT.md`.
+
+## UPDATE 2026-09-25: 1998 gate PASS
+
+`EXACT_REBUILD_GATE=PASS plan=77a84fdbf5a11007432d81e68ea78660dcf0ff5a165f5e983c289d9af31bd4d3 yaml=1fc45b4da559aeb38a3fa11df579e7c977e13124f25cf3624cf17e7c08202159 spans=[1998 c, 240 asm, 2 rodata] sha1_orig=sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=1998`. Log: session scratch `exact-rebuild-1998.log`. Route: `funcs=1225/1439 c_words=66198 asm_funcs=137 asm_words=37559 native_c=669/1439`.
+
+No newer leaf is carved on top of this image yet.
+
+## UPDATE 2026-09-25: 1995 gate PASS; 1998 spans queued
+
+`EXACT_REBUILD_GATE=PASS plan=53825cd11e9475eaab3eebe544afb42da2660e35920449be213db7e142e27816 yaml=39054fd3ae9bae50c7a5f4f10188be0fc30c8e11483c5fe536bf32e0f20c21ab spans=[1995 c, 240 asm, 2 rodata] sha1_orig=sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=1995`. Log: session scratch `exact-rebuild-1995.log`.
+
+Three more leaves are `LEAF_STRONG=EXACT`: `func_8007E5C4` (`0xEC`, `MASPSX_SYMBOL_LOAD_DEST_TEMP`; without it, 3 words), `func_800D3AFC` (`0xCC`, default `-O2 -G0`), `func_800CF3AC` (`0x108`, `MASPSX_EXPAND_DIV`; without it, 13 words). Plan is now **1998 c / 240 asm**. The 1998 image gate writes `exact-rebuild.log`.
+
+## UPDATE 2026-09-25: 1993 gate PASS; 1995 spans queued
+
+`EXACT_REBUILD_GATE=PASS plan=90f756bd0309ba1e0457199880e0c890acd7f08cf6b52534d85e283f488f7d8f yaml=89faf668b48ddd448ad3c5bce239d5d6b92992997ce21fdfbc17e81778c9e3ea spans=[1993 c, 240 asm, 2 rodata] sha1_orig=sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=1993`. Log: session scratch `exact-rebuild-1993.log`.
+
+`func_800DCCCC` (`0x1C8`, default `-O2 -G0`) and `func_80073354` (`0xFC`, `MASPSX_FILL_EPILOGUE_DELAY_SLOT`) are `LEAF_STRONG=EXACT`. Without the epilogue fill, `func_80073354` swaps `jr` and `addiu $sp`. Plan is now **1995 c / 240 asm**. The 1995 image gate writes `exact-rebuild.log`.
+
+## UPDATE 2026-09-25: 1993 gate PASS
+
+`EXACT_REBUILD_GATE=PASS plan=90f756bd0309ba1e0457199880e0c890acd7f08cf6b52534d85e283f488f7d8f yaml=89faf668b48ddd448ad3c5bce239d5d6b92992997ce21fdfbc17e81778c9e3ea spans=[1993 c, 240 asm, 2 rodata] sha1_orig=sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=1993`. Log: session scratch `exact-rebuild-1993.log`. Route: `funcs=1223/1439 c_words=66076 asm_funcs=139 asm_words=37681 native_c=669/1439`.
+
+No further leaf is carved on top of this image yet. Near-miss lanes are still on `func_800DCCCC` (4 words), `func_8007BBFC` (12), and `func_80073354` (8).
+
+## UPDATE 2026-09-25: 1991 gate PASS; 1993 spans queued
+
+`EXACT_REBUILD_GATE=PASS plan=1629aaf1d338942abd446c7b4f2598a277873b118a344fee47b12ab2fc2de94d yaml=ec1bb7479496e91d8eba3a5cc055cfe95c548f96e626dca9ea651ff9167909da spans=[1991 c, 241 asm, 2 rodata] sha1_orig=sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=1991`. Log: session scratch `exact-rebuild-1991.log`.
+
+`func_80087428` (`0x1D4`, cc1 2.8.1, `-O2 -G0 -mno-split-addresses -fno-schedule-insns`, `MASPSX_UNFILL_EPILOGUE_DELAY_SLOT`) and `func_8008D610` (`0x194`, `-O2 -G0`, `MASPSX_FILL_EPILOGUE_DELAY_SLOT`) are `LEAF_STRONG=EXACT`. Plan is now **1993 c / 240 asm**. The 1993 image gate writes `exact-rebuild.log`. Lane H produced no exact leaf (`func_800DCCCC` is 4 words off).
+
+## UPDATE 2026-09-25: 1990 gate PASS; 1991 spans queued
+
+`EXACT_REBUILD_GATE=PASS plan=ef1f82beb4ac9410cd22ed04e31bb483285d4c28e72cd88ee2aaa1adea260ed8 yaml=891bc1b1c0c72e20c421d7f5c63f5c62c9ea27a574ea95ef3c2077914e74bf5e spans=[1990 c, 242 asm, 2 rodata] sha1_orig=sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=1990`. Log: session scratch `exact-rebuild-1990.log`.
+
+`func_8005E588` (`0x15C`) is `LEAF_STRONG=EXACT` on `-O2 -G8`. The screen halfwords stay `$s0`-relative because a register barrier stops cc1 from folding them back into `D_800A2180+offset`. `-G0` is 15 words off. Plan is now **1991 c / 241 asm**. The 1991 image gate writes `exact-rebuild.log`.
+
+## UPDATE 2026-09-25: 1988 gate PASS; 1990 spans queued
+
+`EXACT_REBUILD_GATE=PASS plan=8dbc8ed96de8261a263fd3e43d43024d5ef2d4df619ddcab4e41a272e604dac3 yaml=fcd4fb263e3a0ebf932b46999eac0719fedd25e1b988ce8acc33db19ddd6cd57 spans=[1988 c, 243 asm, 2 rodata] sha1_orig=sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=1988`. Log: session scratch `exact-rebuild-1988.log`.
+
+`func_80057654` (`0x18C`) and `func_80058E44` (`0x1A8`) are `LEAF_STRONG=EXACT` on `-O2 -G8` (existing `era_o2_g8`). Plan is now **1990 c / 242 asm**. The 1990 image gate writes `exact-rebuild.log`.
+
+## UPDATE 2026-09-25: 1984 gate PASS; 1988 spans queued
+
+`EXACT_REBUILD_GATE=PASS plan=d81d1ff35312a60cbb4876a0b9401beb1131fa02a6c696f7b145564c59d298ff yaml=8747d13d0e3fc9668ac3b96cae5805d947c7b0efb53d35e3eb6cb63040542e93 spans=[1984 c, 246 asm, 2 rodata] sha1_orig=sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=1984`. Log: session scratch `exact-rebuild-1984.log`.
+
+Four more leaves are `LEAF_STRONG=EXACT` and deep-preflight PASS, plan now **1988 c / 243 asm** (`8dbc8ed96de8`): `func_8005FCAC` (`era_o2_g8_expand_div`), `func_800777C0` (`era_o2_g0_cc1_281`), `func_800CE610` (default `-O2 -G0`), `func_800875FC` (`era_o2_g0_no_schedule_insns`). The 1988 image gate is the one writing `exact-rebuild.log`.
+
+## UPDATE 2026-09-25: 1982 gate PASS; 1984 spans in the next gate
+
+`EXACT_REBUILD_GATE=PASS plan=77477bf485c5f8e5505fe24ab57f782b68f1a36ca9fee3b3a35b08c97ac631fa yaml=634d97241e7c504b35c63176806732f653813d39eb1e17817f05f025a4df7d54 spans=[1982 c, 248 asm, 2 rodata] sha1_orig=sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=1982`. Saved as the session scratch `exact-rebuild-1982.log`.
+
+Carved after that gate, both `LEAF_STRONG=EXACT` and deep-preflight PASS, plan now **1984 c / 246 asm** (`d81d1ff35312`): `func_80083D04` (`-O2 -G0`, `MASPSX_SPILL_BEFORE_SYMBOL_LOAD` + `MASPSX_FILL_EPILOGUE_DELAY_SLOT`) and `func_8006AD40` (cc1 2.8.1, `-O2 -G0 -mno-split-addresses`, new opt-in `MASPSX_SINK_RETURN_ZERO_INTO_FLAG_DELAY` plus `MASPSX_UNFILL_EPILOGUE_DELAY_SLOT`). Evidence: `docs/evidence/func-8006AD40/REPORT.md`. The 1984 image gate was started after `--write-status` and is the one whose log is `exact-rebuild.log`.
+
+## UPDATE 2026-09-25: two jump-table leaves — 1982 C spans, gate queued
+
+`func_80020288` and `func_8006C5BC` are `LEAF_STRONG=EXACT` on `-O2 -G0` with
+`MASPSX_DISPATCH_FOLD` (`jtbl_8001070C` and `jtbl_800113F0`) plus
+`MASPSX_THREE_WORD_SYMBOL_STORE`. Plan is 1982 c / 248 asm. The 1980-span
+gate below passed before these two were carved.
+
+## UPDATE 2026-09-25: disc-1 gate PASS at 1980 C spans
+
+`EXACT_REBUILD_GATE=PASS plan=deaf6283d3ca… yaml=e46fb9ffe7bc… spans=[1980 c, 250 asm, 2 rodata]`,
+`sha1_orig=sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`,
+`VERIFY_SWEEP=PASS leaves=1980`. Log in the session scratch `exact-rebuild.log`.
+New since the 1959-span tree: `func_800775E8`, `func_800776D4`, `func_80077904`,
+`func_80077294` (cc1 2.8.1, `-mno-split-addresses`), `func_8007E204`/`func_8007E218`
+(computed `goto` tail `jr $t1`; the strong check now accepts a terminal indirect
+`jr`), `func_80019810`, `func_8001C164`, `func_8004FB48`, `func_800638D8`,
+`func_80085290`, `func_80087AA8`, `func_8008CBA8`, `func_8008DB7C`, `func_8007E048`
+(`-fno-schedule-insns2`), `func_8007E370` (global `$v1`), `func_8007E4E0` (`-O1`),
+`func_80070D6C` (`-O1`), `func_8001D170` (`-G8`, `D_8009D254` absolute),
+`func_8007DB24` (expand-div + div-no-reuse nop), `func_800851A8`.
+Eleven overlay targets that gained small leaves also `EXACT_REBUILD_GATE=PASS`
+(`room_m0017i`, `room_m0137i`, `room_m0141i`, `room_m0152i`, `room_m0203i`,
+`room_m0231i`, `room_m0272i`, `room_m0273i`, `room_m0350i`, `room_m0418i`, `ovl_039F`).
+`func_800370BC`/`func_800370CC` stay asm: retail's trapping `add` is not a C `addu`.
+Five `gte-inline` spans still contain `mtc2`/`mfc2`/`ctc2`/`swc2`.
+
+## UPDATE 2026-09-24: batch 8 — 1922 EXE c spans, full gate PASS
+
+`EXACT_REBUILD_GATE=PASS plan=ebf6bbfdb6d2… yaml=1e6364e564cf… spans=[1922 c, 269 asm,
+2 rodata]`, retail SHA-1 unchanged, `VERIFY_SWEEP=PASS leaves=1922`. Log `build/tmp/gate10.log`.
+Contents: decompB's libcd CdControl trio + libpad `func_800830DC` (the "cc1 won't hoist loop
+invariants" park was spelling: explicit `one`/`neg1`/pointer locals before the loop + pins);
+tooling2's `_spu_init` (`func_8007D1D4`, 2.7.2 + patches 8/3/21 — **patch 21**
+`MASPSX_LOAD_DELAY_NOP_BEFORE_LOOP_LABEL`, per-leaf); decompA's 7 (incl. func_80021F38,
+func_800258CC with dispatch+expand_div+force-absolute profiles). Compiler rule for the band:
+try BOTH cc1s per leaf from the first structural draft (survey negative for any other version).
+
+## UPDATE 2026-09-24: overlay lane +7 hand leaves — 193/194 distinct bodies, 72/72 PASS
+
+overlays2 carved 7 new hand-matched leaves (ovl_03C5 `func_80121270`, former 35-word park;
+room_m0174i ×4; room_m0186i ×2) and propagated their shared bodies to rooms m0034i/m0187i/
+m0348i; all six targets `EXACT_REBUILD_GATE=PASS` (lines in `build/fanout/overlays2/logs/`).
+Recount: 223 hand-matched + 2261 masked-body ports = 2484 C spans = **193 distinct bodies**
+(overlays2's hash; 194 by tooling2's). `tools/analysis/room_lane/port.py` now derives an
+unmapped room symbol from mapped field addresses within 0x100 above it when all imply the same
+delta (fixed 5 skipped bodies per room); a re-pass over the other rooms with that fix is queued
+(dry-run first). Inline-GTE bodies remain non-C.
+
+## UPDATE 2026-09-24: batch 9 — 1943 EXE c spans, full gate PASS
+
+`EXACT_REBUILD_GATE=PASS plan=73c844cd5948… yaml=d18c46c28328… spans=[1943 c, 259 asm,
+2 rodata]`, retail SHA-1 unchanged, `VERIFY_SWEEP=PASS leaves=1943`. Log `build/tmp/gate11.log`.
+Contents: decompB's func_8007D074 (2.7.2 fixes the restore order), func_800832B4, func_8007A360
+(prior draft had wrong semantics — retail returns 1 when a0 != 1), func_80081D74, func_80073454,
+func_80076434, func_80083F44 ("constant return behind an empty register barrier" lever);
+tooling2's func_8007FE24 (libds vsync machine); decompA's 21 (incl. func_80035038 0x520,
+func_80026FF8 0x5D4, func_80016910 whose `case 0x7D0` value is unrecoverable — any value below
+0x835 gives the same bytes, documented). New durable process: `build/fanout/
+restore_dropped_rows.py` runs after every lane merge (a `--theirs` merge drops rows other
+agents own inside the lane's range).
+
+## UPDATE 2026-09-24: RCNT2 model, absent → 2, overlay-port plan approved
+
+`pc_port/platform/pe_rcnt2.{h,c}`: root counter 2 (0x1F801120/24/28) with psx-spx semantics
+(mode write resets count + sets bit 10; bit 9 = /8 clock; bit 3 = reset at target; bits 11/12
+reached flags cleared on read; sync 0/3 stops; no IRQ — readers poll), advanced from the
+deterministic device clock, reset by `PE_Sdk_ResetState`. Retail programs it via libapi
+`SetRCnt` = `func_80085814` (`D_8009B7D0` = 0x1F801100, mis-named "DMA acquire" before);
+`func_80085644` bring-up sets mode 0x258 / target 0x44E8. `func_80084FC4`/`func_80084FE4`
+ported (`decomp_hand/rcnt2_port.c`). Remaining absent: `func_800830DC`/`func_800832B4` (SIO0
+busy-wait on 0x1F801040 — needs an SIO model, assigned). Overlay-port mechanism approved in
+stages (`build/fanout/portabsent/OVERLAY_PORT_PROPOSAL.md`): namespaced `<ovl>__func_X` TUs
+per overlay (346 names mean different code across the shared 0x8018EFE8 arena), coverage keyed
+by (overlay, name), rooms deduped by body, then a residency registry + `PE_GuestCode_Resolve`
+that lifts the generator's indirect-call rule (~110 EXE + ~514 overlay leaves).
+
+## UPDATE 2026-09-24: port round 2 — KUSEG mirror, 793 decomp-derived, suite 1555/1555
+
+`PE_RamCanonical()` in `pe_guest_ram.c` folds KUSEG 0x00000000–0x001FFFFF and KSEG1
+0xA0000000–0xA01FFFFF onto KSEG0 (mapped 2 MiB only; range crossings abort) — retail reads
+low RAM through these aliases and the port used to abort. 304 hand ports retired for generated
+decomp TUs in total (6317 words); coverage matched 1943 / from_decomp **793** / hand 1123 /
+stub 25 / absent 2. Open generator accuracy rule (assigned portabsent): guest 0 → host NULL must
+apply ONLY to pointers the leaf null-tests; otherwise mirror-translate (71 generated TUs
+segfault on the current rule where retail runs); `PE_HostToGuest` must canonicalize KUSEG
+aliases (func_800C2B10 returns 0x8000006D vs retail 0x6D). Evidence: `docs/evidence/portverify/
+REPORT.md` (Round 2), `build/fanout/portverify/divergences.md`.
+
+## UPDATE 2026-09-24: overlay lane independently re-gated — 72/72 PASS
+
+tooling2's sequential sweep (`build/fanout/tooling2/overlay_gates.txt`, 02:25–02:58 UTC, one
+gate at a time, per-target YAML-change detection: none changed): **72/72 targets
+`EXACT_REBUILD_GATE=PASS`** (room_m0065i failed once on the split git-status race and passed on
+retry), 2469 c rows, 0 rows without an existing evidence report. Honest metric stands: 216
+hand-matched leaves (139 this session) + 2253 masked-body ports = **187 distinct bodies across
+72 gated targets** (6 subsystem overlays + 66 rooms). Evidence: `docs/evidence/room_<r>-ports-
+2026-09-23/REPORT.md` ×61, `docs/evidence/room-lane-2026-09-23/REPORT.md`, `docs/ai_context/
+OVERLAY_LANE.md` §4.4. Inline-GTE room bodies (8 × 39 rooms + m0391i `func_8018F574`) are
+classified non-C (handwritten-gte-wrapper class) in ROOM_LANE_SCOPING.md.
+
+## NOTE 2026-09-24: overlay-lane metric — count DISTINCT BODIES, not rows
+
+overlays2 configured 72 targets (6 subsystem overlays + 66 rooms) with 2469 staged
+`src/overlays/**/*.c`. Modulo `func_`/`D_` renames these are **187 distinct code bodies**
+(668 files are `return 0;`): room chunk-2 code is shared across rooms, and each shared body was
+matched once and re-emitted per room "re-targeted by symbol address". That is legitimate ONLY
+because each target's `exact_rebuild_overlay.sh` gate proves the byte-exact link; report the
+lane as "187 distinct bodies / 72 targets gated", never "2469 leaves". Defect found by tooling2:
+2257 sources cite evidence reports that do not exist (`docs/evidence/room_<r>-ports-2026-09-23/
+REPORT.md` ×61 + 4 ovl reports) — overlays2 must write them before anything is committed.
+Independent sequential re-gate of all 72 targets pending (tooling2, `build/fanout/tooling2/
+overlay_gates.txt`).
+
+## UPDATE 2026-09-24: port accuracy pass — 756 decomp-derived, suite 1545/1545
+
+`scripts/build_pc_port.sh --build-dir build/pcbuild-lead` → `Results: 1545 run, 1545 passed`;
+`pc_port_coverage.py` → matched 1902 / from_decomp **756** / hand 1122 / stub 22 / absent **2**
+(session start: 368 / 535 / 256 / 496). portverify built a differential harness (generated TU
+renamed and linked beside the hand port, forked children on identical seeded guest RAM, full
+RAM + scratchpad + return compared; 413/449 conflicts runnable) and retired 273 hand ports for
+the generated decomp code. **Retail-accuracy bugs found in hand ports and fixed with regression
+tests** (`pc_port/tests/test_portverify.h`, `build/fanout/portverify/divergences.md`):
+func_800661EC (mask 0xFFF0 vs ~0xF + inverted a3==8 polarity), func_800144FC (state>=0x3C
+must return 1), func_80019B08 (inverted bit-8 test), func_8004F464 (never cleared D_8009D008),
+func_800528F0 (2 XOR passes vs retail 3 — the old test oracle had the same error),
+func_8006BE4C (dropped -10), func_8006B35C (wrong halfwords), func_80067B74/func_80067D18
+(bodies missing). **Systemic:** the era compiler treats plain `char` as unsigned; 63 generated
+TUs were compiled signed on x86 — `game/decomp` and `game/decomp_hand` now build with
+`-funsigned-char`. Generator soundness fixes (portabsent): `(T **)` casts rejected (read 8-byte
+host pointers from guest RAM; live in func_80030640 before), `(T *)` casts must root at guest
+memory, scalar globals passed by VALUE not address (52 TUs), pointer globals pass the stored
+pointer, guest NULL stays NULL. Open: KUSEG 0x00xxxxxx mirror in PE_Translate (7 leaves),
+~83 unanalysed conflicts, root counter 2 not modelled (func_80084FC4/FE4).
+
+## UPDATE 2026-09-24: batch 7 — 1902 EXE c spans, full gate PASS
+
+`EXACT_REBUILD_GATE=PASS plan=6e2cd6373d28… yaml=fd9a71cde75f… spans=[1902 c, 275 asm,
+2 rodata]`, retail SHA-1 unchanged, `VERIFY_SWEEP=PASS leaves=1902`. Log `build/tmp/gate9.log`.
+decompA's batch (22 leaves incl. the field-VM interpreter loop `func_80017018` and
+`func_80051E64` via the hoisted-`la` fold). Merge hazard learned: a `--theirs` 3-way merge of a
+lane's private YAML drops any row the LEAD hand-inserted inside that lane's range — re-check
+hand-inserted rows after every lane merge (`func_800323C8` had to be re-added).
+
+## UPDATE 2026-09-24: batch 6 — 1887 EXE c spans, full gate PASS
+
+`EXACT_REBUILD_GATE=PASS plan=5688d3707eeb… yaml=457ac712c419… spans=[1887 c, 284 asm,
+2 rodata]`, retail SHA-1 unchanged, `VERIFY_SWEEP=PASS leaves=1887`. Log `build/tmp/gate8.log`.
+New in this batch: maspsx patch 17 now DEFAULT-ON (`MASPSX_LA_ABSOLUTE_SMALL_DATA=0` opts
+out; retail has no gp-relative `la` anywhere; 0/2621 leaves change), `MASPSX_DISPATCH_FOLD`
+also folds a hoisted `la $r,$L<n>` table base (closed `func_80051CC4`, previously excluded at
+424a2c3a, and `func_80051E64`), patch 19 `MASPSX_FILL_BRANCH_SPLIT_LI` (**PROVISIONAL** — no
+leaf closes with it yet; revert if none does), patch 20 `MASPSX_RODATA_FOLD=<pool syms>` +
+`strip_rodata_fold` in `disc1_build.py` (closed `func_800323C8`, which needs an unreferenced
+`int pad[4]` local — same device as `func_800347B4`). Findings: ASPSX 2.30 == 2.56 for us
+(0-line maspsx diff); inside 0x80071A84–0x8008D610 retail shows 2.8.1-style reorg slot steals
+AND 2.7.2-style epilogue scheduling in different functions — try BOTH cc1s per leaf; a survey
+of other decompals/old-gcc versions is running (tooling2). The khasinski build-facts table
+(`build/fanout/khasinski_build_facts.tsv`, his TU + flags per remaining function, no code) says
+the libcd/libds/libspu "loop-invariant hoist" parks were lifted at default 2.7.2 -O2 -G0 —
+spelling, not compiler.
+
+## UPDATE 2026-09-24: batch 5 — 1864 EXE c spans, full gate PASS
+
+`EXACT_REBUILD_GATE=PASS plan=c9274f8bba3d… yaml=6630566fc2fe… spans=[1864 c, 291 asm,
+2 rodata]`, retail SHA-1 unchanged, `VERIFY_SWEEP=PASS leaves=1864`. Log:
+`build/tmp/gate7.log`. Since batch 3: maspsx patches 15 (`MASPSX_UNFILL_EPILOGUE_DELAY_SLOT`),
+16 (`MASPSX_DIV_NO_REUSE_NOP`, expand-div only), 17 (`MASPSX_LA_ABSOLUTE_SMALL_DATA`,
+inert on the corpus — approved default-on), 18 (`MASPSX_FILL_CALL_VOLATILE_STORE`, per-leaf);
+`tools/analysis/maspsx_knob_sweep.py` (flag-off identity + knob-on change list for every
+era leaf). Goal lane now: `build/fanout/BRIEF_GOAL.md` (port must match retail; agents
+decompA/decompB/overlays2/portverify/portabsent/tooling2). Open port-accuracy defect:
+`gen_decomp_ports.py` let `(T **)` casts read 8-byte host pointers from guest RAM
+(live in `func_80030640_port.c`); fix in progress (portabsent). The /tmp quota eater is the
+harness's own `/tmp/claude-1000/bash-edit-diff` cache — run a janitor loop.
+
+## UPDATE 2026-09-23: batch 3 — 1821 EXE c spans, full gate PASS
+
+`EXACT_REBUILD_GATE=PASS plan=256deb3d7b01… yaml=741c088e0325… spans=[1821 c, 304 asm,
+2 rodata]`, retail SHA-1 unchanged, `VERIFY_SWEEP=PASS leaves=1821`, deep preflight
+PASS; route `funcs=1044/1370`. Log: `build/tmp/gate5.log`. Adds maspsx patch 14
+(`MASPSX_LOAD_DELAY_NOP_BEFORE_LABEL`, func_80083578/func_8007BF44; func_80081414 lost
+its `asm volatile("nop")` workaround). Not yet merged (in lane private configs under the
+session scratchpad): ~73 more EXE leaves, tooling patches 15/16 (16 narrowed, untested),
+12 more overlay leaves (77 total, gates PASS), ~60 unbuilt port adapters. Work halted
+by the /tmp per-user quota (the Claude harness itself writes there).
+
+## CURRENT 2026-09-22: parallel fan-out — 1655 -> 1780 EXE c spans, 68 overlay leaves
+
+Full record: `docs/evidence/session-2026-09-22-fanout/REPORT.md`. **Nothing
+committed** — all new sources are staged (`git add`; overlay sources `git add -N`).
+
+1. **Verified state.** EXE build `RESULT=EXACT_MATCH` (retail SHA-1 unchanged),
+   `VERIFY_US=PASS`, `VERIFY_SWEEP=PASS leaves=1780`, deep preflight PASS
+   (1780 c / 310 asm / 2 rodata). Overlay gates PASS: ovl_0700 34, ovl_03C5 2,
+   ovl_03C9 7, ovl_0457 12, ovl_03D2 10, ovl_039F 0 (libpress, classified),
+   room_m0022i 3. pc_port suite 1419/1419; decomp-derived port leaves 477.
+2. **New tooling**: multi-table `MASPSX_DISPATCH_FOLD` (comma list), maspsx
+   patches 11/12/13, `era_link_check` lib path, gate keeps logs on FAIL,
+   per-body stub classifier, `gen_decomp_ports` E7c + derived host signatures.
+3. **Gate hygiene learned the hard way**: `disc1_plan.py --write-status` BEFORE
+   the gate (verify fails on a stale status doc); never two gates at once (a
+   backgrounded `&` gate survived and raced the next one); `export
+   TMPDIR=$PWD/build/tmp` (the /tmp tmpfs has a per-user quota).
+4. **Next.** The lanes stopped at a usage limit mid-list. Resume from
+   `docs/evidence/session-2026-09-22-fanout/lane_results/lane<N>.jsonl`
+   (not-attempted = functions absent from the jsonl); the parked list there has
+   1–3-word residuals worth a second look (`func_80083578`/`func_8007BF44` need
+   the load-label-nop maspsx fix; `func_8007A2A4` may close with patch 13).
+   Remaining asm: 310 spans. Port: 369 matched leaves still absent.
+
+---
+
 ## CURRENT 2026-09-21: first branch merge landed — 810 -> 964 c spans on main
 
 The native PC port is the deliverable; matching decomp is the means. Nothing is

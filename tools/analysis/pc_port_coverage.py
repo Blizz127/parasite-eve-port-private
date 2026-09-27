@@ -14,7 +14,9 @@ over".  It answers, from authoritative inputs only:
 Every matched leaf is classified into exactly one bucket:
 
   absent          no pc_port definition anywhere and no decomp-derived shadow
-  stub            a pc_port definition whose body is a bootstrap/stub provider
+  stub            every pc_port definition body of the leaf contains a
+                  bootstrap/stub marker (the leaf's OWN body, not merely a
+                  file that also holds a boundary stub for some other callee)
   hand-translated a real pc_port definition written independently of `src/`
   ported-from-decomp
                   a pc_port definition that carries a decomp provenance header
@@ -46,6 +48,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 CONFIG = Path("configs/USA/disc1.yaml")
 SRC_GLOB = "src/func_*.c"
 PORT_GLOB = "pc_port/**/*.c"
+# Headers can carry `static inline` definitions (e.g. psx_compat.h); they are
+# scanned for definition BODIES only.
+PORT_HEADER_GLOB = "pc_port/**/*.h"
 DECOMP_PORT_DIR = Path("pc_port/game/decomp")
 PORT_SUFFIX = "_port.c"
 
@@ -115,22 +120,108 @@ def parse_src() -> dict[str, dict]:
     return out
 
 
-def parse_ports() -> tuple[dict[str, list[str]], dict[str, str]]:
-    """Return (definitions, provenance).
+def _skip_ws_comments(text: str, i: int) -> int:
+    n = len(text)
+    while i < n:
+        if text[i].isspace():
+            i += 1
+        elif text.startswith("/*", i):
+            j = text.find("*/", i + 2)
+            i = n if j < 0 else j + 2
+        elif text.startswith("//", i):
+            j = text.find("\n", i)
+            i = n if j < 0 else j + 1
+        else:
+            break
+    return i
 
-    definitions: func name -> sorted list of pc_port source files that define it
+
+def _match_close(text: str, i: int, op: str, cl: str) -> int | None:
+    """`text[i] == op`; return the index just past its matching `cl`.
+
+    Comments and string/char literals are skipped so a `}` inside a
+    `"..."` or `/* ... */` does not end the body early.
+    """
+    depth = 0
+    n = len(text)
+    while i < n:
+        c = text[i]
+        if text.startswith("/*", i):
+            j = text.find("*/", i + 2)
+            i = n if j < 0 else j + 2
+            continue
+        if text.startswith("//", i):
+            j = text.find("\n", i)
+            i = n if j < 0 else j + 1
+            continue
+        if c in "\"'":
+            i += 1
+            while i < n and text[i] != c:
+                i += 2 if text[i] == "\\" else 1
+            i += 1
+            continue
+        if c == op:
+            depth += 1
+        elif c == cl:
+            depth -= 1
+            if depth == 0:
+                return i + 1
+        i += 1
+    return None
+
+
+def definition_bodies(text: str) -> list[tuple[str, str]]:
+    """Return [(func name, body text)] for every file-scope definition.
+
+    A `DEF_RE` hit whose parameter list is followed by `{` is a definition;
+    one followed by `;` (a prototype / `extern` declaration) is not.
+    """
+    out: list[tuple[str, str]] = []
+    for m in DEF_RE.finditer(text):
+        close = _match_close(text, m.end() - 1, "(", ")")
+        if close is None:
+            continue
+        k = _skip_ws_comments(text, close)
+        if k >= len(text) or text[k] != "{":
+            continue
+        end = _match_close(text, k, "{", "}")
+        if end is None:
+            continue
+        out.append((m.group(1), text[k:end]))
+    return out
+
+
+def is_stub_body(body: str) -> bool:
+    return any(marker in body for marker in STUB_MARKERS)
+
+
+def parse_ports() -> tuple[dict[str, list[str]], dict[str, str], dict[str, bool]]:
+    """Return (definitions, provenance, stub_only).
+
+    definitions: func name -> sorted list of pc_port source files (`.c`, or a
+                 header with a `static inline` body) that DEFINE it — a
+                 prototype or `extern` declaration is not a definition
     provenance:  func name -> matched-leaf name a decomp port claims to derive
                  from (only for files under pc_port/game/decomp/)
+    stub_only:   func name -> True when EVERY definition body of that name
+                 contains a stub marker (judged per body, not per file)
     """
     definitions: dict[str, set[str]] = {}
     provenance: dict[str, str] = {}
-    for path in sorted(REPO_ROOT.glob(PORT_GLOB)):
+    any_real: dict[str, bool] = {}
+    paths = sorted(REPO_ROOT.glob(PORT_GLOB)) + sorted(REPO_ROOT.glob(PORT_HEADER_GLOB))
+    for path in paths:
         if "build" in path.parts:
+            continue
+        # Overlay TUs define `<ovl>__func_X` through a rename macro; they are
+        # counted by --overlays, never as plain EXE definitions.
+        if "decomp_ovl" in path.parts:
             continue
         text = path.read_text(encoding="utf-8", errors="replace")
         rel = str(path.relative_to(REPO_ROOT))
-        for m in DEF_RE.finditer(text):
-            definitions.setdefault(m.group(1), set()).add(rel)
+        for name, body in definition_bodies(text):
+            definitions.setdefault(name, set()).add(rel)
+            any_real[name] = any_real.get(name, False) or not is_stub_body(body)
         is_decomp_port = (REPO_ROOT / DECOMP_PORT_DIR) in path.parents
         if is_decomp_port:
             for m in PROVENANCE_RE.finditer(text):
@@ -138,11 +229,12 @@ def parse_ports() -> tuple[dict[str, list[str]], dict[str, str]]:
     return (
         {k: sorted(v) for k, v in definitions.items()},
         provenance,
+        {k: not v for k, v in any_real.items()},
     )
 
 
 def classify(
-    leaf: dict, src: dict | None, definitions: dict, provenance: dict, stub_files: set[str]
+    leaf: dict, src: dict | None, definitions: dict, provenance: dict, stub_only: dict
 ) -> tuple[str, list[str], str]:
     """Return (bucket, defining_files, note)."""
     name = leaf["name"]
@@ -151,9 +243,124 @@ def classify(
         return "ported-from-decomp", files, "decomp-derived shadow TU"
     if not files:
         return "absent", files, "no pc_port definition"
-    if all(f in stub_files for f in files):
-        return "stub", files, "bootstrap/stub provider only"
+    if stub_only.get(name, False):
+        return "stub", files, "every definition body is a bootstrap/stub provider"
     return "hand-translated", files, "independent pc_port implementation"
+
+
+# ── overlay coverage (step 2 of the overlay-port mechanism) ──────────────
+OVL_CONFIG_DIR = Path("configs/USA/overlays")
+OVL_PORT_DIR = Path("pc_port/game/decomp_ovl")
+OVL_SPAN_RE = re.compile(
+    r"^\s*-\s*\[\s*(0x[0-9A-Fa-f]+)\s*(?:,\s*(\w+)\s*(?:,\s*(\w+))?)?\s*\]",
+    re.MULTILINE)
+OVL_PROVENANCE_RE = re.compile(r"decomp-source-overlay:\s*(\w+)/(func_[0-9A-Fa-f]{8})")
+
+
+def parse_overlay_leaves() -> list[dict]:
+    """Every matched `c` leaf of every overlay config: {overlay, name, words}."""
+    out: list[dict] = []
+    for path in sorted((REPO_ROOT / OVL_CONFIG_DIR).glob("*.yaml")):
+        if path.name == "manifest.yaml":
+            continue
+        text = path.read_text(encoding="utf-8")
+        spans = [(int(m.group(1), 16), m.group(2), m.group(3))
+                 for m in OVL_SPAN_RE.finditer(text)]
+        offsets = sorted({o for o, _, _ in spans})
+        for off, kind, name in spans:
+            if kind != "c" or not name:
+                continue
+            end = next((o for o in offsets if o > off), off)
+            out.append({"overlay": path.stem, "name": name,
+                        "words": (end - off) // 4})
+    return out
+
+
+def overlay_report() -> dict:
+    """Classify overlay leaves keyed by (overlay, name).
+
+    ported-from-decomp: a gen_overlay_ports.py TU with that provenance;
+    hand-translated / stub: a namespaced `<ovl>__func_X` definition, or a
+      plain `func_X` definition when the name exists in exactly ONE overlay;
+    ambiguous: the name exists in several overlays (different code at the
+      same shared-arena address) and pc_port has only a plain `func_X`
+      definition — it cannot be credited to any one overlay;
+    absent: nothing.
+    """
+    leaves = parse_overlay_leaves()
+    owners: dict[str, set[str]] = {}
+    for leaf in leaves:
+        owners.setdefault(leaf["name"], set()).add(leaf["overlay"])
+    derived: set[tuple[str, str]] = set()
+    for path in sorted((REPO_ROOT / OVL_PORT_DIR).glob("*/*_port.c")):
+        text = path.read_text(encoding="utf-8", errors="replace")
+        for m in OVL_PROVENANCE_RE.finditer(text):
+            derived.add((m.group(1), m.group(2)))
+    definitions, _prov, stub_only = parse_ports()
+    ns_defs: dict[str, bool] = {}
+    for path in sorted(REPO_ROOT.glob(PORT_GLOB)):
+        if "build" in path.parts or "decomp_ovl" in path.parts:
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace")
+        for m in re.finditer(r"^[A-Za-z_][\w \t\*]*?\b(\w+__func_[0-9A-Fa-f]{8})\s*\(",
+                             text, re.MULTILINE):
+            ns_defs[m.group(1)] = True
+    rows = []
+    for leaf in leaves:
+        ov, name = leaf["overlay"], leaf["name"]
+        if (ov, name) in derived:
+            bucket = "ported-from-decomp"
+        elif f"{ov}__{name}" in ns_defs:
+            bucket = "hand-translated"
+        elif name in definitions and len(owners[name]) == 1:
+            bucket = "stub" if stub_only.get(name, False) else "hand-translated"
+        elif name in definitions:
+            bucket = "ambiguous"
+        else:
+            bucket = "absent"
+        rows.append({**leaf, "bucket": bucket,
+                     "port_files": definitions.get(name, []) if bucket != "ported-from-decomp" else []})
+    return {"rows": rows,
+            "ambiguous_names": sorted({r["name"] for r in rows if r["bucket"] == "ambiguous"})}
+
+
+def print_overlay_report(rep: dict, list_bucket: str | None) -> int:
+    rows = rep["rows"]
+    buckets = ("ported-from-decomp", "hand-translated", "stub", "ambiguous", "absent")
+    if list_bucket:
+        if list_bucket not in buckets:
+            raise SystemExit(f"pc_port_coverage: unknown overlay bucket {list_bucket!r}")
+        for r in rows:
+            if r["bucket"] == list_bucket:
+                print(f"{r['overlay']}/{r['name']}")
+        return 0
+    total_words = sum(r["words"] for r in rows)
+    print("pc_port coverage — matched overlay `c` spans -> native port")
+    print(f"  matched overlay leaves: {len(rows)}  ({total_words} words)")
+    print("")
+    for b in buckets:
+        n = sum(1 for r in rows if r["bucket"] == b)
+        w = sum(r["words"] for r in rows if r["bucket"] == b)
+        print(f"  {b + ':':<19} {n:>4} leaves  {w:>6} words")
+    per: dict[str, dict] = {}
+    for r in rows:
+        d = per.setdefault(r["overlay"], {b: 0 for b in buckets})
+        d[r["bucket"]] += 1
+    print("")
+    for ov in sorted(per):
+        d = per[ov]
+        if ov.startswith("ovl_") or d["ported-from-decomp"] or d["hand-translated"] or d["ambiguous"]:
+            print(f"  {ov:<14} " + " ".join(f"{b.split('-')[0]}={d[b]}" for b in buckets))
+    if rep["ambiguous_names"]:
+        print("")
+        print("  ambiguous plain-named pc_port definitions (name exists in several overlays;"
+              " not credited — annotate as <ovl>__func_X):")
+        for n in rep["ambiguous_names"]:
+            ovs = sorted({r["overlay"] for r in rows if r["name"] == n})
+            print(f"    {n}: {' '.join(ovs)}")
+    counts = {b: sum(1 for r in rows if r["bucket"] == b) for b in buckets}
+    print("overlay_summary=" + " ".join(f"{b}={counts[b]}" for b in buckets))
+    return 0
 
 
 def main() -> int:
@@ -169,25 +376,30 @@ def main() -> int:
         metavar="NAME",
         help="print the dependency surface of one matched leaf",
     )
+    ap.add_argument(
+        "--overlays",
+        action="store_true",
+        help="report overlay leaves keyed by (overlay, name) instead of the EXE",
+    )
     args = ap.parse_args()
+
+    if args.overlays:
+        rep = overlay_report()
+        if args.json:
+            json.dump(rep, sys.stdout, indent=2, sort_keys=True)
+            sys.stdout.write("\n")
+            return 0
+        return print_overlay_report(rep, args.list_bucket)
 
     leaves = parse_matched()
     src = parse_src()
-    definitions, provenance = parse_ports()
-
-    stub_files: set[str] = set()
-    for path in sorted(REPO_ROOT.glob(PORT_GLOB)):
-        if "build" in path.parts:
-            continue
-        text = path.read_text(encoding="utf-8", errors="replace")
-        if any(marker in text for marker in STUB_MARKERS):
-            stub_files.add(str(path.relative_to(REPO_ROOT)))
+    definitions, provenance, stub_only = parse_ports()
 
     report = []
     for leaf in leaves:
         name = leaf["name"]
         body = src.get(name)
-        bucket, files, note = classify(leaf, body, definitions, provenance, stub_files)
+        bucket, files, note = classify(leaf, body, definitions, provenance, stub_only)
         report.append(
             {
                 **leaf,

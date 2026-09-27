@@ -7,9 +7,9 @@
 
 extern unsigned int func_80052F70(void);
 
-uint8_t func_80033A20(void) {return PE_LoadU8(0x8009CE80u);}
-int32_t func_8005B89C(void) {return (int32_t)PE_LoadU32(0x8009D028u);}
-int func_8005257C(void) {return (D_8009D1A0>>1u)&1u;}
+/* func_80033A20: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80033A20_port.c (src/func_80033A20.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_8005B89C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8005B89C_port.c (src/func_8005B89C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_8005257C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8005257C_port.c (src/func_8005257C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 void func_8004C594(void)
 {

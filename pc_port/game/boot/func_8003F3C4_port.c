@@ -55,17 +55,14 @@
 
 
 
-extern void func_80068CE0(void);
+extern void func_8003DFC8(void); /* generated from src/func_8003DFC8.c */
 extern void func_80087024(void);
 extern void func_800661A4(void);
 extern void func_800661CC(void);
 extern int func_80074A44(int mode);
 extern void func_800754E4(pe_addr_t ot, pe_addr_t env);
 
-void func_8003DFC8(int a0)
-{
-    (void)a0;
-}
+/* func_8003DFC8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8003DFC8_port.c (src/func_8003DFC8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 static void effect_module_finish(unsigned int code)
 {
@@ -498,7 +495,7 @@ epilogue:
     /* .L8003F6CC */
     func_80074DC0(0);
     func_80087024();
-    func_8003DFC8(1);
+    func_8003DFC8();
     func_800696F0();
     /* 3F6EC..3F738: D1A0 = (D1A0|0x40) & ~0x3800; B0CD8 = (B0CD8|2) &
      * ~0x800, then if bit 9 was set B0CD8 = (that|2) & 0xFFFF7DFF. */

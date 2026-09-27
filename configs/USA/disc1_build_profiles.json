@@ -713,6 +713,1268 @@
         "MASPSX_DISPATCH_FOLD": "jtbl_80010C90",
         "MASPSX_THREE_WORD_SYMBOL_STORE": "1"
       }
+    },
+    "era_o2_g0_dispatch_800113d0_aspsx_230": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0"
+      ],
+      "environment": {
+        "ERA_ASPSX_VER": "2.30",
+        "MASPSX_THREE_WORD_SYMBOL_STORE": "1",
+        "MASPSX_DISPATCH_FOLD": "jtbl_800113D0"
+      }
+    },
+    "era_o2_g0_cc1_281_fill_call_delay_slot": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-mno-split-addresses"
+      ],
+      "environment": {
+        "ERA_CC1_VER": "2.8.1",
+        "MASPSX_FILL_CALL_DELAY_SLOT": "1"
+      }
+    },
+    "era_o2_g0_no_schedule_insns_cc1_281_fill_call_delay_slot_symbol_load_dest_temp": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-mno-split-addresses",
+        "-fno-schedule-insns"
+      ],
+      "environment": {
+        "ERA_CC1_VER": "2.8.1",
+        "MASPSX_SYMBOL_LOAD_DEST_TEMP": "1",
+        "MASPSX_FILL_CALL_DELAY_SLOT": "1",
+        "MASPSX_LOAD_DELAY_NOP_BEFORE_LABEL": "1"
+      }
+    },
+    "era_o2_g0_dispatch_800120bc_800120dc_cc1_281": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-mno-split-addresses"
+      ],
+      "environment": {
+        "ERA_CC1_VER": "2.8.1",
+        "MASPSX_THREE_WORD_SYMBOL_STORE": "1",
+        "MASPSX_DISPATCH_FOLD": "jtbl_800120BC,jtbl_800120DC"
+      }
+    },
+    "era_o2_g8_force_d8009d2f0_d8009d254_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009D2F0,D_8009D254"
+      }
+    },
+    "era_o2_g8_force_d8009d2f0_d8009d254_d8009d20c_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009D2F0,D_8009D254,D_8009D20C"
+      }
+    },
+    "era_o2_g8_force_d8009d2f0_d8009d254_d8009d2e8_d800b0d88_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009D2F0,D_8009D254,D_8009D2E8,D_800B0D88"
+      }
+    },
+    "era_o2_g8_dispatch_80011158": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_THREE_WORD_SYMBOL_STORE": "1",
+        "MASPSX_DISPATCH_FOLD": "jtbl_80011158"
+      }
+    },
+    "era_o2_g8_dispatch_8001125c": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_THREE_WORD_SYMBOL_STORE": "1",
+        "MASPSX_DISPATCH_FOLD": "jtbl_8001125C"
+      }
+    },
+    "era_o2_g0_no_expensive_optimizations": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-fno-expensive-optimizations"
+      ]
+    },
+    "era_o2_g0_fill_branch_macro_split": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0"
+      ],
+      "environment": {
+        "MASPSX_FILL_BRANCH_MACRO_SPLIT": "1"
+      }
+    },
+    "era_o2_g0_no_cse_skip_blocks": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-fno-cse-skip-blocks"
+      ]
+    },
+    "era_o2_g0_dispatch_800120fc_8001211c_cc1_281_fill_jump_stack_store": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-mno-split-addresses"
+      ],
+      "environment": {
+        "ERA_CC1_VER": "2.8.1",
+        "MASPSX_THREE_WORD_SYMBOL_STORE": "1",
+        "MASPSX_DISPATCH_FOLD": "jtbl_800120FC,jtbl_8001211C",
+        "MASPSX_FILL_JUMP_STACK_STORE": "1"
+      }
+    },
+    "era_o2_g0_cc1_281_fill_jump_stack_store": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-mno-split-addresses"
+      ],
+      "environment": {
+        "ERA_CC1_VER": "2.8.1",
+        "MASPSX_FILL_JUMP_STACK_STORE": "1"
+      }
+    },
+    "era_o2_g8_force_d8009d1a0_d8009d2a4_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009D1A0,D_8009D2A4"
+      }
+    },
+    "era_o2_g8_force_d8009d2fc_d8009d278_d8009d1ac_d8009d1ce_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009D2FC,D_8009D278,D_8009D1AC,D_8009D1CE"
+      }
+    },
+    "era_o2_g8_force_d8009d278_d8009d254_d8009d2fc_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009D278,D_8009D254,D_8009D2FC"
+      }
+    },
+    "era_o2_g8_force_d8009d254_d8009d2e8_d8009d278_d8009d28c_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009D254,D_8009D2E8,D_8009D278,D_8009D28C"
+      }
+    },
+    "era_o2_g8_force_d8009d278_d8009d254_d8009d1a0_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009D278,D_8009D254,D_8009D1A0"
+      }
+    },
+    "era_o2_g0_no_rerun_cse_after_loop": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-fno-rerun-cse-after-loop"
+      ]
+    },
+    "era_o2_g0_cc1_281_return_via_epilogue_jump": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-mno-split-addresses"
+      ],
+      "environment": {
+        "ERA_CC1_VER": "2.8.1",
+        "MASPSX_RETURN_VIA_EPILOGUE_JUMP": "1"
+      }
+    },
+    "era_o2_g0_cc1_281_load_delay_call_slot_store": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-mno-split-addresses"
+      ],
+      "environment": {
+        "ERA_CC1_VER": "2.8.1",
+        "MASPSX_LOAD_DELAY_CALL_SLOT_STORE": "1"
+      }
+    },
+    "era_o2_g0_cc1_281_fill_call_delay_slot_branch_macro_split": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-mno-split-addresses"
+      ],
+      "environment": {
+        "ERA_CC1_VER": "2.8.1",
+        "MASPSX_FILL_CALL_DELAY_SLOT": "1",
+        "MASPSX_FILL_BRANCH_MACRO_SPLIT": "1"
+      }
+    },
+    "era_o2_g0_cc1_281_fill_branch_macro_split": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-mno-split-addresses"
+      ],
+      "environment": {
+        "ERA_CC1_VER": "2.8.1",
+        "MASPSX_FILL_BRANCH_MACRO_SPLIT": "1"
+      }
+    },
+    "era_o2_g0_dispatch_8001206c_cc1_281": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-mno-split-addresses"
+      ],
+      "environment": {
+        "ERA_CC1_VER": "2.8.1",
+        "MASPSX_THREE_WORD_SYMBOL_STORE": "1",
+        "MASPSX_DISPATCH_FOLD": "jtbl_8001206C"
+      }
+    },
+    "era_o2_g0_fill_branch_macro_split_epilogue": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0"
+      ],
+      "environment": {
+        "MASPSX_FILL_BRANCH_MACRO_SPLIT": "1",
+        "MASPSX_FILL_EPILOGUE_DELAY_SLOT": "1"
+      }
+    },
+    "era_o2_g0_load_delay_call_slot_store": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0"
+      ],
+      "environment": {
+        "MASPSX_LOAD_DELAY_CALL_SLOT_STORE": "1"
+      }
+    },
+    "era_o2_g8_dispatch_800100a0_force_d800b0cd8_d8009d1a0_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_THREE_WORD_SYMBOL_STORE": "1",
+        "MASPSX_DISPATCH_FOLD": "jtbl_800100A0",
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_800B0CD8,D_8009D1A0"
+      }
+    },
+    "era_o2_g8_force_d8009d254_d8009d1a0_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009D254,D_8009D1A0"
+      }
+    },
+    "era_o2_g8_force_d8009d254_plus7_battle_reset_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009D254,D_8009D290,D_8009D1AC,D_8009D1A8,D_8009D1CE,D_8009D235,D_8009D250,D_8009D27C"
+      }
+    },
+    "era_o2_g8_force_d8009d254_plus51_battle_menu_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009D254,D_800915E0,D_8009D1A0,D_8009D2E8,D_800B0135,D_800B0145,D_800B017D,D_800B018D,D_800B0136,D_800B0146,D_800B017E,D_800B018E,D_800B013C,D_800B014C,D_800B0184,D_800B0194,D_800B013E,D_800B014E,D_800B0186,D_800B0196,D_800B0134,D_800B013D,D_800B0144,D_800B014D,D_800B017C,D_800B0185,D_800B018C,D_800B0195,D_800B0158,D_800B0159,D_800B015A,D_800B0160,D_800B0161,D_800B0162,D_800B0168,D_800B0169,D_800B016A,D_800B0170,D_800B0171,D_800B0172,D_800B01A0,D_800B01A1,D_800B01A2,D_800B01A8,D_800B01A9,D_800B01AA,D_800B01B0,D_800B01B1,D_800B01B2,D_800B01B8,D_800B01B9,D_800B01BA"
+      }
+    },
+    "era_o2_g8_force_d8009d278_d8009d254_d8009cddc_d8009cdd8_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009D278,D_8009D254,D_8009CDDC,D_8009CDD8"
+      }
+    },
+    "era_o2_g8_dispatch_800112a4": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_THREE_WORD_SYMBOL_STORE": "1",
+        "MASPSX_DISPATCH_FOLD": "jtbl_800112A4"
+      }
+    },
+    "era_o2_g0_cc1_281_load_delay_nop_before_label": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-mno-split-addresses"
+      ],
+      "environment": {
+        "ERA_CC1_VER": "2.8.1",
+        "MASPSX_LOAD_DELAY_NOP_BEFORE_LABEL": "1"
+      }
+    },
+    "era_o2_g8_force_d8009d20c_d8009d254_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009D20C,D_8009D254"
+      }
+    },
+    "era_o2_g8_dispatch_80011458_force_d800b0e64_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_DISPATCH_FOLD": "jtbl_80011458",
+        "MASPSX_THREE_WORD_SYMBOL_STORE": "1",
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_800B0E64"
+      }
+    },
+    "era_o2_g0_cc1_281_unfill_epilogue_delay_slot": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-mno-split-addresses"
+      ],
+      "environment": {
+        "ERA_CC1_VER": "2.8.1",
+        "MASPSX_UNFILL_EPILOGUE_DELAY_SLOT": "1"
+      }
+    },
+    "era_o2_g0_cc1_281_div_no_reuse_nop_expand_div": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-mno-split-addresses"
+      ],
+      "environment": {
+        "ERA_CC1_VER": "2.8.1",
+        "MASPSX_EXPAND_DIV": "1",
+        "MASPSX_DIV_NO_REUSE_NOP": "1"
+      }
+    },
+    "era_o2_g8_force_d800b1620_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_800B1620"
+      }
+    },
+    "era_o2_g8_la_absolute_small_data": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_LA_ABSOLUTE_SMALL_DATA": "1"
+      }
+    },
+    "era_o2_g0_fill_call_volatile_store_fill_epilogue_delay_slot": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0"
+      ],
+      "environment": {
+        "MASPSX_FILL_CALL_VOLATILE_STORE": "1",
+        "MASPSX_FILL_EPILOGUE_DELAY_SLOT": "1"
+      }
+    },
+    "era_o2_g8_dispatch_80011170_force_d8009d254_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_THREE_WORD_SYMBOL_STORE": "1",
+        "MASPSX_DISPATCH_FOLD": "jtbl_80011170",
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009D254"
+      }
+    },
+    "era_o2_g8_dispatch_80011144": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_THREE_WORD_SYMBOL_STORE": "1",
+        "MASPSX_DISPATCH_FOLD": "jtbl_80011144"
+      }
+    },
+    "era_o2_g0_cc1_281_symbol_load_dest_temp": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-mno-split-addresses"
+      ],
+      "environment": {
+        "ERA_CC1_VER": "2.8.1",
+        "MASPSX_SYMBOL_LOAD_DEST_TEMP": "1"
+      }
+    },
+    "era_o2_g0_rodata_fold_800323c8": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0"
+      ],
+      "environment": {
+        "MASPSX_RODATA_FOLD": "D_80010DFC,D_80010E10,D_80010E24"
+      }
+    },
+    "era_o2_g8_force_d800c0e20_d800c0e22_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_800C0E20,D_800C0E22"
+      }
+    },
+    "era_o2_g8_dispatch_800112dc_force_d800c0e0c_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_THREE_WORD_SYMBOL_STORE": "1",
+        "MASPSX_DISPATCH_FOLD": "jtbl_800112DC",
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_800C0E0C"
+      }
+    },
+    "era_o2_g8_dispatch_80011218": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_THREE_WORD_SYMBOL_STORE": "1",
+        "MASPSX_DISPATCH_FOLD": "jtbl_80011218"
+      }
+    },
+    "era_o2_g0_dispatch_80010e4c": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0"
+      ],
+      "environment": {
+        "MASPSX_DISPATCH_FOLD": "jtbl_80010E4C",
+        "MASPSX_THREE_WORD_SYMBOL_STORE": "1"
+      }
+    },
+    "era_o2_g8_dispatch_80010690_force_d8009d2f0_d8009d1a0_d8009d254_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_THREE_WORD_SYMBOL_STORE": "1",
+        "MASPSX_DISPATCH_FOLD": "jtbl_80010690",
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009D2F0,D_8009D1A0,D_8009D254"
+      }
+    },
+    "era_o2_g8_force_d8009d278_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009D278"
+      }
+    },
+    "era_o2_g8_expand_div_force_d8009cddc_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_EXPAND_DIV": "1",
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009CDDC"
+      }
+    },
+    "era_o2_g8_force_d8009d254_d8009d278_d8009d2fc_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009D254,D_8009D278,D_8009D2FC"
+      }
+    },
+    "era_o2_g8_dispatch_800111a8": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_THREE_WORD_SYMBOL_STORE": "1",
+        "MASPSX_DISPATCH_FOLD": "jtbl_800111A8"
+      }
+    },
+    "era_o2_g8_expand_div_force_d8009d278_d8009d254_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_EXPAND_DIV": "1",
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009D278,D_8009D254"
+      }
+    },
+    "era_o2_g8_dispatch_80010884_expand_div_force_d8009d278_d8009d1f4_d8009d2b0_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_EXPAND_DIV": "1",
+        "MASPSX_THREE_WORD_SYMBOL_STORE": "1",
+        "MASPSX_DISPATCH_FOLD": "jtbl_80010884",
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009D278,D_8009D1F4,D_8009D2B0"
+      }
+    },
+    "era_o2_g8_force_d8009d278_d8009d20c_d8009d254_d8009d208_d8009d1d4_d8009d23c_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009D278,D_8009D20C,D_8009D254,D_8009D208,D_8009D1D4,D_8009D23C"
+      }
+    },
+    "era_o2_g0_dispatch_800107a4": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0"
+      ],
+      "environment": {
+        "MASPSX_DISPATCH_FOLD": "jtbl_800107A4",
+        "MASPSX_THREE_WORD_SYMBOL_STORE": "1"
+      }
+    },
+    "era_o2_g8_force_d8009d2b0_d8009d278_d8009d20c_d8009d254_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009D2B0,D_8009D278,D_8009D20C,D_8009D254"
+      }
+    },
+    "era_o2_g0_cc1_281_split_fill_call_delay_slot": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0"
+      ],
+      "environment": {
+        "ERA_CC1_VER": "2.8.1",
+        "MASPSX_FILL_CALL_DELAY_SLOT": "1"
+      }
+    },
+    "era_o2_g0_fill_call_delay_slot_branch_macro_split": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0"
+      ],
+      "environment": {
+        "MASPSX_FILL_CALL_DELAY_SLOT": "1",
+        "MASPSX_FILL_BRANCH_MACRO_SPLIT": "1"
+      }
+    },
+    "era_o2_g0_fill_call_delay_slot_branch_macro_split_epilogue": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0"
+      ],
+      "environment": {
+        "MASPSX_FILL_CALL_DELAY_SLOT": "1",
+        "MASPSX_FILL_BRANCH_MACRO_SPLIT": "1",
+        "MASPSX_FILL_EPILOGUE_DELAY_SLOT": "1"
+      }
+    },
+    "era_o2_g0_cc1_281_split_fill_call_delay_slot_branch_macro_split": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0"
+      ],
+      "environment": {
+        "ERA_CC1_VER": "2.8.1",
+        "MASPSX_FILL_CALL_DELAY_SLOT": "1",
+        "MASPSX_FILL_BRANCH_MACRO_SPLIT": "1"
+      }
+    },
+    "era_o2_g0_cc1_281_fill_branch_macro_split_symbol_load_dest_temp": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-mno-split-addresses"
+      ],
+      "environment": {
+        "ERA_CC1_VER": "2.8.1",
+        "MASPSX_FILL_BRANCH_MACRO_SPLIT": "1",
+        "MASPSX_SYMBOL_LOAD_DEST_TEMP": "1"
+      }
+    },
+    "era_o2_g0_spu_init_8007d1d4": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-fno-strength-reduce"
+      ],
+      "environment": {
+        "MASPSX_FILL_CALL_DELAY_SLOT": "1",
+        "MASPSX_FILL_EPILOGUE_DELAY_SLOT": "1",
+        "MASPSX_LOAD_DELAY_NOP_BEFORE_LOOP_LABEL": "1"
+      }
+    },
+    "era_o2_g0_load_delay_nop_before_label_epilogue": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0"
+      ],
+      "environment": {
+        "MASPSX_LOAD_DELAY_NOP_BEFORE_LABEL": "1",
+        "MASPSX_FILL_EPILOGUE_DELAY_SLOT": "1"
+      }
+    },
+    "era_o2_g0_load_delay_nop_before_label": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0"
+      ],
+      "environment": {
+        "MASPSX_LOAD_DELAY_NOP_BEFORE_LABEL": "1"
+      }
+    },
+    "era_o2_g0_cc1_281_fill_call_delay_slot_load_delay_call_slot_store": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-mno-split-addresses"
+      ],
+      "environment": {
+        "ERA_CC1_VER": "2.8.1",
+        "MASPSX_FILL_CALL_DELAY_SLOT": "1",
+        "MASPSX_LOAD_DELAY_CALL_SLOT_STORE": "1"
+      }
+    },
+    "era_o2_g0_cc1_281_fill_call_delay_slot_load_delay_nop_before_label": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-mno-split-addresses"
+      ],
+      "environment": {
+        "ERA_CC1_VER": "2.8.1",
+        "MASPSX_FILL_CALL_DELAY_SLOT": "1",
+        "MASPSX_LOAD_DELAY_NOP_BEFORE_LABEL": "1"
+      }
+    },
+    "era_o2_g8_force_d8009d254_d8009cddc_d8009d1e8_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009D254,D_8009CDDC,D_8009D1E8"
+      }
+    },
+    "era_o2_g8_expand_div_force_d8009d278_d8009d254_d8009d1a0_d8009cddc_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_EXPAND_DIV": "1",
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009D278,D_8009D254,D_8009D1A0,D_8009CDDC"
+      }
+    },
+    "era_o2_g8_force_d8009ee70_d80092224_d800a1854_d800a1858_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009EE70,D_80092224,D_800A1854,D_800A1858"
+      }
+    },
+    "era_o2_g8_force_d8009ee70_d80092224_d800a185c_d800a1854_d800a1838_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009EE70,D_80092224,D_800A185C,D_800A1854,D_800A1838"
+      }
+    },
+    "era_o2_g8_force_d8009d1a8_d8009d1ac_d800bceac_d800bcea8_d800bceb4_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009D1A8,D_8009D1AC,D_800BCEAC,D_800BCEA8,D_800BCEB4"
+      }
+    },
+    "era_o2_g8_force_d800b0e64_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_800B0E64"
+      }
+    },
+    "era_o2_g8_force_d8009d254_d8009d2f0_d8009d20c_d800bd028_d800bd025_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009D254,D_8009D2F0,D_8009D20C,D_800BD028,D_800BD025"
+      }
+    },
+    "era_o2_g8_force_d8009d1a0_d8009d280_d800be9a0_d800be9a2_d800be9a6_d800be9a7_d800b0cd8_d800b0dbf_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009D1A0,D_8009D280,D_800BE9A0,D_800BE9A2,D_800BE9A6,D_800BE9A7,D_800B0CD8,D_800B0DBF"
+      }
+    },
+    "era_o2_g8_dispatch_8001104c_force_d800c0e20_d800c0e22_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_800C0E20,D_800C0E22",
+        "MASPSX_THREE_WORD_SYMBOL_STORE": "1",
+        "MASPSX_DISPATCH_FOLD": "jtbl_8001104C"
+      }
+    },
+    "era_o2_g8_dispatch_800108f0_force_d8009d254_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009D254",
+        "MASPSX_THREE_WORD_SYMBOL_STORE": "1",
+        "MASPSX_DISPATCH_FOLD": "jtbl_800108F0"
+      }
+    },
+    "era_o2_g8_dispatch_800107d4_rodata_fold_80010760_force_d8009d1a0_d8009d254_d8009d278_d8009d2e8_d8009d1ac_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009D1A0,D_8009D254,D_8009D278,D_8009D2E8,D_8009D1AC",
+        "MASPSX_THREE_WORD_SYMBOL_STORE": "1",
+        "MASPSX_DISPATCH_FOLD": "jtbl_800107D4",
+        "MASPSX_RODATA_FOLD": "D_80010760"
+      }
+    },
+    "era_o2_g8_expand_div_force_d8009d278_d8009d254_d8009d2e8_d8009d228_d8009cddc_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_EXPAND_DIV": "1",
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009D278,D_8009D254,D_8009D2E8,D_8009D228,D_8009CDDC"
+      }
+    },
+    "era_o2_g8_rodata_fold_8001074c_80010760_force_d8009d2a0_d8009d1a0_d8009d278_d8009d254_d8009d20c_d800942e4_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_RODATA_FOLD": "D_8001074C,D_80010760",
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009D2A0,D_8009D1A0,D_8009D278,D_8009D254,D_8009D20C,D_800942E4"
+      }
+    },
+    "era_o2_g0_dispatch_8001213c": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0"
+      ],
+      "environment": {
+        "MASPSX_DISPATCH_FOLD": "jtbl_8001213C",
+        "MASPSX_THREE_WORD_SYMBOL_STORE": "1"
+      }
+    },
+    "era_o2_g0_dispatch_8001213c_cc1_281": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-mno-split-addresses"
+      ],
+      "environment": {
+        "ERA_CC1_VER": "2.8.1",
+        "MASPSX_DISPATCH_FOLD": "jtbl_8001213C"
+      }
+    },
+    "era_o2_g8_cc1_281": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8",
+        "-mno-split-addresses"
+      ],
+      "environment": {
+        "ERA_CC1_VER": "2.8.1"
+      }
+    },
+    "era_o2_g8_dispatch_80011428": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_DISPATCH_FOLD": "jtbl_80011428",
+        "MASPSX_THREE_WORD_SYMBOL_STORE": "1"
+      }
+    },
+    "era_o2_g0_dispatch_800113b0": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0"
+      ],
+      "environment": {
+        "MASPSX_DISPATCH_FOLD": "jtbl_800113B0",
+        "MASPSX_THREE_WORD_SYMBOL_STORE": "1"
+      }
+    },
+    "era_o2_g0_no_delayed_branch_reorder_fill_calls": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-fno-delayed-branch"
+      ],
+      "environment": {
+        "MASPSX_REORDER_FILL_CALLS": "1"
+      }
+    },
+    "era_o2_g0_no_schedule_insns2_cc1_281": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-mno-split-addresses",
+        "-fno-schedule-insns2"
+      ],
+      "environment": {
+        "ERA_CC1_VER": "2.8.1"
+      }
+    },
+    "era_o2_g0_div_no_reuse_nop_expand_div": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0"
+      ],
+      "environment": {
+        "MASPSX_EXPAND_DIV": "1",
+        "MASPSX_DIV_NO_REUSE_NOP": "1"
+      }
+    },
+    "era_o2_g0_dispatch_8001070c": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0"
+      ],
+      "environment": {
+        "MASPSX_DISPATCH_FOLD": "jtbl_8001070C",
+        "MASPSX_THREE_WORD_SYMBOL_STORE": "1"
+      }
+    },
+    "era_o2_g0_dispatch_800113f0": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0"
+      ],
+      "environment": {
+        "MASPSX_DISPATCH_FOLD": "jtbl_800113F0",
+        "MASPSX_THREE_WORD_SYMBOL_STORE": "1"
+      }
+    },
+    "era_o2_g0_fill_epilogue_delay_slot_spill_before_symbol_load": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0"
+      ],
+      "environment": {
+        "MASPSX_SPILL_BEFORE_SYMBOL_LOAD": "1",
+        "MASPSX_FILL_EPILOGUE_DELAY_SLOT": "1"
+      }
+    },
+    "era_o2_g0_cc1_281_sink_return_zero_into_flag_delay_unfill_epilogue_delay_slot": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-mno-split-addresses"
+      ],
+      "environment": {
+        "ERA_CC1_VER": "2.8.1",
+        "MASPSX_SINK_RETURN_ZERO_INTO_FLAG_DELAY": "1",
+        "MASPSX_UNFILL_EPILOGUE_DELAY_SLOT": "1"
+      }
+    },
+    "era_o2_g0_no_schedule_insns_cc1_281_unfill_epilogue_delay_slot": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-mno-split-addresses",
+        "-fno-schedule-insns"
+      ],
+      "environment": {
+        "ERA_CC1_VER": "2.8.1",
+        "MASPSX_UNFILL_EPILOGUE_DELAY_SLOT": "1"
+      }
+    },
+    "era_o2_g0_sink_zero_store_into_beqz": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0"
+      ],
+      "environment": {
+        "MASPSX_SINK_ZERO_STORE_INTO_BEQZ": "1"
+      }
+    },
+    "era_o2_g0_cc1_281_fill_call_delay_slot_unaligned_word_copy_return_temp": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-mno-split-addresses"
+      ],
+      "environment": {
+        "ERA_CC1_VER": "2.8.1",
+        "MASPSX_FILL_CALL_DELAY_SLOT": "1",
+        "MASPSX_UNALIGNED_WORD_COPY_RETURN_TEMP": "1"
+      }
+    },
+    "era_o2_g0_no_schedule_insns_no_schedule_insns2": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-fno-schedule-insns",
+        "-fno-schedule-insns2"
+      ]
+    },
+    "era_o2_g0_cc1_281_fill_call_delay_slot_unfill_epilogue_delay_slot": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-mno-split-addresses"
+      ],
+      "environment": {
+        "ERA_CC1_VER": "2.8.1",
+        "MASPSX_FILL_CALL_DELAY_SLOT": "1",
+        "MASPSX_UNFILL_EPILOGUE_DELAY_SLOT": "1"
+      }
+    },
+    "era_o2_g8_drop_unused_var8": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_DROP_UNUSED_VAR8": "1"
+      }
+    },
+    "era_o2_g0_cc1_281_load_delay_nop_before_label_nop_before_label_skip_empty_app_swap_s2_s1_save_pairs": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-mno-split-addresses"
+      ],
+      "environment": {
+        "ERA_CC1_VER": "2.8.1",
+        "MASPSX_SWAP_S2_S1_SAVE_PAIRS": "1",
+        "MASPSX_LOAD_DELAY_NOP_BEFORE_LABEL": "1",
+        "MASPSX_NOP_BEFORE_LABEL_SKIP_EMPTY_APP": "1"
+      }
+    },
+    "era_o2_g0_no_strength_reduce": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-fno-strength-reduce"
+      ]
+    },
+    "era_o2_g0_load_before_stack_half": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0"
+      ],
+      "environment": {
+        "MASPSX_LOAD_BEFORE_STACK_HALF": "1"
+      }
+    },
+    "era_o1_g0_bnez_postdec_from_minus_one_ori_small_li": {
+      "toolchain": "era",
+      "flags": [
+        "-O1",
+        "-G0"
+      ],
+      "environment": {
+        "MASPSX_BNEZ_POSTDEC_FROM_MINUS_ONE": "1",
+        "MASPSX_ORI_SMALL_LI": "1"
+      }
+    },
+    "era_o2_g0_frame48_s5_after_s2": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0"
+      ],
+      "environment": {
+        "MASPSX_FRAME48_S5_AFTER_S2": "1"
+      }
+    },
+    "era_o2_g0_cc1_281_addu_neg1_beq_delay": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-mno-split-addresses"
+      ],
+      "environment": {
+        "ERA_CC1_VER": "2.8.1",
+        "MASPSX_ADDU_NEG1_BEQ_DELAY": "1"
+      }
+    },
+    "era_o2_g8_div_delay_reuse_v0_expand_div_force_d8009d2f0_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009D2F0",
+        "MASPSX_EXPAND_DIV": "1",
+        "MASPSX_DIV_DELAY_REUSE_V0": "1"
+      }
+    },
+    "era_o2_g0_drop_jump_to_epilogue": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0"
+      ],
+      "environment": {
+        "MASPSX_DROP_JUMP_TO_EPILOGUE": "1"
+      }
+    },
+    "era_o2_g0_sltu_a0_lt_a2_dest_v1": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0"
+      ],
+      "environment": {
+        "MASPSX_SLTU_A0_LT_A2_DEST_V1": "1"
+      }
+    },
+    "era_o2_g0_dup_half_shift": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0"
+      ],
+      "environment": {
+        "MASPSX_DUP_HALF_SHIFT": "1"
+      }
+    },
+    "era_o2_g0_mult_mflo_to_multu": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0"
+      ],
+      "environment": {
+        "MASPSX_MULT_MFLO_TO_MULTU": "1"
+      }
+    },
+    "era_o1_g0_mflo_before_mfhi": {
+      "toolchain": "era",
+      "flags": [
+        "-O1",
+        "-G0"
+      ],
+      "environment": {
+        "MASPSX_MFLO_BEFORE_MFHI": "1"
+      }
+    },
+    "era_o2_g0_mflo_before_mfhi": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0"
+      ],
+      "environment": {
+        "MASPSX_MFLO_BEFORE_MFHI": "1"
+      }
+    },
+    "era_o2_g0_cc1_281_beqz_sym_store_delay_fill_call_delay_slot_index_pair_jal_schedule": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-mno-split-addresses"
+      ],
+      "environment": {
+        "ERA_CC1_VER": "2.8.1",
+        "MASPSX_BEQZ_SYM_STORE_DELAY": "1",
+        "MASPSX_FILL_CALL_DELAY_SLOT": "1",
+        "MASPSX_INDEX_PAIR_JAL_SCHEDULE": "1"
+      }
     }
   },
   "assignments": {
@@ -722,7 +1984,9 @@
       "func_80089F28",
       "func_80085174",
       "func_8008FC78",
-      "func_80018E84"
+      "func_80018E84",
+      "func_8007E4E0",
+      "func_80070D6C"
     ],
     "era_o2_g0_expand_div": [
       "func_8003C5D8",
@@ -742,7 +2006,6 @@
       "func_80090108",
       "func_8008B5B8",
       "func_8008B624",
-      "func_80067E1C",
       "func_8008B978",
       "func_8008C0A4",
       "func_8008B2CC",
@@ -760,7 +2023,18 @@
       "func_80065260",
       "func_800D4928",
       "func_8008F898",
-      "func_8008F9CC"
+      "func_8008F9CC",
+      "func_80067E1C",
+      "func_8001F4D4",
+      "func_80090E20",
+      "func_8005B91C",
+      "func_8005BA78",
+      "func_800C4E50",
+      "func_800D5010",
+      "func_800D7FBC",
+      "func_80068E24",
+      "func_80066268",
+      "func_800CF3AC"
     ],
     "era_o2_g0_fill_store_delay_slot": [
       "func_80074A14",
@@ -848,7 +2122,17 @@
       "func_80074520",
       "func_800723A4",
       "func_800738D8",
-      "func_8007EB88"
+      "func_8007EB88",
+      "func_800762BC",
+      "func_80082314",
+      "func_800829C4",
+      "func_8007A4D0",
+      "func_800830DC",
+      "func_8007D074",
+      "func_80073454",
+      "func_8008D610",
+      "func_80073354",
+      "func_80083644"
     ],
     "era_o2_g8": [
       "func_800124F8",
@@ -1012,7 +2296,6 @@
       "func_8005EA8C",
       "func_8005F5B8",
       "func_800625B8",
-      "func_8006322C",
       "func_800473E4",
       "func_8004D5CC",
       "func_80047FE0",
@@ -1027,8 +2310,6 @@
       "func_8004551C",
       "func_8004C34C",
       "func_8004D2DC",
-      "func_80062D2C",
-      "func_80064EB4",
       "func_80046EAC",
       "func_800131E8",
       "func_8002F658",
@@ -1090,7 +2371,75 @@
       "func_8005E6F0",
       "func_80054520",
       "func_80059FD0",
-      "func_8005968C"
+      "func_8005968C",
+      "func_8006322C",
+      "func_80062D2C",
+      "func_80064EB4",
+      "func_80012574",
+      "func_8004542C",
+      "func_80034DE0",
+      "func_80055724",
+      "func_8005BCBC",
+      "func_8005BE1C",
+      "func_80057C54",
+      "func_8005DF6C",
+      "func_8004D18C",
+      "func_8005F1A0",
+      "func_80058AA8",
+      "func_800542A0",
+      "func_800543CC",
+      "func_80061A3C",
+      "func_800480AC",
+      "func_80059534",
+      "func_8005B248",
+      "func_8001ACE0",
+      "func_800360B4",
+      "func_80043C64",
+      "func_800471E4",
+      "func_8005B3A4",
+      "func_8004CC50",
+      "func_80064B74",
+      "func_80042D40",
+      "func_800579D4",
+      "func_8004B394",
+      "func_800574A8",
+      "func_8005F698",
+      "func_8001AA78",
+      "func_80045D0C",
+      "func_8005EB64",
+      "func_8005CAEC",
+      "func_8005ED18",
+      "func_8003C638",
+      "func_8004B970",
+      "func_8005E12C",
+      "func_8005E30C",
+      "func_80048654",
+      "func_8004E704",
+      "func_80045FA4",
+      "func_8004E97C",
+      "func_80062090",
+      "func_80061878",
+      "func_8006153C",
+      "func_80045A98",
+      "func_80044B0C",
+      "func_8004A6CC",
+      "func_80044444",
+      "func_8005CCA4",
+      "func_80057094",
+      "func_8004324C",
+      "func_800371B0",
+      "func_80045670",
+      "func_8005C688",
+      "func_8001C164",
+      "func_8004FB48",
+      "func_800638D8",
+      "func_80057654",
+      "func_80058E44",
+      "func_8005E588",
+      "func_80046574",
+      "func_8001C614",
+      "func_80055E14",
+      "func_80062A7C"
     ],
     "era_o2_g8_force_d8009d2e8_absolute": [
       "func_800293F4"
@@ -1104,7 +2453,10 @@
       "func_80018300",
       "func_80017988",
       "func_80019B08",
-      "func_800184EC"
+      "func_800184EC",
+      "func_8001787C",
+      "func_80013300",
+      "func_80013514"
     ],
     "era_o2_g8_vm_dispatch": [
       "func_80012850"
@@ -1288,7 +2640,8 @@
       "func_80076B44",
       "func_8007FBF0",
       "func_80085918",
-      "func_800800F4"
+      "func_800800F4",
+      "func_8007E5C4"
     ],
     "era_o2_g8_force_descriptor_absolute": [
       "func_80052E30",
@@ -1316,7 +2669,9 @@
       "func_8005FA3C",
       "func_8005FB74",
       "func_8005FDF0",
-      "func_8005FF28"
+      "func_8005FF28",
+      "func_800602D0",
+      "func_8005FCAC"
     ],
     "era_o2_g0_dispatch_80010080": [
       "func_80012E7C"
@@ -1338,26 +2693,31 @@
     ],
     "era_o2_g8_force_d800c0e44_absolute": [
       "func_8004FEEC",
-      "func_800434C0"
+      "func_800434C0",
+      "func_800622BC"
     ],
     "era_o2_g8_force_d8009d1a0_d8009d278_absolute": [
       "func_80021080",
       "func_800210D4"
     ],
     "era_o2_g8_force_d8009d278_d8009d254_absolute": [
-      "func_80020D50"
+      "func_80020D50",
+      "func_80023008"
     ],
     "era_o1_g8_force_d800b0cd8_absolute": [
       "func_80034F10"
     ],
     "era_o2_g8_force_d8009d254_absolute": [
-      "func_800515F8"
+      "func_800515F8",
+      "func_8001D170"
     ],
     "era_o2_g8_force_d8009d2e8_d8009d254_d8009d278_absolute": [
       "func_80020C74"
     ],
     "era_o2_g0_fill_epilogue_delay_slot_symbol_load_dest_temp": [
-      "func_800819D8"
+      "func_800819D8",
+      "func_8007F418",
+      "func_8007E704"
     ],
     "era_o2_g0_fill_branch_delay_slot": [
       "func_80043474"
@@ -1367,10 +2727,15 @@
       "func_800199CC",
       "func_800D401C",
       "func_800C251C",
-      "func_800C5EB0"
+      "func_800C5EB0",
+      "func_800875FC",
+      "func_80039D24",
+      "func_80039ED4"
     ],
     "era_o2_g8_force_d800b0cd8_absolute": [
-      "func_8003F2FC"
+      "func_8003F2FC",
+      "func_8004E074",
+      "func_8004E2E4"
     ],
     "era_o2_g8_force_d8009d2a4_absolute": [
       "func_80019540"
@@ -1379,7 +2744,8 @@
       "func_80020DD0"
     ],
     "era_o2_g0_no_schedule_insns_fill_epilogue_delay_slot": [
-      "func_800837C8"
+      "func_800837C8",
+      "func_800846AC"
     ],
     "era_o2_g8_force_d8009d20c_absolute": [
       "func_80065400"
@@ -1413,7 +2779,9 @@
       "func_80053B48"
     ],
     "era_o2_g8_force_d800c0e0c_absolute": [
-      "func_80059A40"
+      "func_80059A40",
+      "func_80054E4C",
+      "func_80054CF8"
     ],
     "era_o2_g0_dispatch_800c22a4": [
       "func_800D413C"
@@ -1430,12 +2798,13 @@
     "era_o2_g8_force_d800c0e0a_absolute": [
       "func_8005D994"
     ],
-    "era_o2_g0_dispatch_800113d0": [
-      "func_8006C1CC"
-    ],
     "era_o2_g8_force_d8009d1a0_absolute": [
       "func_80021D4C",
-      "func_8003E974"
+      "func_8003E974",
+      "func_80015BAC",
+      "func_80016E40",
+      "func_80015AF0",
+      "func_80016F10"
     ],
     "era_o2_g8_force_d8009cddc_absolute": [
       "func_80033430"
@@ -1454,11 +2823,12 @@
       "func_8007BBB0",
       "func_8007FB04",
       "func_8007D15C",
-      "func_8007F994",
       "func_8008227C",
       "func_80085984",
       "func_80073BBC",
-      "func_80082444"
+      "func_80082444",
+      "func_8007F994",
+      "func_80085C44"
     ],
     "era_o2_g0_fill_call_delay_slot_fill_epilogue_delay_slot": [
       "func_8007C2A0",
@@ -1469,7 +2839,10 @@
       "func_80082CF0",
       "func_80081314",
       "func_8007C13C",
-      "func_8007ED58"
+      "func_8007ED58",
+      "func_8007EC14",
+      "func_800727B4",
+      "func_8007D454"
     ],
     "era_o2_g0_dispatch_8001086c": [
       "func_800255E4"
@@ -1481,13 +2854,366 @@
       "func_80083014"
     ],
     "era_o2_g0_cc1_281": [
-      "func_80074C14"
+      "func_80074C14",
+      "func_80076170",
+      "func_80076208",
+      "func_80074FD4",
+      "func_80074F44",
+      "func_8007512C",
+      "func_800840DC",
+      "func_8007D6D0",
+      "func_80085A64",
+      "func_8007F88C",
+      "func_8007FA2C",
+      "func_8007FCFC",
+      "func_80077144",
+      "func_80075CE8",
+      "func_80075EE0",
+      "func_8008CF70",
+      "func_8007A360",
+      "func_80081D74",
+      "func_80083F44",
+      "func_800775E8",
+      "func_800776D4",
+      "func_80077904",
+      "func_80077294",
+      "func_800777C0",
+      "func_800844E4"
     ],
     "era_o2_g0_cc1_281_fill_call_delay_slot_symbol_at_temp_symbol_load_dest_temp": [
       "func_80074A44"
     ],
     "era_o2_g0_dispatch_80010c90": [
       "func_80030220"
+    ],
+    "era_o2_g0_dispatch_800113d0_aspsx_230": [
+      "func_8006C1CC"
+    ],
+    "era_o2_g0_cc1_281_fill_call_delay_slot": [
+      "func_80073F00",
+      "func_80074E28",
+      "func_80076434"
+    ],
+    "era_o2_g0_no_schedule_insns_cc1_281_fill_call_delay_slot_symbol_load_dest_temp": [
+      "func_80081414"
+    ],
+    "era_o2_g0_dispatch_800120bc_800120dc_cc1_281": [
+      "func_80085F74"
+    ],
+    "era_o2_g8_force_d8009d2f0_d8009d254_absolute": [
+      "func_800136C0",
+      "func_800148E0"
+    ],
+    "era_o2_g8_force_d8009d2f0_d8009d254_d8009d20c_absolute": [
+      "func_80013C34",
+      "func_80013E84"
+    ],
+    "era_o2_g8_force_d8009d2f0_d8009d254_d8009d2e8_d800b0d88_absolute": [
+      "func_80014FD8"
+    ],
+    "era_o2_g8_dispatch_80011158": [
+      "func_8005112C"
+    ],
+    "era_o2_g8_dispatch_8001125c": [
+      "func_80053D2C"
+    ],
+    "era_o2_g0_no_expensive_optimizations": [
+      "func_8006DCE4",
+      "func_8006DE80"
+    ],
+    "era_o2_g0_fill_branch_macro_split": [
+      "func_800739C4",
+      "func_8007C214",
+      "func_80082B70"
+    ],
+    "era_o2_g0_no_cse_skip_blocks": [
+      "func_800C6C18"
+    ],
+    "era_o2_g0_dispatch_800120fc_8001211c_cc1_281_fill_jump_stack_store": [
+      "func_800862F4"
+    ],
+    "era_o2_g0_cc1_281_fill_jump_stack_store": [
+      "func_8007DCAC"
+    ],
+    "era_o2_g8_force_d8009d1a0_d8009d2a4_absolute": [
+      "func_80015C7C"
+    ],
+    "era_o2_g8_force_d8009d2fc_d8009d278_d8009d1ac_d8009d1ce_absolute": [
+      "func_80020F18"
+    ],
+    "era_o2_g8_force_d8009d278_d8009d254_d8009d2fc_absolute": [
+      "func_80021128"
+    ],
+    "era_o2_g8_force_d8009d254_d8009d2e8_d8009d278_d8009d28c_absolute": [
+      "func_80021DE0"
+    ],
+    "era_o2_g8_force_d8009d278_d8009d254_d8009d1a0_absolute": [
+      "func_80022210"
+    ],
+    "era_o2_g0_no_rerun_cse_after_loop": [
+      "func_80014228"
+    ],
+    "era_o2_g0_cc1_281_return_via_epilogue_jump": [
+      "func_80072334"
+    ],
+    "era_o2_g0_cc1_281_load_delay_call_slot_store": [
+      "func_800742B8"
+    ],
+    "era_o2_g0_cc1_281_fill_call_delay_slot_branch_macro_split": [
+      "func_800809E0"
+    ],
+    "era_o2_g0_cc1_281_fill_branch_macro_split": [
+      "func_80084168"
+    ],
+    "era_o2_g0_dispatch_8001206c_cc1_281": [
+      "func_80082778"
+    ],
+    "era_o2_g0_fill_branch_macro_split_epilogue": [
+      "func_80082E00",
+      "func_8007A60C",
+      "func_8007A740"
+    ],
+    "era_o2_g0_load_delay_call_slot_store": [
+      "func_8007A2A4"
+    ],
+    "era_o2_g8_dispatch_800100a0_force_d800b0cd8_d8009d1a0_absolute": [
+      "func_800144FC"
+    ],
+    "era_o2_g8_force_d8009d254_d8009d1a0_absolute": [
+      "func_8002B0E8"
+    ],
+    "era_o2_g8_force_d8009d254_plus7_battle_reset_absolute": [
+      "func_80029810"
+    ],
+    "era_o2_g8_force_d8009d254_plus51_battle_menu_absolute": [
+      "func_800295E4"
+    ],
+    "era_o2_g8_force_d8009d278_d8009d254_d8009cddc_d8009cdd8_absolute": [
+      "func_800347B4",
+      "func_800334AC"
+    ],
+    "era_o2_g8_dispatch_800112a4": [
+      "func_80057834"
+    ],
+    "era_o2_g0_cc1_281_load_delay_nop_before_label": [
+      "func_80083578",
+      "func_8007BF44",
+      "func_800832B4"
+    ],
+    "era_o2_g8_force_d8009d20c_d8009d254_absolute": [
+      "func_8002156C",
+      "func_8002F0B0"
+    ],
+    "era_o2_g8_dispatch_80011458_force_d800b0e64_absolute": [
+      "func_8006D078"
+    ],
+    "era_o2_g0_cc1_281_unfill_epilogue_delay_slot": [
+      "func_8007D614",
+      "func_80077404",
+      "func_8008A750"
+    ],
+    "era_o2_g0_cc1_281_div_no_reuse_nop_expand_div": [
+      "func_80077E64"
+    ],
+    "era_o2_g8_force_d800b1620_absolute": [
+      "func_8001A918"
+    ],
+    "era_o2_g8_la_absolute_small_data": [
+      "func_80044274"
+    ],
+    "era_o2_g0_fill_call_volatile_store_fill_epilogue_delay_slot": [
+      "func_80076354"
+    ],
+    "era_o2_g8_dispatch_80011170_force_d8009d254_absolute": [
+      "func_800512AC"
+    ],
+    "era_o2_g8_dispatch_80011144": [
+      "func_8004ECB4"
+    ],
+    "era_o2_g0_rodata_fold_800323c8": [
+      "func_800323C8"
+    ],
+    "era_o2_g8_dispatch_800111f8": [
+      "func_80051CC4"
+    ],
+    "era_o2_g8_force_d800c0e20_d800c0e22_absolute": [
+      "func_80058030",
+      "func_8004A0C8"
+    ],
+    "era_o2_g8_dispatch_800112dc_force_d800c0e0c_absolute": [
+      "func_8005D2B4"
+    ],
+    "era_o2_g8_dispatch_80011218": [
+      "func_80051E64"
+    ],
+    "era_o2_g0_dispatch_80010e4c": [
+      "func_800314E4"
+    ],
+    "era_o2_g8_dispatch_80010690_force_d8009d2f0_d8009d1a0_d8009d254_absolute": [
+      "func_80017018"
+    ],
+    "era_o2_g8_force_d8009d278_absolute": [
+      "func_80022D7C"
+    ],
+    "era_o2_g8_expand_div_force_d8009cddc_absolute": [
+      "func_8003C818"
+    ],
+    "era_o2_g8_force_d8009d254_d8009d278_d8009d2fc_absolute": [
+      "func_80021F38"
+    ],
+    "era_o2_g8_dispatch_800111a8": [
+      "func_80051980"
+    ],
+    "era_o2_g8_expand_div_force_d8009d278_d8009d254_absolute": [
+      "func_80021278"
+    ],
+    "era_o2_g8_dispatch_80010884_expand_div_force_d8009d278_d8009d1f4_d8009d2b0_absolute": [
+      "func_800258CC"
+    ],
+    "era_o2_g8_force_d8009d278_d8009d20c_d8009d254_d8009d208_d8009d1d4_d8009d23c_absolute": [
+      "func_80027A08"
+    ],
+    "era_o2_g0_dispatch_800107a4": [
+      "func_80023E14"
+    ],
+    "era_o2_g8_force_d8009d2b0_d8009d278_d8009d20c_d8009d254_absolute": [
+      "func_800275CC",
+      "func_80026FF8"
+    ],
+    "era_o2_g0_spu_init_8007d1d4": [
+      "func_8007D1D4"
+    ],
+    "era_o2_g0_cc1_281_fill_call_delay_slot_load_delay_nop_before_label": [
+      "func_8007FE24"
+    ],
+    "era_o2_g8_force_d8009d254_d8009cddc_d8009d1e8_absolute": [
+      "func_80034104"
+    ],
+    "era_o2_g8_expand_div_force_d8009d278_d8009d254_d8009d1a0_d8009cddc_absolute": [
+      "func_80033A40"
+    ],
+    "era_o2_g8_force_d8009ee70_d80092224_d800a1854_d800a1858_absolute": [
+      "func_80042020"
+    ],
+    "era_o2_g8_force_d8009ee70_d80092224_d800a185c_d800a1854_d800a1838_absolute": [
+      "func_80040F80"
+    ],
+    "era_o2_g8_force_d8009d1a8_d8009d1ac_d800bceac_d800bcea8_d800bceb4_absolute": [
+      "func_8003495C"
+    ],
+    "era_o2_g8_force_d800b0e64_absolute": [
+      "func_80035038"
+    ],
+    "era_o2_g8_force_d8009d254_d8009d2f0_d8009d20c_d800bd028_d800bd025_absolute": [
+      "func_80016910"
+    ],
+    "era_o2_g8_force_d8009d1a0_d8009d280_d800be9a0_d800be9a2_d800be9a6_d800be9a7_d800b0cd8_d800b0dbf_absolute": [
+      "func_8003EB04"
+    ],
+    "era_o2_g8_dispatch_8001104c_force_d800c0e20_d800c0e22_absolute": [
+      "func_8004C608"
+    ],
+    "era_o2_g8_dispatch_800108f0_force_d8009d254_absolute": [
+      "func_8002AA98"
+    ],
+    "era_o2_g8_expand_div_force_d8009d278_d8009d254_d8009d2e8_d8009d228_d8009cddc_absolute": [
+      "func_8001F9C4"
+    ],
+    "era_o2_g8_rodata_fold_8001074c_80010760_force_d8009d2a0_d8009d1a0_d8009d278_d8009d254_d8009d20c_d800942e4_absolute": [
+      "func_80022394"
+    ],
+    "era_o2_g0_dispatch_8001213c": [
+      "func_8008E2DC"
+    ],
+    "era_o2_g0_dispatch_800113b0": [
+      "func_8006BECC"
+    ],
+    "era_o2_g8_dispatch_800107d4_rodata_fold_80010760_force_d8009d1a0_d8009d254_d8009d278_d8009d2e8_d8009d1ac_absolute": [
+      "func_80024250"
+    ],
+    "era_o2_g0_no_delayed_branch_reorder_fill_calls": [
+      "func_80084B78"
+    ],
+    "era_o2_g0_no_schedule_insns2_cc1_281": [
+      "func_8007E048"
+    ],
+    "era_o2_g0_div_no_reuse_nop_expand_div": [
+      "func_8007DB24"
+    ],
+    "era_o2_g0_dispatch_8001070c": [
+      "func_80020288"
+    ],
+    "era_o2_g0_dispatch_800113f0": [
+      "func_8006C5BC"
+    ],
+    "era_o2_g0_fill_epilogue_delay_slot_spill_before_symbol_load": [
+      "func_80083D04"
+    ],
+    "era_o2_g0_cc1_281_sink_return_zero_into_flag_delay_unfill_epilogue_delay_slot": [
+      "func_8006AD40"
+    ],
+    "era_o2_g0_no_schedule_insns_cc1_281_unfill_epilogue_delay_slot": [
+      "func_80087428"
+    ],
+    "era_o2_g0_sink_zero_store_into_beqz": [
+      "func_8007C484"
+    ],
+    "era_o2_g0_cc1_281_fill_call_delay_slot_unaligned_word_copy_return_temp": [
+      "func_80080E34"
+    ],
+    "era_o2_g0_no_schedule_insns_no_schedule_insns2": [
+      "func_800746A0"
+    ],
+    "era_o2_g0_cc1_281_fill_call_delay_slot_unfill_epilogue_delay_slot": [
+      "func_8007BBFC"
+    ],
+    "era_o2_g8_drop_unused_var8": [
+      "func_8005382C"
+    ],
+    "era_o2_g0_cc1_281_load_delay_nop_before_label_nop_before_label_skip_empty_app_swap_s2_s1_save_pairs": [
+      "func_80080F98"
+    ],
+    "era_o2_g0_no_strength_reduce": [
+      "func_8003999C"
+    ],
+    "era_o2_g0_load_before_stack_half": [
+      "func_800CFD50"
+    ],
+    "era_o1_g0_bnez_postdec_from_minus_one_ori_small_li": [
+      "func_80070D10"
+    ],
+    "era_o2_g0_frame48_s5_after_s2": [
+      "func_800677FC"
+    ],
+    "era_o2_g0_cc1_281_fill_branch_macro_split_symbol_load_dest_temp": [
+      "func_80076EE4"
+    ],
+    "era_o2_g0_cc1_281_addu_neg1_beq_delay": [
+      "func_8007E964"
+    ],
+    "era_o2_g8_div_delay_reuse_v0_expand_div_force_d8009d2f0_absolute": [
+      "func_800133E8"
+    ],
+    "era_o2_g0_drop_jump_to_epilogue": [
+      "func_8007E160"
+    ],
+    "era_o2_g0_sltu_a0_lt_a2_dest_v1": [
+      "func_80073244"
+    ],
+    "era_o2_g0_dup_half_shift": [
+      "func_8006EC08"
+    ],
+    "era_o2_g0_mult_mflo_to_multu": [
+      "func_80078CC4"
+    ],
+    "era_o1_g0_mflo_before_mfhi": [
+      "func_80070FAC"
+    ],
+    "era_o2_g0_mflo_before_mfhi": [
+      "func_8003708C"
+    ],
+    "era_o2_g0_cc1_281_beqz_sym_store_delay_fill_call_delay_slot_index_pair_jal_schedule": [
+      "func_8007BDDC"
     ]
   }
 }

@@ -14,23 +14,7 @@
 #include "pe_port_compat.h"
 #include "pe_sdk.h"
 
-void func_8003C5D8(pe_addr_t dest, int a1)
-{
-    int scale;
-    int quot;
-
-    if (dest == 0u)
-        return;
-
-    scale = a1;
-    if ((a1 << 16) == 0)
-        scale = 1;
-    quot = 128 / (int)(int16_t)scale;
-    PE_StoreU8(dest + 0x8Du, (uint8_t)scale);
-    PE_StoreU8(dest + 0x8Eu, (uint8_t)quot);
-    PE_StoreU8(dest + 0x8Fu, (uint8_t)quot);
-    PE_StoreU8(dest + 0x93u, (uint8_t)quot);
-}
+/* func_8003C5D8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8003C5D8_port.c (src/func_8003C5D8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 /* 3B144..3B708: projected GT4/GT3/G4/G3 packet submission. NCLIP
  * uses signed screen coordinates and a wrapping 32-bit MAC0 result. */

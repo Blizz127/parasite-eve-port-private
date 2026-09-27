@@ -1,0 +1,44 @@
+extern int D_8009CEF4;
+extern unsigned char *func_80062A34(int, int);
+extern int func_80063428(unsigned char *);
+extern int func_80059F08(int);
+extern int func_8005415C(int);
+extern int func_80052F0C(void);
+extern void func_80052E30(int);
+extern void func_800543CC(int, int);
+extern int func_80054288(void);
+extern void func_800647D0(unsigned char *, int);
+extern void func_800638D8(unsigned char *, void (*)(void));
+extern void func_800430A0(void);
+
+void func_8004FB48(unsigned char *a0)
+{
+    int s;
+    int mask;
+    int id;
+    int n;
+
+    s = func_80063428(func_80062A34(2, 0x36));
+    if (s >= 0) {
+        mask = 0x33E;
+        if (*(int *)(a0 + 0x24) == 7) {
+            id = func_80059F08(0);
+            n = func_8005415C(id);
+            if (n != 0 && n < 6) {
+                mask = 0x3E;
+            } else {
+                mask = 1 << n;
+            }
+            if (func_80052F0C() != s) {
+                id = -1;
+            }
+        } else {
+            id = -1;
+        }
+        func_80052E30(s);
+        func_800543CC(mask, id);
+        func_800647D0(a0, func_80054288());
+    }
+    D_8009CEF4 = (int)a0;
+    func_800638D8(a0, func_800430A0);
+}

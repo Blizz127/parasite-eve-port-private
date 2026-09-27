@@ -18,13 +18,7 @@ int32_t func_800D3F64(uint32_t id,uint32_t group)
         (int16_t)PE_LoadU32(matrix+24u),(int16_t)PE_LoadU32(matrix+28u));
 }
 
-int func_800C6B90(pe_addr_t p,int32_t radius)
-{
-    pe_addr_t actor=PE_LoadU32(0x8009D254u);
-    int32_t dx=lh(actor+0x2Au)-lh(p),dz=lh(actor+0x32u)-lh(p+4u);
-    int32_t r=(int32_t)((uint32_t)(int32_t)lh(actor+0x224u)+(uint32_t)radius);
-    return (int32_t)((uint32_t)mul32(dx,dx)+(uint32_t)mul32(dz,dz))<mul32(r,r);
-}
+/* func_800C6B90: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800C6B90_port.c (src/func_800C6B90.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 static uint32_t clut(void)
 {

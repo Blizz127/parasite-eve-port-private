@@ -14,7 +14,4 @@
 #include "psx_compat.h"
 #include "pe_port_compat.h"
 
-void func_8004FF58(pe_addr_t slot)
-{
-    func_800638D8(slot, 0x80050C70u);
-}
+/* func_8004FF58: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8004FF58_port.c (src/func_8004FF58.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

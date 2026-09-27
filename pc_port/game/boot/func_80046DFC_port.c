@@ -59,9 +59,9 @@ void func_80047040(uint32_t index)
     }
 }
 
-void func_800471BC(pe_addr_t list) {func_800638D8(list,0x80047040u);}
-void func_8004732C(pe_addr_t list) {func_800638D8(list,0x80050280u);}
-void func_800474A8(pe_addr_t list) {func_800638D8(list,0x80050308u);}
+/* func_800471BC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800471BC_port.c (src/func_800471BC.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_8004732C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8004732C_port.c (src/func_8004732C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_800474A8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800474A8_port.c (src/func_800474A8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 int func_800471E4(pe_addr_t window,uint32_t event)
 {

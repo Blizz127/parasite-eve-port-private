@@ -1,3 +1,5 @@
+#include <stdio.h>
+#include <stdlib.h>
 /*
  * PE-CH2 — func_80066800: opcode 0x82 52-byte view-record apply.
  *
@@ -94,33 +96,7 @@ int func_80065E48_position(int32_t x, int32_t y, int32_t z)
     return 0;
 }
 
-/*
- * PE-BTL64 — func_800661EC camera-request leaf.
- *
- * 31 words 0x800661EC..0x80066268, SHA-256
- * 095ed0474107c1b7124d63d5dc36c7fbc97f82ac409ee06746741734bc0bba28.
- * Zero jal. Callers 17C54 (0x03, a3=0) and 17C8C (0x46, a3=8).
- * If BCF88 bit 0x40 is clear, return -19 with no stores.
- * Else BCFA0=1, BCF9C/9E/A2=a0/a1/a2, BCF98=*BCF8C,
- * BCF88 = (flags & 0xFFF0) | (a3==8 ? 1 : 9), return 0.
- */
-int func_800661EC(int a0, int a1, unsigned int a2, unsigned int a3)
-{
-    uint32_t flags;
-    uint32_t low;
-
-    flags = PE_LoadU32(GA_D_800BCF88);
-    if ((flags & 0x40u) == 0u)
-        return -19;
-    PE_StoreU16(0x800BCFA0u, 1u);
-    PE_StoreU16(0x800BCF9Cu, (uint16_t)a0);
-    PE_StoreU16(0x800BCF9Eu, (uint16_t)a1);
-    PE_StoreU16(0x800BCFA2u, (uint16_t)a2);
-    PE_StoreU32(0x800BCF98u, PE_LoadU32(0x800BCF8Cu));
-    low = (a3 == 8u) ? 1u : 9u;
-    PE_StoreU32(GA_D_800BCF88, (flags & 0xFFF0u) | low);
-    return 0;
-}
+/* func_800661EC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800661EC_port.c (src/func_800661EC.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 /* 66268: advance an explicit camera pan before the actor-follow update.
  * Stage dialogue issues 661EC even when Aya is absent. Both background
@@ -189,32 +165,9 @@ static int32_t pe_rsin_77d30(uint32_t a0)
     return -(int16_t)PE_LoadU16(GA_RSIN_589C + (0x1000u - a0) * 2u);
 }
 
-int32_t func_80077CF4(int32_t angle)
-{
-    int32_t s;
+/* func_80077CF4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80077CF4_port.c (src/func_80077CF4.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-    if (angle < 0) {
-        s = pe_rsin_77d30((uint32_t)(-angle) & 0xFFFu);
-        return -s;
-    }
-    return pe_rsin_77d30((uint32_t)angle & 0xFFFu);
-}
-
-int32_t func_80077DC4(int32_t angle)
-{
-    uint32_t a0;
-
-    if (angle < 0)
-        angle = -angle;
-    a0 = (uint32_t)angle & 0xFFFu;
-    if (a0 < 0x401u)
-        return (int16_t)PE_LoadU16(GA_RSIN_589C + (0x400u - a0) * 2u);
-    if (a0 < 0x801u)
-        return -(int16_t)PE_LoadU16(GA_RSIN_509C + a0 * 2u);
-    if (a0 < 0xC01u)
-        return -(int16_t)PE_LoadU16(GA_RSIN_589C + (0xC00u - a0) * 2u);
-    return (int16_t)PE_LoadU16(GA_RSIN_409C + a0 * 2u);
-}
+/* func_80077DC4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80077DC4_port.c (src/func_80077DC4.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 /*
  * PE-BTL69 — func_80066CE8 walk heading matrix.
@@ -599,27 +552,84 @@ void func_80067A78(void)
     }
 }
 
-void func_80067B74(void)
+/* Shared colour walk of src/func_80067B74.c and src/func_80067D18.c: for
+ * each of the container's n 0x38-byte records, write `col` to bytes +6/+5/+4
+ * of the c 16-byte entries at *(rec + 0x30) (offset by c << 4 when
+ * D_8009CDDC != 0).  The entry pointer is a 32-bit guest address, so it is
+ * read with PE_LoadU32 rather than through a host `unsigned char **`. */
+static void pe_67b74_colour_walk(uint8_t col)
 {
+    pe_addr_t base = PE_LoadU32(0x800B1624u);
+    uint32_t n = PE_LoadU16(base + 6u), i;
+    pe_addr_t e = base + PE_LoadU32(base + 0x14u);
+
+    for (i = 0; i < n; i++, e += 0x38u) {
+        pe_addr_t q = PE_LoadU32(e + 0x30u);
+        uint32_t c = PE_LoadU16(e + 0x26u), k;
+        if (PE_LoadU32(0x8009CDDCu) != 0u)
+            q += c << 4;
+        for (k = 0; k < c; k++, q += 0x10u) {
+            PE_StoreU8(q + 6u, col);
+            PE_StoreU8(q + 5u, col);
+            PE_StoreU8(q + 4u, col);
+        }
+    }
+}
+
+/* src/func_80067B74.c (fade step).  Was an early-return stub that skipped
+ * the whole body when bit 0x400 was set (portverify). */
+int func_80067B74(void)
+{
+    int32_t na, nb, d;
+    uint32_t t;
+
     if ((PE_LoadU32(GA_D_800BCF88) & 0x400u) == 0u)
-        return;
+        return 0;
+    na = (int32_t)PE_LoadU8(0x800BCFFBu) << 7;
+    nb = (int32_t)PE_LoadU8(0x800BCFFAu) - 1;
+    if (nb == 0) {
+        /* Retail 0x80067BA8: `bnez v0` guards `break 0x7`. */
+        fprintf(stderr, "FATAL: func_80067B74: retail break 7 "
+                        "(D_800BCFFA == 1 divides by zero)\n");
+        abort();
+    }
+    d = na / nb;
+    pe_67b74_colour_walk((uint8_t)(0x80 - d));
+    t = PE_LoadU8(0x800BCFFBu) + 1u;
+    PE_StoreU8(0x800BCFFBu, (uint8_t)t);
+    if ((t & 0xFFu) >= PE_LoadU8(0x800BCFFAu)) {
+        pe_addr_t h = PE_LoadU32(0x800B1624u);
+        PE_StoreU32(GA_D_800BCF88,
+                    (PE_LoadU32(GA_D_800BCF88) & ~0xC00u) | 0x800u);
+        PE_StoreU16(h + 0x26u, 0x1FF0u);
+    }
+    return 0;
 }
 
-void func_80067D18(void)
+/* src/func_80067D18.c (colour hold + phase advance).  Was an early-return
+ * stub (portverify). */
+int func_80067D18(void)
 {
-    if ((PE_LoadU32(GA_D_800BCF88) & 0x1000u) == 0u)
-        return;
+    uint32_t f1 = PE_LoadU32(GA_D_800BCF88), f, t;
+
+    if ((f1 & 0x1000u) == 0u)
+        return 0;
+    pe_67b74_colour_walk((f1 & 0x2000u) != 0u ? PE_LoadU8(0x800BCFFCu) : 0x80u);
+    f = PE_LoadU32(GA_D_800BCF88);
+    t = f & 0xFFFF3FFFu;
+    PE_StoreU32(GA_D_800BCF88, t);
+    switch (f & 0xC000u) {
+    case 0x4000u:
+        PE_StoreU32(GA_D_800BCF88, t | 0x8000u);
+        break;
+    case 0x8000u:
+        PE_StoreU32(GA_D_800BCF88, t & ~0x1000u);
+        break;
+    }
+    return 0;
 }
 
-void func_80068CE0(void)
-{
-    func_80066CE8();
-    func_80065674();
-    func_80067E1C();
-    func_80067A78();
-    func_80067B74();
-    func_80067D18();
-}
+/* func_80068CE0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80068CE0_port.c (src/func_80068CE0.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 #define GA_D_800BD024 0x800BD024u
 #define GA_D_800BD028 0x800BD028u

@@ -41,12 +41,7 @@
 extern int func_80074A44(int mode);
 extern int func_8006EC08(void);
 
-int func_8006EBE4(void)
-{
-    if (PE_LoadU8(0x800B0DBAu) != 0u)
-        return (int16_t)PE_LoadU16(0x800B0DBCu);
-    return -1;
-}
+/* func_8006EBE4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8006EBE4_port.c (src/func_8006EBE4.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 void func_80042FE8(void)
 {

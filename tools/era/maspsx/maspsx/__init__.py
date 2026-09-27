@@ -197,6 +197,352 @@
 #      of re-expanding it into the 4-word $at macro. 2.7.2 output is
 #      byte-identical (it never produces the form). Durable test
 #      tests/test_lo_store_passthrough.py.
+#  22. reorder_fill_calls (ctor arg, or env MASPSX_REORDER_FILL_CALLS=1): for
+#      leaves compiled with cc1 -fno-delayed-branch (every slot left empty,
+#      which retail shows for branch/j slots), model the two LOCAL fills
+#      ASPSX's reorder pass still makes, as a pre-pass that rewrites them
+#      into cc1-style `.set noreorder` blocks:
+#        (A) X / jal T  ->  jal T / X            (call slot)
+#        (B) X / lw $31,N($sp) / addu $sp,$sp,M / j $31
+#            ->  lw $31,N($sp) / X / j $31 / addu $sp,$sp,M
+#            (X fills the $31 load delay, the pop fills the return slot).
+#      ROM evidence: func_80084B78 -- 0x80084BF4 `jal func_80083E50` /
+#      `li $a1,1`, the second call with `move $a1,$zero` in its slot, while
+#      every branch/j slot and the jalr/jal slots preceded by a branch or a
+#      label stay nop; epilogue 0x80084C3C `lw $ra` / `move $v0,$zero` /
+#      `jr $ra` / `addiu $sp,$sp,24`. Closes that leaf (21 words -> 0).
+#      HAZARDS: HF1 X is a single-word ALU op from a closed list (move, li
+#      with a one-word immediate, addu/addiu/subu/and/andi/or/ori/xor/xori/
+#      nor/slt*/shifts), never a load/store/branch/macro/symbol operand;
+#      HF2 X never names $zero as destination, $at, $sp, $fp or $ra (a jal
+#      writes $ra before its slot runs); HF3 a jalr target register X
+#      writes is refused (the jump reads it first); X must IMMEDIATELY
+#      precede the jal / epilogue with no label or directive between (a
+#      label means the call is a branch target), and only in reorder mode.
+#      SWEEP (2026-09-24): 4255 era leaves, flag-off byte-identical, knob-on
+#      changes 0. Default OFF; per-leaf.
+#      RE-SWEEP 2026-09-24 (baseline = this file without the patch-22
+#      pre-pass call): 4279 era leaves, flag-off 4279/4279 identical;
+#      knob-on changes only its user func_80084B78.
+#  21. load_delay_nop_before_loop_label (ctor arg, or env
+#      MASPSX_LOAD_DELAY_NOP_BEFORE_LOOP_LABEL=1): the loop-head sibling of
+#      patch 14. When a load is immediately followed by a label that is a
+#      pure LOOP HEAD, emit the required load-delay nop BEFORE the label
+#      (`lw` / nop / $L: / use) instead of after it, so the back-edge skips
+#      it. ROM evidence: func_8007D1D4 0x8007D37C `lw $v1,D_8009B3FC` / nop /
+#      0x8007D384 loop head; back-edge 0x8007D3A4 `bnez $v0,0x8007D384`
+#      (1440fff7; stock placement gives fff6). Closes that leaf.
+#      PER-LEAF, BAND ONLY: forcing the knob on over the corpus (4206 era
+#      leaves) changes exactly 12 matched leaves, all below 0x80071A84, with
+#      the identical shape (symbolic `lw`, then a back-edge-only label) where
+#      retail keeps label-then-nop: func_80018300/80018364/800183E8/80018460,
+#      func_8002F0B0, func_80055724, func_8005B500, func_8005CAEC,
+#      func_8005D020, func_80062CE4, func_8006F224, func_8006F39C. Like patch
+#      14 (all positives in 0x80071A84-0x8008D610) the placement is a
+#      band-vs-older-region difference, not a local rule.
+#      HAZARDS: HL21-1 the label must be the very next non-comment line
+#      after the load; HL21-2 every branch/jump to it must come AFTER it
+#      (back-edges only; the fall-through from the load is the one forward
+#      entry, and it still executes the nop); HL21-3 no cc1 noreorder
+#      back-edge may carry a load (or compound macro) in its slot. Default
+#      OFF; flag-off byte-identical (4206/4206).
+#      RE-SWEEP 2026-09-24 (after patches 22 + the fold-composition strip,
+#      baseline = this file without the patch-21 clause): 4269 era leaves,
+#      flag-off 4269/4269 identical; knob-on changes 17 = func_8007D1D4 (the
+#      user) + 16 matched leaves all below 0x80071A84 (the 12 above plus the
+#      newer func_800275CC, func_80027D14, func_80028E94, func_8005C688).
+#  20. rodata_fold (ctor arg rodata_fold_symbols, or env
+#      MASPSX_RODATA_FOLD=s0,s1,...): the i-th cc1 `$LC<n>` literal defined
+#      in .rdata is retail's shared pool object s<i>; every instruction
+#      operand naming `$LC<n>` (`la $r,$LCn`, `op $r,$LCn[+off]`) is
+#      retargeted to it, like MASPSX_DISPATCH_FOLD for switch tables. The
+#      build (disc1_build.strip_rodata_fold) then strips the object's
+#      duplicate .rodata only after proving it byte-identical to the pool
+#      blocks and that no relocation still points at it.
+#      ROM evidence: func_800323C8 copies three initialized 18-byte local
+#      arrays from the pool (0x800323D0 `lui $a2,0x8001` / `addiu
+#      $a2,0xDFC` = D_80010DFC; D_80010E10; D_80010E24) with lwl/lwr.
+#      HAZARDS: HR1 the list must name exactly as many symbols as cc1
+#      emitted $LC labels (else ValueError -- a wrong count would silently
+#      mis-map); HR2 whole-token `$LC<n>` instruction operands only, never
+#      the .rdata definitions; order/bytes are re-proven by the build strip.
+#      Default OFF (empty list); per-leaf.
+#  19. fill_branch_split_li (ctor arg, or env MASPSX_FILL_BRANCH_SPLIT_LI=1):
+#      PROVISIONAL (lead ruling 2026-09-24: reverted unless a leaf closes
+#      with it by the end of the lane). cc1 splits a 32-bit constant into
+#      `li $r,HI<<16` / `ori $r,$r,LO`; when that pair immediately follows
+#      a reorder-mode conditional branch, retail (ASPSX) has the `lui` in
+#      the branch's delay slot. The fill is legal only when $r is dead at
+#      the branch target, so it reuses patch 6's liveness walk in an
+#      EXTENDED mode (patch 6's own behaviour is unchanged): HS5 a
+#      reorder-mode branch inside the walk pushes its target and continues
+#      (a later fill can only move the next fall-through instruction into
+#      its slot, which the fall-through walk already checks); HS6 a call
+#      preserves a callee-saved register ($16-$23, $30), except a jalr
+#      through it; HS7 mult/multu read two GPRs, mfhi/mflo write one.
+#      Other gates: HS1 the li must be a pure high word (low 16 bits zero);
+#      HS2 the next line must be the completing `ori $r,$r,imm`; HS3 no
+#      ABI-fixed/$at destination; HS4 dead-at-target proof.
+#      ROM evidence: func_80038D74 0x80038E28 `bnez $v0` / `lui $s0,0x8001`
+#      (slot) / `ori $s0,$s0,0x3`; whole-EXE scan: 56 branches with a split
+#      constant's lui in the slot vs 5 with a nop slot before lui/ori.
+#      func_80038D74 goes 214 -> 6 words (the rest is a cc1 sched1 residual).
+#      Default OFF; per-leaf.
+#  DISPATCH_FOLD `la` form (extends the switch-dispatch retarget): cc1 may
+#      hoist a switch table's address out of a loop as `la $r,$L<n>` and
+#      index it with addu/`lw 0($r)`; such an `la` is now retargeted too,
+#      only for `$L<n>` labels defined in .rdata (HD1) and plain two-operand
+#      lines (HD2). ROM evidence: func_80051CC4 0x80051D2C/30
+#      `lui $t6,0x8001` / `addiu $t6,0x11F8` = jtbl_800111F8 (2 words ->
+#      LINK_EXACT). Inert unless MASPSX_DISPATCH_FOLD is set.
+#  18. fill_call_volatile_store (ctor arg, or env
+#      MASPSX_FILL_CALL_VOLATILE_STORE=1): the `jal` sibling of patch 11.
+#      The single-word register-based store (sb/sh/sw imm($r)) that
+#      immediately precedes a reorder-mode direct `jal <symbol>` moves into
+#      the call's delay slot:  sw $3,0($2) / jal F / nop  ->  jal F / sw $3,0($2)
+#      cc1 leaves that slot empty only for a `volatile` store (gcc's reorg
+#      never slots a volatile insn; a plain store it fills itself), so in
+#      practice this reaches volatile hardware-register writes.
+#      ROM evidence: func_80076354 0x800763C4 `jal func_800773D0` /
+#      `sw $v1,0($v0)` (the DMA CHCR = 0x11000002 kick); closes that leaf
+#      with patch 3 on plain 2.7.2 -O2 -G0.
+#      PER-LEAF ONLY: forcing it on over the corpus (1835 era leaves) changes
+#      exactly 2 matched leaves, both volatile stores retail keeps before the
+#      `jal` with a nop slot: func_80082E00 (`sb $2,0($3)` / jal
+#      func_80083578) and ovl_0457 func_8012562C (`sw $2,0($16)` / jal
+#      func_80080C48). No operand/position rule separates them from the
+#      positive, so the choice is the leaf's.
+#      HAZARDS: HC1 `jal` writes $31 before the slot runs -- refuse a moved
+#      store that reads $31 (value or base) or $at; HC2 direct `jal <symbol>`
+#      only (no jalr, no `j`: patch 11 owns `j <label>`); HC3 numeric 16-bit
+#      offset (one instruction; symbolic stores are macros, patch 8's arm);
+#      HC4 compound `;` lines refused; HC5 the call must be the next
+#      non-comment line in reorder mode (a label or `.set` in between, or a
+#      cc1 noreorder block, refuses). The store writes no GPR and a direct
+#      `jal` reads none, so slot execution is equivalent to the pre-call
+#      position. Default OFF; flag-off byte-identical (1835/1835).
+#  17. la_absolute_small_data (ctor arg, or env
+#      MASPSX_LA_ABSOLUTE_SMALL_DATA=1): a plain `la $r,SYM[+off]` whose
+#      symbol GNU as would place in small data (a local .sdata/.sbss entry or
+#      a sized `.extern` that fits -G<n>) is emitted as the explicit absolute
+#      pair `lui $r,%hi(SYM)` / `addiu $r,$r,%lo(SYM)`. Stock maspsx already
+#      models ASPSX < 2.80 as never forming a gp-relative `la`
+#      (gp_allow_la=False) but then hands the line to GNU as, which DOES make
+#      it `addiu $r,$gp,%gp_rel(SYM)`. Loads/stores of the same symbol are
+#      untouched and stay gp-relative -- the split retail shows. Before this
+#      patch the only workaround was MASPSX_FORCE_ABSOLUTE_SYMBOLS, which
+#      also turns the symbol's stores absolute.
+#      ROM evidence: func_80044274 -- `sw $v0,0x220($gp)` (D_8009CF90) and
+#      `lui $a0,0x800A` / `addiu $a0,$a0,-0x3070` (&D_8009CF90) at
+#      0x80044360, `lui $a1` / `addiu $a1,-0x306C` (&D_8009CF94); closed with
+#      the plain C spelling (was an alias store through D_8009CF8C).
+#      HAZARDS: HA1 only when gp_allow_la is off (ASPSX >= 2.80 forms a gp
+#      la); HA2 compound `;` lines refused; HA3 numeric operands refused;
+#      HA4 only symbols GNU as would place gp-relative (anything else already
+#      assembles absolute) -- indexed `la SYM($b)` takes the indexed path
+#      and is untouched. The pair is exactly GNU as's own absolute `la`
+#      expansion, so no scheduling or register changes.
+#      SWEEP (2026-09-23, tools/analysis/maspsx_knob_sweep.py): 1765 era
+#      leaves, flag-off 1765/1765 byte-identical, knob-on changes 0 (every
+#      matched -G8 leaf that takes a small-data address forces the symbol
+#      absolute today).
+#      DEFAULT ON (2026-09-23; env MASPSX_LA_ABSOLUTE_SMALL_DATA=0 opts out,
+#      ctor arg True/False overrides the env): retail never forms a
+#      gp-relative address. Raw scan of `addi/addiu $r,$gp,imm`: the EXE has
+#      3557 gp-relative loads/stores and 4 such words -- 0x800725B4 is the
+#      crt0 `$gp` setup (`lui gp,0x800A` / `addiu gp,gp,-0x3290`), 0x8009BC48
+#      / 0x8009BD68 / 0x8009BD98 lie past .text (data); in all 30 extracted
+#      PE.IMG overlay/room blobs every hit disassembles amid data words. So
+#      this is a correctness fix of maspsx's own gp_allow_la=False model
+#      (same class as patches 7 and 9), not a per-leaf choice. Flip sweep:
+#      default-on vs the pre-flip file with the knob unset
+#      (maspsx_knob_sweep.py --default-check): 2621/2621 era leaves
+#      byte-identical; the upstream test_gp_rel `..._gp_allow_la_false`
+#      expectation is amended (LOCAL PATCH, tracked) to the absolute pair.
+#  16. div_no_reuse_nop (ctor arg, or env MASPSX_DIV_NO_REUSE_NOP=1): stock
+#      maspsx treats the `mflo`/`mfhi` that ends a div/rem/divu/remu macro
+#      expansion like a load and emits a "Reuse of $r" nop when the next
+#      instruction reads the result. MIPS I has no such hazard for mflo/mfhi
+#      (only the separate mult/div-after-mfxx hazard, which is kept).
+#      ROM evidence (whole-image scan of div-macro tails, i.e. an mfxx within
+#      3 words after a `break`): 2.8.1 band 0x80071A84-0x8008D610 -- 4 direct
+#      reads, 0 with a nop (func_80077E64 0x80077F20, func_8007DB24
+#      0x8007DB54, 0x8007A060, 0x8007A0E8); older region -- 14 reads, ALL
+#      behind a nop (e.g. 0x80025964, 0x8001B880). Per-leaf, band only.
+#      Only the --expand-div (trap-checked) expansion is affected: the
+#      unexpanded `div $zero` + mfxx path keeps its reuse nop (forcing the
+#      knob on there changed ~30 matched band leaves in the first sweep).
+#      HAZARDS: only the reuse nop after the macro's own mfxx is dropped; the
+#      _handle_mflo_mfhi mult/div hazard nops are untouched; mult's explicit
+#      cc1 `mflo` lines are not affected. Default OFF; flag-off identical.
+#      SWEEP (re-run 2026-09-23 after the --expand-div narrowing,
+#      tools/analysis/maspsx_knob_sweep.py --knob MASPSX_DIV_NO_REUSE_NOP,
+#      baseline = this file with the two patch-16 `elif` arms removed):
+#      1748 era leaves (EXE + 7 overlay plans), flag-off 1748/1748
+#      byte-identical; knob-on changes 4 = the one user func_80077E64 plus
+#      three era_o2_g0_expand_div leaves OUTSIDE the band that retail keeps
+#      the nop for (func_80065260, func_8008F898, func_8008F9CC) -- confirms
+#      per-leaf, band-only.
+#  15. unfill_epilogue_delay_slot (ctor arg, or env
+#      MASPSX_UNFILL_EPILOGUE_DELAY_SLOT=1): the inverse of patch 3.
+#      gcc-2.8.1-psx's reorg fills the return slot with the stack pop
+#      (`lw $31` / nop / `j $31` / `addu $sp,$sp,N`); retail's compiler left
+#      it for the assembler, which emitted `lw $31` / `addiu $sp` / `jr $ra` /
+#      nop. The patch rewrites cc1's six-line noreorder epilogue block into
+#      reorder-mode `addu $sp,$sp,N` / `j $31`; maspsx then needs no
+#      load-delay nop (the pop does not read $31) and adds the slot nop.
+#      ROM evidence (2.8.1 band 0x80071A84-0x8008D610, every `jr $ra` whose
+#      slot or predecessor is the stack pop): ra-only frames 8 unfilled / 0
+#      filled (e.g. func_8007D614 0x8007D6C8, func_80077404 0x80077540,
+#      func_8007A238, func_8007BDD4, func_8007CE78, func_80085F08);
+#      all other frame sizes mixed (67 filled / 24 unfilled), so per-leaf.
+#      HAZARDS: HU1 only the exact cc1 block with a single
+#      `addu/addiu $sp,$sp,<imm>` slot is rewritten; any other slot
+#      instruction, a label inside, or a missing `.set` line refuses. The
+#      pop and the return are both unconditional and adjacent, so moving
+#      the pop ahead of the jump is semantics-preserving. Default OFF;
+#      flag-off byte-identical.
+#  14. load_delay_nop_before_label (ctor arg, or env
+#      MASPSX_LOAD_DELAY_NOP_BEFORE_LABEL=1): stock maspsx emits a required
+#      MIPS-I load-delay nop AFTER an intervening label (`lw` / `$L8:` /
+#      nop / use). When that label is immediately followed by a cc1
+#      directive that opens a block -- `.set noreorder` (a cc1-scheduled
+#      branch) or `#.set volatile` (a volatile access) -- retail has the nop
+#      BEFORE the label (`lw` / nop / `$L8:` / use), which moves the label one
+#      word and changes every branch offset to it.
+#      ROM evidence: func_80081414 (`lb $2` / nop / $L8: noreorder `beq`;
+#      carried an `asm volatile("nop")` workaround before this patch),
+#      func_80083578 and func_8007BF44 (`lw $3,SYM` / nop / $L2: volatile
+#      `lhu`/`lbu` poll loop). Regression set that keeps label-then-nop
+#      (label followed by a plain reorder-mode instruction): func_800292EC
+#      $L5, func_8006F224 $L14/$L7, func_8006F39C $L24/$L31.
+#      PER-LEAF ONLY: forcing the knob on over the whole matched corpus
+#      changes exactly 3 leaves, all `.set noreorder`-after-label shapes in
+#      the older compiler region (< 0x80071A84) that retail keeps
+#      label-then-nop: func_800360B4 $L2, func_8005968C $L16, func_8005BF44
+#      $L21. All three positives are in the 0x80071A84-0x8008D610 band.
+#      Why this is sound: both placements satisfy the fall-through load
+#      delay, and HN3 proves no branch predecessor arrives with a pending
+#      load (reorder-mode branches get maspsx's own nop slot).
+#      HAZARDS: HN1 the label must be the very next non-comment line after the
+#      load (anything else in between keeps the stock path); HN2 only
+#      `.set noreorder` / `#.set volatile` directly after the label; HN3 no
+#      branch/jump to the label may carry a load (or a compound macro) in a
+#      cc1-filled delay slot -- that path would lose its load delay.
+#      Default OFF; flag-off byte-identical.
+#  12. return_via_epilogue_jump (ctor arg, or env
+#      MASPSX_RETURN_VIA_EPILOGUE_JUMP=1): gcc-2.8.1-psx's reorg turns a jump
+#      to a frameless function's return into a second, mid-function return
+#      insn (`.set noreorder` / `j $31` / <stolen slot insn>). Retail's
+#      compiler kept the jump: `j <label on the final jr $ra>` with the same
+#      stolen insn in the slot. The patch rewrites every such earlier
+#      `j $31` to `j $L<fresh>` and puts that label on the final `j $31`.
+#      Semantics are unchanged: in a frameless function the final `j $31`
+#      is a bare return, so jumping to it returns.
+#      ROM evidence: func_80072334 (memmove) 0x80072368
+#      `j .L80072398` / `addu $v0,$a3,$zero`, .L80072398 = the final `jr $ra`.
+#      HAZARDS: HR1 frameless only (`.frame $sp,0,$31` and a zero `.mask`):
+#      with a frame an earlier return is a whole duplicated epilogue and the
+#      final `j $31` would skip its restores; refused. HR2 only a `j $31`
+#      that opens a cc1 noreorder block (its slot is already scheduled);
+#      the final return is left in place. Default OFF; flag-off identical.
+#  13. load_delay_call_slot_store (ctor arg, or env
+#      MASPSX_LOAD_DELAY_CALL_SLOT_STORE=1): emit the MIPS-I load-delay `nop`
+#      between a load and a following cc1-noreorder `jal <symbol>` whose
+#      delay-slot store (sb/sh/sw) reads the loaded register, as value or
+#      base. Architecturally the `jal` already covers the load delay, but
+#      in retail the store was scheduled before the call behind a
+#      load-delay nop and the assembler's reorder pass later moved it into
+#      the slot, leaving the nop behind.
+#      ROM evidence (disc1 survey of load / jal / slot-reads-load-dest): in
+#      the 0x80071A84-0x8008D610 compiler region, both store slots keep the
+#      nop (func_800742B8 0x80074304 `lw $v0` / nop / jal / `sw $v0,0($v1)`,
+#      func_8007A2A4 0x8007A304 `lw $v0` / nop / jal / `sb $zero,0($v0)`)
+#      and the single ALU slot does not (func_80089328 0x800895F8
+#      `lh $a0` / jal / `addu $a1,$a0,$zero`). In the older region 20
+#      store slots have NO nop (cc1 filled them), so this is per-leaf only.
+#      HAZARDS: HL1 the jal must be opened by cc1's `.set noreorder` (else
+#      maspsx adds its own slot nop and the store is not in the slot);
+#      HL2 no label/other instruction between the load and the jal;
+#      HL3 slot must be a single store reading the loaded register; jalr and
+#      branches are refused. Default OFF; flag-off byte-identical.
+#  11. fill_jump_stack_store (ctor arg, or env
+#      MASPSX_FILL_JUMP_STACK_STORE=1): ASPSX's reorder pass fills the delay
+#      slot of a plain `j <label>` with the single-word stack store that
+#      immediately precedes it:
+#        sw $0,0($sp) / j $L22 / nop   ->   j $L22 / sw $0,0($sp)
+#      WHY cc1 leaves the slot empty: the store is to a `volatile` local
+#      (cc1 brackets it with `#.set volatile`), and gcc's reorg.c never puts
+#      a volatile insn into a delay slot. ASPSX does not know about C
+#      volatility and schedules it. A NON-volatile stack store before a `j`
+#      is normally moved by cc1 itself, so in practice the knob reaches the
+#      volatile case.
+#      ROM evidence (Parasite Eve disc1, whole-image scan of `j <label>`
+#      slots): 4 `sw $zero,N($sp)` fills -- func_8007DCAC 0x8007DCB8 and
+#      func_800862F4 0x80086410 (both the libspu `volatile` x13 wait-loop
+#      entry: `v = K; i = 0; goto test`), func_800735C4 0x80073638 and
+#      0x8007387C; plus 43 register-valued sb/sh/sw $sp fills whose origin
+#      (cc1 or ASPSX) the ROM alone cannot tell apart.
+#      HAZARDS (each a guard; anything undecidable is refused):
+#        HJ1 only `j <label>`: `jal` writes $31 and `j $31`/`j $r` belong to
+#            other patches (1/3/8); refused.
+#        HJ2 only a `$sp`-based store (the volatile-local shape). The moved
+#            store writes no GPR and `j <label>` reads none, so the slot is
+#            semantically equivalent to the pre-jump position.
+#        HJ3 numeric offset within 16 bits (a single instruction; larger
+#            offsets expand to an $at macro and are refused).
+#        HJ4 compound `;` macro lines refused.
+#        HJ5 the jump must be the very next input line: a label (jump is a
+#            branch target) or `.set` (cc1 noreorder block) in between is
+#            refused, and nothing happens inside a noreorder region.
+#      Default OFF: opt in per leaf; flag-off is byte-identical.
+#  10. fill_branch_macro_split (ctor arg, or env
+#      MASPSX_FILL_BRANCH_MACRO_SPLIT=1): the CONDITIONAL-BRANCH sibling of
+#      patch 8. The second word of an absolute store macro or of a `la`
+#      macro that immediately precedes a reorder-mode conditional branch
+#      goes into the branch's delay slot:
+#        lui $at,%hi(SYM) / beq $a,$b,L / sw $r,%lo(SYM)($at)
+#        lui $r,%hi(SYM)  / beqz $v,L  / addiu $r,$r,%lo(SYM)
+#      This is a DIFFERENT mechanism from patch 6 and must not be confused
+#      with it: patch 6 moves a fall-through-only instruction (the one AFTER
+#      the branch) into a slot that executes on both edges, so it needs a
+#      liveness proof and a fidelity gate. Here the moved word was ALREADY
+#      before the branch, i.e. already on both edges; moving it into the
+#      slot leaves the register/memory state at the branch target and at the
+#      fall-through byte-identical. No liveness is involved and patch 6's
+#      gates do not apply (they key on the line after the branch; this arm
+#      keys on the macro line before it, and consuming the branch line means
+#      patch 6 never sees that branch at all).
+#      HAZARDS (each a guard; the knob refuses anything it cannot decide):
+#        HB1 the branch READS its operand registers at branch time, BEFORE
+#            the slot runs. The `la` arm's moved word writes its register, so
+#            a `la` whose destination is one of the branch's operands would
+#            let the branch test a half-formed address (only the `lui`
+#            applied): refused, canonical register compare. The store arm's
+#            moved word writes no GPR, so a store OF a branch operand is
+#            harmless (5 such sites in ROM). `$at` is never a cc1 branch
+#            operand; refused anyway.
+#        HB2 `$at` lifetime: written by the `lui` that stays before the
+#            branch, read by the store in the slot, dead at both the target
+#            and the fall-through. It is the assembler temporary, so no
+#            surviving code on either edge can read it before redefining it.
+#        HB3 `bltzal`/`bgezal` write $31 like `jal`; cc1 never emits them,
+#            and they are refused (a moved `sw $31` / `la $31` would see the
+#            new link value).
+#        HB4 label / `.set` between the macro and the branch (branch target
+#            or a cc1 noreorder block that already owns the slot): refused.
+#            A branch inside an active `.set noreorder` region (is_reorder
+#            False) has no maspsx slot to fill: refused.
+#        HB5 compound `;` lines, numeric operands, gp-relative destinations,
+#            indexed `la`: refused exactly as in patch 8 (H7/H8/H9).
+#        HB6 only the six cc1 branch spellings (beq/bne/blez/bgtz/bltz/bgez)
+#            with a label target are accepted; anything else is refused.
+#      ROM evidence (Parasite Eve disc1, whole-image scan): 19 sites / 14
+#      functions -- 16 store splits (12 beq+sw, 2 bne+sw, 1 blez+sw,
+#      1 bgtz+sw) and 3 `la` splits (2 beq, 1 bltz); 0 sites where a `la`
+#      destination is a branch operand. Closed here: func_800739C4,
+#      func_80082E00, func_8007C214, func_800809E0.
+#      Default OFF: opt in per leaf; flag-off is byte-identical.
 import struct
 import os
 import re
@@ -718,10 +1064,43 @@ class MaspsxProcessor:
         fill_epilogue_delay_slot=False,
         fill_call_delay_slot=False,
         fill_branch_delay_slot=False,
+        fill_branch_split_li=False,
+        rodata_fold_symbols=None,
+        fill_branch_macro_split=False,
         three_word_symbol_store=False,
         symbol_load_dest_temp=False,
         symbol_at_temp=False,
         dispatch_fold_symbol=None,
+        fill_jump_stack_store=False,
+        return_via_epilogue_jump=False,
+        load_delay_call_slot_store=False,
+        load_delay_nop_before_label=False,
+        unfill_epilogue_delay_slot=False,
+        div_no_reuse_nop=False,
+        la_absolute_small_data=None,
+        fill_call_volatile_store=False,
+        load_delay_nop_before_loop_label=False,
+        reorder_fill_calls=False,
+        spill_before_symbol_load=False,
+        sink_return_zero_into_flag_delay=False,
+        sink_zero_store_into_beqz=False,
+        unaligned_word_copy_return_temp=False,
+        drop_unused_var8=False,
+        swap_s2_s1_save_pairs=False,
+        nop_before_label_skip_empty_app=False,
+        load_before_stack_half=False,
+        ori_small_li=False,
+        bnez_postdec_from_minus_one=False,
+        beqz_sym_store_delay=False,
+        frame48_s5_after_s2=False,
+        sink_reg_sw_into_bnez=False,
+        addu_neg1_beq_delay=False,
+        div_delay_reuse_v0=False,
+        drop_jump_to_epilogue=False,
+        sltu_a0_lt_a2_dest_v1=False,
+        dup_half_shift=False,
+        mult_mflo_to_multu=False,
+        mflo_before_mfhi=False,
     ):
         self.lines = [x.strip() for x in lines]
 
@@ -762,12 +1141,23 @@ class MaspsxProcessor:
         )
         # LOCAL PATCH 6: opt-in fill of a reorder-mode conditional branch delay
         # slot from the following instruction (see the patch log).
+        # LOCAL PATCH 19: split-constant lui into a preceding branch slot.
+        self.fill_branch_split_li = (
+            fill_branch_split_li
+            or os.environ.get("MASPSX_FILL_BRANCH_SPLIT_LI") == "1"
+        )
         self.fill_branch_delay_slot = (
             fill_branch_delay_slot
             or os.environ.get("MASPSX_FILL_BRANCH_DELAY_SLOT") == "1"
         )
         self._branch_fill_label_map = None
         self._branch_fill_reorder = None
+        # LOCAL PATCH (patch 10): opt-in store/`la` macro second word into the
+        # delay slot of a following conditional branch (see the patch log).
+        self.fill_branch_macro_split = (
+            fill_branch_macro_split
+            or os.environ.get("MASPSX_FILL_BRANCH_MACRO_SPLIT") == "1"
+        )
         # LOCAL PATCH: the env gate keeps the untracked maspsx.py driver
         # untouched and permits per-leaf selection.
         self.three_word_symbol_store = (
@@ -803,6 +1193,253 @@ class MaspsxProcessor:
         self.dispatch_fold_symbol = (
             dispatch_fold_symbol
             or os.environ.get("MASPSX_DISPATCH_FOLD") or None
+        )
+        # Multi-table form: MASPSX_DISPATCH_FOLD=<sym0>,<sym1>,... maps the
+        # i-th cc1 switch table ($L<n> label defined in .rdata, in .rdata
+        # emission order) to the i-th pool symbol. A single symbol keeps the
+        # original "every $L<digits> operand" substitution byte-identically.
+        self.dispatch_fold_symbols = (
+            [s.strip() for s in self.dispatch_fold_symbol.split(",") if s.strip()]
+            if self.dispatch_fold_symbol
+            else []
+        )
+        self._dispatch_fold_map = None
+        # LOCAL PATCH 20: `$LC<n>` literals -> retail pool symbols.
+        fold = rodata_fold_symbols or os.environ.get("MASPSX_RODATA_FOLD") or ""
+        self.rodata_fold_symbols = [
+            x.strip() for x in fold.split(",") if x.strip()
+        ]
+        # LOCAL PATCH 11: opt-in ASPSX reorder fill of a plain `j <label>`
+        # slot with the immediately preceding single-word $sp store.
+        self.fill_jump_stack_store = (
+            fill_jump_stack_store
+            or os.environ.get("MASPSX_FILL_JUMP_STACK_STORE") == "1"
+        )
+        # LOCAL PATCH 12: retarget a frameless function's mid-body return
+        # (`j $31` in a cc1 noreorder block) to its final `j $31`.
+        self.return_via_epilogue_jump = (
+            return_via_epilogue_jump
+            or os.environ.get("MASPSX_RETURN_VIA_EPILOGUE_JUMP") == "1"
+        )
+        # LOCAL PATCH 13: load-delay nop before a noreorder `jal` whose
+        # delay-slot store reads the just-loaded register.
+        self.load_delay_call_slot_store = (
+            load_delay_call_slot_store
+            or os.environ.get("MASPSX_LOAD_DELAY_CALL_SLOT_STORE") == "1"
+        )
+        # LOCAL PATCH 14: load-delay nop BEFORE a label that opens a cc1
+        # directive block (see the patch log).
+        self.load_delay_nop_before_label = (
+            load_delay_nop_before_label
+            or os.environ.get("MASPSX_LOAD_DELAY_NOP_BEFORE_LABEL") == "1"
+        )
+        # LOCAL PATCH 15: undo cc1's own `j $31` / `addu $sp` epilogue fill.
+        self.unfill_epilogue_delay_slot = (
+            unfill_epilogue_delay_slot
+            or os.environ.get("MASPSX_UNFILL_EPILOGUE_DELAY_SLOT") == "1"
+        )
+        # LOCAL PATCH 16: no load-delay-style reuse nop after the mflo/mfhi
+        # that ends a div/rem macro expansion.
+        self.div_no_reuse_nop = (
+            div_no_reuse_nop
+            or os.environ.get("MASPSX_DIV_NO_REUSE_NOP") == "1"
+        )
+        # LOCAL PATCH 17: `la` of a small-data symbol expands absolute.
+        # DEFAULT ON since 2026-09-23 (retail never forms a gp `la`);
+        # MASPSX_LA_ABSOLUTE_SMALL_DATA=0 opts out. The ctor argument
+        # defaults to None = follow the environment.
+        env_la = os.environ.get("MASPSX_LA_ABSOLUTE_SMALL_DATA")
+        self.la_absolute_small_data = (
+            la_absolute_small_data
+            if la_absolute_small_data is not None
+            else env_la != "0"
+        )
+        # LOCAL PATCH 22: -fno-delayed-branch call-slot / epilogue fills.
+        self.reorder_fill_calls = (
+            reorder_fill_calls
+            or os.environ.get("MASPSX_REORDER_FILL_CALLS") == "1"
+        )
+        # LOCAL PATCH: move one prologue `sw $sN,imm($sp)` ahead of a symbolic
+        # `lw $r,SYM` that cc1 scheduled in front of it. Opt-in. The two
+        # instructions are independent ($r is not $sN); retail keeps the
+        # callee-save first so the load-delay slot can be the following `sw $ra`.
+        self.spill_before_symbol_load = (
+            spill_before_symbol_load
+            or os.environ.get("MASPSX_SPILL_BEFORE_SYMBOL_LOAD") == "1"
+        )
+        # LOCAL PATCH 23: cc1 filled a `beq $2,$0,$Lep` delay with the
+        # fall-through's symbolic load, and maspsx then yanks that macro out
+        # and leaves a nop. Retail keeps `move $2,$0` in that delay (the
+        # early-out return 0; $2 is the flag just tested) and the load only
+        # on the fall-through. The same `move $2,$0` currently sits in front
+        # of the noreorder `j $31` / `addu $sp` epilogue. Opt-in: one such
+        # beq, delay is one ordinary instruction, epilogue zero is the
+        # instruction immediately before that noreorder block. The delay
+        # instruction moves to the fall-through (taken path no longer
+        # executes it) and the epilogue zero is deleted so patch 15 can
+        # unfill `j $31` / `addu $sp`. Default OFF.
+        self.sink_return_zero_into_flag_delay = (
+            sink_return_zero_into_flag_delay
+            or os.environ.get("MASPSX_SINK_RETURN_ZERO_INTO_FLAG_DELAY") == "1"
+        )
+        # LOCAL PATCH: a `sw $0,SYM` immediately before a reorder-mode
+        # `beq $r,$0,$L` is the address-temp half of a store that retail
+        # keeps in that branch's delay (`lui $at` / `beqz` / `sw %lo($at)`).
+        # cc1 emits the store first and leaves the slot empty. Opt-in.
+        # The store writes neither the branch register nor memory the branch
+        # reads, so moving it into the slot preserves both paths.
+        self.sink_zero_store_into_beqz = (
+            sink_zero_store_into_beqz
+            or os.environ.get("MASPSX_SINK_ZERO_STORE_INTO_BEQZ") == "1"
+        )
+        # LOCAL PATCH 24: cc1 2.8.1's 4-byte movstrsi scratch is $t0.
+        # PSY-Q uses $v1 when the source base is $v0 and $v0 otherwise.
+        # Opt-in. Renames only a consecutive lwl/lwr/swl/swr $8 quartet
+        # (lwl +3 / lwr +0, swl/swr to $sp three bytes apart) so the later
+        # load-delay nop still sees the register the store reads.
+        self.unaligned_word_copy_return_temp = (
+            unaligned_word_copy_return_temp
+            or os.environ.get("MASPSX_UNALIGNED_WORD_COPY_RETURN_TEMP") == "1"
+        )
+        # LOCAL PATCH 25: cc1 reserves an 8-byte stack temporary for
+        # `ptr + 1 - i + i` and then deletes every use, leaving vars=8.
+        # Opt-in. Shrinks a frame of exactly 32 whose only $sp memory
+        # operands are the callee saves at 24 and 28, down to 24 with
+        # those saves at 16 and 20. Refuses any other $sp use.
+        self.drop_unused_var8 = (
+            drop_unused_var8
+            or os.environ.get("MASPSX_DROP_UNUSED_VAR8") == "1"
+        )
+        # LOCAL PATCH 26: cc1 saves $s1=$a0 before $s2=$a1. Retail saves
+        # the $s2 pair first. Opt-in, and only that exact quartet.
+        self.swap_s2_s1_save_pairs = (
+            swap_s2_s1_save_pairs
+            or os.environ.get("MASPSX_SWAP_S2_S1_SAVE_PAIRS") == "1"
+        )
+        # LOCAL PATCH 27: an empty asm barrier emits #APP/#NO_APP between a
+        # label and the `.set noreorder` that patch 14 looks for, so the
+        # load-delay nop stays after the label. Opt-in companion to patch 14.
+        self.nop_before_label_skip_empty_app = (
+            nop_before_label_skip_empty_app
+            or os.environ.get("MASPSX_NOP_BEFORE_LABEL_SKIP_EMPTY_APP") == "1"
+        )
+        # LOCAL PATCH 28: a volatile `sh` to 0($sp) sits before the `lhu`
+        # that retail schedules first. Opt-in. Swaps that pair when the
+        # halfword load is not through $sp and the registers differ.
+        # Comment lines between them (the `#.set volatile` pair) stay put.
+        self.load_before_stack_half = (
+            load_before_stack_half
+            or os.environ.get("MASPSX_LOAD_BEFORE_STACK_HALF") == "1"
+        )
+        # LOCAL PATCH 29: cc1 emits `li $r,1` and gas turns that into
+        # `addiu $r,$zero,1`. This leaf's constants are PSY-Q `ori $r,$zero,imm`
+        # (0 < imm < 0x8000). Larger and negative `li` stay for gas.
+        self.ori_small_li = (
+            ori_small_li
+            or os.environ.get("MASPSX_ORI_SMALL_LI") == "1"
+        )
+        # LOCAL PATCH 30: `n-- != 0` becomes `li $z,-1` / `addu $n,$n,-1` /
+        # `bne $n,$z` with the loop store in the delay. Retail tests the
+        # pre-decrement value (`bne $n,$zero`) and decrements in that slot,
+        # with the store ahead of the branch. Opt-in, one occurrence, and
+        # only when $z is otherwise dead.
+        self.bnez_postdec_from_minus_one = (
+            bnez_postdec_from_minus_one
+            or os.environ.get("MASPSX_BNEZ_POSTDEC_FROM_MINUS_ONE") == "1"
+        )
+        # LOCAL PATCH 31: cc1 stores the incremented counter before `beqz`
+        # and zeroes `$v0` in that delay. Retail puts the symbolic `sw` in
+        # the delay and zeroes `$v0` on the taken path only, so the other
+        # path `j`s over that zero with `li $v0,-1` in its delay.
+        self.beqz_sym_store_delay = (
+            beqz_sym_store_delay
+            or os.environ.get("MASPSX_BEQZ_SYM_STORE_DELAY") == "1"
+        )
+        # LOCAL PATCH 32: cc1 saves $s5 before the $s2=$a0 pair and sizes the
+        # frame at 48 (16 bytes of outgoing args + seven saves, aligned).
+        # Retail saves $s2, copies $a0, then saves $s5, and the frame is 56
+        # because of 8 bytes of unused locals. Opt-in. Fires only on that
+        # exact quartet plus one `addu $sp,$sp,48`, and only when every other
+        # $sp operand is an lw/sw.
+        self.frame48_s5_after_s2 = (
+            frame48_s5_after_s2
+            or os.environ.get("MASPSX_FRAME48_S5_AFTER_S2") == "1"
+        )
+        # LOCAL PATCH 33: cc1 stores a value and then `bne`s on that same
+        # register with the else-update as the following line. In reorder
+        # mode the delay is a nop and the store stays ahead of the branch.
+        # Retail puts that store in the delay so the taken path keeps the
+        # pre-update value. Opt-in. Only `sw $r, DEST` immediately before
+        # `bne $r, $0/$zero, $L`, and only when DEST does not use $r.
+        self.sink_reg_sw_into_bnez = (
+            sink_reg_sw_into_bnez
+            or os.environ.get("MASPSX_SINK_REG_SW_INTO_BNEZ") == "1"
+        )
+        # LOCAL PATCH: cc1 compares against `li $r,-1` and reuses that
+        # register for the decrement (`addu $r,$s,$r`) in the beq delay.
+        # Retail writes `addiu $r,$s,-1` in the slot. Opt-in.
+        self.addu_neg1_beq_delay = (
+            addu_neg1_beq_delay
+            or os.environ.get("MASPSX_ADDU_NEG1_BEQ_DELAY") == "1"
+        )
+        # LOCAL PATCH: cc1 parks `b + 1` in $a3 because $v0 still holds the
+        # slt the preceding beq already consumed. Retail reuses $v0 for that
+        # divisor (`addu $v0,$a1,1` in the delay) and the two expanded `rem`
+        # guards plus the join compares follow. Opt-in. The first `mfhi $v1`
+        # / `sll $a0,$v1,16` stay; only the second remainder and the compares
+        # that spilled into $a0/$a1 move back to $v0/$v1.
+        self.div_delay_reuse_v0 = (
+            div_delay_reuse_v0
+            or os.environ.get("MASPSX_DIV_DELAY_REUSE_V0") == "1"
+        )
+        # LOCAL PATCH: cc1 emits `j $Lepi` / `addu $v0,$zero,$zero` to skip an
+        # empty asm barrier, and $Lepi is the very next `j $31`. The jump's
+        # delay is the zeroing, so deleting the jump leaves that zeroing as
+        # the fallthrough into the epilogue. Opt-in.
+        self.drop_jump_to_epilogue = (
+            drop_jump_to_epilogue
+            or os.environ.get("MASPSX_DROP_JUMP_TO_EPILOGUE") == "1"
+        )
+        # LOCAL PATCH: after `bne $v0,$0` / `li $v0,1`, cc1 reuses $v0 for
+        # `sltu $v0,$a0,$a2`. Retail keeps that compare in $v1 so the 1 in
+        # the delay is not the same register as the next test. Opt-in. Only
+        # that 5-instruction window.
+        self.sltu_a0_lt_a2_dest_v1 = (
+            sltu_a0_lt_a2_dest_v1
+            or os.environ.get("MASPSX_SLTU_A0_LT_A2_DEST_V1") == "1"
+        )
+        # LOCAL PATCH: a signed-char zero test comes out as `sll $v0,$v0,24` /
+        # `beq $v0` and `-1 << 16` is folded to `li $v0,-65536`. Retail tests
+        # the copy in $v1, plants -1 in that delay, and shifts on both arms.
+        # Opt-in. Only that window.
+        self.dup_half_shift = (
+            dup_half_shift
+            or os.environ.get("MASPSX_DUP_HALF_SHIFT") == "1"
+        )
+        # LOCAL PATCH: cc1 emits `mult` when only `mflo` is consumed, because
+        # the low 32 bits match `multu`. Retail still writes `multu`. Opt-in.
+        # A following `mfhi` is left alone.
+        self.mult_mflo_to_multu = (
+            mult_mflo_to_multu
+            or os.environ.get("MASPSX_MULT_MFLO_TO_MULTU") == "1"
+        )
+        # LOCAL PATCH: a signed 64-bit square is `mfhi` then `mflo`, then
+        # two `addu $dst,$tmp,$zero` copies. Retail writes `mflo` then
+        # `mfhi` into those destinations. Two hazard nops stay only when
+        # another `mult` follows. Opt-in.
+        self.mflo_before_mfhi = (
+            mflo_before_mfhi
+            or os.environ.get("MASPSX_MFLO_BEFORE_MFHI") == "1"
+        )
+        # LOCAL PATCH 21: load-delay nop before a loop-head label.
+        self.load_delay_nop_before_loop_label = (
+            load_delay_nop_before_loop_label
+            or os.environ.get("MASPSX_LOAD_DELAY_NOP_BEFORE_LOOP_LABEL") == "1"
+        )
+        # LOCAL PATCH 18: register-based store into a following `jal` slot.
+        self.fill_call_volatile_store = (
+            fill_call_volatile_store
+            or os.environ.get("MASPSX_FILL_CALL_VOLATILE_STORE") == "1"
         )
 
         self.bss_entries: dict[str, int] = {}
@@ -920,8 +1557,439 @@ class MaspsxProcessor:
                             )
                         self.sdata_entries[current_symbol] += size
 
+    def _dispatch_rdata_tables(self):
+        """cc1-local `$L<digits>` labels defined inside `.rdata`, in order.
+
+        cc1 emits each switch's jump table right after its tablejump, bracketed
+        by `.rdata` ... `.text`; the definition order here is therefore the
+        order of the tables in the object's .rodata section.
+        """
+        tables = []
+        in_rdata = False
+        for line in self.lines:
+            directive = line.split("#", 1)[0].strip()
+            head = directive.split()[0] if directive.split() else ""
+            if head in (".rdata",):
+                in_rdata = True
+                continue
+            if head in (".text", ".data", ".sdata", ".bss", ".sbss") or (
+                head == ".section"
+            ):
+                in_rdata = directive.split()[1:2] == [".rodata"] if head == ".section" else False
+                continue
+            if in_rdata:
+                match = re.match(r"^(\$L\d+):", directive)
+                if match:
+                    tables.append(match.group(1))
+        return tables
+
+    def _dispatch_fold_target(self, operand):
+        # LOCAL PATCH (switch dispatch retarget, multi-table).
+        if len(self.dispatch_fold_symbols) <= 1:
+            return self.dispatch_fold_symbol
+        if self._dispatch_fold_map is None:
+            tables = self._dispatch_rdata_tables()
+            if len(tables) != len(self.dispatch_fold_symbols):
+                raise ValueError(
+                    f"MASPSX_DISPATCH_FOLD names {len(self.dispatch_fold_symbols)} "
+                    f"tables but cc1 emitted {len(tables)} .rdata switch tables "
+                    f"({', '.join(tables) or 'none'})"
+                )
+            self._dispatch_fold_map = dict(zip(tables, self.dispatch_fold_symbols))
+        if operand not in self._dispatch_fold_map:
+            raise ValueError(
+                f"MASPSX_DISPATCH_FOLD: {operand} is not a .rdata switch table"
+            )
+        return self._dispatch_fold_map[operand]
+
+    def _rodata_lc_labels(self) -> List[str]:
+        # cc1 `$LC<n>` literal labels defined inside `.rdata`, in emission
+        # order (= their order in the object's .rodata).
+        labels = []
+        in_rdata = False
+        for line in self.lines:
+            directive = line.split("#", 1)[0].strip()
+            head = directive.split()[0] if directive.split() else ""
+            if head == ".rdata":
+                in_rdata = True
+                continue
+            if head in (".text", ".data", ".sdata", ".bss", ".sbss", ".section"):
+                in_rdata = head == ".section" and directive.split()[1:2] == [".rodata"]
+                continue
+            if in_rdata:
+                m = re.match(r"^(\$LC\d+):", directive)
+                if m:
+                    labels.append(m.group(1))
+        return labels
+
+    def _fold_rodata_literals(self) -> None:
+        # LOCAL PATCH 20 (rodata_fold, env MASPSX_RODATA_FOLD=s0,s1,...): the
+        # i-th cc1 `$LC<n>` literal defined in .rdata is retail's shared pool
+        # object s<i> (e.g. an initialized local array's image in the EXE
+        # .rodata pool). Every operand that names `$LC<n>` -- `la $r,$LCn`,
+        # a plain load `op $r,$LCn` -- and `$LCn+off` is retargeted to the
+        # pool symbol, exactly like MASPSX_DISPATCH_FOLD does for switch
+        # tables. The build then strips the object's duplicate .rodata only
+        # after proving it byte-identical to the pool blocks
+        # (disc1_build.strip_rodata_fold). HR1 the list must name exactly as
+        # many symbols as cc1 emitted $LC labels (else ValueError: a wrong
+        # count would silently mis-map); HR2 only whole-token `$LC<n>`
+        # operands of instruction lines are rewritten, never the `.rdata`
+        # definitions themselves.
+        labels = self._rodata_lc_labels()
+        if len(labels) != len(self.rodata_fold_symbols):
+            raise ValueError(
+                f"MASPSX_RODATA_FOLD names {len(self.rodata_fold_symbols)} "
+                f"literals but cc1 emitted {len(labels)} .rdata $LC labels "
+                f"({', '.join(labels) or 'none'})"
+            )
+        mapping = dict(zip(labels, self.rodata_fold_symbols))
+        token = re.compile(r"(?<![\w$])(\$LC\d+)(?![\w])")
+        out = []
+        for line in self.lines:
+            stripped = line.strip()
+            if (
+                stripped
+                and not stripped.startswith((".", "#"))
+                and not stripped.endswith(":")
+                and token.search(stripped)
+            ):
+                new = token.sub(
+                    lambda m: mapping.get(m.group(1), m.group(1)), line
+                )
+                if new != line:
+                    out.append(f"# RODATA_FOLD: {stripped}")
+                line = new
+            out.append(line)
+        self.lines = out
+
+    def _fold_dispatch_table_la(self) -> None:
+        # LOCAL PATCH (switch dispatch retarget, `la` form): cc1 may hoist the
+        # switch table's address out of a loop as a plain `la $r,$L<n>` and
+        # then index it with `addu`/`lw 0($r)`, so no indexed `$L<n>($b)`
+        # operand ever reaches the load arm. Rewrite such an `la` to the pool
+        # symbol exactly like the indexed form. HD1 only labels DEFINED in
+        # .rdata (a real cc1 switch table) are rewritten, in single- and
+        # multi-table mode alike; HD2 only a plain two-operand `la` line (no
+        # `;` compound, no offset, no index).
+        tables = set(self._dispatch_rdata_tables())
+        if not tables:
+            return
+        out = []
+        for line in self.lines:
+            m = re.match(r"^la\t(\$\w+),(\$L\d+)$", line)
+            if m and m.group(2) in tables:
+                target = self._dispatch_fold_target(m.group(2))
+                out.append(f"# DISPATCH_FOLD LA: {m.group(2)} -> {target}")
+                line = f"la\t{m.group(1)},{target}"
+            out.append(line)
+        self.lines = out
+
+    def _load_before_stack_half(self):
+        """Move `lhu` ahead of a preceding `sh` to `$sp`."""
+        sh_re = re.compile(r"^sh\t(\$\w+),(-?\d+)\(\$sp\)$")
+        lhu_re = re.compile(r"^lhu\t(\$\w+),(-?\d+)\((\$\w+)\)$")
+        lines = self.lines
+        out = []
+        i = 0
+        while i < len(lines):
+            if sh_re.match(lines[i]):
+                j = i + 1
+                while j < len(lines) and (
+                    lines[j] == "" or lines[j].startswith("#")
+                ):
+                    j += 1
+                m2 = lhu_re.match(lines[j]) if j < len(lines) else None
+                sh = sh_re.match(lines[i])
+                if (
+                    m2
+                    and m2.group(3) != "$sp"
+                    and sh.group(1) != m2.group(1)
+                ):
+                    out.append(lines[j])
+                    out.append(lines[i])
+                    out.extend(lines[i + 1:j])
+                    i = j + 1
+                    continue
+            out.append(lines[i])
+            i += 1
+        self.lines = out
+
+    def _bnez_postdec_from_minus_one(self):
+        """Rewrite one `bne $n,$z` against a hoisted -1 into a pre-test."""
+        lines = self.lines
+        li_re = re.compile(r"^li\t(\$\w+),(-1|0xffffffff)$")
+        dec_re = re.compile(r"^addu\t(\$\w+),\1,-1$")
+        bne_re = re.compile(r"^bne\t(\$\w+),(\$\w+),(\S+)$")
+        sw_re = re.compile(r"^sw\t\$\w+,-?\d+\(\$\w+\)$")
+
+        def bare(line: str) -> str:
+            return strip_comments(line).strip()
+
+        li_hits = []
+        for i, line in enumerate(lines):
+            m = li_re.match(bare(line))
+            if m:
+                li_hits.append((i, m.group(1)))
+        if len(li_hits) != 1:
+            return
+        li_at, reg = li_hits[0]
+        found = None
+        for i in range(len(lines) - 6):
+            dec = dec_re.match(bare(lines[i]))
+            if not dec:
+                continue
+            cnt = dec.group(1)
+            if bare(lines[i + 1]) != ".set\tnoreorder":
+                continue
+            if bare(lines[i + 2]) != ".set\tnomacro":
+                continue
+            bne = bne_re.match(bare(lines[i + 3]))
+            if not bne or bne.group(1) != cnt or bne.group(2) != reg:
+                continue
+            if not sw_re.match(bare(lines[i + 4])):
+                continue
+            if bare(lines[i + 5]) != ".set\tmacro":
+                continue
+            if bare(lines[i + 6]) != ".set\treorder":
+                continue
+            found = (i, cnt, bne.group(3), bare(lines[i + 4]))
+            break
+        if found is None:
+            return
+        for j, line in enumerate(lines):
+            if j == li_at or j == found[0] + 3:
+                continue
+            if reg in set(re.findall(r"\$\w+", bare(line))):
+                return
+        i, cnt, label, sw = found
+        out = []
+        for j, line in enumerate(lines):
+            if j == li_at:
+                continue
+            if j == i:
+                out.append(sw)
+                continue
+            if j == i + 3:
+                out.append(f"bne\t{cnt},$zero,{label}")
+                continue
+            if j == i + 4:
+                out.append(f"addu\t{cnt},{cnt},-1")
+                continue
+            out.append(line)
+        self.lines = out
+
+    def _swap_s2_s1_save_pairs(self):
+        """Swap a prologue `sw/move $s1,$a0` pair with the following `$s2,$a1` pair."""
+        lines = self.lines
+        move_s1 = ("move\t$17,$4", "addu\t$17,$4,$0", "addu\t$17,$4,$zero")
+        move_s2 = ("move\t$18,$5", "addu\t$18,$5,$0", "addu\t$18,$5,$zero")
+        for i in range(len(lines) - 3):
+            if (
+                lines[i] == "sw\t$17,20($sp)"
+                and lines[i + 1] in move_s1
+                and lines[i + 2] == "sw\t$18,24($sp)"
+                and lines[i + 3] in move_s2
+            ):
+                a, b, c, d = lines[i:i + 4]
+                lines[i:i + 4] = [c, d, a, b]
+                self.lines = lines
+                return
+
+    def _drop_unused_var8(self):
+        """Shrink a 32-byte frame whose 8-byte local area is never used."""
+        mem_re = re.compile(
+            r"^(?:lw|sw|lh|sh|lb|sb|lhu|lbu|lwl|lwr|swl|swr)\t\$\w+,(-?\d+)\(\$sp\)$"
+        )
+        alloc = []
+        free = []
+        mem = []
+        for i, line in enumerate(self.lines):
+            if "$sp" not in line and not line.startswith(".frame"):
+                continue
+            if line.startswith(".frame") or line.startswith(".mask"):
+                continue
+            m = re.match(r"^(subu|addu|addiu)\t\$sp,\$sp,(-?\d+)$", line)
+            if m:
+                imm = int(m.group(2))
+                if m.group(1) == "subu" and imm == 32:
+                    alloc.append(i)
+                elif m.group(1) == "addiu" and imm == -32:
+                    alloc.append(i)
+                elif m.group(1) in ("addu", "addiu") and imm == 32:
+                    free.append(i)
+                else:
+                    return
+                continue
+            m = mem_re.match(line)
+            if m:
+                mem.append((i, int(m.group(1))))
+                continue
+            return
+        if len(alloc) != 1 or len(free) != 1 or not mem:
+            return
+        if any(off < 24 or off > 28 for _, off in mem):
+            return
+        lines = list(self.lines)
+        lines[alloc[0]] = lines[alloc[0]].replace(",32", ",24").replace(",-32", ",-24")
+        lines[free[0]] = lines[free[0]].replace(",32", ",24")
+        for i, off in mem:
+            lines[i] = lines[i].replace(f",{off}($sp)", f",{off - 8}($sp)", 1)
+        self.lines = lines
+
+    def _rename_unaligned_word_copy_temp(self):
+        """Rename a $t0 4-byte unaligned copy to $v1 (base $v0) or $v0."""
+        op_re = re.compile(r"^(lwl|lwr|swl|swr)\t\$8,(-?\d+)\((\$\w+)\)$")
+        lines = self.lines
+        out = []
+        i = 0
+        n = len(lines)
+        while i < n:
+            matched = False
+            m0 = op_re.match(lines[i]) if i + 3 < n else None
+            if m0 and m0.group(1) == "lwl" and m0.group(2) == "3":
+                base = m0.group(3)
+                m1 = op_re.match(lines[i + 1])
+                m2 = op_re.match(lines[i + 2])
+                m3 = op_re.match(lines[i + 3])
+                quartet = (
+                    m1
+                    and m1.group(1) == "lwr"
+                    and m1.group(2) == "0"
+                    and m1.group(3) == base
+                    and m2
+                    and m2.group(1) == "swl"
+                    and m2.group(3) == "$sp"
+                    and m3
+                    and m3.group(1) == "swr"
+                    and m3.group(3) == "$sp"
+                    and int(m3.group(2)) == int(m2.group(2)) - 3
+                )
+                dest = "$3" if base == "$2" else "$2"
+                if quartet and dest != base:
+                    for k in range(4):
+                        out.append(lines[i + k].replace("$8,", f"{dest},", 1))
+                    i += 4
+                    matched = True
+            if not matched:
+                out.append(lines[i])
+                i += 1
+        self.lines = out
+
+    def _sink_reg_sw_into_bnez(self, res):
+        """Move `sw $r,SYM` into the empty delay of the following
+        `bne $r,$0,$L`. A symbol store is split so `%hi` stays ahead of
+        the branch and `%lo($at)` occupies the slot. The stock nop that
+        filled that slot is dropped. Flag-off never calls this.
+        """
+        def real(line):
+            s = line.strip()
+            return bool(s) and not s.startswith("#") and not s.startswith(".") and not s.endswith(":")
+
+        out = []
+        i = 0
+        while i < len(res):
+            sw = res[i].split()
+            if len(sw) == 2 and sw[0] == "sw" and "," in sw[1]:
+                reg, dest = sw[1].split(",", 1)
+                j = i + 1
+                while j < len(res) and not real(res[j]):
+                    j += 1
+                k = j + 1
+                while k < len(res) and not real(res[k]):
+                    k += 1
+                bne = res[j].split() if j < len(res) else []
+                nop = res[k].split() if k < len(res) else []
+                label = None
+                if len(bne) == 2 and bne[0] == "bne":
+                    ops = bne[1].split(",")
+                    if (len(ops) == 3 and ops[0] == reg
+                            and ops[1] in ("$0", "$zero")):
+                        label = ops[2]
+                if (label is not None and reg != "$0" and reg not in dest
+                        and nop and nop[0] == "nop"):
+                    block = [".set\tnoat", f"lui\t$at,%hi({dest})"] if "(" not in dest else []
+                    slot = (f"sw\t{reg},%lo({dest})($at)" if "(" not in dest
+                            else res[i].strip())
+                    block += [
+                        ".set\tnoreorder",
+                        ".set\tnomacro",
+                        f"bne\t{reg},$0,{label}",
+                        slot,
+                        ".set\tmacro",
+                        ".set\treorder",
+                    ]
+                    if "(" not in dest:
+                        block.append(".set\tat")
+                    # Keep any comment/blank lines that sat between sw and nop,
+                    # except the nop itself.
+                    out.extend(block)
+                    i = k + 1
+                    continue
+            out.append(res[i])
+            i += 1
+        return out
+
+    def _frame48_s5_after_s2(self, res):
+        """See the constructor note. Returns res unchanged unless the
+        prologue is exactly `subu $sp,48` / `sw $21` / `sw $18` /
+        `addu $18,$4,$zero` and the epilogue is one `addu $sp,$sp,48`.
+        """
+        real = []
+        for i, line in enumerate(res):
+            s = line.strip()
+            if not s or s.startswith("#") or s.startswith(".") or s.endswith(":"):
+                continue
+            real.append(i)
+        if len(real) < 4:
+            return res
+        def parts(i):
+            return res[i].split()
+
+        if parts(real[0]) != ["subu", "$sp,$sp,48"]:
+            return res
+        sw_s5 = parts(real[1])
+        sw_s2 = parts(real[2])
+        move = parts(real[3])
+        if (len(sw_s5) != 2 or sw_s5[0] != "sw" or not sw_s5[1].startswith("$21,")
+                or not sw_s5[1].endswith("($sp)")):
+            return res
+        if (len(sw_s2) != 2 or sw_s2[0] != "sw" or not sw_s2[1].startswith("$18,")
+                or not sw_s2[1].endswith("($sp)")):
+            return res
+        if move != ["addu", "$18,$4,$zero"]:
+            return res
+        epilogues = [i for i in real if parts(i) == ["addu", "$sp,$sp,48"]]
+        if len(epilogues) != 1:
+            return res
+        for i in real:
+            for tok in parts(i):
+                if "$sp" in tok and i not in (real[0], epilogues[0]):
+                    if not (tok.endswith("($sp)") and parts(i)[0] in ("sw", "lw")):
+                        return res
+        # Move the $s5 save to just after the $s2 = $a0 copy.
+        s5_line = res[real[1]]
+        del res[real[1]]
+        # real[3] shifted left by one.
+        insert_at = real[3]
+        res.insert(insert_at, s5_line)
+
+        def bump_mem(line):
+            def repl(m):
+                return f"{int(m.group(1)) + 8}($sp)"
+            return re.sub(r"(-?\d+)\(\$sp\)", repl, line)
+
+        out = []
+        for line in res:
+            toks = line.split()
+            if toks == ["subu", "$sp,$sp,48"] or toks == ["addu", "$sp,$sp,48"]:
+                line = line.replace("$sp,$sp,48", "$sp,$sp,56")
+            out.append(bump_mem(line))
+        return out
+
     def process_lines(self):
         self.is_reorder = True
+        self._dispatch_fold_map = None
         self.skip_instructions = 0
         self.file_num = 1
 
@@ -936,6 +2004,30 @@ class MaspsxProcessor:
         self.extern_entries = {}
 
         self.preprocess_lines()
+        if self.unaligned_word_copy_return_temp:
+            self._rename_unaligned_word_copy_temp()
+        if self.drop_unused_var8:
+            self._drop_unused_var8()
+        if self.swap_s2_s1_save_pairs:
+            self._swap_s2_s1_save_pairs()
+        if self.load_before_stack_half:
+            self._load_before_stack_half()
+        if self.bnez_postdec_from_minus_one:
+            self._bnez_postdec_from_minus_one()
+        if self.dispatch_fold_symbol:
+            self._fold_dispatch_table_la()
+        if self.rodata_fold_symbols:
+            self._fold_rodata_literals()
+        if self.return_via_epilogue_jump:
+            self._retarget_mid_function_returns()
+        if self.sink_return_zero_into_flag_delay:
+            self._sink_return_zero_into_flag_delay()
+        if self.unfill_epilogue_delay_slot:
+            self._unfill_epilogue_delay_slots()
+        if self.reorder_fill_calls:
+            self._reorder_fill_calls_and_epilogue()
+        if self.spill_before_symbol_load:
+            self._spill_before_symbol_load()
 
         res = []
         in_include_asm_hack = False
@@ -995,6 +2087,495 @@ class MaspsxProcessor:
                     ]
                 )
 
+        if self.sink_reg_sw_into_bnez:
+            res = self._sink_reg_sw_into_bnez(res)
+        if self.frame48_s5_after_s2:
+            res = self._frame48_s5_after_s2(res)
+        if self.addu_neg1_beq_delay:
+            res = self._addu_neg1_beq_delay(res)
+        if self.div_delay_reuse_v0:
+            res = self._div_delay_reuse_v0(res)
+        if self.drop_jump_to_epilogue:
+            res = self._drop_jump_to_epilogue(res)
+        if self.sltu_a0_lt_a2_dest_v1:
+            res = self._sltu_a0_lt_a2_dest_v1(res)
+        if self.dup_half_shift:
+            res = self._dup_half_shift(res)
+        if self.mult_mflo_to_multu:
+            res = self._mult_mflo_to_multu(res)
+        if self.mflo_before_mfhi:
+            res = self._mflo_before_mfhi(res)
+        if os.environ.get("MASPSX_INDEX_PAIR_JAL_SCHEDULE") == "1":
+            res = self._index_pair_jal_schedule(res)
+        return res
+
+    def _index_pair_jal_schedule(self, res):
+        """Reorder one index-pair argument block ahead of a jal.
+
+        cc1 emits the byte-0 shift first, a load-delay nop after the
+        second index byte, the stack argument in the jal delay, and a
+        fall-through `-1` in `$v1`. Retail shifts byte 1 first, puts
+        the byte-0 add in that nop's place, stores the stack argument
+        before the two result loads, takes the format address in the
+        jal delay, and jumps over a `$v0 = 0` to the status test.
+        """
+        def bare(line):
+            return line.split("#", 1)[0].strip()
+
+        real = []
+        for idx, line in enumerate(res):
+            s = bare(line)
+            if s and not s.startswith(".") and not s.endswith(":"):
+                real.append((idx, s))
+        labels = {}
+        for idx, line in enumerate(res):
+            s = bare(line)
+            if s.endswith(":"):
+                labels[s[:-1]] = idx
+
+        for n in range(len(real) - 16):
+            seq = [real[n + k][1] for k in range(17)]
+            if not (
+                re.match(r"^sll\s*\$4,\$4,2$", seq[0])
+                and re.match(r"^sll\s*\$2,\$2,2$", seq[1])
+                and re.match(r"^addu\s*\$2,\$2,\$16$", seq[2])
+                and re.match(r"^lw\s*\$3,0\(\$2\)$", seq[3])
+                and re.match(r"^lbu\s*\$2,", seq[4])
+                and seq[5] == "nop"
+                and re.match(r"^sll\s*\$2,\$2,2$", seq[6])
+                and re.match(r"^addu\s*\$2,\$2,\$19$", seq[7])
+                and re.match(r"^addu\s*\$4,\$4,\$16$", seq[8])
+                and re.match(r"^lw\s*\$6,0\(\$2\)$", seq[9])
+                and re.match(r"^lw\s*\$7,0\(\$4\)$", seq[10])
+                and re.match(r"^la\s*\$4,(\S+)$", seq[11])
+                and re.match(r"^jal\s*(\S+)$", seq[12])
+                and re.match(r"^sw\s*\$3,(-?\d+)\(\$sp\)$", seq[13])
+                and re.match(r"^jal\s*(\S+)$", seq[14])
+                and seq[15] == "nop"
+                and re.match(r"^li\s*\$3,(-1|0xffffffff)$", seq[16])
+            ):
+                continue
+            sym = re.match(r"^la\s*\$4,(\S+)$", seq[11]).group(1)
+            call = re.match(r"^jal\s*(\S+)$", seq[12]).group(1)
+            stack = re.match(r"^sw\s*\$3,(-?\d+)\(\$sp\)$", seq[13]).group(1)
+            tail = re.match(r"^jal\s*(\S+)$", seq[14]).group(1)
+            # The status test is the next real op and must be `bne $3`.
+            if n + 17 >= len(real):
+                continue
+            bne = re.match(r"^bne\s*\$3,\$0,(\S+)$", real[n + 17][1])
+            if not bne:
+                continue
+            dest = bne.group(1)
+            tail_li = None
+            if n + 18 < len(real) and re.match(
+                r"^li\s*\$2,(-1|0xffffffff)$", real[n + 18][1]
+            ):
+                tail_li = real[n + 18][0]
+            join = dest + "_join"
+            first = real[n][0]
+            last = tail_li if tail_li is not None else real[n + 17][0]
+            label_line = None
+            label_text = None
+            for j in range(real[n + 16][0] + 1, real[n + 17][0]):
+                if bare(res[j]).endswith(":"):
+                    label_line = j
+                    label_text = bare(res[j])
+                    break
+            if label_line is None:
+                continue
+            repl_lines = [
+                "sll\t$2,$2,2",
+                "addu\t$2,$2,$16",
+                "sll\t$4,$4,2",
+                "lw\t$3,0($2)",
+                seq[4],
+                "addu\t$4,$4,$16",
+                "sll\t$2,$2,2",
+                "addu\t$2,$2,$19",
+                f"sw\t$3,{stack}($sp)",
+                "lw\t$6,0($2)",
+                "lw\t$7,0($4)",
+                f"lui\t$4,%hi({sym})",
+                f"jal\t{call}",
+                f"addiu\t$4,$4,%lo({sym})",
+                f"jal\t{tail}",
+                "nop",
+                f"j\t{join}",
+                "li\t$2,-1",
+                label_text,
+                "addu\t$2,$zero,$zero",
+                f"{join}:",
+                f"bne\t$2,$zero,{dest}",
+                "li\t$2,-1",
+            ]
+            out = []
+            inserted = False
+            for i, line in enumerate(res):
+                if first <= i <= last:
+                    if not inserted:
+                        out.extend(repl_lines)
+                        inserted = True
+                    continue
+                out.append(line)
+            return out
+        return res
+
+    def _addu_neg1_beq_delay(self, res):
+        """`li $r,-1` / `beq $s,$r,$L` / `addu $r,$s,$r` -> delay `addiu $r,$s,-1`."""
+        def bare(line):
+            return line.split("#", 1)[0].strip()
+
+        def next_real(start):
+            j = start
+            while j < len(res):
+                s = bare(res[j])
+                if s and not s.startswith(".") and not s.endswith(":"):
+                    return j
+                j += 1
+            return None
+
+        i = 0
+        while i < len(res):
+            li = re.match(r"^li\s+(\$\w+),(-1|0xffffffff)$", bare(res[i]))
+            if li:
+                reg = li.group(1)
+                j = next_real(i + 1)
+                k = next_real(j + 1) if j is not None else None
+                if j is not None and k is not None:
+                    beq = re.match(r"^beq\s+(\$\w+),(\$\w+),(\S+)$", bare(res[j]))
+                    addu = re.match(
+                        r"^addu\s+(\$\w+),(\$\w+),(\$\w+)$", bare(res[k]))
+                    if (beq and addu and beq.group(2) == reg
+                            and addu.group(1) == reg
+                            and {addu.group(2), addu.group(3)} == {beq.group(1), reg}
+                            and beq.group(1) != reg):
+                        res[k] = f"addiu\t{reg},{beq.group(1)},-1"
+                        i = k + 1
+                        continue
+            i += 1
+        return res
+
+    def _div_delay_reuse_v0(self, res):
+        """Rename the $a3 divisor window described on div_delay_reuse_v0."""
+        def bare(line):
+            return line.split("#", 1)[0].strip()
+
+        real = []
+        for idx, line in enumerate(res):
+            s = bare(line)
+            if not s or s.startswith(".") or s.endswith(":") or s == "nop":
+                continue
+            real.append((idx, s))
+
+        # Registers are the retail names ($2=$v0, $3=$v1, $4=$a0, $5=$a1,
+        # $6=$a2, $7=$a3). Labels are captured. Nops are skipped so a
+        # load-delay debug nop between mfhi and the consumer does not hide
+        # the window; those nops are left in place.
+        pats = [
+            r"^beq\s+\$2,\$0,(\S+)$",
+            r"^addu\s+\$7,\$5,1$",
+            r"^div\s+\$zero,\$3,\$7$",
+            r"^bnez\s+\$7,(\S+)$",
+            r"^break\s+0x7$",
+            r"^addiu\s+\$at,\$zero,-1$",
+            r"^bne\s+\$7,\$at,(\S+)$",
+            r"^lui\s+\$at,0x8000$",
+            r"^bne\s+\$3,\$at,(\S+)$",
+            r"^break\s+0x6$",
+            r"^mfhi\s+\$3$",
+            r"^sll\s+\$4,\$3,16$",
+            r"^j\s+(\S+)$",
+            r"^slt\s+\$4,\$6,\$4$",
+            r"^bgez\s+\$4,(\S+)$",
+            r"^sll\s+\$5,\$5,16$",
+            r"^div\s+\$zero,\$3,\$7$",
+            r"^bnez\s+\$7,(\S+)$",
+            r"^break\s+0x7$",
+            r"^addiu\s+\$at,\$zero,-1$",
+            r"^bne\s+\$7,\$at,(\S+)$",
+            r"^lui\s+\$at,0x8000$",
+            r"^bne\s+\$3,\$at,(\S+)$",
+            r"^break\s+0x6$",
+            r"^mfhi\s+\$2$",
+            r"^addu\s+\$3,\$7,\$2$",
+            r"^sll\s+\$4,\$3,16$",
+            r"^slt\s+\$5,\$5,\$6$",
+            r"^bne\s+\$5,\$0,(\S+)$",
+            r"^slt\s+\$4,\$4,\$6$",
+            r"^beq\s+\$4,\$0,(\S+)$",
+        ]
+        compiled = [re.compile(p) for p in pats]
+        n = len(pats)
+        i = 0
+        while i + n <= len(real):
+            groups = []
+            ok = True
+            for k, cre in enumerate(compiled):
+                m = cre.match(real[i + k][1])
+                if not m:
+                    ok = False
+                    break
+                groups.append(m)
+            # The negative-path compares and the join all target one label.
+            if ok and not (groups[14].group(1) == groups[28].group(1) == groups[30].group(1)):
+                ok = False
+            if not ok:
+                i += 1
+                continue
+            repl = {
+                1: "addu\t$2,$5,1",
+                2: "div\t$zero,$3,$2",
+                3: f"bnez\t$2,{groups[3].group(1)}",
+                6: f"bne\t$2,$at,{groups[6].group(1)}",
+                13: "slt\t$2,$6,$4",
+                16: "div\t$zero,$3,$2",
+                17: f"bnez\t$2,{groups[17].group(1)}",
+                20: f"bne\t$2,$at,{groups[20].group(1)}",
+                24: "mfhi\t$3",
+                25: "addu\t$2,$2,$3",
+                26: "sll\t$4,$2,16",
+                27: "slt\t$2,$5,$6",
+                28: f"bne\t$2,$0,{groups[28].group(1)}",
+                29: "slt\t$2,$4,$6",
+                30: f"beq\t$2,$0,{groups[30].group(1)}",
+            }
+            for k, text in repl.items():
+                res[real[i + k][0]] = text
+            i += n
+        return res
+
+    def _drop_jump_to_epilogue(self, res):
+        """Delete `j $L` when $L is the following `j $31` and the delay is `addu $v0,$0,$0`."""
+        def bare(line):
+            return line.split("#", 1)[0].strip()
+
+        real = []
+        for idx, line in enumerate(res):
+            s = bare(line)
+            if s and not s.startswith(".") and not s.endswith(":"):
+                real.append((idx, s))
+        drop = []
+        for n, (idx, s) in enumerate(real):
+            m = re.match(r"^j\s+(\$\w+)$", s)
+            if not m or n + 2 >= len(real):
+                continue
+            label = m.group(1)
+            delay = real[n + 1][1]
+            epi = real[n + 2][1]
+            if delay not in ("addu\t$2,$0,$zero", "addu\t$2,$zero,$zero", "addu $2,$0,$zero"):
+                # bare() does not collapse the tab, so compare the stripped form.
+                if not re.match(r"^addu\s+\$2,\$0,\$zero$", delay) and not re.match(
+                    r"^addu\s+\$2,\$zero,\$zero$", delay
+                ):
+                    continue
+            if not re.match(r"^j\s+\$31$", epi) and epi not in ("jr\t$31", "jr\t$ra"):
+                if not re.match(r"^jr\s+\$(31|ra)$", epi):
+                    continue
+            # Only labels (including the target) may sit between the delay and the epilogue.
+            saw = False
+            blocked = False
+            for line in res[real[n + 1][0] + 1:real[n + 2][0]]:
+                t = bare(line)
+                if not t:
+                    continue
+                if t.endswith(":") and t[:-1] == label:
+                    saw = True
+                    continue
+                if t.endswith(":"):
+                    continue
+                blocked = True
+                break
+            if saw and not blocked:
+                drop.append(idx)
+        for idx in reversed(drop):
+            del res[idx]
+        return res
+
+    def _sltu_a0_lt_a2_dest_v1(self, res):
+        """Rename one `sltu $v0,$a0,$a2` / `bne $v0` pair to $v1."""
+        def bare(line):
+            return line.split("#", 1)[0].strip()
+
+        real = []
+        for idx, line in enumerate(res):
+            s = bare(line)
+            if s and not s.startswith(".") and not s.endswith(":"):
+                real.append((idx, s))
+        for n in range(len(real) - 4):
+            if not re.match(r"^bne\s+\$2,\$0,\S+$", real[n][1]):
+                continue
+            if not re.match(r"^li\s+\$2,(1|0x1|0x00000001)$", real[n + 1][1]):
+                continue
+            if not re.match(r"^sltu\s+\$2,\$4,\$6$", real[n + 2][1]):
+                continue
+            bne = re.match(r"^bne\s+\$2,\$0,(\S+)$", real[n + 3][1])
+            if not bne:
+                continue
+            if not re.match(r"^li\s+\$2,(-1|0xffffffff|-0x1)$", real[n + 4][1]):
+                continue
+            res[real[n + 2][0]] = "sltu\t$3,$4,$6"
+            res[real[n + 3][0]] = f"bne\t$3,$0,{bne.group(1)}"
+        return res
+
+    def _dup_half_shift(self, res):
+        """Rewrite the signed-char `-1 << 16` window described above."""
+        def bare(line):
+            return line.split("#", 1)[0].strip()
+
+        i = 0
+        while i < len(res):
+            if not re.match(r"^sll\s+\$2,\$2,24$", bare(res[i])):
+                i += 1
+                continue
+            idxs = [i]
+            j = i + 1
+            while len(idxs) < 6 and j < len(res):
+                s = bare(res[j])
+                if s and not s.startswith(".") and not s.endswith(":"):
+                    idxs.append(j)
+                j += 1
+            if len(idxs) < 6:
+                break
+            beq = re.match(r"^beq\s+\$2,\$0,(\$\w+)$", bare(res[idxs[1]]))
+            li_ok = re.match(r"^li\s+\$2,-65536$", bare(res[idxs[2]]))
+            lhu = re.match(r"^lhu\s+\$2,\S+$", bare(res[idxs[3]]))
+            nop_ok = bare(res[idxs[4]]) == "nop"
+            sll_ok = re.match(r"^sll\s+\$2,\$2,16$", bare(res[idxs[5]]))
+            if not (beq and li_ok and lhu and nop_ok and sll_ok):
+                i += 1
+                continue
+            label = beq.group(1)
+            saw = False
+            k = idxs[5] + 1
+            while k < len(res):
+                s = bare(res[k])
+                if not s:
+                    k += 1
+                    continue
+                if s.endswith(":"):
+                    if s[:-1] == label:
+                        saw = True
+                    k += 1
+                    continue
+                break
+            if not saw:
+                i += 1
+                continue
+            taken = label + "b"
+            lhu_line = res[idxs[3]]
+            res[idxs[0]] = f"beq\t$3,$0,{taken}"
+            res[idxs[1]] = "addiu\t$2,$zero,-1"
+            res[idxs[2]] = lhu_line
+            res[idxs[3]] = f"j\t{label}"
+            res[idxs[4]] = "sll\t$2,$2,16"
+            res.insert(idxs[5], f"{taken}:")
+            i = idxs[5] + 2
+        return res
+
+    def _mflo_before_mfhi(self, res):
+        """`mfhi $H / mflo $L / addu $LO,$L,$zero / addu $HI,$H,$zero`.
+
+        Becomes `mflo $LO / mfhi $HI`. Two nops are inserted only when the
+        next real instruction is `mult` (the hi/lo hazard before another
+        multiply). A following `addu` keeps no nops.
+
+        A shift copy of the same pair,
+        `srl $LO,$L,N / sll $HI,$H,M`, is folded into those half reads.
+        """
+        def bare(line):
+            return line.split("#", 1)[0].strip()
+
+        real = []
+        for idx, line in enumerate(res):
+            s = bare(line)
+            if s and not s.startswith(".") and not s.endswith(":") and s != "nop":
+                real.append((idx, s))
+        repl = {}
+        drop = set()
+        consumed = set()
+        for n in range(len(real) - 4):
+            if n in consumed:
+                continue
+            i_mult, s_mult = real[n]
+            if not re.match(r"^mult\s+\$\w+,\$\w+$", s_mult):
+                continue
+            mh = re.match(r"^mfhi\s+(\$\w+)$", real[n + 1][1])
+            ml = re.match(r"^mflo\s+(\$\w+)$", real[n + 2][1])
+            if not mh or not ml:
+                continue
+            h, l = mh.group(1), ml.group(1)
+            mv_lo = re.match(
+                r"^addu\s+(\$\w+)," + re.escape(l) + r",\$zero$", real[n + 3][1]
+            )
+            mv_hi = re.match(
+                r"^addu\s+(\$\w+)," + re.escape(h) + r",\$zero$", real[n + 4][1]
+            )
+            if not mv_lo or not mv_hi:
+                continue
+            nxt = real[n + 5][1] if n + 5 < len(real) else ""
+            repl[real[n + 1][0]] = f"mflo\t{mv_lo.group(1)}"
+            repl[real[n + 2][0]] = f"mfhi\t{mv_hi.group(1)}"
+            if nxt.startswith("mult"):
+                repl[real[n + 3][0]] = "nop"
+                repl[real[n + 4][0]] = "nop"
+            else:
+                drop.add(real[n + 3][0])
+                drop.add(real[n + 4][0])
+            consumed.update(range(n, n + 5))
+        # `mfhi $H / mflo $L / srl $LO,$L,N / sll $HI,$H,M` folds the copy
+        # into the half reads: `mflo $LO / mfhi $HI / srl $LO,$LO,N / sll $HI,$HI,M`.
+        for n in range(len(real) - 4):
+            if n in consumed or (n + 1) in consumed:
+                continue
+            i_mult, s_mult = real[n]
+            if not re.match(r"^mult\s+\$\w+,\$\w+$", s_mult):
+                continue
+            mh = re.match(r"^mfhi\s+(\$\w+)$", real[n + 1][1])
+            ml = re.match(r"^mflo\s+(\$\w+)$", real[n + 2][1])
+            if not mh or not ml:
+                continue
+            h, l = mh.group(1), ml.group(1)
+            srl_m = re.match(
+                r"^srl\s+(\$\w+)," + re.escape(l) + r",((?:0x)?[0-9A-Fa-f]+)$",
+                real[n + 3][1],
+            )
+            sll_m = re.match(
+                r"^sll\s+(\$\w+)," + re.escape(h) + r",((?:0x)?[0-9A-Fa-f]+)$",
+                real[n + 4][1],
+            )
+            if not srl_m or not sll_m:
+                continue
+            lo_dest, hi_dest = srl_m.group(1), sll_m.group(1)
+            if lo_dest == l or hi_dest == h or lo_dest == hi_dest:
+                continue
+            repl[real[n + 1][0]] = f"mflo\t{lo_dest}"
+            repl[real[n + 2][0]] = f"mfhi\t{hi_dest}"
+            repl[real[n + 3][0]] = f"srl\t{lo_dest},{lo_dest},{srl_m.group(2)}"
+            repl[real[n + 4][0]] = f"sll\t{hi_dest},{hi_dest},{sll_m.group(2)}"
+            consumed.update(range(n, n + 5))
+        out = []
+        for i, line in enumerate(res):
+            if i in drop:
+                continue
+            out.append(repl.get(i, line))
+        return out
+
+    def _mult_mflo_to_multu(self, res):
+        """`mult $a,$b` / `mflo` -> `multu`. Does not touch a following `mfhi`."""
+        def bare(line):
+            return line.split("#", 1)[0].strip()
+
+        real = []
+        for idx, line in enumerate(res):
+            s = bare(line)
+            if s and not s.startswith(".") and not s.endswith(":") and s != "nop":
+                real.append((idx, s))
+        for n, (idx, s) in enumerate(real[:-1]):
+            m = re.match(r"^mult\s+(\$\w+),(\$\w+)$", s)
+            if not m:
+                continue
+            if re.match(r"^mflo\s+\$\w+$", real[n + 1][1]):
+                res[idx] = f"multu\t{m.group(1)},{m.group(2)}"
         return res
 
     def get_next_instruction(
@@ -1025,6 +2606,40 @@ class MaspsxProcessor:
         if self.symbol_at_temp_only is None:
             return True
         return operand in self.symbol_at_temp_only
+
+    def _line_after_beq_is_label(self) -> bool:
+        # The instruction after the following `beq` is a label, so the
+        # delay slot is empty and a preceding store can fill it.
+        i = self.line_index + 1
+        saw_beq = False
+        while i < len(self.lines):
+            line = self.lines[i]
+            if line == "" or line.startswith("#"):
+                i += 1
+                continue
+            if not saw_beq:
+                if line.startswith("beq\t"):
+                    saw_beq = True
+                    i += 1
+                    continue
+                return False
+            return line.endswith(":")
+        return False
+
+    def _next_line_is_beqz(self):
+        # Next non-blank, non-comment line is `beq $r,$0,$Label` (or
+        # `$zero`). Returns that line, or None. Does not skip `.set` or
+        # labels: those mean cc1 already owns the slot.
+        i = self.line_index + 1
+        while i < len(self.lines):
+            line = self.lines[i]
+            if line == "" or line.startswith("#"):
+                i += 1
+                continue
+            if re.match(r"^beq\t\$[0-9a-z]+,\$(?:0|zero),\$L\d+$", line):
+                return line
+            return None
+        return None
 
     def _next_line_is_return_jump(self) -> bool:
         # LOCAL PATCH helper: True when the next non-blank, non-comment input
@@ -1158,7 +2773,7 @@ class MaspsxProcessor:
             return i
         return None
 
-    def _branch_fill_effect(self, line: str, reg: int):
+    def _branch_fill_effect(self, line: str, reg: int, extended: bool = False):
         """Effect of a single instruction on `reg`: "read", "write", "none" or
         "bail" (mnemonic or operand shape not fully understood)."""
         line = strip_comments(line)
@@ -1168,6 +2783,20 @@ class MaspsxProcessor:
             return "none"
         parts = line.split(None, 1)
         op = parts[0]
+        if extended and op in ("mult", "multu", "mfhi", "mflo"):
+            # LOCAL PATCH 19 walk (HS7): cc1's 2-operand mult/multu reads two
+            # GPRs and writes only hi/lo; mfhi/mflo write one GPR.
+            ops = self._branch_fill_operands(line)
+            nums = [gpr_number(t) for t in ops]
+            if any(n is None for n in nums):
+                return "bail"
+            if op in ("mult", "multu"):
+                if len(nums) != 2:
+                    return "bail"
+                return "read" if reg in nums else "none"
+            if len(nums) != 1:
+                return "bail"
+            return "write" if nums[0] == reg else "none"
         if op in live_write_none:
             writes = None
         elif op in live_write_first:
@@ -1192,7 +2821,9 @@ class MaspsxProcessor:
             return "write" if dest == reg else "none"
         return "read" if reg in regs else "none"
 
-    def _branch_fill_reg_dead_at(self, label: str, reg: int) -> bool:
+    def _branch_fill_reg_dead_at(
+        self, label: str, reg: int, extended: bool = False
+    ) -> bool:
         """True when `reg` is provably dead at `label`.
 
         A conservative forward reachability walk: every path leaving `label`
@@ -1249,6 +2880,27 @@ class MaspsxProcessor:
                 op = strip_comments(line).split(None, 1)[0]
 
                 if op in cond_branch_mnemonics:
+                    if reorder[i] and extended:
+                        # LOCAL PATCH 19 walk (HS5): a reorder-mode branch
+                        # reads its operands, then either edge continues. Its
+                        # slot is maspsx's nop or a fill that MOVES the next
+                        # fall-through instruction there; that instruction is
+                        # walked on the fall-through, so any read of `reg` it
+                        # makes is still seen, and a write it makes on the
+                        # taken edge only kills earlier. Sound to skip.
+                        operands = self._branch_fill_operands(line)
+                        if not operands or operands[-1] not in labels:
+                            return False
+                        if any(
+                            gpr_number(t) == reg
+                            for t in reg_operand_re.findall(
+                                " ".join(operands[:-1])
+                            )
+                        ):
+                            return False
+                        stack.append(labels[operands[-1]])
+                        i += 1
+                        continue
                     if reorder[i]:
                         # no textual delay slot, and with this very patch on
                         # the slot's contents are not knowable here
@@ -1260,7 +2912,7 @@ class MaspsxProcessor:
                     slot = self._branch_fill_delay_slot_index(i)
                     if slot is None or target not in labels:
                         return False
-                    effect = self._branch_fill_effect(self.lines[slot], reg)
+                    effect = self._branch_fill_effect(self.lines[slot], reg, extended)
                     if effect in ("bail", "read"):
                         return False
                     if effect == "write":
@@ -1287,7 +2939,7 @@ class MaspsxProcessor:
                     slot = self._branch_fill_delay_slot_index(i)
                     if slot is None:
                         return False
-                    effect = self._branch_fill_effect(self.lines[slot], reg)
+                    effect = self._branch_fill_effect(self.lines[slot], reg, extended)
                     if effect in ("bail", "read"):
                         return False
                     if effect == "write":
@@ -1299,9 +2951,32 @@ class MaspsxProcessor:
                     continue
 
                 if op in ("jal", "jalr"):
-                    return False
+                    # LOCAL PATCH 19 walk (HS6): a call preserves a
+                    # callee-saved register ($16-$23, $30) and does not
+                    # consume its value; argument setup is separate code the
+                    # walk sees. A register-indirect call through `reg` reads
+                    # it. Caller-saved registers stay refused.
+                    if not extended or not (16 <= reg <= 23 or reg == 30):
+                        return False
+                    operands = self._branch_fill_operands(line)
+                    if any(gpr_number(t) == reg for t in operands):
+                        return False
+                    if not reorder[i]:
+                        slot = self._branch_fill_delay_slot_index(i)
+                        if slot is None:
+                            return False
+                        effect = self._branch_fill_effect(self.lines[slot], reg, extended)
+                        if effect in ("bail", "read"):
+                            return False
+                        if effect == "write":
+                            killed = True
+                            break
+                        i = slot + 1
+                        continue
+                    i += 1
+                    continue
 
-                effect = self._branch_fill_effect(line, reg)
+                effect = self._branch_fill_effect(line, reg, extended)
                 if effect in ("bail", "read"):
                     return False
                 if effect == "write":
@@ -1313,10 +2988,54 @@ class MaspsxProcessor:
                 return False
         return True
 
+    def _branch_fill_split_li(self, index: int, cand: str, target: str):
+        # LOCAL PATCH 19 (fill_branch_split_li). `cand` (line `index`, the
+        # line right after the branch) is `li $r,C` with C's low half zero --
+        # the high word cc1 splits off a 32-bit constant -- and the next
+        # instruction is `ori $r,$r,imm` completing it. Retail (ASPSX) puts
+        # that lui in the branch's delay slot. HS1 C must need exactly one
+        # `lui` (low 16 bits zero, not a 16-bit literal); HS2 the next
+        # non-blank line must be the completing `ori $r,$r,imm` (no label in
+        # between: the pair must be one straight-line materialization);
+        # HS3 $r must not be ABI-fixed/$at; HS4 SAFETY: $r provably dead at
+        # the branch target (patch 6's liveness walk), since the slot runs on
+        # the taken edge too. Returns the explicit `lui` line or None.
+        args = self._branch_fill_operands(cand)
+        if len(args) != 2 or not is_number(args[1]):
+            return None
+        dest = args[0]
+        if dest in branch_fill_forbidden_dest:
+            return None
+        dest_num = gpr_number(dest)
+        if dest_num is None or dest_num in (0, 1) or dest_num >= 26:
+            return None
+        value = int(args[1], 0) & 0xFFFFFFFF
+        if value & 0xFFFF or value <= 0xFFFF:  # HS1
+            return None
+        nxt = self._branch_fill_next_index(index)
+        if nxt is None or any(
+            self.lines[j] != "" for j in range(index + 1, nxt)
+        ):
+            return None
+        ori = strip_comments(self.lines[nxt])
+        if ";" in ori or ori.split(None, 1)[0] != "ori":  # HS2
+            return None
+        oargs = self._branch_fill_operands(ori)
+        if (
+            len(oargs) != 3
+            or gpr_number(oargs[0]) != dest_num
+            or gpr_number(oargs[1]) != dest_num
+            or not is_number(oargs[2])
+        ):
+            return None
+        if not self._branch_fill_reg_dead_at(target, dest_num, extended=True):  # HS4
+            return None
+        return f"lui\t{dest},0x{value >> 16:x}"
+
     def _branch_fill_candidate(self, branch_line: str):
         """The line to emit in this reorder-mode conditional branch's delay
         slot, or None to keep the stock `nop`."""
-        if not self.fill_branch_delay_slot:
+        if not (self.fill_branch_delay_slot or self.fill_branch_split_li):
             return None
         branch_line = strip_comments(branch_line)
         op = branch_line.split(None, 1)[0]
@@ -1343,6 +3062,12 @@ class MaspsxProcessor:
             return None
         cand_stripped = strip_comments(cand)
         cop = cand_stripped.split(None, 1)[0]
+        if self.fill_branch_split_li and cop == "li":
+            split = self._branch_fill_split_li(index, cand_stripped, target)
+            if split is not None:
+                return split
+        if not self.fill_branch_delay_slot:
+            return None
         spec = branch_fill_candidates.get(cop)
         if spec is None:
             return None
@@ -1476,6 +3201,69 @@ class MaspsxProcessor:
             return (line, target)
         return None
 
+    def _next_line_is_label_jump(self):
+        # LOCAL PATCH helper (patch 11): the next non-blank, non-comment
+        # input line when it is a reorder-mode plain `j <label>` (HJ1), else
+        # None. Labels and `.set` lines are NOT skipped (HJ5), exactly like
+        # patch 8's lookahead.
+        if not self.is_reorder:  # HJ5: cc1's noreorder block owns the slot
+            return None
+        call = self._next_line_is_plain_call()
+        if call is None:
+            return None
+        # cc1 spells labels `$L<n>`, which the shared lookahead reports as a
+        # `$`-target; only a real register (jr/jalr) is refused here.
+        if call[1] is not None and isinstance(canon_reg(call[1]), int):
+            return None  # HJ1: no jr/jalr (and `j $31` was refused upstream)
+        if call[0].split()[0] != "j":  # HJ1: `jal` writes $31; not this knob
+            return None
+        return call[0]
+
+    def _next_line_is_cond_branch(self):
+        # LOCAL PATCH helper (patch 10): inspect the next non-blank,
+        # non-comment input line and return `(line, read_registers)` when it
+        # is a plain reorder-mode conditional branch whose delay slot may be
+        # filled with a macro's second word, else None. `read_registers` is
+        # the set of canonical register numbers the branch tests (HB1).
+        #
+        # Same lookahead discipline as _next_line_is_plain_call: labels and
+        # `.set` lines are NOT skipped (HB4), compound lines refused (HB5).
+        if not self.is_reorder:  # HB4: no maspsx slot inside noreorder
+            return None
+        i = self.line_index + 1
+        while i < len(self.lines):
+            line = self.lines[i]
+            if line == "" or line.startswith("#"):
+                i += 1
+                continue
+            if ";" in line:  # HB5
+                return None
+            parts = line.split()
+            if len(parts) != 2:
+                return None
+            op, operands = parts
+            if op not in branch_mnemonics:  # HB6 (also excludes bltzal/bgezal)
+                return None
+            fields = operands.split(",")
+            if len(fields) < 2 or len(fields) > 3:
+                return None
+            target = fields[-1]
+            regs = fields[:-1]
+            # cc1 labels are spelled `$L<n>`; a register target (`beq ..,$2`)
+            # is not a branch we understand.
+            if isinstance(canon_reg(target), int):
+                return None
+            if not all(r.startswith("$") for r in regs):
+                return None
+            reads = set()
+            for r in regs:
+                c = canon_reg(r)
+                if not isinstance(c, int):
+                    return None  # unknown register spelling: refuse
+                reads.add(c)
+            return (line, reads)
+        return None
+
     def _uses_gp(self, line: str) -> bool:
         if self.sdata_limit == 0:
             return False
@@ -1537,16 +3325,521 @@ class MaspsxProcessor:
                 label = self.get_next_instruction(
                     skip=0, ignore_nop=True, ignore_set=True
                 )
+                if is_label(label) and (
+                    (
+                        self.load_delay_nop_before_label
+                        and self._label_opens_directive_block(label)
+                    )
+                    or (
+                        self.load_delay_nop_before_loop_label
+                        and self._label_is_loop_head(label)
+                    )
+                ):
+                    # LOCAL PATCH 14: leave the label in place; the nop goes
+                    # before it.
+                    res.append(
+                        f"nop # DEBUG: Reuse of '{r_dest}'. {reason} "
+                        f"(LOAD_DELAY_NOP_BEFORE_LABEL: {label})"
+                    )
+                    return res
                 if is_label(label):
                     res.append(label)
                     self.skip_instructions = 1
                 res.append(f"nop # DEBUG: Reuse of '{r_dest}'. {reason}")
+        elif self.load_delay_call_slot_store and self._call_slot_store_reads(
+            next_instruction, r_dest
+        ):
+            res.append(
+                f"nop # DEBUG: LOAD_DELAY_CALL_SLOT_STORE: the `{next_instruction}` "
+                f"delay-slot store reads {r_dest}"
+            )
         else:
             res.append(
                 f"#nop # DEBUG: '{next_instruction}' does not load from {r_dest}"
             )
 
         return res
+
+    def _label_is_loop_head(self, label: str) -> bool:
+        # LOCAL PATCH helper (patch 21). True when `label` is the very next
+        # non-comment line after the current load (HL21-1, as patch 14's HN1)
+        # and it is a pure loop head: at least one branch/jump targets it,
+        # EVERY branch/jump that targets it sits AFTER it in the function
+        # (backward edges only -- the only forward entry is the fall-through
+        # from the load, HL21-2), and no such branch in a cc1 `.set
+        # noreorder` block carries a load (or a compound macro) in its delay
+        # slot (HL21-3, as patch 14's HN3): with the nop moved before the
+        # label, the back-edges reach the first use without a pending load.
+        i = self.line_index + 1
+        while i < len(self.lines) and (
+            self.lines[i] == "" or self.lines[i].startswith("#")
+        ):
+            i += 1
+        if i >= len(self.lines) or self.lines[i] != label:  # HL21-1
+            return False
+        label_index = i
+        target = label[:-1]
+        edges = 0
+        noreorder = False
+        for k, line in enumerate(self.lines):
+            if line == ".set\tnoreorder":
+                noreorder = True
+            elif line == ".set\treorder":
+                noreorder = False
+            parts = line.split(None, 1)
+            if len(parts) != 2:
+                continue
+            op, operands = parts
+            if op not in branch_mnemonics and op not in ("j", "jal"):
+                continue
+            if operands.split(",")[-1].strip() != target:
+                continue
+            if k < label_index:  # HL21-2: a forward entry
+                return False
+            edges += 1
+            if not noreorder:
+                continue
+            m = k + 1
+            while m < len(self.lines) and (
+                self.lines[m] == "" or self.lines[m].startswith("#")
+            ):
+                m += 1
+            if m >= len(self.lines):
+                return False
+            slot_op = self.lines[m].split(None, 1)[0]
+            if slot_op in load_mnemonics or ";" in self.lines[m]:  # HL21-3
+                return False
+        return edges > 0
+
+    def _label_opens_directive_block(self, label: str) -> bool:
+        # LOCAL PATCH helper (patch 14). Walking the raw input from the
+        # current load: skip blank and comment lines up to `label` (HN1: it
+        # must be the very next non-comment line -- no other label or
+        # instruction in between), then True when the first non-blank line
+        # after the label is a cc1 directive that opens a block: `.set
+        # noreorder` (a cc1-scheduled branch) or `#.set volatile` (a volatile
+        # access). HN2: any other line (a plain instruction, another label,
+        # `.set reorder`, `#APP`) keeps the stock label-then-nop placement.
+        i = self.line_index + 1
+        while i < len(self.lines) and (
+            self.lines[i] == "" or self.lines[i].startswith("#")
+        ):
+            i += 1
+        if i >= len(self.lines) or self.lines[i] != label:  # HN1
+            return False
+        i += 1
+        while i < len(self.lines) and self.lines[i] == "":
+            i += 1
+        if i >= len(self.lines):
+            return False
+        if (
+            self.nop_before_label_skip_empty_app
+            and i + 1 < len(self.lines)
+            and self.lines[i] == "#APP"
+            and self.lines[i + 1] == "#NO_APP"
+        ):
+            i += 2
+            while i < len(self.lines) and self.lines[i] == "":
+                i += 1
+        if i >= len(self.lines):
+            return False
+        if self.lines[i] not in (".set\tnoreorder", "#.set\tvolatile"):  # HN2
+            return False
+        # HN3: every branch/jump to this label must arrive without a pending
+        # load. A reorder-mode branch gets maspsx's own nop slot; a branch in
+        # a cc1 `.set noreorder` block whose delay-slot instruction is a load
+        # would reach the label's first use with no delay once the nop moves
+        # before the label -- refuse.
+        target = label[:-1]
+        noreorder = False
+        for k, line in enumerate(self.lines):
+            if line == ".set\tnoreorder":
+                noreorder = True
+            elif line == ".set\treorder":
+                noreorder = False
+            parts = line.split(None, 1)
+            if len(parts) != 2:
+                continue
+            op, operands = parts
+            if op not in branch_mnemonics and op not in ("j", "jal"):
+                continue
+            if operands.split(",")[-1].strip() != target:
+                continue
+            if not noreorder:
+                continue
+            m = k + 1
+            while m < len(self.lines) and (
+                self.lines[m] == "" or self.lines[m].startswith("#")
+            ):
+                m += 1
+            if m >= len(self.lines):
+                return False
+            slot_op = self.lines[m].split(None, 1)[0]
+            if slot_op in load_mnemonics or ";" in self.lines[m]:
+                return False
+        return True
+
+    def _call_slot_store_reads(self, next_instruction: str, r_dest: str) -> bool:
+        # LOCAL PATCH helper (patch 13). True when, walking the raw input from
+        # the current load, the next instruction is a direct `jal <symbol>`
+        # opened by cc1's own `.set noreorder` (so the following instruction
+        # really is its delay slot: HL1), no label intervenes (HL2), and that
+        # slot instruction is a single sb/sh/sw that reads `r_dest` as its
+        # value or base register (HL3).
+        parts = next_instruction.split()
+        if len(parts) != 2 or parts[0] != "jal" or parts[1].startswith("$"):
+            return False
+        i = self.line_index + 1
+        noreorder = False
+        while i < len(self.lines):
+            line = self.lines[i]
+            if line == "" or line.startswith("#"):
+                i += 1
+                continue
+            if line == ".set\tnoreorder":
+                noreorder = True
+            elif line.startswith(".set"):
+                pass
+            elif line == next_instruction:
+                break
+            else:
+                return False  # HL2: a label or another instruction in between
+            i += 1
+        else:
+            return False
+        if not noreorder:  # HL1
+            return False
+        i += 1
+        while i < len(self.lines) and (
+            self.lines[i] == "" or self.lines[i].startswith("#")
+        ):
+            i += 1
+        if i >= len(self.lines) or ";" in self.lines[i]:
+            return False
+        slot = self.lines[i].split(None, 1)
+        if len(slot) != 2 or slot[0] not in ("sb", "sh", "sw"):  # HL3
+            return False
+        want = canon_reg(r_dest)
+        if not isinstance(want, int):
+            return False
+        return any(
+            canon_reg(r) == want for r in re.findall(r"\$\w+", slot[1])
+        )
+
+    @staticmethod
+    def _reorder_fill_candidate(line: str):
+        # LOCAL PATCH 22 helper: `line` is a single-word ALU instruction that
+        # may be moved (HF1). Returns (dest_gpr, {read gprs}) or None.
+        if ";" in line or line.startswith("#") or line.endswith(":"):
+            return None
+        parts = strip_comments(line).strip().split(None, 1)
+        if len(parts) != 2:
+            return None
+        op, operands = parts
+        ops = [x.strip() for x in operands.split(",")]
+        three = {"addu", "addiu", "subu", "and", "andi", "or", "ori", "xor",
+                 "xori", "nor", "slt", "slti", "sltu", "sltiu", "sll", "srl",
+                 "sra", "sllv", "srlv", "srav"}
+        if op == "move" and len(ops) == 2:
+            regs = ops
+        elif op == "li" and len(ops) == 2:
+            if not is_number(ops[1]) or not -0x8000 <= int(ops[1], 0) <= 0xFFFF:
+                return None  # one word only (no lui/ori pair)
+            regs = [ops[0]]
+        elif op in three and len(ops) == 3:
+            if is_number(ops[2]):
+                v = int(ops[2], 0)
+                if not -0x8000 <= v <= 0xFFFF:
+                    return None
+                regs = ops[:2]
+            else:
+                regs = ops
+        else:
+            return None
+        nums = [gpr_number(r) for r in regs]
+        if any(n is None for n in nums):
+            return None
+        # HF2: never $zero-dest, $at, $sp, $fp or $ra
+        if nums[0] in (0, 1) or any(n in (1, 29, 30, 31) for n in nums):
+            return None
+        return nums[0], set(nums[1:])
+
+    def _spill_before_symbol_load(self) -> None:
+        # Swap `lw $r,SYM` with the immediately following `sw $sN,imm($sp)`
+        # when $r is not $sN. cc1 sometimes hoists that symbolic load above
+        # one callee-save; retail keeps the save first.
+        out = []
+        i = 0
+        lines = self.lines
+        while i < len(lines):
+            a = lines[i].split()
+            b = lines[i + 1].split() if i + 1 < len(lines) else []
+            if (
+                len(a) == 2
+                and a[0] == "lw"
+                and "(" not in a[1]
+                and "," in a[1]
+                and len(b) == 2
+                and b[0] == "sw"
+                and b[1].endswith("($sp)")
+                and "," in b[1]
+                and a[1].split(",")[0] != b[1].split(",")[0]
+            ):
+                out.append(lines[i + 1])
+                out.append(lines[i])
+                i += 2
+                continue
+            out.append(lines[i])
+            i += 1
+        self.lines = out
+
+    def _reorder_fill_calls_and_epilogue(self) -> None:
+        # LOCAL PATCH 22 (reorder_fill_calls, env MASPSX_REORDER_FILL_CALLS=1).
+        # For cc1 output built with -fno-delayed-branch (every slot empty),
+        # model the two local fills ASPSX's reorder pass makes, rewriting them
+        # into cc1-style `.set noreorder` blocks that maspsx passes through:
+        #  (A) X / jal T            ->  jal T / X          (call slot)
+        #  (B) X / lw $31,N($sp) / addu $sp,$sp,M / j $31
+        #                           ->  lw $31,N($sp) / X / j $31 / addu $sp,..
+        # (X fills the $31 load delay; the pop fills the return slot.)
+        # Only in reorder mode, X must immediately precede (no label, no
+        # directive in between) and be a single-word ALU op (HF1/HF2).
+        lines = self.lines
+        out = []
+        noreorder = False
+        i = 0
+
+        def nxt(k):
+            k += 1
+            while k < len(lines) and (lines[k] == "" or lines[k].startswith("#")):
+                k += 1
+            return k
+
+        while i < len(lines):
+            line = lines[i]
+            if line == ".set\tnoreorder":
+                noreorder = True
+            elif line == ".set\treorder":
+                noreorder = False
+            cand = None if noreorder else self._reorder_fill_candidate(line)
+            if cand is not None:
+                dest, reads = cand
+                j = nxt(i)
+                nl = lines[j] if j < len(lines) else ""
+                parts = nl.split()
+                # (A) call slot: direct `jal sym` or `jal $r` (jalr)
+                if len(parts) == 2 and parts[0] == "jal":
+                    target = parts[1]
+                    tnum = gpr_number(target) if target.startswith("$") else None
+                    # HF3: jalr reads its target at jump time -- X must not
+                    # write it; `jal $31,$r` spellings are refused.
+                    if "," not in target and (tnum is None or tnum != dest):
+                        out += [f"# REORDER_FILL_CALLS: {line} -> {nl} slot",
+                                ".set\tnoreorder", ".set\tnomacro", nl, line,
+                                ".set\tmacro", ".set\treorder"]
+                        i = j + 1
+                        continue
+                # (B) epilogue
+                if re.match(r"^lw\t\$(31|ra),-?\d+\(\$(sp|29)\)$", nl):
+                    k = nxt(j)
+                    m = nxt(k)
+                    if (
+                        k < len(lines) and m < len(lines)
+                        and re.match(r"^addi?u\t\$(sp|29),\$(sp|29),-?\d+$", lines[k])
+                        and lines[m] == "j\t$31"
+                    ):
+                        out += [f"# REORDER_FILL_CALLS: epilogue {line}",
+                                nl, line,
+                                ".set\tnoreorder", ".set\tnomacro", "j\t$31",
+                                lines[k], ".set\tmacro", ".set\treorder"]
+                        i = m + 1
+                        continue
+            out.append(line)
+            i += 1
+        self.lines = out
+
+    def _sink_return_zero_into_flag_delay(self) -> None:
+        # LOCAL PATCH 23. See the ctor comment. Refuses unless the shape is
+        # unique: one `beq $2,$0,$L`, one epilogue `move $2,$0` directly
+        # before the noreorder return block, and a single ordinary delay
+        # instruction. Idempotent: the epilogue zero is gone after one run.
+        lines = self.lines
+        zero = "move\t$2,$0"
+        sunk = "addu\t$2,$0,$zero"
+
+        def next_real(idx):
+            while idx < len(lines) and (
+                lines[idx] == "" or lines[idx].startswith("#")
+            ):
+                idx += 1
+            return idx
+
+        epi = None
+        for i, line in enumerate(lines):
+            if line != zero:
+                continue
+            j = next_real(i + 1)
+            if j >= len(lines) or lines[j] != ".set\tnoreorder":
+                continue
+            seq = []
+            k = j
+            while k < len(lines) and len(seq) < 4:
+                if lines[k] != "" and not lines[k].startswith("#"):
+                    seq.append(lines[k])
+                k += 1
+            if (
+                len(seq) == 4
+                and seq[0] == ".set\tnoreorder"
+                and seq[1] == ".set\tnomacro"
+                and seq[2] == "j\t$31"
+                and re.match(r"^addi?u\t\$sp,\$sp,-?\d+$", seq[3])
+            ):
+                epi = i
+                break
+        if epi is None:
+            return
+
+        lab = None
+        for i in range(epi - 1, -1, -1):
+            if lines[i].endswith(":") and not lines[i].startswith("."):
+                lab = lines[i][:-1]
+                break
+        if not lab or not re.match(r"\$L\d+$", lab):
+            return
+        beqs = [
+            i
+            for i, line in enumerate(lines)
+            if line == f"beq\t$2,$0,{lab}"
+        ]
+        if len(beqs) != 1:
+            return
+        bi = beqs[0]
+        di = next_real(bi + 1)
+        if di >= len(lines) or di == epi:
+            return
+        delay = lines[di]
+        if (
+            delay == zero
+            or delay.endswith(":")
+            or delay.startswith(".")
+            or re.match(r"^(b|j|jal)", delay)
+        ):
+            return
+
+        out = []
+        for i, line in enumerate(lines):
+            if i == bi:
+                # Reorder mode would ignore a filled slot and emit its own
+                # nop. A noreorder pair makes the `addu` the real delay.
+                out.append(".set\tnoreorder")
+                out.append(line)
+                continue
+            if i == di:
+                out.append(sunk)
+                out.append(".set\treorder")
+                out.append(
+                    f"# SINK_RETURN_ZERO: {delay} moved to the fall-through"
+                )
+                out.append(delay)
+                continue
+            if i == epi:
+                out.append(
+                    "# SINK_RETURN_ZERO: move $2,$0 sunk into beq $2,$0 delay"
+                )
+                continue
+            out.append(line)
+        self.lines = out
+
+    def _unfill_epilogue_delay_slots(self) -> None:
+        # LOCAL PATCH 15. Rewrite every cc1-scheduled epilogue block
+        #   .set noreorder / .set nomacro / j $31 / addu $sp,$sp,N /
+        #   .set macro / .set reorder
+        # into reorder-mode `addu $sp,$sp,N` / `j $31`, so the stack pop runs
+        # before the return and maspsx emits its own `nop` slot. HU1: the
+        # block must be exactly those six lines (blank/comment lines between
+        # them are allowed), the slot a single `addu`/`addiu $sp,$sp,<imm>`.
+        # Idempotent: the rewritten form no longer matches.
+        lines = self.lines
+        out = []
+        i = 0
+        while i < len(lines):
+            if lines[i] == ".set\tnoreorder":
+                seq = []
+                j = i
+                while j < len(lines) and len(seq) < 6:
+                    if lines[j] != "" and not lines[j].startswith("#"):
+                        seq.append((j, lines[j]))
+                    j += 1
+                texts = [t for _, t in seq]
+                if (
+                    len(texts) == 6
+                    and texts[1] == ".set\tnomacro"
+                    and texts[2] == "j\t$31"
+                    and re.match(
+                        r"^addi?u\t\$(sp|29),\$(sp|29),-?\d+$", texts[3]
+                    )
+                    and texts[4] == ".set\tmacro"
+                    and texts[5] == ".set\treorder"
+                ):
+                    out.append(
+                        f"# UNFILL_EPILOGUE_DELAY_SLOT: {texts[3]} moved before j $31"
+                    )
+                    out.append(texts[3])
+                    out.append("j\t$31")
+                    i = seq[-1][0] + 1
+                    continue
+            out.append(lines[i])
+            i += 1
+        self.lines = out
+
+    def _retarget_mid_function_returns(self) -> None:
+        # LOCAL PATCH 12. Per `.ent`/`.end` function: when the function is
+        # frameless (`.frame $sp,0,$31` and a zero `.mask`: HR1) and cc1 emitted
+        # more than one `j $31`, every earlier `j $31` that sits in a cc1
+        # `.set noreorder` block (HR2) becomes `j $L<fresh>` and the label is
+        # placed on the function's final `j $31`. Idempotent: a second run
+        # finds a single `j $31` and changes nothing.
+        counter = getattr(self, "_retarget_label_counter", 0)
+        lines = self.lines
+        out = []
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+            if not line.startswith(".ent\t"):
+                out.append(line)
+                i += 1
+                continue
+            name = line.split("\t", 1)[1]
+            end = i + 1
+            while end < len(lines) and lines[end] != f".end\t{name}":
+                end += 1
+            body = lines[i:end]
+            frameless = any(
+                re.match(r"^\.frame\t\$sp,0,\$31", x) for x in body
+            ) and any(x.startswith(".mask\t0x00000000") for x in body)
+            returns = [k for k, x in enumerate(body) if x == "j\t$31"]
+            if frameless and len(returns) > 1:
+                final = returns[-1]
+                moved = []
+                for k in returns[:-1]:
+                    back = k - 1
+                    while back >= 0 and (
+                        body[back] == "" or body[back].startswith("#")
+                        or body[back] == ".set\tnomacro"
+                    ):
+                        back -= 1
+                    if back >= 0 and body[back] == ".set\tnoreorder":  # HR2
+                        moved.append(k)
+                if moved:
+                    label = f"$L{900000 + counter}"
+                    counter += 1
+                    for k in moved:
+                        body[k] = f"j\t{label}"
+                    body = body[:final] + [f"{label}:"] + body[final:]
+            out.extend(body)
+            i = end
+        self._retarget_label_counter = counter
+        self.lines = out
 
     def _handle_mflo_mfhi(self, r_source=None) -> List[str]:
         # we cannot use a div/mult within 2 instructions of mflo/mfhi
@@ -1794,7 +4087,7 @@ class MaspsxProcessor:
         # branch's `la` condition so that nothing else in that chain becomes
         # newly reachable for `la` when the knob is on.
         if (
-            self.fill_call_delay_slot
+            (self.fill_call_delay_slot or self.fill_branch_macro_split)
             and op == "la"
             and not is_macro  # H7
             and len(rest) == 1
@@ -1806,20 +4099,32 @@ class MaspsxProcessor:
         ):
             la_parts = rest[0].split(",")
             la_operand = la_parts[1] if len(la_parts) == 2 else ""
-            call = self._next_line_is_plain_call()
-            if (
-                call is not None
-                and la_operand
+            call = (
+                self._next_line_is_plain_call()
+                if self.fill_call_delay_slot else None
+            )
+            # LOCAL PATCH (patch 10): the same split before a conditional
+            # branch. `branch[1]` is the set of registers the branch tests.
+            branch = (
+                self._next_line_is_cond_branch()
+                if call is None and self.fill_branch_macro_split else None
+            )
+            la_ok = (
+                la_operand
                 and "(" not in la_operand  # not an indexed form
                 # H2: the moved word WRITES this register; $31 would destroy
                 # the return address `jal` has just stored.
                 and canon_reg(la_parts[0]) not in (31, 1)
+                # H9: a numeric operand is not a symbol macro.
+                and not re.match(r"^-?(0x[0-9A-Fa-f]+|\d+)$", la_operand)
+            )
+            if (
+                la_ok
+                and call is not None
                 # H3: a register-indirect jump reads its target register
                 # BEFORE the slot runs, so the moved word must not be what
                 # completes that address.
                 and canon_reg(call[1]) != canon_reg(la_parts[0])
-                # H9: a numeric operand is not a symbol macro.
-                and not re.match(r"^-?(0x[0-9A-Fa-f]+|\d+)$", la_operand)
             ):
                 r_dest = la_parts[0]
                 res.extend(
@@ -1829,6 +4134,25 @@ class MaspsxProcessor:
                         call[0],
                         f"addiu\t{r_dest},{r_dest},%lo({la_operand})",
                         "# FILL_CALL_DELAY_SLOT LA END",
+                    ]
+                )
+                self.skip_instructions = 1
+                return res
+            if (
+                la_ok
+                and branch is not None
+                # HB1: the branch reads its operands BEFORE the slot runs, so
+                # the moved word must not be what completes one of them.
+                and canon_reg(la_parts[0]) not in branch[1]
+            ):
+                r_dest = la_parts[0]
+                res.extend(
+                    [
+                        "# FILL_BRANCH_MACRO_SPLIT LA START",
+                        f"lui\t{r_dest},%hi({la_operand})",
+                        branch[0],
+                        f"addiu\t{r_dest},{r_dest},%lo({la_operand})",
+                        "# FILL_BRANCH_MACRO_SPLIT LA END",
                     ]
                 )
                 self.skip_instructions = 1
@@ -1891,7 +4215,7 @@ class MaspsxProcessor:
                     and self.dispatch_fold_symbol
                     and re.match(r"^\$L\d+$", operand)
                 ):
-                    operand = self.dispatch_fold_symbol
+                    operand = self._dispatch_fold_target(operand)
                 dest_temp_used = (
                     self.symbol_load_dest_temp
                     and not is_macro
@@ -2051,10 +4375,71 @@ class MaspsxProcessor:
                 if op == "la" and not self.gp_allow_la:
                     gp_allowed = False
 
-                if gp_allowed and (
+                if (
+                    # LOCAL PATCH 17 (la_absolute_small_data): ASPSX < 2.80
+                    # never forms a gp-relative `la`; GNU as would, for any
+                    # symbol it places in small data. Emit the absolute pair
+                    # explicitly so only the loads/stores stay gp-relative.
+                    self.la_absolute_small_data
+                    and op == "la"
+                    and not self.gp_allow_la  # HA1
+                    and not is_macro  # HA2
+                    and not re.match(r"^-?(0x[0-9A-Fa-f]+|\d+)$", symbol)  # HA3
+                    and (
+                        symbol in self.sdata_entries
+                        or symbol in self.sbss_entries
+                        or symbol in self.extern_entries
+                    )  # HA4
+                ):
+                    res.extend(
+                        [
+                            "# LA_ABSOLUTE_SMALL_DATA START",
+                            f"lui\t{r_dest},%hi({operand})",
+                            f"addiu\t{r_dest},{r_dest},%lo({operand})",
+                            "# LA_ABSOLUTE_SMALL_DATA END",
+                        ]
+                    )
+                elif gp_allowed and (
                     symbol in self.sdata_entries or symbol in self.sbss_entries
                 ):
                     res.append(f"{op}\t{r_dest},{gp_rel}")
+                elif (
+                    self.beqz_sym_store_delay
+                    and op == "sw"
+                    and r_source is None
+                    and (beq := self._next_line_is_beqz()) is not None
+                    and self._line_after_beq_is_label()
+                ):
+                    res.extend(
+                        [
+                            "# BEQZ_SYM_STORE_DELAY START",
+                            ".set\tnoat",
+                            f"lui\t$at,%hi({operand})",
+                            beq,
+                            f"sw\t{r_dest},%lo({operand})($at)",
+                            ".set\tat",
+                            "# BEQZ_SYM_STORE_DELAY END",
+                        ]
+                    )
+                    self.skip_instructions = 1
+                elif (
+                    self.sink_zero_store_into_beqz
+                    and op == "sw"
+                    and r_dest in ("$0", "$zero")
+                    and (beq := self._next_line_is_beqz()) is not None
+                ):
+                    res.extend(
+                        [
+                            "# SINK_ZERO_STORE_INTO_BEQZ START",
+                            ".set\tnoat",
+                            f"lui\t$at,%hi({operand})",
+                            beq,
+                            f"sw\t$0,%lo({operand})($at)",
+                            ".set\tat",
+                            "# SINK_ZERO_STORE_INTO_BEQZ END",
+                        ]
+                    )
+                    self.skip_instructions = 1
                 elif (
                     self.fill_store_delay_slot
                     and op == "sw"
@@ -2110,6 +4495,36 @@ class MaspsxProcessor:
                             f"{op}\t{r_dest},%lo({operand})($at)",
                             ".set\tat",
                             "# FILL_CALL_DELAY_SLOT END",
+                        ]
+                    )
+                    self.skip_instructions = 1
+                elif (
+                    # LOCAL PATCH (patch 10, absolute-store arm): the macro's
+                    # second word goes into the delay slot of the following
+                    # reorder-mode conditional branch:
+                    #   lui $at,%hi(SYM) / beq $a,$b,L / sw $r,%lo(SYM)($at)
+                    # The store was already before the branch (on both edges)
+                    # and writes no GPR, so moving it into the slot changes
+                    # nothing the branch reads and nothing either edge sees.
+                    self.fill_branch_macro_split
+                    and op in ("sb", "sh", "sw")
+                    and not is_macro  # HB5
+                    # HB3 ($31 spelled by a link branch) / HB2 ($at value reg)
+                    and canon_reg(r_dest) not in (31, 1)
+                    and (branch := self._next_line_is_cond_branch()) is not None
+                    # HB1: cc1 never tests $at, but the surviving `lui $at`
+                    # would clobber it before the branch reads it.
+                    and 1 not in branch[1]
+                ):
+                    res.extend(
+                        [
+                            "# FILL_BRANCH_MACRO_SPLIT START",
+                            ".set\tnoat",
+                            f"lui\t$at,%hi({operand})",
+                            branch[0],
+                            f"{op}\t{r_dest},%lo({operand})($at)",
+                            ".set\tat",
+                            "# FILL_BRANCH_MACRO_SPLIT END",
                         ]
                     )
                     self.skip_instructions = 1
@@ -2180,6 +4595,62 @@ class MaspsxProcessor:
                     )
                 else:
                     res.append(line)
+            elif (
+                # LOCAL PATCH 11 (fill_jump_stack_store): ASPSX's reorder
+                # pass moves a single-word stack store into the empty delay
+                # slot of the plain `j <label>` that follows it:
+                #   sw $0,0($sp) / j L / nop  ->  j L / sw $0,0($sp)
+                self.fill_jump_stack_store
+                and op in ("sb", "sh", "sw")
+                and not is_macro  # HJ4
+                and r_source
+                and canon_reg(r_source) == 29  # HJ2: $sp base only
+                and re.match(r"^-?(0x[0-9A-Fa-f]+|\d+)$", operand)
+                and -32768 <= int(operand, 0) <= 32767  # HJ3: one word
+                and (jump := self._next_line_is_label_jump()) is not None
+            ):
+                res.extend(
+                    [
+                        "# FILL_JUMP_STACK_STORE START",
+                        jump,
+                        line,
+                        "# FILL_JUMP_STACK_STORE END",
+                    ]
+                )
+                self.skip_instructions = 1
+            elif (
+                # LOCAL PATCH 18 (fill_call_volatile_store): the `jal`
+                # sibling of patch 11. ASPSX's reorder pass moves the
+                # single-word register-based store that immediately precedes
+                # a reorder-mode direct `jal <symbol>` into its empty slot:
+                #   sw $3,0($2) / jal F / nop  ->  jal F / sw $3,0($2)
+                # cc1 leaves that slot empty only when the store is volatile
+                # (reorg never slots a volatile insn).
+                self.fill_call_volatile_store
+                and op in ("sb", "sh", "sw")
+                and not is_macro  # HC4
+                and r_source
+                and isinstance(canon_reg(r_source), int)
+                # HC1: `jal` writes $31 before the slot runs; a moved store
+                # that reads $31 (value or base) would see the new link.
+                and canon_reg(r_source) not in (31, 1)
+                and canon_reg(r_dest) not in (31, 1)
+                and re.match(r"^-?(0x[0-9A-Fa-f]+|\d+)$", operand)
+                and -32768 <= int(operand, 0) <= 32767  # HC3: one word
+                and self.is_reorder  # HC5: no cc1 noreorder block
+                and (call := self._next_line_is_plain_call()) is not None
+                and call[1] is None  # HC2: direct `jal <symbol>` only
+                and call[0].split()[0] == "jal"
+            ):
+                res.extend(
+                    [
+                        "# FILL_CALL_VOLATILE_STORE START",
+                        call[0],
+                        line,
+                        "# FILL_CALL_VOLATILE_STORE END",
+                    ]
+                )
+                self.skip_instructions = 1
             elif r_source and (int(operand, 0) > 32767 or int(operand, 0) < -32768):
                 # e.g. sw	$2,56200($4)
                 res.extend(
@@ -2226,7 +4697,18 @@ class MaspsxProcessor:
 
         elif op == "li":
             # TODO: handle non-soft floats?
-            if self.expand_li:
+            small = None
+            if self.ori_small_li:
+                match = re.match(
+                    r"li\s+(\$[0-9A-z]+),\s?(-?[x0-9a-fA-F]+)", line
+                )
+                if match:
+                    imm = int(match.group(2), 0)
+                    if 0 < imm < 0x8000:
+                        small = f"ori\t{match.group(1)},$zero,{imm}"
+            if small is not None:
+                res.append(small)
+            elif self.expand_li:
                 res += expand_load_immediate(line)
             else:
                 res.append(line)
@@ -2289,6 +4771,12 @@ class MaspsxProcessor:
             extra_nops = self._handle_mflo_mfhi(r_source=r_dest)
             if len(extra_nops) > 0:
                 res += extra_nops
+            elif self.div_no_reuse_nop and self.expand_div:
+                # LOCAL PATCH 16: mflo/mfhi results are available to the next
+                # instruction; no load-delay-style reuse nop.
+                res.append(
+                    f"#nop # DEBUG: DIV_NO_REUSE_NOP: no reuse nop after {r_dest}"
+                )
             else:
                 next_instruction = self.get_next_instruction(
                     skip=0, ignore_set=True, ignore_label=True
@@ -2333,6 +4821,12 @@ class MaspsxProcessor:
             extra_nops = self._handle_mflo_mfhi(r_source=r_dest)
             if len(extra_nops) > 0:
                 res += extra_nops
+            elif self.div_no_reuse_nop and self.expand_div:
+                # LOCAL PATCH 16: mflo/mfhi results are available to the next
+                # instruction; no load-delay-style reuse nop.
+                res.append(
+                    f"#nop # DEBUG: DIV_NO_REUSE_NOP: no reuse nop after {r_dest}"
+                )
             else:
                 next_instruction = self.get_next_instruction(
                     skip=0, ignore_set=True, ignore_label=True

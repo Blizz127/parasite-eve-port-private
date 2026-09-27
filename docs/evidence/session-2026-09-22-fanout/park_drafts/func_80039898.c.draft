@@ -1,0 +1,38 @@
+/* VRAM 0x80039898 / file 0x2A098 / size 0xD8. */
+extern volatile unsigned char D_80091A1F;
+extern unsigned char *D_80091A28;
+
+static __inline__ int inl(void) {
+    unsigned char *base = D_80091A28;
+    unsigned char *p = base + D_80091A1F;
+    unsigned int v = *(unsigned char *)(p + 0x1D);
+    return *(unsigned char *)(base + v + 4);
+}
+
+int func_80039898(void) {
+    unsigned char *p;
+    int i;
+    int sel;
+    unsigned char *q;
+    int r;
+
+    sel = 0;
+    p = D_80091A28 + 1;
+    for (i = 0; i < p[2]; i++) {
+        if ((p + i)[3] == 3) {
+            sel = i;
+            i = p[2];
+        }
+    }
+    q = p + 0x1B;
+    for (i = 0; i < q[0]; i++) {
+        if ((q + i)[1] == (sel & 0xFF)) {
+            r = i;
+            goto found;
+        }
+    }
+    r = 0xFF;
+found:
+    D_80091A1F = r;
+    return inl();
+}

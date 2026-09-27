@@ -17,16 +17,16 @@ int32_t func_8005415C(int32_t index)
     return record?PE_LoadU8(record+6u):0;
 }
 
-int32_t func_80054288(void) {return (int32_t)PE_LoadU32(0x8009D040u);}
+/* func_800556E8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800556E8_port.c (src/func_800556E8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_80054288: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80054288_port.c (src/func_80054288.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 static int32_t filtered_item(int32_t index,pe_addr_t count,pe_addr_t table)
 {
     if (index<0 || index>=(int32_t)PE_LoadU32(count)) return 0;
     return (int16_t)PE_LoadU16(table+(uint32_t)index*2u);
 }
-int32_t func_800556E8(int32_t index) {return filtered_item(index,0x8009D040u,0x800A1D9Cu);}
-int32_t func_80058E08(int32_t index) {return filtered_item(index,0x8009D044u,0x800A1E00u);}
-int32_t func_80057ED8(int32_t index) {return filtered_item(index,0x8009D078u,0x800A1FD4u);}
+/* func_80058E08: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80058E08_port.c (src/func_80058E08.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_80057ED8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80057ED8_port.c (src/func_80057ED8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 pe_addr_t func_80058BBC(int32_t index)
 {
@@ -44,9 +44,4 @@ int32_t func_80059F08(uint32_t index)
     return (int32_t)PE_LoadU32(0x8009D090u+index*4u);
 }
 
-void func_80055610(void)
-{
-    uint32_t bits=PE_LoadU32(0x800C0E24u),count=0u,i;
-    for (i=0;i<20u;i++,bits>>=1u) if (bits&1u) PE_StoreU16(0x800A1D9Cu+count++*2u,(uint16_t)i);
-    PE_StoreU32(0x8009D068u,0u);PE_StoreU32(0x8009D040u,count);
-}
+/* func_80055610: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80055610_port.c (src/func_80055610.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

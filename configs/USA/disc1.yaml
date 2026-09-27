@@ -58,7 +58,8 @@ segments:
       - [0x2CF8, c, func_800124F8]
       # Phase 5GY-125E0: descriptor spawn loop, VRAM 0x800125E0,
       # file 0x2DE0, size 0x8C. Resume generated asm at 0x2E6C.
-      - [0x2D74, asm]
+      # lane1: func_80012574 VRAM 0x80012574 size 0x6C.
+      - [0x2D74, c, func_80012574]
       - [0x2DE0, c, func_800125E0]
       # Phase 5GZ-1266C: boot work-table link init, VRAM 0x8001266C,
       # file 0x2E6C, size 0x94.
@@ -79,27 +80,67 @@ segments:
       - [0x38B4, asm]
       # unregistered orphan in src/, verified at a default profile by orchestrator
       - [0x39E8, c, func_800131E8]
-      - [0x3B00, asm]
+      # lane1: func_80013300 VRAM 0x80013300 size 0xE8.
+      - [0x3B00, c, func_80013300]
+      # sum of +0x14 and +0x1C stays in $a0; divisor reuses $v0
+      - [0x3BE8, c, func_800133E8]
+      # lane1: func_80013514 VRAM 0x80013514 size 0x1AC.
+      - [0x3D14, c, func_80013514]
+      # lane1: func_800136C0 VRAM 0x800136C0 size 0x2C8.
+      - [0x3EC0, c, func_800136C0]
+      - [0x4188, asm]
+      # lane1: func_80013C34 VRAM 0x80013C34 size 0x250.
+      - [0x4434, c, func_80013C34]
+      # lane1: func_80013E84 VRAM 0x80013E84 size 0x3A4.
+      - [0x4684, c, func_80013E84]
+      # lane1: func_80014228 VRAM 0x80014228 size 0x188.
+      - [0x4A28, c, func_80014228]
+      # lane1: func_800143B0 VRAM 0x800143B0 size 0x14C.
+      - [0x4BB0, c, func_800143B0]
+      # lane1: func_800144FC VRAM 0x800144FC size 0x198.
+      - [0x4CFC, c, func_800144FC]
       # matching C leaf
       - [0x4E94, c, func_80014694]
-      - [0x50E0, asm]
+      # lane1: func_800148E0 VRAM 0x800148E0 size 0x2C0.
+      - [0x50E0, c, func_800148E0]
+      - [0x53A0, asm]
       - [0x55A0, c, func_80014DA0]
-      - [0x5630, asm]
+      # lane1: func_80014E30 VRAM 0x80014E30 size 0x1A8.
+      - [0x5630, c, func_80014E30]
+      # lane1: func_80014FD8 VRAM 0x80014FD8 size 0x130.
+      - [0x57D8, c, func_80014FD8]
+      # lane1: func_80015108 VRAM 0x80015108 size 0x138.
+      - [0x5908, c, func_80015108]
+      - [0x5A40, asm]
       - [0x5DFC, c, func_800155FC]
-      - [0x5E48, asm]
+      # lane1: func_80015648 VRAM 0x80015648 size 0x148.
+      - [0x5E48, c, func_80015648]
       # matching C leaf
       - [0x5F90, c, func_80015790]
-      - [0x6164, asm]
+      # task set floor by entity roll
+      - [0x6164, c, func_80015964]
       - [0x62B8, c, func_80015AB8]
-      - [0x62F0, asm]
+      # lane1: func_80015AF0 VRAM 0x80015AF0 size 0xBC.
+      - [0x62F0, c, func_80015AF0]
+      # lane1: func_80015BAC VRAM 0x80015BAC size 0xD0.
+      - [0x63AC, c, func_80015BAC]
+      # lane1: func_80015C7C VRAM 0x80015C7C size 0x130.
+      - [0x647C, c, func_80015C7C]
+      - [0x65AC, asm]
+      # task script cmd dispatch
+      - [0x7110, c, func_80016910]
       - [0x75F8, c, func_80016DF8]
       - [0x761C, c, func_80016E1C]
-      - [0x7640, asm]
+      # lane1: func_80016E40 VRAM 0x80016E40 size 0xD0.
+      - [0x7640, c, func_80016E40]
+      # lane1: func_80016F10 VRAM 0x80016F10 size 0xD0.
+      - [0x7710, c, func_80016F10]
       # func_80016FE0 — D_8009D2E8 bit-0 gate writing 1/0 through a0[0]; the
       # if/else form (not the early-return form) reproduces retail's
       # bnez/zero-store layout. era -O2 -G0, LINK_EXACT.
       - [0x77E0, c, func_80016FE0]
-      - [0x7818, asm]
+      # Field-VM interpreter main loop (operand-mode decode + D_800910A0 opcode dispatch).
+      - [0x7818, c, func_80017018]
       # func_80017294 — field-VM handler: repoint the VM cursor (gp-relative
       # D_8009CE00) to D_8009D2F0[0x27] + **a0 * 2; return 1. era -O2 -G8 +
       # MASPSX_FORCE_ABSOLUTE_SYMBOLS=D_8009D2F0 (base absolute, cursor
@@ -139,7 +180,8 @@ segments:
       # gp-relative form of D_8009D300 (0x590($gp)) requires -G8. era -O2 -G8,
       # LINK_EXACT.
       - [0x804C, c, func_8001784C]
-      - [0x807C, asm]
+      # lane1: func_8001787C VRAM 0x8001787C size 0xAC.
+      - [0x807C, c, func_8001787C]
       # Probe: D_8009D2F0 byte and halfword field readers/writer.
       - [0x8128, c, func_80017928]
       - [0x8148, c, func_80017948]
@@ -214,7 +256,8 @@ segments:
       - [0x87F0, c, func_80017FF0]
       # store duplicated in BOTH if/else arms; cross-jumping merges the tail
       - [0x8804, c, func_80018004]
-      - [0x8880, asm]
+      # lane1: func_80018080 VRAM 0x80018080 size 0xE4.
+      - [0x8880, c, func_80018080]
       # if/else dispatch keeping D_8009D2F0 live in $a3 across both arms
       - [0x8964, c, func_80018164]
       # Phase 5GA: D_800BCF88 bits-0xC0 clearer, era -O2 -G0.
@@ -321,7 +364,8 @@ segments:
       # named D_8009D254 local loaded right after D_8009D2F0
       - [0x98BC, c, func_800190BC]
       - [0x9954, c, func_80019154]
-      - [0x9970, asm]
+      # lane1: func_80019170 VRAM 0x80019170 size 0xF0.
+      - [0x9970, c, func_80019170]
       # func_80019260 — func_8003E0D0(D_8009D2F0 + 0x1B4) then zero
       # D_8009D2F0->w18C; return 1. era -O2 -G0, LINK_EXACT.
       - [0x9A60, c, func_80019260]
@@ -392,7 +436,8 @@ segments:
       # teardown addiu $sp,+0x18 in the jr delay slot. Era -O2 -G0; no $gp.
       # Segment-head carve: C 0x20, resume A010.s size 0x3D4 to A3E4.
       - [0x9FF0, c, func_800197F0]
-      - [0xA010, asm]
+      # LINK_EXACT on swept stable source
+      - [0xA010, c, func_80019810]
       # func_800198C4 — lbu of *a0[0] plus two word args from a0[1]/a0[2]
       # passed to func_8002FAD8(D_8009D2F0, ...); return 1. era -O2 -G0.
       - [0xA0C4, c, func_800198C4]
@@ -440,7 +485,8 @@ segments:
       # Probe: call-and-store wrapper retaining descriptor across the call.
       - [0xA5B8, c, func_80019DB8]
       - [0xA5F4, c, func_80019DF4]
-      - [0xA704, asm]
+      # lane1: func_80019F04 VRAM 0x80019F04 size 0xDC.
+      - [0xA704, c, func_80019F04]
       # pin both list pointers ($a0/$a1) to reproduce retail's allocation
       - [0xA7E0, c, func_80019FE0]
       # clear 0x18C links pointing at D_8009D2F0 across the D_8009D20C list
@@ -482,12 +528,38 @@ segments:
       # unregistered orphan in src/, verified at a default profile by orchestrator
       - [0xAF84, c, func_8001A784]
       - [0xB090, c, func_8001A890]
-      - [0xB118, asm]
+      # func_8001A918 — relocate the D_800B1620 scene header (self-relative offsets -> pointers, table rebase loop).
+      # era -O2 -G8 with D_800B1620 forced absolute (new profile era_o2_g8_force_d800b1620_absolute).
+      # LEVERS: tmp asm("$2") for the load, h asm("$4"), f asm("$3") = h->f18 reused, q asm("$2") in the early exit.
+      - [0xB118, c, func_8001A918]
       # D_8009D20C list walk calling func_8001AE40 on clear-bit records
       - [0xB1F8, c, func_8001A9F8]
-      - [0xB278, asm]
+      # lane1: func_8001AA78 VRAM 0x8001AA78 size 0x268.
+      - [0xB278, c, func_8001AA78]
+      # lane1: func_8001ACE0 VRAM 0x8001ACE0 size 0x160.
+      - [0xB4E0, c, func_8001ACE0]
+      - [0xB640, asm]
+      # LINK_EXACT on swept stable source
+      - [0xC964, c, func_8001C164]
+      # gp-relative G8
+      - [0xCE14, c, func_8001C614]
+      - [0xCFDC, asm]
+      # lane1: func_8001CAB0 VRAM 0x8001CAB0 size 0xF0.
+      - [0xD2B0, c, func_8001CAB0]
+      - [0xD3A0, asm]
+      # -G8 with D_8009D254 forced absolute
+      - [0xD970, c, func_8001D170]
       - [0xDA68, c, func_8001D268]
       - [0xDB40, asm]
+      # lane1: func_8001F4D4 VRAM 0x8001F4D4 size 0x340.
+      - [0xFCD4, c, func_8001F4D4]
+      - [0x10014, asm]
+      # entity status timers + auto-cure
+      - [0x101C4, c, func_8001F9C4]
+      # lane1: func_800201DC VRAM 0x800201DC size 0xAC.
+      - [0x109DC, c, func_800201DC]
+      # switch on e->f18->f1 folds to jtbl_8001070C
+      - [0x10A88, c, func_80020288]
       # matching C leaf
       - [0x111F0, c, func_800209F0]
       # NEW LEVER: casting one pointer global to an `int` pinned to $a1 (t = (int)D_8009D278; *(unsigned
@@ -499,7 +571,8 @@ segments:
       # 24 byte-constant stores with the 6 constants hoisted; NEW LEVER: splitting the 0x4C read-modify-
       - [0x115D0, c, func_80020DD0]
       - [0x116FC, c, func_80020EFC]
-      - [0x11718, asm]
+      # lane1: func_80020F18 VRAM 0x80020F18 size 0x13C.
+      - [0x11718, c, func_80020F18]
       # func_80021054 — gate on D_8009D278->w4C bit 16, else return the
       # gp-relative signed byte D_8009CE3C. era -O2 -G8 (gp-relative global),
       # LINK_EXACT.
@@ -508,7 +581,14 @@ segments:
       - [0x11880, c, func_80021080]
       # byte-identical twin of func_80021080
       - [0x118D4, c, func_800210D4]
-      - [0x11928, asm]
+      # lane1: func_80021128 VRAM 0x80021128 size 0x150.
+      - [0x11928, c, func_80021128]
+      # Battle escape roll: level-ratio threshold vs rand()%100 (result code pair).
+      - [0x11A78, c, func_80021278]
+      # lane1: func_8002156C VRAM 0x8002156C size 0x178.
+      - [0x11D6C, c, func_8002156C]
+      # lane1: func_800216E4 VRAM 0x800216E4 size 0x16C.
+      - [0x11EE4, c, func_800216E4]
       # VOLUME-110: C leaf func_80021850 — VRAM 0x80021850, size 0x88
       # (34 words). Swap two 12-byte records selected by signed-byte indices.
       # Era -O2 -G0 matches on the first natural aggregate-copy phrasing.
@@ -520,17 +600,50 @@ segments:
       # (unsigned) to D_8009CE68 and -8 (signed) to D_8009CE6C; both
       # gp-relative at 0xF8/0xFC($gp). era -O2 -G8 (profile era_o2_g8),
       # LINK_EXACT. Mid-120D8 carve, C at 0x177D0 (0x28).
-      - [0x120D8, asm]
+      # lane1: func_800218D8 VRAM 0x800218D8 size 0x220.
+      - [0x120D8, c, func_800218D8]
+      # lane1: func_80021AF8 VRAM 0x80021AF8 size 0x254.
+      - [0x122F8, c, func_80021AF8]
       - [0x1254C, c, func_80021D4C]
-      - [0x125E0, asm]
+      # lane1: func_80021DE0 VRAM 0x80021DE0 size 0x158.
+      - [0x125E0, c, func_80021DE0]
+      # Battle turn step: face target, advance slot, fire end-of-round effects.
+      - [0x12738, c, func_80021F38]
+      # lane1: func_80022210 VRAM 0x80022210 size 0x184.
+      - [0x12A10, c, func_80022210]
+      # Battle phase advance: slot-walk, facing/sound pick from two pool tables (D_8001074C/D_80010760), 0x80000/0x100000 phase flags.
+      - [0x12B94, c, func_80022394]
+      - [0x13578, asm]
+      # Status-effect particle spawner (D_8009D278->f68 flags vs actor status word).
+      - [0x1357C, c, func_80022D7C]
+      # lane1: func_80023008 VRAM 0x80023008 size 0x124.
+      - [0x13808, c, func_80023008]
+      - [0x1392C, asm]
+      # Battle item-use effect switch (heal amounts, status toggles, clears).
+      - [0x14614, c, func_80023E14]
+      # restored after lane merge (row belongs to another agent)
+      - [0x14A50, c, func_80024250]
+      - [0x1523C, asm]
       - [0x15CBC, c, func_800254BC]
       # real `switch` on the command word; ERA_ASPSX_VER=2.30 is load-bearing - ASPSX 2.30 expands the a
       - [0x15D68, c, func_80025568]
       # matching C leaf
       - [0x15DE4, c, func_800255E4]
-      - [0x160CC, asm]
+      # Battle target cursor: cycle target on L/R, then draw the status panel for the mode.
+      - [0x160CC, c, func_800258CC]
+      - [0x163D8, asm]
       - [0x177D0, c, func_80026FD0]
-      - [0x177F8, asm]
+      # battle target highlight flash
+      - [0x177F8, c, func_80026FF8]
+      # Battle target highlight by attack shape (single / arc / all) with inline mark().
+      - [0x17DCC, c, func_800275CC]
+      # Petrify/fade status step (queue actor, fade D_8009CE68, clear 0x6000 flag).
+      - [0x18208, c, func_80027A08]
+      # battle enemy update
+      - [0x18514, c, func_80027D14]
+      - [0x18D74, asm]
+      # enemy death state step
+      - [0x19694, c, func_80028E94]
       # C leaf func_80029388 — VRAM 0x80029388, size 0x6C (27 words).
       # jal 2F658, then the same 7 x 220-byte SlotRecord in-use clear as
       # 2F9CC (unsigned char counter, sltiu 7, 3-word symbol store), gp
@@ -544,7 +657,20 @@ segments:
       # absolute (strip .extern sdata size) so RMW is 2-word lui/lw + lui/at
       # sw. C 0x1F0, resume 19DE4.s 0x6188 to 1FF6C.
       - [0x19BF4, c, func_800293F4]
-      - [0x19DE4, asm]
+      # lane1: func_800295E4 VRAM 0x800295E4 size 0x22C.
+      - [0x19DE4, c, func_800295E4]
+      # lane1: func_80029810 VRAM 0x80029810 size 0x1BC.
+      - [0x1A010, c, func_80029810]
+      - [0x1A1CC, asm]
+      # battle finisher sequence state machine
+      - [0x1B298, c, func_8002AA98]
+      # lane1: func_8002B0E8 VRAM 0x8002B0E8 size 0x1B4.
+      - [0x1B8E8, c, func_8002B0E8]
+      - [0x1BA9C, asm]
+      # func_8002F0B0 — battle death step (3-state D_8009CE74 machine over the D_8009D20C actor list). era -O2 -G8 with
+      # D_8009D20C/D_8009D254 absolute. LEVERS: 'info == 0' arm first; one volatile-qualified read of the +0x98 flag word
+      # after the |= 0x1000 store (retail reloads it).
+      - [0x1F8B0, c, func_8002F0B0]
       # matching C leaf
       - [0x1FB00, c, func_8002F300]
       # unregistered orphan in src/, verified at a default profile by orchestrator
@@ -587,7 +713,7 @@ segments:
       # two-instruction gap nop). Mid-20210 carve: prefix 0xB24, C 0x50,
       # resume 20D84.s 0xBC then existing 30640 C.
       - [0x20678, c, func_8002FE78]
-      - [0x20778, asm]
+      - [0x20778, c, func_8002FF78]
       - [0x2090C, c, func_8003010C]
       # matching C leaf
       - [0x20A20, c, func_80030220]
@@ -601,17 +727,44 @@ segments:
       # func_80030640 — RNG gate, VRAM 0x80030640, size 0xA0 (40 words).
       # era -O2 -G0. Mid-20210 carve: prefix 0xC30, C 0xA0, resume 20EE0.s.
       - [0x20E40, c, func_80030640]
-      - [0x20EE0, asm]
+      - [0x20EE0, c, func_800306E0]
+      - [0x21094, asm]
+      # Battle status panel mode dispatch (switch jtbl_80010E4C).
+      - [0x21CE4, c, func_800314E4]
+      - [0x21F60, asm]
+      - [0x2256C, c, func_80031D6C]
+      # func_80031E68 — per-target highlight sprites (DR_TPAGE+SPRT entries in D_8009E3B8[side][3]); era -O2 -G0.
+      # LEVERS: row+index pointer form (&(T[b] + i)->sp)->f (hoists the table bases into $s1/$s3 like func_80031D6C);
+      # count as a 2-bit bitfield (signed slt); the v0 = 224 store written in BOTH if/else arms (cross-jumped tail).
+      - [0x22668, c, func_80031E68]
+      # Battle panel gauge-pip sprites (D_8009E500 rows of 10 DR_TPAGE+SPRT).
+      - [0x2285C, c, func_8003205C]
+      # restored after lane merge (row belongs to another agent)
+      - [0x22BC8, c, func_800323C8]
+      # func_800325DC — ATB gauge: place the gauge sprite, count pending status commands (types 1/2/393) against the
+      # charge value, draw via func_800328DC. era -O2 -G0. LEVERS: unsigned short y; n computed before the sprite stores;
+      # row+index pointer form for the sprite; if/else-if ladder whose 'n--' tails cc1 cross-jumps like retail.
+      - [0x22DDC, c, func_800325DC]
+      - [0x22FD8, c, func_800327D8]
+      - [0x230DC, asm]
       # struct-array copy; pointer local for 4 of the 5 stores + the symbol-indexed form for the 5th, an
       - [0x23B5C, c, func_8003335C]
       # stride-28 struct array + gp byte decrement; patch 5 + forced-absolute index base
       - [0x23C30, c, func_80033430]
-      - [0x23CAC, asm]
+      # battle status-icon row
+      - [0x23CAC, c, func_800334AC]
       - [0x241A0, c, func_800339A0]
       - [0x24220, c, func_80033A20]
       # Phase 5FS-33A2C: D_8009D244 byte-flag setter, era -O2 -G0.
       - [0x2422C, c, func_80033A2C]
-      - [0x24240, asm]
+      # battle active-status bars
+      - [0x24240, c, func_80033A40]
+      # battle enemy HP digits
+      - [0x24904, c, func_80034104]
+      - [0x24FB4, c, func_800347B4]
+      # battle message/state ticker
+      - [0x2515C, c, func_8003495C]
+      - [0x255E0, c, func_80034DE0]
       # NEW LEVER: a zero-code `asm volatile("":"=r"(p):"0"(p))` barrier keeps &D_800B0CD8 in a register
       - [0x25710, c, func_80034F10]
       # Phase 5FG: search-and-clear over the 16-entry D_800A7624 table.
@@ -619,16 +772,18 @@ segments:
       # route through the gate; first leaf exercising the load path).
       # Mid-2422C carve: prefix 0x29C8, C 0x54, resume 26C48.s.
       - [0x257C4, c, func_80034FC4]
-      - [0x25838, asm]
+      # scene entity alloc
+      - [0x25838, c, func_80035038]
+      - [0x25D58, asm]
       - [0x26484, c, func_80035C84]
       - [0x26604, c, func_80035E04]
       - [0x26754, c, func_80035F54]
       # D_8009D20C list copy; the 0x18C link is reloaded per field
       - [0x2681C, c, func_8003601C]
-      - [0x268B4, asm]
+      - [0x268B4, c, func_800360B4]
       - [0x269F4, c, func_800361F4]
       - [0x26A54, c, func_80036254]
-      - [0x26AB8, asm]
+      - [0x26AB8, c, func_800362B8]
       - [0x26BF4, c, func_800363F4]
       # Phase 5FP-370A8: fixed-point quotient helper, era -O2 -G0.
       # Mid-26C48 carve: prefix 0xC60, C 0x14, resume 278BC.s.
@@ -643,7 +798,9 @@ segments:
       - [0x27634, c, func_80036E34]
       - [0x27658, c, func_80036E58]
       - [0x2767C, c, func_80036E7C]
-      - [0x2777C, asm]
+      - [0x2777C, c, func_80036F7C]
+      # signed product high half; mflo before mfhi via shift-copy fold
+      - [0x2788C, c, func_8003708C]
       - [0x278A8, c, func_800370A8]
       # Phase 5FQ-370DC: packet setup/submit wrapper, era -O2 -G0.
       # Mid-278BC carve: prefix 0x20, C 0x64, resume 27940.s.
@@ -652,7 +809,8 @@ segments:
       # Phase 5FR-37140: packet setup/submit twin, era -O2 -G0.
       - [0x27940, c, func_80037140]
       - [0x279A4, c, func_800371A4]
-      - [0x279B0, asm]
+      # Damage-popup table reset + two DR_TPAGE/SPRT/TILE packets per buffer.
+      - [0x279B0, c, func_800371B0]
       - [0x27C54, c, func_80037454]
       # stride-56 table scan; patch 5 for the $at-with-%lo indexed load
       - [0x27C6C, c, func_8003746C]
@@ -680,7 +838,10 @@ segments:
       - [0x29140, c, func_80038940]
       # two func_80071A74 calls + `for(;;)` when i==1; patch 5 for the indexed table load
       - [0x29154, c, func_80038954]
-      - [0x291DC, asm]
+      # func_800389DC — load save slot record: retry the CD read (func_8006E6A8/func_8006E7E8, -1 = retry) of the
+      # D_80093176 extent, then copy slot*328+1.. bytes into the D_8009ECD8 record. era -O2 -G0; one running index k++.
+      - [0x291DC, c, func_800389DC]
+      - [0x293C0, c, func_80038BC0]
       # func_80038CE4 — two-level indexed byte getter: base = *D_80091A28;
       # p = base + (a0 & 0xFF); v = p[0x1D]; return base[v + 4]. era -O2 -G0,
       # LINK_EXACT (10 words). Carved from the 0x29154 asm tail:
@@ -694,23 +855,60 @@ segments:
       - [0x2951C, c, func_80038D1C]
       - [0x29548, c, func_80038D48]
       - [0x29574, asm]
+      # func_80039184 — font glyph code -1 (floor 3 -> reset to 1), reload the page, place the cursor on the first slot of
+      # class (code%10 != 0). era -O2 -G0. Same helpers/levers as func_80039310/func_8003944C.
+      - [0x29984, c, func_80039184]
       - [0x29AEC, c, func_800392EC]
-      - [0x29B10, asm]
+      # func_80039310 — font glyph code +1 (cap 70 -> D_80091A20 error), reload the page and place the cursor on the first
+      # class-2 slot. era -O2 -G0. LEVERS: pointer local k = &D_80091A1D; shared find_pos inline (see func_8003944C).
+      - [0x29B10, c, func_80039310]
+      # func_8003944C — set font glyph by key code: range checks (D_80091A20/D_80091A1D error flags), load the glyph page
+      # via func_800389DC(D_80091A1E = D_8009EE22[key]), place the cursor on the first slot of class (key%10 != 0) or 3.
+      # era -O2 -G0. LEVERS: one inline find_pos(cls) holding both searches with a SHARED i; int result stored to the
+      # byte cursor (reload without barrier); flag bytes as separate globals (a struct base gets cached in $s0).
+      - [0x29C4C, c, func_8003944C]
+      # func_80039678 — font glyph cursor step: mark-class glyphs dispatch to func_80039310/func_80039184, keys 20-23 move
+      # the D_80091A1C cursor (same-class search left/right); returns the current glyph class. era -O2 -G0.
+      # LEVERS: inline cur_attr() (data loaded before cur); empty register barrier on the class byte c (zero-extension re-derived per use).
+      - [0x29E78, c, func_80039678]
+      # func_80039898 — reset the font cursor to the first class-3 glyph slot; returns the glyph class. era -O2 -G0.
+      # LEVERS: D_80091A1C as a struct (cur at +3, data at +0xC); inline find_slot with goto found/done (its parameter
+      # copies give the 16-byte frame); unsigned char sel; the int result stored to the byte cursor is not forwarded
+      # (retail's reload without any barrier).
+      - [0x2A098, c, func_80039898]
       # Tier-2 S: reset three byte states and one pointer-sized state word;
       # five direct callers, era -O2 -G0, exact first phrasing.
       # Carve: 29574 prefix 0xBFC, C 0x2C, resume 2A19C.s 0x2C3C.
       - [0x2A170, c, func_80039970]
-      - [0x2A19C, asm]
+      # strength-reduce off
+      - [0x2A19C, c, func_8003999C]
+      - [0x2A374, c, func_80039B74]
+      # schedule-insns off
+      - [0x2A524, c, func_80039D24]
+      # schedule-insns off
+      - [0x2A6D4, c, func_80039ED4]
+      - [0x2A888, asm]
+      # func_8003AF14 — render-object update: flag-word (0x9C) driven reset/move/fade/colour steps then draw via
+      # func_8003C0B4. era -O2 -G0. The repeated 'if (f9C & 8) draw' tails are cross-jumped by cc1 like retail.
+      - [0x2B714, c, func_8003AF14]
+      - [0x2B944, asm]
       # matching C leaf
       - [0x2BF08, c, func_8003B708]
       - [0x2C17C, asm]
       # Volume 97: reciprocal-byte initializer; era -O2 -G0 with the
       # sanctioned ASPSX signed-division guard expansion.
       - [0x2CDD8, c, func_8003C5D8]
-      - [0x2CE38, asm]
+      # func_8003C638 — render-object fade tick (0x8C counter state machine, D_8009CDA0 colour word). era -O2 -G8.
+      # LEVER: tail order b94/b95/b96 adds before the c8C decrement.
+      - [0x2CE38, c, func_8003C638]
+      # Actor colour fade step (timer/dur, per-channel step, D_8009CDA0 light colour).
+      - [0x2D018, c, func_8003C818]
       # matching C leaf
       - [0x2D2EC, c, func_8003CAEC]
-      - [0x2D4B0, asm]
+      # null-guarded record walk
+      - [0x2D4B0, c, func_8003CCB0]
+      - [0x2D6F8, c, func_8003CEF8]
+      - [0x2D850, asm]
       # Phase 5AJ: C leaf func_8003D82C — VRAM 0x8003D82C, size 0x8.
       # File span 0x2E02C–0x2E034 exclusive. Return-1 stub (jr; addiu $v0,1).
       # Prefix size 0x2B620 (= 0x2E02C - 0x2A0C); contiguous — no ROM holes.
@@ -735,13 +933,16 @@ segments:
       - [0x2E7D0, c, func_8003DFD0]
       # unregistered orphan in src/, verified at a default profile by orchestrator
       - [0x2E7D8, c, func_8003DFD8]
-      - [0x2E8A4, asm]
+      # func_8003E0A4 — 1/3 selector (3 when (*a0)[2]==2) + two short stores; era -O2 -G0.
+      # LEVER: register int v asm("$2") = 2 reused as the compare constant and the result.
+      - [0x2E8A4, c, func_8003E0A4]
       # Volume campaign: C leaf func_8003E0D0 — VRAM 0x8003E0D0,
       # file span 0x2E8D0–0x2E8FC exclusive, size 0x2C.
       - [0x2E8D0, c, func_8003E0D0]
       # NEW LEVER: `i++` BEFORE the pointer advance in the loop body fixes the biv emission order so the
       - [0x2E8FC, c, func_8003E0FC]
       - [0x2E988, asm]
+      - [0x2EC74, c, func_8003E474]
       - [0x2EDF0, c, func_8003E5F0]
       - [0x2EE0C, asm]
       # Phase 5EY: C leaf func_8003E610 — VRAM 0x8003E610, size 0x70 (28 words).
@@ -768,27 +969,42 @@ segments:
       # in-range words retail keeps absolute; s2/s0/s1 pins; empty asm
       # barrier keeps addiu s0,s2,-0x12. LINK_EXACT. Resume 2FF58.s.
       - [0x2F2C8, asm]
+      # pad input step
+      - [0x2F304, c, func_8003EB04]
+      - [0x2F874, asm]
       # read `*s | 2` BEFORE the D_8009D1A0 RMW; &D_800B0CD8 kept in a register by the zero-code asm bar
       - [0x2FAFC, c, func_8003F2FC]
       - [0x2FBC4, c, func_8003F3C4]
       - [0x2FF58, asm]
+      # Save-block serializer: memcpy fields to the D_800A0ED0 cursor (mirror of func_8003FBD8).
+      - [0x30000, c, func_8003F800]
+      # Save-block deserializer: memcpy fields from the D_800A0ED0 cursor (builtin block moves).
+      - [0x303D8, c, func_8003FBD8]
       - [0x307AC, c, func_8003FFAC]
       - [0x307BC, c, func_8003FFBC]
-      - [0x307CC, asm]
+      - [0x307CC, c, func_8003FFCC]
+      - [0x3086C, c, func_8004006C]
+      - [0x30A10, c, func_80040210]
       # CRC16-CCITT; crc must be `int` (retail never masks to 16 bits)
       - [0x30B54, c, func_80040354]
       # 4x func_800726F4 then 3 zero stores in reverse address order
       - [0x30BC8, c, func_800403C8]
       # twin of func_800403C8
       - [0x30C38, c, func_80040438]
-      - [0x30CA8, asm]
+      - [0x30CA8, c, func_800404A8]
       # matching C leaf
       - [0x30DA4, c, func_800405A4]
       # func_80042770 — stride-1048 row byte getter, low bit: index address
       # needs the 3-word $at form that keeps the %lo displacement (maspsx
       # patch 5, MASPSX_SYMBOL_AT_TEMP=1, profile era_o2_g0_symbol_at_temp).
       - [0x311B4, c, func_800409B4]
-      - [0x31380, asm]
+      # Save-file image builder: header, blocks, func_8003F800, CRC-16/CCITT over 0x2000 bytes.
+      - [0x31380, c, func_80040B80]
+      # memcard abort active op
+      - [0x31780, c, func_80040F80]
+      - [0x31908, asm]
+      # memcard slot select
+      - [0x32820, c, func_80042020]
       - [0x32970, c, func_80042170]
       - [0x32A28, c, func_80042228]
       # save/Save_LoadCardFileIntoRuntime. Oracle -O2 -G0 confirmed. NEW LEVER: a byte-aligned `struct {
@@ -799,7 +1015,7 @@ segments:
       - [0x32CB4, c, func_800424B4]
       # Clear-call plus 15 absolute `sw` globals; default maspsx absolute-store expansion; the -1 is mat
       - [0x32D38, c, func_80042538]
-      - [0x32DDC, asm]
+      - [0x32DDC, c, func_800425DC]
       - [0x32F70, c, func_80042770]
       # Stride-0x418 record sweep. `for (p = SYM; p < SYM + 0x830; p += 0x418)` with p[1] and *(int *)(p
       - [0x32F98, c, func_80042798]
@@ -857,7 +1073,7 @@ segments:
       - [0x334B8, c, func_80042CB8]
       # Fade-ramp writer. NEW LEVER: the `for (p = SYM; p < SYM + 0xF; p++)` form (bound recomputed from
       - [0x334C4, c, func_80042CC4]
-      - [0x33540, asm]
+      - [0x33540, c, func_80042D40]
       - [0x336D0, c, func_80042ED0]
       - [0x336DC, c, func_80042EDC]
       # func_80042EDC — seed the D_8009CEE0 group (D_8009CED8=1, D_8009CEE4=1,
@@ -884,7 +1100,8 @@ segments:
       # File span 0x340C0–0x340E0 exclusive. First arg+return leaf: a0 & 0x1FF
       # stored to gp global, zero -> re-store 0x1FF, return 0 in jr delay slot.
       # Mid-33A4C carve: prefix 0x674, C 0x20, ends at existing 438E0 carve (no resume).
-      - [0x33A4C, asm]
+      # Battle command availability check (MP cost / grade / gp flag D_8009CF3C).
+      - [0x33A4C, c, func_8004324C]
       # band-classifier compare chain; maspsx patch 6 fills the bne slot with the following slti (regist
       - [0x33C74, c, func_80043474]
       # Save-slot entry renderer - LINK_EXACT on the FIRST attempt with the oracle's -O2 -G8. A real `sw
@@ -902,13 +1119,20 @@ segments:
       - [0x341D8, c, func_800439D8]
       # Status-panel draw; a `p = &D_800C0E0A;` pointer local gives retail's single materialised base fo
       - [0x3430C, c, func_80043B0C]
-      - [0x34464, asm]
+      - [0x34464, c, func_80043C64]
+      - [0x345A4, asm]
       - [0x34974, c, func_80044174]
-      - [0x34A74, asm]
+      - [0x34A74, c, func_80044274]
+      # func_80044444 — item-list window input handler (confirm/use with the class-selected handler pointer, move-mode swap,
+      # cancel routing by window id). era -O2 -G8. LEVERS: 'call(); r = 1;' order (no cross-jump); single stack store of v via x;
+      # shared 'out: return r'.
+      - [0x34C44, c, func_80044444]
       - [0x34FF0, c, func_800447F0]
       # menu/Menu_DrawAmmoTypeHeader. Oracle -O2 -G8 confirmed. Levers: `if (k != 0xA) {...} else {...}`
       - [0x35124, c, func_80044924]
-      - [0x3530C, asm]
+      # func_80044B0C — item action-menu handler: 4-action switch from D_80092234[menu][row] (use/move/equip/discard),
+      # shared done/fail tails. era -O2 -G8.
+      - [0x3530C, c, func_80044B0C]
       - [0x355CC, c, func_80044DCC]
       - [0x35614, c, func_80044E14]
       - [0x35698, c, func_80044E98]
@@ -919,18 +1143,28 @@ segments:
       # Four-way event handler; `-func_8005E120()` gives the `negu`.
       - [0x35AC0, c, func_800452C0]
       - [0x35BE8, c, func_800453E8]
-      - [0x35C2C, asm]
+      - [0x35C2C, c, func_8004542C]
       # HP/MP panel: three `x = p[b] + *(short *)(p + h); if (x >= 0x3E8) x = 0x3E7;` clamps; cc1 cross-
       - [0x35D1C, c, func_8004551C]
-      - [0x35E70, asm]
+      # Equipment stat comparison panel (old vs new ATK/DEF/etc, clamp 999).
+      - [0x35E70, c, func_80045670]
+      # func_80045A98 — equip-slot panel: sync the preview selection (windows 13/16 or the equipped weapon/armor), draw the
+      # compare view or the three stat rows. era -O2 -G8.
+      - [0x36298, c, func_80045A98]
+      - [0x3650C, c, func_80045D0C]
       # Two-object construct, flag OR, dispatch. NEW LEVER: explicit temps `t = *(int *)(q+0x64); flag =
       - [0x366E4, c, func_80045EE4]
-      - [0x367A4, asm]
+      # func_80045FA4 — item detail panel: position the panel window (relative to window 6/11 or the list row), draw the
+      # two stat values (2-digit / clamped 3-digit). era -O2 -G8. LEVERS: inner subtractions kept in locals (y, u) so fold
+      # cannot reassociate them; own dy local for the list-row arm; argument pieces computed x, z, y.
+      - [0x367A4, c, func_80045FA4]
       - [0x36A0C, c, func_8004620C]
       - [0x36B34, c, func_80046334]
       # main/Menu_StepSkillList. Oracle -O2 -G8 confirmed. Needs the explicit `flag = D_8009CF1C;` temp 
       - [0x36B78, c, func_80046378]
-      - [0x36D74, asm]
+      # G8
+      - [0x36D74, c, func_80046574]
+      - [0x36EC0, asm]
       - [0x372BC, c, func_80046ABC]
       # Event handler with a 0/1 result local set in three jal delay slots.
       - [0x37358, c, func_80046B58]
@@ -945,7 +1179,7 @@ segments:
       # Two-layout HUD draw over four $at-indexed byte tables; cc1 cross-jumps the shared trailing call.
       - [0x37840, c, func_80047040]
       - [0x379BC, c, func_800471BC]
-      - [0x379E4, asm]
+      - [0x379E4, c, func_800471E4]
       # Tier-2 B: independently referenced callback-registration wrapper
       # for func_80050280; era -O2 -G0, exact first phrasing.
       - [0x37B2C, c, func_8004732C]
@@ -984,10 +1218,14 @@ segments:
       - [0x38748, c, func_80047F48]
       # Three-arg event handler; `func_80059F08(SYM == 0)` gives the `sltiu $a0,$a0,1`.
       - [0x387E0, c, func_80047FE0]
-      - [0x388AC, asm]
+      - [0x388AC, c, func_800480AC]
       # Six-call draw sequence.
       - [0x389FC, c, func_800481FC]
       - [0x38A54, asm]
+      # func_80048654 — open the item list screen: three window/list pairs (ids 12/13/14) with handler slots,
+      # initial cursor via func_8005382C. era -O2 -G8. LEVER: shared handler addresses as locals pinned
+      # h1 asm("$17") = func_80044444, h2 asm("$16") = func_80058030.
+      - [0x38E54, c, func_80048654]
       # Event handler with a 3-case compare-tree switch on a call result.
       - [0x39038, c, func_80048838]
       - [0x39118, asm]
@@ -1005,9 +1243,14 @@ segments:
       # Event handler sharing func_800490B0's 7-entry lhu->sh copy loop; same ERA_ASPSX_VER=2.30 require
       - [0x39B54, c, func_80049354]
       - [0x39CAC, asm]
+      # menu equip slot select step 2
+      - [0x3A8C8, c, func_8004A0C8]
       # Object construct + 32-byte record copy. NEW LEVER: a byte-aligned struct (`typedef struct { char
       - [0x3AD70, c, func_8004A570]
-      - [0x3AECC, asm]
+      # func_8004A6CC — bonus-point spend panel draw: stat rows (base byte + bonus short, clamped 999) for rows 0-2, or the
+      # level/exp view for rows >= 3. era -O2 -G8.
+      - [0x3AECC, c, func_8004A6CC]
+      - [0x3B1A0, asm]
       # Two-object construct with crossed field stores.
       - [0x3B59C, c, func_8004AD9C]
       - [0x3B61C, c, func_8004AE1C]
@@ -1021,7 +1264,7 @@ segments:
       - [0x3B93C, c, func_8004B13C]
       # Six-icon highlight draw; each highlight is `func_8005EB58((sel == K && flag != 0) ? 0 : 1);` - t
       - [0x3BA14, c, func_8004B214]
-      - [0x3BB94, asm]
+      - [0x3BB94, c, func_8004B394]
       - [0x3BD34, c, func_8004B534]
       # Tier-2 B: independently referenced adjacent wrapper for
       # func_800504BC; era -O2 -G0, exact first phrasing.
@@ -1035,7 +1278,9 @@ segments:
       - [0x3BF0C, asm]
       # Object construct plus a data-symbol field store.
       - [0x3C10C, c, func_8004B90C]
-      - [0x3C170, asm]
+      # func_8004B970 — EXP review panel step: count D_8009CFE8 up to D_8009CFEC, level lookup, 60-frame banner, draw three rows.
+      # era -O2 -G8. LEVER: 'else rem = 0' (a pre-initialised rem gets pulled into an earlier jal slot).
+      - [0x3C170, c, func_8004B970]
       # func_8004BC80 — create handle (0x16,0,0,0) and install func_8004BCB4
       # at +0x30. era -O2 -G0, LINK_EXACT.
       - [0x3C380, c, func_8004BB80]
@@ -1061,7 +1306,9 @@ segments:
       # Phase 5EJ: constant handle construction and dispatch.
       - [0x3CD94, c, func_8004C594]
       - [0x3CDDC, c, func_8004C5DC]
-      - [0x3CE08, asm]
+      # menu help text by help id
+      - [0x3CE08, c, func_8004C608]
+      - [0x3D450, c, func_8004CC50]
       # Two-call constant forwarding wrapper: era -O2 -G0.
       # The preceding asm span ends at this callable 10-word leaf.
       - [0x3D5AC, c, func_8004CDAC]
@@ -1076,7 +1323,7 @@ segments:
       - [0x3D830, c, func_8004D030]
       # Menu-object construct with a guarded field fixup and a trailing guarded init pair.
       - [0x3D884, c, func_8004D084]
-      - [0x3D98C, asm]
+      - [0x3D98C, c, func_8004D18C]
       - [0x3DA7C, c, func_8004D27C]
       - [0x3DA88, c, func_8004D288]
       # Guarded two-arg call.
@@ -1113,12 +1360,23 @@ segments:
       - [0x3E564, c, func_8004DD64]
       # Two-arm draw + countdown loop. NEW LEVERS: (a) an unused 8-byte local (`char pad[8];`) reproduce
       - [0x3E774, c, func_8004DF74]
-      - [0x3E874, asm]
+      # func_8004E074 — name-entry window handler (cursor move across windows 23/24/25, glyph pick, cancel/confirm with the
+      # all-blank check). era -O2 -G8 with D_800B0CD8 absolute. LEVERS: nested signed range checks with goto done; w pinned $16;
+      # 'ok &= (*q++ == 15)' blank scan.
+      - [0x3E874, c, func_8004E074]
+      # Sub-menu input handler (confirm/scroll between task pages 0x17-0x19).
+      - [0x3EAE4, c, func_8004E2E4]
+      # func_8004E704 — open the equipment screen: reuse/create window 50, then list windows 51/52 with handler slots,
+      # mode-dependent category mask (0x3803FE / 0xF400), optional window 19. era -O2 -G8.
+      - [0x3EF04, c, func_8004E704]
       - [0x3F14C, c, func_8004E94C]
       - [0x3F170, c, func_8004E970]
       # Tier-2 callback wrapper func_8004EF30.  Former 0x3F17C asm span:
       # prefix 0x5B4, C 0x28, resume 0x4F0 (0x5B4 + 0x28 + 0x4F0 = 0xACC).
-      - [0x3F17C, asm]
+      # func_8004E97C — item screen (re)open: rebuild window 0 with the popcount of the D_8009CEF0 category mask, list window 1
+      # with handlers, restore the saved cursor. era -O2 -G8. LEVERS: if (D_8009CF98) {...} else func_800512AC(9, 0);
+      # window 1 created into a fresh variable (nw).
+      - [0x3F17C, c, func_8004E97C]
       # gp store, callback register, countdown draw loop (triplet with func_8004FCF8 / func_8004FDE8 / f
       - [0x3F3CC, c, func_8004EBCC]
       # func_8004EC3C / func_8004EC78 — select slot 0/1, then register the
@@ -1127,7 +1385,10 @@ segments:
       - [0x3F474, asm]
       - [0x3F478, c, func_8004EC78]
       - [0x3F4B0, asm]
-      - [0x3F4B4, asm]
+      # func_8004ECB4 — equipment-screen top window handler: 5-way switch (jtbl_80011144) on the selected row
+      # (row 2 remapped to 4 in mode 1); stat snapshot into D_800A1888[4]. era -O2 -G8 + dispatch fold (new profile).
+      # LEVERS: shared 'show:' tail with the message id; cases break to one 'return 1'; fresh window variable for window 59.
+      - [0x3F4B4, c, func_8004ECB4]
       - [0x3F730, c, func_8004EF30]
       # Adjacent Tier-2 callback wrapper func_8004F2E4.  Former 0x3F758 span:
       # prefix 0x38C, C 0x28, resume 0x13C (0x38C + 0x28 + 0x13C = 0x4F0).
@@ -1175,7 +1436,8 @@ segments:
       - [0x40210, c, func_8004FA10]
       # Battle-start seed (short form).
       - [0x402F8, c, func_8004FAF8]
-      - [0x40348, asm]
+      # LINK_EXACT on swept stable source
+      - [0x40348, c, func_8004FB48]
       # Bound-checked forward; the `return 0` tail supplies the `addu $v0,$zero,$zero` delay slot.
       - [0x4043C, c, func_8004FC3C]
       # Three-call chain. NEW LEVERS: `register int x asm("$16"/"$17"/"$18")` pins reproduce retail's s0
@@ -1304,11 +1566,13 @@ segments:
       - [0x41884, c, func_80051084]
       # 0x24-byte record shift-down (cc1 movstrsi loop); LEVER: write the bound twice (`while (p < &D_80
       - [0x41898, c, func_80051098]
-      - [0x4192C, asm]
+      - [0x4192C, c, func_8005112C]
       - [0x41A44, c, func_80051244]
       # while (D_800A1AA0 < D_8009D014) func_8005112C(); the symbol must be used directly in the guard (
       - [0x41A58, c, func_80051258]
-      - [0x41AAC, asm]
+      # func_800512AC — battle item-command switch (13-entry jtbl_80011170): result codes into D_8009D010, weapon/armor
+      # record copies into D_8009D1E0, grade bitfield update; era -O2 -G8 + dispatch fold + D_8009D254 absolute (new profile).
+      - [0x41AAC, c, func_800512AC]
       - [0x41CF8, c, func_800514F8]
       - [0x41D04, c, func_80051504]
       # NEW DURABLE LEVER: ERA_ASPSX_VER=2.30 removes maspsx's 'nop between load dest and $at expansion'
@@ -1335,7 +1599,10 @@ segments:
       - [0x4206C, c, func_8005186C]
       # func_80051510 body + func_800574A8()/func_80051980(0,a0) tail (goto-done for the three early exi
       - [0x420A8, c, func_800518A8]
-      - [0x42180, asm]
+      # Item stat block builder (clamps, isqrt, grade, 20-case attribute switch; la-form DISPATCH_FOLD).
+      - [0x42180, c, func_80051980]
+      # restored after lane merge (row belongs to another agent)
+      - [0x424C4, c, func_80051CC4]
       # (D_800A1B30+0x14) * *(unsigned short*)func_8005DBAC(a0) / 20 (inline magic divide)
       - [0x425F8, c, func_80051DF8]
       # Phase 5AQ: C leaf func_80051E48 — VRAM 0x80051E48, size 0x10.
@@ -1346,7 +1613,8 @@ segments:
       # Preceding 420A8.s is 0x5A0; resume 42658.s is 0x968.
       - [0x42648, c, func_80051E48]
       - [0x42658, c, func_80051E58]
-      - [0x42664, asm]
+      # Item stat decoder: clamp/isqrt fields + 17-case attribute switch (la-form DISPATCH_FOLD).
+      - [0x42664, c, func_80051E64]
       # aya/Aya_StatDerivation. Oracle -G0 hint was right (-G8 does not even link). Levers: int buf[2] f
       - [0x4298C, c, func_8005218C]
       # func_8005B91C(3,D_800C0E2E,&tmp,0) then func_8005DBAC(tmp+D_800A1B3C); two guarded out-params
@@ -1447,7 +1715,10 @@ segments:
       - [0x437CC, c, func_80052FCC]
       # id dispatcher; LEVERS: a single `res` local initialised to 0 (retail clears $a1 in the guard del
       - [0x43868, c, func_80053068]
-      - [0x43928, asm]
+      # func_80053128 — rebuild the item bit-3 'in use' flags over D_800C0EAC[0x80] from the
+      # D_800C1F80 list and the D_800923D8 ranges; era -O2 -G0. LEVERS: 'i = 0;' before the for-init
+      # 'q = D_800C1F80' plus register short *q asm("$5").
+      - [0x43928, c, func_80053128]
       # CROSS-JUMP FINDING (this closed 6 leaves I had wrongly written off as a cc1 frontend limit): whe
       - [0x43AB4, c, func_800532B4]
       # dispatcher - the goto-done cross-jump form plus the `w` copy local (see result_band3.json func_8
@@ -1456,17 +1727,19 @@ segments:
       - [0x43BD4, c, func_800533D4]
       # GP-relative halfword table getter: era -O2 -G8.
       - [0x43CCC, c, func_800534CC]
-      - [0x43CE4, asm]
+      # default O2
+      - [0x43CE4, c, func_800534E4]
       # if(a0[5]&0x10){tbl=D_800C20A4; if(a0[6]==9) tbl+=0x10;} else tbl=func_8005DC9C(a0[4]-1); func_80
       - [0x43E48, c, func_80053648]
       # Decremented record lookup and byte-6 getter: era -O2 -G0.
       - [0x43EB8, c, func_800536B8]
-      - [0x4402C, asm]
+      # drop unused 8-byte frame slot
+      - [0x4402C, c, func_8005382C]
       # item/Inv_InsertItem. Free-slot scan over D_800C0EAC (0x20 stride), 32-byte unaligned struct copy
       - [0x44168, c, func_80053968]
       # item/Inv_InsertItem. BIG NEW RUNG: -fno-schedule-insns took this from 18 word mismatches to 1 in
       - [0x44348, c, func_80053B48]
-      - [0x4452C, asm]
+      - [0x4452C, c, func_80053D2C]
       # LEVERS: separate `u` (raw lhu) and `v` (result) locals reproduce retail's $v1/$v0 split; loop bo
       - [0x4466C, c, func_80053E6C]
       # count of func_8005415C(i)==a0 over D_8009D050. NOTE: retail's frame is 0x28, not the 0x20 cc1 em
@@ -1484,24 +1757,30 @@ segments:
       - [0x44A40, c, func_80054240]
       - [0x44A88, c, func_80054288]
       - [0x44A94, c, func_80054294]
-      - [0x44AA0, asm]
+      - [0x44AA0, c, func_800542A0]
+      - [0x44BCC, c, func_800543CC]
       # item/Inv_RandomSelectionText. Two inlined dispatch loops counting set mask bits, plus three list
       - [0x44D20, c, func_80054520]
       # item/Inv_RandomSelectionText. Filter loop + a lagged-Fibonacci PRNG refill + an indexed pick. Le
       - [0x4505C, c, func_8005485C]
       # item/Inv_RandomSelectionText. Four strcpy and two strcat blocks over D_800A1B50, all written as 
       - [0x45288, c, func_80054A88]
-      - [0x454F8, asm]
+      - [0x454F8, c, func_80054CF8]
+      - [0x4564C, c, func_80054E4C]
+      - [0x45758, asm]
       # item/Inv_RollRandomItemType. Two more inlined copies of the PRNG-refill block. Levers: SEPARATE 
       - [0x45BA4, c, func_800553A4]
       # bit-scan of D_800C0E24 into the short table D_800A1D9C; `extern int SYM[]` keeps the far word ab
       - [0x45E10, c, func_80055610]
-      - [0x45E68, asm]
+      - [0x45E68, c, func_80055668]
       # func_800556E8/58E08 — signed range-gated short-table getters: reject
       # a0<0 and a0>=gp-limit-6, else D_800A1D9C/D_800A1E00[a0]. era -O2 -G8
       # makes the limits gp-relative. LINK_EXACT each.
       - [0x45EE8, c, func_800556E8]
-      - [0x45F24, asm]
+      - [0x45F24, c, func_80055724]
+      - [0x45F60, asm]
+      # gp-relative table walk
+      - [0x46614, c, func_80055E14]
       # Volume campaign: gp-backed bitset setter, era -O2 -G8.
       - [0x467B4, c, func_80055FB4]
       - [0x467E0, c, func_80055FE0]
@@ -1519,14 +1798,21 @@ segments:
       - [0x47440, c, func_80056C40]
       # two inlined copies of the func_80053648 table-select over D_800A1F94 / D_800A1FB4
       - [0x477B8, c, func_80056FB8]
-      - [0x47894, asm]
+      # func_80057094 — commit the edited weapon/armor records (D_800A1F94/D_800A1FB4) with the mod-slot stat clamp, then
+      # notify func_800512AC(5|7) for the equipped weapon. era -O2 -G8. LEVERS: CAP(a) = a >= 1000 ? 999 : a (no MIN fold);
+      # resolver in the goto-done form with w = x; items addressed through the D_800C0E00 struct.
+      - [0x47894, c, func_80057094]
+      - [0x47CA8, c, func_800574A8]
+      # id lookup; frame pad; eight in blez delay
+      - [0x47E54, c, func_80057654]
       # LEVER: retail stores p[5] TWICE - `v=p[5]&0xBF; p[5]=v; if(!a1) v|=0x40; p[5]=v;` - the duplicat
       - [0x47FE0, c, func_800577E0]
-      - [0x48034, asm]
+      - [0x48034, c, func_80057834]
+      - [0x481D4, c, func_800579D4]
       # GP-relative halfword take-and-clear helper: era -O2 -G8.
       - [0x48370, c, func_80057B70]
       - [0x48410, c, func_80057C10]
-      - [0x48454, asm]
+      - [0x48454, c, func_80057C54]
       - [0x48518, c, func_80057D18]
       # slot teardown; LEVERS: `int w = *e; v = w;` gives retail's load-then-copy; D_800C0E22 must be a 
       - [0x48530, c, func_80057D30]
@@ -1540,7 +1826,11 @@ segments:
       # both knobs are load-bearing (no patch = 9 mismatches, -G0 = 14).
       # LINK_EXACT (16 words). The preceding 0x486D8 asm was empty;
       # C 0x3C, closes exactly at the next span 0x48714.
-      - [0x48714, asm]
+      - [0x48714, c, func_80057F14]
+      # func_80058030 — swap two inventory entries between the stock list D_800A1FD4 (13) and the carried list D_8009D048
+      # (14): XOR swap, equipped-slot index fixups, busy/special-item refusals. era -O2 -G8 with D_800C0E20/E22 absolute (new
+      # profile). LEVERS: 'st = D_800A1FD4' base local for the stock-side swaps; bs asm("$3") for p; shared out: return r.
+      - [0x48830, c, func_80058030]
       # dispatcher inlined + the D_800C0E48 re-init and func_80053B48; goto-done + `w` copy + `goto noto
       - [0x48B3C, c, func_8005833C]
       # item/Inv_InventoryImport. The dispatch block inlined TWICE (the original C calls a static helper
@@ -1549,7 +1839,7 @@ segments:
       - [0x48E70, c, func_80058670]
       # item/Inv_InventoryImport. Oracle -G8 hint correct first try.
       - [0x490EC, c, func_800588EC]
-      - [0x492A8, asm]
+      - [0x492A8, c, func_80058AA8]
       # same dispatcher via a table lookup; needs the goto-done form PLUS a second local `w = v;` used o
       - [0x493BC, c, func_80058BBC]
       # item/Inv_InventorySwap. Twin of func_800588EC.
@@ -1557,7 +1847,10 @@ segments:
       # func_80058E08 — twin of func_800556E8 with limit D_8009D044 and table
       # D_800A1E00. era -O2 -G8, LINK_EXACT.
       - [0x49608, c, func_80058E08]
-      - [0x49644, asm]
+      # same lookup; bit 0x20
+      - [0x49644, c, func_80058E44]
+      - [0x497EC, asm]
+      - [0x49D34, c, func_80059534]
       # item/Inv_ItemActions. THREE inlined dispatch blocks (two reaching D_800BEEAC as (int)D_800C0E22 
       - [0x49E8C, c, func_8005968C]
       # item/Inv_ArmorCapacity. Dispatch block again, this time anchored on D_800C0E22: retail derives D
@@ -1573,7 +1866,8 @@ segments:
       - [0x4B7FC, c, func_8005AFFC]
       # sort comparator; a real `switch` for the 3 field-offset cases, and `goto one;` to put the `retur
       - [0x4B924, c, func_8005B124]
-      - [0x4BA48, asm]
+      - [0x4BA48, c, func_8005B248]
+      - [0x4BBA4, c, func_8005B3A4]
       # item/Inv_CompareItemsForSort. switch(a0) with cases 0/1/2 compiles to retail's comparison tree a
       - [0x4BD00, c, func_8005B500]
       # NEW LEVER: writing the D_8009D0BC store in BOTH arms lets post-reload cross-jumping place the si
@@ -1584,7 +1878,8 @@ segments:
       - [0x4C09C, c, func_8005B89C]
       # binary search idx=0x40 step=0x20; `if(key>=*p) idx+=step else if(key<p[-1]) idx-=step else step=
       - [0x4C0A8, c, func_8005B8A8]
-      - [0x4C11C, asm]
+      - [0x4C11C, c, func_8005B91C]
+      - [0x4C278, c, func_8005BA78]
       # func_8005DB8C() table + the 5B8A8 binary search + `key - p[-1]` tail
       - [0x4C3E4, c, func_8005BBE4]
       - [0x4C498, c, func_8005BC98]
@@ -1597,12 +1892,12 @@ segments:
       # Same shape as 5AR/5AS; plain -O1 matches (MIPS-I load-delay).
       # Mid-4C4B0 carve: also 5E884 @ 4F084 and 6EBD4 @ 5F3D4 (sizes in build_us.sh).
       - [0x4C4B0, c, func_8005BCB0]
-      - [0x4C4BC, asm]
+      - [0x4C4BC, c, func_8005BCBC]
       # same `&&` loop lever + pin p=$3; LEVER: writing BOTH the loop bound and the post-loop test as th
       - [0x4C510, c, func_8005BD10]
       # same `&&` loop lever; pins p=$4 i=$3; `r = (0 < i); p--;` then the guarded double 0xFF backfill
       - [0x4C594, c, func_8005BD94]
-      - [0x4C61C, asm]
+      - [0x4C61C, c, func_8005BE1C]
       - [0x4C6DC, c, func_8005BEDC]
       # Volume campaign: gp-selected pointer into D_800C0DE0; size 0x20,
       # era -O2 -G8.
@@ -1627,10 +1922,19 @@ segments:
       # era -O2 -G8.
       # frame tick; LEVER: `goto fail;` puts the error arm at the END, matching retail's `bnez` to a tra
       - [0x4CD94, c, func_8005C594]
-      - [0x4CE88, asm]
+      # Usable-item bitmap builder (stat thresholds) + active-slot search.
+      - [0x4CE88, c, func_8005C688]
+      - [0x4D2EC, c, func_8005CAEC]
+      # func_8005CCA4 — new-game inventory setup: base stats, starting items, move the first equipped weapon/armor out of the
+      # stock list and into the carried list. era -O2 -G8. LEVERS: D_800C0E00 as one struct (items at +0xAC, stock at +0x1180);
+      # two inline take_* searches; the found id reuses the loop counter i ($s0).
+      - [0x4D4A4, c, func_8005CCA4]
       # item/Inv_InventorySetup. Levers: D_800C0E22 declared as a SCALAR extern plus MASPSX_FORCE_ABSOLU
       - [0x4D820, c, func_8005D020]
-      - [0x4DAB4, asm]
+      # func_8005D2B4 — inventory script-command dispatcher (cmds 1100..1120 via jtbl_800112DC): counts, capacity, weapon
+      # mod-slot lookups, key-item removal, restart setup. era -O2 -G8 + dispatch fold + D_800C0E0C absolute (new profile).
+      # LEVERS: parameters reused as counters (arg in 1100, arg2 pinned $5 in 1102); per-case pointer locals; remove_key inline.
+      - [0x4DAB4, c, func_8005D2B4]
       # save/Save_InitMetadataState. Two inlined copies of a clear-then-name-copy helper plus a long ini
       - [0x4DEF4, c, func_8005D6F4]
       - [0x4E140, c, func_8005D940]
@@ -1647,7 +1951,10 @@ segments:
       # func_8005DB8C — global word + record-base helper: the source symbol is
       # *data* (`&D_800A8038`) so a split `q = base - 0x10` local keeps retail's
       # `addiu v1,v0,-16` and reuses `$v0` for the load; era -O2 -G0, LINK_EXACT.
-      - [0x4E2FC, asm]
+      # func_8005DAFC — offset-table entry getter: base = *D_800A802C + &D_800A8028;
+      # returns base + ((short*)base)[a0+1] when a0 < *(u16*)base. era -O2 -G0; the
+      # `(a0 << 1) + (int)base` operand order gives retail's `addu v0,v0,v1`.
+      - [0x4E2FC, c, func_8005DAFC]
       # func_8005DB44 — pool-record getter (0x48 = 18 words). rec = &D_800A8038
       # (data symbol); returns `start + ((a0<<5) + (rec-0x10))` where
       # start=D_800A8034, guarded by `a0 < ((*rec - start) >> 5)`. era -O1 -G0;
@@ -1682,7 +1989,7 @@ segments:
       - [0x4E688, c, func_8005DE88]
       # free-node pop from D_8009D0DC and append to the D_8009D0E0/E4 list
       - [0x4E6E4, c, func_8005DEE4]
-      - [0x4E76C, asm]
+      - [0x4E76C, c, func_8005DF6C]
       - [0x4E838, c, func_8005E038]
       - [0x4E914, c, func_8005E114]
       - [0x4E920, c, func_8005E120]
@@ -1691,12 +1998,19 @@ segments:
       # mask must live in a local (a direct `!= 0` folds to sltu+ne).
       # era -O2 -G8; both LINK_EXACT.
       # Former 0x4E92C asm span: prefix 0x3B8, C 0x34, C 0x34, resume 0x1C.
-      - [0x4E92C, asm]
+      # func_8005E12C — pad event pump: release(4)/press(1)/repeat(2) events pushed onto the D_8009D0DC free list ->
+      # D_8009D0E0/E4 queue (push helper inlined twice), auto-repeat timer D_8009D0F8. era -O2 -G8.
+      # LEVERS: 'enabled' test as if (D_8009D0E8 != 0) {...} else if (btn == 0) ...; '(t >= -299) ? 1 : 8' polarity.
+      - [0x4E92C, c, func_8005E12C]
+      # func_8005E30C — pad event dispatch: pump (func_8005E12C) unless D_8009D0EC, pop the first typed event, hand it to the
+      # window chain's +0x2C handlers (press/repeat |0x20000, release-0x20 -> 0x10000). era -O2 -G8; pop is an inlined helper.
+      - [0x4EB0C, c, func_8005E30C]
       - [0x4ECE4, c, func_8005E4E4]
       - [0x4ED18, c, func_8005E518]
       - [0x4ED4C, c, func_8005E54C]
       - [0x4ED7C, c, func_8005E57C]
-      - [0x4ED88, asm]
+      # s0 is &buf; halfwords via barrier so they stay s0-relative
+      - [0x4ED88, c, func_8005E588]
       - [0x4EEE4, c, func_8005E6E4]
       # 0x78-stride record select into 5 gp slots; D_8009CDDC must be `extern int SYM[]` to stay absolut
       - [0x4EEF0, c, func_8005E6F0]
@@ -1730,16 +2044,21 @@ segments:
       # parameterless twin of func_8005E9C8, same bp lever
       - [0x4F28C, c, func_8005EA8C]
       - [0x4F358, c, func_8005EB58]
-      - [0x4F364, asm]
+      - [0x4F364, c, func_8005EB64]
+      # func_8005ED18 — emit one POLY_FT4 glyph quad into the OT (id -> func_8005DADC rect). era -O2 -G8.
+      # LEVERS: register g asm("$16") for the rect pointer and a block-local register q asm("$4") = p for the
+      # geometry/UV block; P_TAG bitfield addPrim as in func_8005EB64.
+      - [0x4F518, c, func_8005ED18]
       - [0x4F6C8, c, func_8005EEC8]
       - [0x4F6D4, asm]
+      - [0x4F9A0, c, func_8005F1A0]
       - [0x4FA7C, c, func_8005F27C]
       # gpu/Draw_PrintCenteredTextInWidth. Long grind, 125 -> 0. Levers, in the order they mattered: the
       - [0x4FB54, c, func_8005F354]
       - [0x4FD94, c, func_8005F594]
       # 2-word save/restore stack around a string print; LEVERS: explicit t0/t1 temps so both globals lo
       - [0x4FDB8, c, func_8005F5B8]
-      - [0x4FE98, asm]
+      - [0x4FE98, c, func_8005F698]
       # Boolean-selected GP state initializer: era -O2 -G8.
       - [0x50044, c, func_8005F844]
       # gpu/Draw_EmitDigitSprite, 114w. Long ladder 76 -> 0. Levers: volatile reads to preserve retail's
@@ -1750,12 +2069,13 @@ segments:
       # Former 0x50074 asm span: prefix 0x4B4, five C 0x34, resume 0x50E2C.
       - [0x5023C, c, func_8005FA3C]
       - [0x50374, c, func_8005FB74]
-      - [0x504AC, asm]
+      # expand div
+      - [0x504AC, c, func_8005FCAC]
       - [0x505F0, c, func_8005FDF0]
       - [0x50728, c, func_8005FF28]
       # gpu/Draw_PrintTimeValue. LINK_EXACT first try. Frame-count clock printer: clamp to 0x57E3F, two 
       - [0x5086C, c, func_8006006C]
-      - [0x50AD0, asm]
+      - [0x50AD0, c, func_800602D0]
       - [0x50D28, c, func_80060528]
       - [0x50D5C, c, func_8006055C]
       - [0x50D90, c, func_80060590]
@@ -1765,12 +2085,15 @@ segments:
       - [0x51CA0, c, func_800614A0]
       # colour average packer; LEVER: `register int *p asm("$7")` or cc1 folds the store into an absolut
       - [0x51CAC, c, func_800614AC]
-      - [0x51D3C, asm]
+      - [0x51D3C, c, func_8006153C]
+      - [0x52078, c, func_80061878]
+      - [0x5223C, c, func_80061A3C]
       # short-pair emitter into D_800A22B0 with a 0x30-byte cap; the limit must be written inside the lo
       - [0x52380, c, func_80061B80]
       - [0x52434, asm]
+      - [0x52890, c, func_80062090]
       - [0x52AB0, c, func_800622B0]
-      - [0x52ABC, asm]
+      - [0x52ABC, c, func_800622BC]
       # 0x90-stride free-list link walk D_800A22E0..+0xD80 then D_800A2FD0 tail null + 3 gp words
       - [0x52D68, c, func_80062568]
       # node allocator + 4-slot child search; `while (i < 4 && q[2] != 0)` compound form, `(i << 2) + (i
@@ -1788,7 +2111,8 @@ segments:
       # era -O2 -G8 (gp head). Mid-531BC carve: prefix 0x64, C 0x14,
       # C 0x48, then resume 5327C.s 0x23C.
       - [0x53234, c, func_80062A34]
-      - [0x5327C, asm]
+      # string width center; every span word matches
+      - [0x5327C, c, func_80062A7C]
       - [0x534B8, c, func_80062CB8]
       - [0x534C4, c, func_80062CC4]
       - [0x534D0, c, func_80062CD0]
@@ -1836,7 +2160,8 @@ segments:
       - [0x53CD4, asm]
       # walks a node's parent chain accumulating +0x18/+0x1C offsets (finding the parent by searching ea
       - [0x53F4C, c, func_8006374C]
-      - [0x540D8, asm]
+      # LINK_EXACT on swept stable source
+      - [0x540D8, c, func_800638D8]
       # scroll clamp on a0[18]/a0[23]/a0[14]
       - [0x54530, c, func_80063D30]
       # two negative/limit clamps then the 80063D30 scroll clamp
@@ -1853,7 +2178,7 @@ segments:
       - [0x55254, c, func_80064A54]
       # D_800A3060 state apply (index read from a0[28]); plain early-return chain, no pins needed
       - [0x552C0, c, func_80064AC0]
-      - [0x55374, asm]
+      - [0x55374, c, func_80064B74]
       # Phase 5CA: C leaf func_80064C20 — file 0x55420, size 0x10.
       - [0x55420, c, func_80064C20]
       # Phase 5EQ: C leaf func_8006A64C — VRAM 0x8006A64C, size 0x28.
@@ -1922,7 +2247,8 @@ segments:
       - [0x56648, asm]
       # D_800BCF88 gate + viewport publish; hoisting (s & ~0xF) into a local kills the duplicated and
       - [0x569EC, c, func_800661EC]
-      - [0x56A68, asm]
+      - [0x56A68, c, func_80066268]
+      - [0x56DA0, asm]
       # func_80067B40 — D_800BCFFA = a0; D_800BCFFB = 0;
       # D_800BCF88 = (D_800BCF88 & ~0xC00) | 0x400; return 0. The two byte
       # stores are absolute while the word goes through a $v0 base pin.
@@ -1934,15 +2260,18 @@ segments:
       - [0x573D8, c, func_80066BD8]
       - [0x5747C, c, func_80066C7C]
       - [0x574E8, asm]
+      - [0x579C8, c, func_800671C8]
+      - [0x57A94, asm]
       - [0x57E78, c, func_80067678]
       - [0x57ECC, c, func_800676CC]
       - [0x57F30, c, func_80067730]
       # D_800B1624 stride-56 record; 4 sh stores + D_800BCF88 |= 0x80 through a pointer local
       - [0x57FA0, c, func_800677A0]
-      - [0x57FFC, asm]
+      # 52-byte view record publish; frame48 s5-after-s2
+      - [0x57FFC, c, func_800677FC]
       # CLOSED from band4's 2. ONE edit, a NEW LEVER: a bare `__asm__ __volatile__("");` between the two
       - [0x581C4, c, func_800679C4]
-      - [0x58278, asm]
+      - [0x58278, c, func_80067A78]
       - [0x58340, c, func_80067B40]
       # sibling of func_80067D18: same D_800B1624 sprite-recolour loop and the same pin set, plus an inl
       - [0x58374, c, func_80067B74]
@@ -1968,7 +2297,8 @@ segments:
       # four contiguous C carves (6A5BC/6A64C/6A674/6A8D4), no asm between.
       - [0x594E0, c, func_80068CE0]
       - [0x59528, c, func_80068D28]
-      - [0x59624, asm]
+      - [0x59624, c, func_80068E24]
+      - [0x5994C, asm]
       # near-twin of the already-matched func_80069660; second loop gates on (D_8009D1A0&0x100)==0 || (c
       - [0x59D94, c, func_80069594]
       # D_8009D1A0 gated two 0xB-iteration call loops with a mid 0x104 re-check
@@ -1979,7 +2309,7 @@ segments:
       - [0x5A8E8, c, func_8006A0E8]
       - [0x5AA5C, c, func_8006A25C]
       - [0x5AAE8, c, func_8006A2E8]
-      - [0x5AB18, asm]
+      - [0x5AB18, c, func_8006A318]
       - [0x5ADBC, c, func_8006A5BC]
       - [0x5AE4C, c, func_8006A64C]
       # Phase 5EX: C leaf func_8006A674 — VRAM 0x8006A674, size 0x260 (152 words).
@@ -1992,7 +2322,11 @@ segments:
       # stores with byte-address cursor arithmetic. Era -O2 -G0; no $gp.
       - [0x5B0D4, c, func_8006A8D4]
       # Mid-5B1E4 carve: prefix 0x3164, C 0x54, resume 5E39C.s.
-      - [0x5B1E4, asm]
+      # func_8006A9E4 — scene data load (215w): goto-retry per read block, char-aligned block
+      # structs (lwl/lwr copies), `while ((s = poll() != 0) != 0)` final poll. era -O2 -G0. decompB.
+      - [0x5B1E4, c, func_8006A9E4]
+      # flag-beq delay is return 0; unfilled epilogue
+      - [0x5B540, c, func_8006AD40]
       # D_800B0CD8 subsystem reset: eight clear loops, a func_8006E498(D_800B0CD8+0x14C, 0x5EAF6804) see
       - [0x5BB5C, c, func_8006B35C]
       - [0x5BCF8, asm]
@@ -2002,14 +2336,16 @@ segments:
       # Era -O2 -G0; union layout preserves the word-backed flag field and
       # the shared symbolic base across all byte stores.
       - [0x5C64C, c, func_8006BE4C]
-      - [0x5C6CC, asm]
+      - [0x5C6CC, c, func_8006BECC]
       # main/Scene_InitEntityPlayer - an 8-case JUMP-TABLE state machine on D_800B0DC5 (states 0x20..0x2
       - [0x5C9CC, c, func_8006C1CC]
       - [0x5CCC4, c, func_8006C4C4]
-      - [0x5CDBC, asm]
+      # switch folds to jtbl_800113F0
+      - [0x5CDBC, c, func_8006C5BC]
       # D_800B0CD8 gate chain then func_800661A4 / func_8003A088 / func_8003AC90 / func_8003AF14 / func_
       - [0x5D468, c, func_8006CC68]
       - [0x5D5A4, asm]
+      - [0x5D878, c, func_8006D078]
       - [0x5DA4C, c, func_8006D24C]
       - [0x5DAB8, asm]
       - [0x5E348, c, func_8006DB48]
@@ -2024,7 +2360,7 @@ segments:
       - [0x5E3E0, c, func_8006DBE0]
       # chunk search from key 0x73DECD80 stepping 4, via func_8006E498. All four masks (0x1FFC00/0xD0000
       - [0x5E418, c, func_8006DC18]
-      - [0x5E4E4, asm]
+      - [0x5E4E4, c, func_8006DCE4]
       # func_8006DED4 — VRAM 0x8006DED4, size 0x7C (31 words). Packs three
       # shorts (a3, a4, a5 — a4/a5 are unsigned short stack args, retail
       # lhu 0x48/0x4C(sp)) into a stack record, calls func_8006DFA8, then
@@ -2033,7 +2369,7 @@ segments:
       - [0x5E538, c, func_8006DD38]
       # double func_8006DED4 call; `volatile int *p = &D_800B0E08` holds the base in $s3, a0/a1/a2/a3 pi
       - [0x5E5CC, c, func_8006DDCC]
-      - [0x5E680, asm]
+      - [0x5E680, c, func_8006DE80]
       - [0x5E6D4, c, func_8006DED4]
       # func_8006DF50 — VRAM 0x8006DF50, size 0x58 (22 words). Record lookup
       # func_8006E514; return -1 on a null lookup, else forward to
@@ -2088,7 +2424,8 @@ segments:
       # Signed-byte global getter on D_800B0DBA; plain -O1 matches.
       - [0x5F3D4, c, func_8006EBD4]
       - [0x5F3E4, c, func_8006EBE4]
-      - [0x5F408, asm]
+      # byte gate then halfword or -1 shifted by 16
+      - [0x5F408, c, func_8006EC08]
       # Signed-halfword indexed offset reader: era -O2 -G0.
       - [0x5F46C, c, func_8006EC6C]
       # func_8006EC84 — offset-table walker (26 words, 0x68). Calls
@@ -2179,6 +2516,11 @@ segments:
       # Two-phase subsystem teardown wrapper: era -O2 -G0.
       - [0x60BF4, c, func_800703F4]
       - [0x60C1C, asm]
+      # lagged-Fibonacci table seed; ori small li + pre-decrement bnez
+      - [0x61510, c, func_80070D10]
+      # pinned index walk over the embedded 0x80070E04 table; -O1
+      - [0x6156C, c, func_80070D6C]
+      - [0x615D0, asm]
       # Phase FTE1: frame tail (VRAM 0x80070E54, size 0x158), era -O2 -G8;
       # resume 617AC.s.
       - [0x61654, c, func_80070E54]
@@ -2187,7 +2529,8 @@ segments:
       # Calls func_8007506C(base+4, base+0xC) then, when a0[1]&8, repeats on
       # s0; returns base+0xC in $s1. era -O2 -G0, LINK_EXACT.
       # Mid-617AC carve: prefix 0x124, C 0x74, resume 0x620D0+0x74.
-      - [0x617AC, asm]
+      # three absolute squares, 64-bit sum shifted right by 20
+      - [0x617AC, c, func_80070FAC]
       # D_8009D1A0&2 gate else zero 0x68/0x6C/0x70 + func_8001A680
       - [0x61834, c, func_80071034]
       - [0x618A4, asm]
@@ -2205,11 +2548,14 @@ segments:
       # Phase 5FA: conditional offset-0x14 pointer helper.
       - [0x621C4, c, func_800719C4]
       - [0x621E4, asm]
+      - [0x62B34, c, func_80072334]
+      - [0x62BA0, asm]
       # This is qsort: func_800723A4(void *b, unsigned int n, int size, int (*cmp)()) with func_800724F4
       - [0x62BA4, c, func_800723A4]
       # byte-swap loop; i=0 hoisted above the guard + do/while (a `for` here would add a phantom 8-byte 
       - [0x62CF4, c, func_800724F4]
       - [0x62D30, asm]
+      - [0x62FB4, c, func_800727B4]
       # jal/j/jalr slot macro split (maspsx patch 8, MASPSX_FILL_CALL_DELAY_SLOT)
       - [0x63150, c, func_80072950]
       - [0x63250, asm]
@@ -2219,15 +2565,22 @@ segments:
       # 64-bit shift (arithmetic right); explicit i=0/do-while kills the phantom frame, counter pinned $
       - [0x636A4, c, func_80072EA4]
       - [0x63760, asm]
+      # unsigned 64-bit compare; last sltu in $v1
+      - [0x63A44, c, func_80073244]
       # twin of 80072EA4 with a logical right shift
       - [0x63A94, c, func_80073294]
       - [0x63B50, asm]
+      # epilogue fill
+      - [0x63B54, c, func_80073354]
+      - [0x63C50, asm]
+      - [0x63C54, c, func_80073454]
       # 64-bit negate: struct-by-value ~x then func_80072DF4(x,{1,0}); hi-before-lo statement order
       - [0x63D54, c, func_80073554]
       - [0x63DC4, asm]
       # 32x32->64 multiply via three func_80072DF4 adds. ERA_ASPSX_VER=2.30 is REQUIRED: maspsx omits th
       - [0x640D8, c, func_800738D8]
-      - [0x641C4, asm]
+      - [0x641C4, c, func_800739C4]
+      - [0x64228, asm]
       # jal/j/jalr slot macro split (maspsx patch 8, MASPSX_FILL_CALL_DELAY_SLOT)
       - [0x643BC, c, func_80073BBC]
       - [0x64454, asm]
@@ -2260,10 +2613,12 @@ segments:
       - [0x64610, c, func_80073E10]
       # boot init chain. Needs asm barriers on both the D_800945E4 and D_80094620 bases, a volatile-qual
       - [0x64628, c, func_80073E28]
-      - [0x64700, asm]
+      # psyq/libapi/intr_state - the PSY-Q interrupt dispatcher. FIRST of the four entries that were par
+      - [0x64700, c, func_80073F00]
+      - [0x648D0, asm]
       # teardown; asm barrier on D_800945E4, D_80095678 declared pointer-to-volatile for the double load
       - [0x64A18, c, func_80074218]
-      - [0x64AB8, asm]
+      - [0x64AB8, c, func_800742B8]
       # Phase 5CX: C leaf func_80074330 — file 0x64B30, size 0x24.
       - [0x64B30, c, func_80074330]
       - [0x64B54, asm]
@@ -2280,7 +2635,8 @@ segments:
       - [0x64CD4, c, func_800744D4]
       # D_800956BC event-flag dispatch over D_800956C0[7] + D_800956E0 log sweep. NEW LEVER (inverse of 
       - [0x64D20, c, func_80074520]
-      - [0x64EA0, asm]
+      # schedule off both passes
+      - [0x64EA0, c, func_800746A0]
       # Phase 5CZ: C leaf func_8007474C — file 0x64F4C, size 0x24.
       - [0x64F4C, c, func_8007474C]
       - [0x64F70, asm]
@@ -2325,13 +2681,17 @@ segments:
       # func_80074DC0 — same gate/log pair, then the D_80095744->f(0x3C)
       # handler with a0. era -O2 -G0 + patch 3; LINK_EXACT.
       - [0x655C0, c, func_80074DC0]
-      - [0x65628, asm]
+      # func_80074E28 — GPU debug RECT bounds report through D_80095748.
+      # 2.8.1 -mno-split-addresses + patch 8; `h` pinned to $3. LINK_EXACT.
+      - [0x65628, c, func_80074E28]
+      - [0x65744, c, func_80074F44]
+      - [0x657D4, c, func_80074FD4]
       # func_8007506C / func_800750CC — reset a record via func_80074E28, then
       # push D_80095744->v[0x20]/[0x1C] out the D_80095744->f(0x8) slot.
       # era -O2 -G0 + patch 3; LINK_EXACT.
       - [0x6586C, c, func_8007506C]
       - [0x658CC, c, func_800750CC]
-      - [0x6592C, asm]
+      - [0x6592C, c, func_8007512C]
       # func_800751E4 — same D_8009574E gate / D_80095748 log pair, then a
       # next-pointer link walk (0xA4 chunks): clears p[3], merges the low 24
       # bits of (p+4) into the word at p, and finally stamps the D_8009580C /
@@ -2382,19 +2742,24 @@ segments:
       # func_80076150(a1,a2,a3&0xFFFF), +8 from func_800762BC(a4/stack).
       # era -O2 -G0 + patch 3; LINK_EXACT.
       - [0x66494, c, func_80075C94]
-      - [0x664E8, asm]
+      - [0x664E8, c, func_80075CE8]
+      - [0x666E0, c, func_80075EE0]
       # Phase 5FF: command-word builder with two flag bits and a masked field.
       - [0x66950, c, func_80076150]
-      - [0x66970, asm]
+      - [0x66970, c, func_80076170]
+      - [0x66A08, c, func_80076208]
       # func_800762A0 — draw-mode word packer: ((a1 & 0x7FF) << 11) |
       # ((a0 & 0x7FF) | 0xE5000000). era -O2 -G0; object is byte-exact with
       # 4 bytes of trailing zero pad; LINK_EXACT.
       - [0x66AA0, c, func_800762A0]
-      - [0x66ABC, asm]
+      - [0x66ABC, c, func_800762BC]
       # Phase 5BU: C leaf func_8007633C — VRAM 0x8007633C, size 0x18.
       # Pointer double-deref on D_80095854 (lui/lw/nop/lw0/jr/nop).
       - [0x66B3C, c, func_8007633C]
-      - [0x66B54, asm]
+      # restored after lane merge (row belongs to another agent)
+      - [0x66B54, c, func_80076354]
+      - [0x66C34, c, func_80076434]
+      - [0x66E64, asm]
       # func_80076B20 — write *D_80095854 = a0 then index D_800A3348 by
       # a0 >> 24; era -O2 -G0 + maspsx patch 4
       # (MASPSX_SYMBOL_LOAD_DEST_TEMP=1) for the jr-delay-slot indexed store
@@ -2420,14 +2785,27 @@ segments:
       - [0x673E0, c, func_80076BE0]
       - [0x67410, c, func_80076C10]
       - [0x67434, asm]
+      # GPU queue drain; 2.8.1, branch-macro split, dest-temp loads
+      - [0x676E4, c, func_80076EE4]
+      - [0x67944, c, func_80077144]
+      # LINK_EXACT on swept stable source
+      - [0x67A94, c, func_80077294]
       # Phase 5FZ: C leaf func_800773D0 — VRAM 0x800773D0, size 0x34 (13 words).
       # Arms the GPU timeout deadline (D_80095888 = VSync + 0xF0) and clears the
       # poll counter D_8009588C.  era -O2 -G0 (default profile).
       - [0x67BD0, c, func_800773D0]
-      - [0x67C04, asm]
+      # GPU timeout check: 2.8.1 + patch 15 (unfilled ra-only epilogue slot).
+      - [0x67C04, c, func_80077404]
       # GPU state gate through *D_80095854/*D_80095850; the dead read is '*(volatile unsigned int *)D_80
       - [0x67D48, c, func_80077548]
-      - [0x67DE8, asm]
+      # GPU wait then D_80095744[8](a0, a1); masks 0x01000000/0x04000000
+      - [0x67DE8, c, func_800775E8]
+      # 2.8.1 epilogue order; sibling of func_800775E8
+      - [0x67ED4, c, func_800776D4]
+      # cc1 2.8.1 no-split
+      - [0x67FC0, c, func_800777C0]
+      # 2.8.1 epilogue order
+      - [0x68104, c, func_80077904]
       # Phase 5EL: register func_80076EE4 for mode two.
       - [0x68200, c, func_80077A00]
       # Phase 5DA: C leaf func_80077A28 — file 0x68228, size 0x24.
@@ -2512,7 +2890,9 @@ segments:
       # displacement kept); plain -O2 -G0 mismatches 31 words, patch 5 is
       # LINK_EXACT.
       - [0x685C4, c, func_80077DC4]
-      - [0x68664, asm]
+      # 2.8.1 + expand_div + patch 16 (no reuse nop after the expanded div's mflo). size 0x104.
+      - [0x68664, c, func_80077E64]
+      - [0x68768, asm]
       # func_80078C94 — copies 3 words from a1[0..2] into a0[5..7] and
       # returns a0. era -O1 -G0 + -fno-delayed-branch: cc1 puts the return
       # `move $2,$4` BEFORE `jr $31` (unfilled slot), which is exactly
@@ -2520,10 +2900,14 @@ segments:
       # LINK_EXACT (9 words).
       - [0x69494, c, func_80078C94]
       - [0x694B8, asm]
+      # packed halfword scale by three weights; multu via mflo
+      - [0x694C4, c, func_80078CC4]
+      - [0x695FC, asm]
       # Phase 5BK: C leaf func_8007A324 — VRAM 0x8007A324, size 0x10.
       # Unsigned-byte global getter on D_8009AFC4; plain -O1 matches.
       - [0x6AA44, c, func_8007A244]
-      - [0x6AAA4, asm]
+      # func_8007A2A4 — pad subsystem mode reset; lw;nop;jal;sb tail via maspsx patch 13. era -O2 -G0.
+      - [0x6AAA4, c, func_8007A2A4]
       - [0x6AB24, c, func_8007A324]
       # Phase 5BL: C leaf func_8007A334 — VRAM 0x8007A334, size 0x10.
       # Unsigned-byte global getter on D_8009AFD4; plain -O1 matches.
@@ -2534,7 +2918,7 @@ segments:
       # Phase 5BN: C leaf func_8007A354 — VRAM 0x8007A354, size 0xC.
       # Address-of D_8009AFD0 (lui/jr/addiu in delay slot); plain -O1 matches.
       - [0x6AB54, c, func_8007A354]
-      - [0x6AB60, asm]
+      - [0x6AB60, c, func_8007A360]
       # Phase 5EF: direct func_8007B9EC forwarding wrapper.
       - [0x6ABCC, c, func_8007A3CC]
       # Phase 5EF: signed state/count exchange; blez/slti prove int.
@@ -2554,7 +2938,9 @@ segments:
       - [0x6ACBC, c, func_8007A4BC]
       # Tier-2 continuation: one-result wrapper around func_8007B964.
       # Former 0x6ACD0 span: prefix 0x3BC, C 0x20, resume 0x1884.
-      - [0x6ACD0, asm]
+      - [0x6ACD0, c, func_8007A4D0]
+      - [0x6AE0C, c, func_8007A60C]
+      - [0x6AF40, c, func_8007A740]
       - [0x6B08C, c, func_8007A88C]
       # Phase 5EF: boolean-negating wrappers around 8007BF44 / 8007C044.
       - [0x6B0AC, c, func_8007A8AC]
@@ -2573,7 +2959,12 @@ segments:
       - [0x6C2C0, c, func_8007BAC0]
       # 4 zero stores + 2 calls. PATCH 8 CANARY: 10 mismatches -> 0 with MASPSX_FILL_CALL_DELAY_SLOT=1 a
       - [0x6C3B0, c, func_8007BBB0]
-      - [0x6C3FC, asm]
+      # pinned zero args plus call fill and epilogue unfill
+      - [0x6C3FC, c, func_8007BBFC]
+      # poll loop; index-pair jal schedule
+      - [0x6C5DC, c, func_8007BDDC]
+      # 2.8.1 + patch 14 (load-delay nop before the poll-loop label). LEAF_STRONG=EXACT.
+      - [0x6C744, c, func_8007BF44]
       # 'extern volatile unsigned char *D_8009B27C' (pointer TO volatile) gives one pointer load + a re-
       - [0x6C844, c, func_8007C044]
       - [0x6C930, c, func_8007C130]
@@ -2581,7 +2972,8 @@ segments:
       # Former 0x6C93C asm span: prefix 0x408, C 0x1C, resume 0x1944.
       # First-try match (28 without patch 8). The two byte cursors are ONE symbol: `p = &D_8009B295; q =
       - [0x6C93C, c, func_8007C13C]
-      - [0x6CA14, asm]
+      # func_8007C214 — slot record copy + optional D_800B0CC8 hook; store macro split into beqz slot (maspsx patch 10). era -O2 -G0.
+      - [0x6CA14, c, func_8007C214]
       # Branch polarity was load-bearing: `if (D_800A8020 != 0) return -1;` FIRST, then the call arm (15
       - [0x6CAA0, c, func_8007C2A0]
       - [0x6CAF8, asm]
@@ -2593,6 +2985,9 @@ segments:
       - [0x6CC40, asm]
       - [0x6CC44, c, func_8007C444]
       - [0x6CC78, asm]
+      # status-1 barrier plus sink zero store into beqz
+      - [0x6CC84, c, func_8007C484]
+      - [0x6CD3C, asm]
       - [0x6CD44, c, func_8007C544]
       # Phase 5EF: zero-argument func_8007D074 forwarding wrapper.
       - [0x6CD60, asm]
@@ -2603,17 +2998,28 @@ segments:
       - [0x6D680, c, func_8007CE80]
       - [0x6D6AC, asm]
       - [0x6D854, c, func_8007D054]
-      - [0x6D874, asm]
+      - [0x6D874, c, func_8007D074]
       # One-shot init guarded by D_8009B3EC. Two jal macro splits. Return value of func_800726E4 assigne
       - [0x6D95C, c, func_8007D15C]
       - [0x6D9CC, asm]
+      # func_8007D1D4 — libspu _spu_init; 2.7.2 -O2 -G0 -fno-strength-reduce +
+      # maspsx patches 8/3/21. LINK_EXACT.
+      - [0x6D9D4, c, func_8007D1D4]
+      # call and epilogue fill
+      - [0x6DC54, c, func_8007D454]
+      # 2.8.1 + patch 15 (unfilled epilogue slot).
+      - [0x6DE14, c, func_8007D614]
+      # func_8007D6D0 — SPU transfer kick (volatile SPU ctrl). era cc1 2.8.1 -mno-split-addresses.
+      - [0x6DED0, c, func_8007D6D0]
+      - [0x6DF78, asm]
       # D_8009B418 gated variant of func_8007DA7C
       - [0x6E1F8, c, func_8007D9F8]
       # three func_8007D778 calls, D_8009B414 << D_8009B424
       - [0x6E27C, c, func_8007DA7C]
       # short store through *D_8009B3FC, optional >>D_8009B424; if(a2==0){}else{} branch polarity
       - [0x6E2E0, c, func_8007DAE0]
-      - [0x6E324, asm]
+      # expand-div plus div-no-reuse nop
+      - [0x6E324, c, func_8007DB24]
       # func_8007DBC8 — u16 table read D_8009B3FC[a0], optionally shifted by
       # D_8009B424; the narrow `unsigned short v` local homes the value in $a0.
       # era -O2 -G0, LINK_EXACT.
@@ -2625,7 +3031,9 @@ segments:
       # (retail loads only $a0). era -O2 -G0; object +4-byte gas pad, LINK_EXACT.
       - [0x6E45C, c, func_8007DC5C]
       - [0x6E484, c, func_8007DC84]
-      - [0x6E4AC, asm]
+      # libspu volatile x13 busy-wait (60 iters); cc1 2.8.1 + patch 11 (jump stack store fill).
+      - [0x6E4AC, c, func_8007DCAC]
+      - [0x6E508, asm]
       - [0x6E514, c, func_8007DD14]
       - [0x6E538, asm]
       # func_8007DD74 — func_8007DDC4(a0) then func_8007DDB4(a0, 0x3F, 0);
@@ -2658,28 +3066,50 @@ segments:
       - [0x6E810, c, func_8007E010]
       # func_8007E0C0 — func_80072714(); func_8007E1F4(1, D_800A34B0);
       # func_80072724(); return 1. era -O2 -G0, LINK_EXACT.
-      - [0x6E848, asm]
+      # handler install; -fno-schedule-insns2 keeps li v0,1 before restores
+      - [0x6E848, c, func_8007E048]
       - [0x6E8C0, c, func_8007E0C0]
-      - [0x6E8F8, asm]
+      # func_8007E0F8 — clear *D_8009B4B0 +0xA, volatile countdown c[3]=10 (frame 0x10), return 0. era -O2 -G0.
+      - [0x6E8F8, c, func_8007E0F8]
+      # two bit tests on D_8009B4B4; shared jr
+      - [0x6E960, c, func_8007E160]
+      - [0x6E9A0, asm]
+      # tail jr through jtbl_800A34C8 in $t1 via computed goto
+      - [0x6EA04, c, func_8007E204]
+      # tail jr through jtbl_800A34CC in $t1 via computed goto
+      - [0x6EA18, c, func_8007E218]
+      - [0x6EA2C, asm]
+      # global register $v1 poll then jr through *(int *)0xDFFC
+      - [0x6EB70, c, func_8007E370]
+      - [0x6EBB4, asm]
+      # word copy to 0xDF80; -O1 keeps the load-delay nop
+      - [0x6ECE0, c, func_8007E4E0]
+      - [0x6ED14, asm]
       # func_8007E594 — clear a 0x18-byte object (word 0, bytes 4..8 via a
       # down-counting parallel pointer q, then words 0xC/0x10/0x14). The local
       # `q` is load-bearing; era -O2 -G0, LINK_EXACT.
       - [0x6ED94, c, func_8007E594]
-      - [0x6EDC4, asm]
+      # dest-temp symbolic load
+      - [0x6EDC4, c, func_8007E5C4]
       # ring-slot address getter over the 24-byte D_800A3540 table; pins $3/$4/$2 + asm barrier on the b
       - [0x6EEB0, c, func_8007E6B0]
-      - [0x6EF04, asm]
+      # slot walk; dest-temp load and epilogue fill
+      - [0x6EF04, c, func_8007E704]
       # D_800A3604 slot dispatch; 'if (e[0] != 0) return f(...) != 0; return 0;' is the polarity that me
       - [0x6F0F4, c, func_8007E8F4]
-      - [0x6F164, asm]
+      # CD completion; beq -1 delay is addiu via MASPSX_ADDU_NEG1_BEQ_DELAY
+      - [0x6F164, c, func_8007E964]
       # ring push into D_800A3610[16]; f5 base written as (char*)idx-0x7B and the add as ((*idx<<4)+(int
       - [0x6F388, c, func_8007EB88]
-      - [0x6F414, asm]
+      # FIRST-TRY MATCH by adapting func_8007ED58 - they are siblings sharing the same 40-word init bloc
+      - [0x6F414, c, func_8007EC14]
       # 13 -> 0. Two pointer bases (&D_800B8AB0 and &D_800A3510) each need the non-volatile tie to stay 
       - [0x6F558, c, func_8007ED58]
       # Phase 5EF: direct func_8007FB04 forwarding wrapper.
       - [0x6F664, c, func_8007EE64]
       - [0x6F684, asm]
+      # dest-temp load plus epilogue delay fill
+      - [0x6FC18, c, func_8007F418]
       # duplicate the whole body in BOTH arms (cc1 cross-jumps the tail) and pin the outgoing arg 'regis
       - [0x6FE08, c, func_8007F608]
       # 8x24-byte table init; register pins $4/$5/$2/$3 for the two ivs, and 'i = 0;' written BEFORE 'e 
@@ -2703,12 +3133,14 @@ segments:
       - [0x6FFC8, c, func_8007F7C8]
       # pins r=$16,p=$17,i=$3,m=$2 and a nested q=$3 for (int)p-0xC8 so the base decrement is not reasso
       - [0x6FFE8, c, func_8007F7E8]
-      - [0x7008C, asm]
+      # func_8007F88C — pad event post into D_800A3520/D_800A3530 + optional D_800B8AB4 hook. era cc1 2.8.1 -mno-split-addresses.
+      - [0x7008C, c, func_8007F88C]
       - [0x70160, c, func_8007F960]
       - [0x7018C, asm]
       # Boot init. NEW LEVER COMBO: D_800A36A8/A4/A0 must ALL be `volatile int`. Volatile on A36A8 alone
       - [0x70194, c, func_8007F994]
-      - [0x7022C, asm]
+      # func_8007FA2C — pad state reset (D_8009B554/560/56C records). era cc1 2.8.1 -mno-split-addresses.
+      - [0x7022C, c, func_8007FA2C]
       # Store D_8009B554=0, call func_8007B9EC, zero two globals, func_80073D58(0,0). Patch 8 alone, fir
       - [0x70304, c, func_8007FB04]
       # two pinned pointer bases ($6=&D_8009B598, $7=base-0x44), each with its own asm barrier
@@ -2767,7 +3199,11 @@ segments:
       # Mid-704BC carve: prefix 0xC84, C 0x10, resume 71150.s 0xC12C.
       # guarded D_8009B570=0x20 then tail call; pointer local &D_8009B598 + asm barrier keeps the shared
       - [0x704BC, c, func_8007FCBC]
-      - [0x704FC, asm]
+      # func_8007FCFC — pad request setup (id byte, payload copy, timeout from D_8009B5A4, then func_8007B558 issue). era cc1 2.8.1 -mno-split-addresses.
+      - [0x704FC, c, func_8007FCFC]
+      # func_8007FE24 — libds vsync state machine; 2.8.1 -mno-split-addresses
+      # + maspsx patches 8/14. LINK_EXACT.
+      - [0x70624, c, func_8007FE24]
       # indexed D_8009B5A4[k] load uses the dest-register address temp (patch 4); '!=0 first' branch pol
       - [0x708F4, c, func_800800F4]
       # switch(m){0x1F,0x20,default} beats the if/else chain; 'int b = a1; int c = a0;' in THAT order re
@@ -2801,7 +3237,9 @@ segments:
       # era -O2 -G0, LINK_EXACT.
       - [0x71150, c, func_80080950]
       - [0x71198, c, func_80080998]
-      - [0x711E0, asm]
+      # func_800809E0 — era cc1 2.8.1 -mno-split-addresses + maspsx call/branch macro-split fills.
+      - [0x711E0, c, func_800809E0]
+      - [0x712BC, asm]
       - [0x712C4, c, func_80080AC4]
       - [0x712E4, c, func_80080AE4]
       - [0x71304, c, func_80080B04]
@@ -2822,10 +3260,13 @@ segments:
       # exact twin of func_80080D5C (same source, different address)
       - [0x715C4, c, func_80080DC4]
       - [0x7162C, asm]
+      # 2.8.1 unaligned copy temp rename
+      - [0x71634, c, func_80080E34]
       # func_80080F64 — if ((a0 & 0xFF) == 2) func_80081D74(func_80080F98, -1).
       # era -O2 -G0, LINK_EXACT.
       - [0x71764, c, func_80080F64]
-      - [0x71798, asm]
+      # s2/s1 prologue swap and nop before label
+      - [0x71798, c, func_80080F98]
       # 'register int m1 asm("$4") = -1;' RE-ASSIGNED before the second call reproduces retail's two sep
       - [0x71910, c, func_80081110]
       # CD read poll (28 words). era -O2 -G0 + MASPSX_FILL_EPILOGUE_DELAY_SLOT:
@@ -2844,6 +3285,8 @@ segments:
       - [0x71B14, c, func_80081314]
       - [0x71BE8, c, func_800813E8]
       - [0x71C08, asm]
+      # 184w DsSearchFile. SIZE CORRECTION: 0x2E0, not the 0x2C4 I used in the earlier park (184 words; 
+      - [0x71C14, c, func_80081414]
       - [0x71EF4, c, func_800816F4]
       - [0x71F14, asm]
       # 0x2C-stride keyed table search with a strcmp-style callback. Writing the loop with explicit `got
@@ -2851,7 +3294,7 @@ segments:
       - [0x7227C, asm]
       # two setup calls with an 8-byte stack buffer then a do/while poll; returns r==0
       - [0x72518, c, func_80081D18]
-      - [0x72574, asm]
+      - [0x72574, c, func_80081D74]
       # D_8009B700[4] guard + 3 calls; same asm-barrier pointer-base lever
       - [0x725F8, c, func_80081DF8]
       # Phase 5EF: D_8009B708 integer exchange.
@@ -2871,6 +3314,8 @@ segments:
       # D_8009B700[4] guard + 2 calls (asm-barrier base)
       - [0x72ABC, c, func_800822BC]
       - [0x72B0C, asm]
+      # func_80082314 — link/probe handshake: status poll loop, buffer send via func_8007F0C8, spin on volatile D_800B28F8. era -O2 -G0 + patch 3.
+      - [0x72B14, c, func_80082314]
       # unsigned char==2 -> register callback else store 2; if/else reuses the compare constant
       - [0x72C00, c, func_80082400]
       # Patch 8 closes the `lui $at / jal / sw %lo($at)` split (9 -> 4 with the knob). Two C levers: the
@@ -2894,7 +3339,8 @@ segments:
       - [0x72DC0, c, func_800825C0]
       # switch(a1) field getter over the D_8009B738 record, incl. a bound-checked halfword table in case
       - [0x72E80, c, func_80082680]
-      - [0x72F78, asm]
+      # func_80082778 — 5-byte row byte getter via switch (jtbl_8001206C folded); era cc1 2.8.1 + three-word store + dispatch fold.
+      - [0x72F78, c, func_80082778]
       # two-level bound-checked byte-table lookup through the D_8009B738 handler's record; signed <0 sho
       - [0x7304C, c, func_8008284C]
       - [0x730F4, c, func_800828F4]
@@ -2903,29 +3349,37 @@ segments:
       # func_800835A4(D_8009B738(a0), a1, a2)
       - [0x73174, c, func_80082974]
       - [0x731BC, asm]
+      # func_800829C4 — pad port enable mask set (bit0 port A, bit1 port B, timeout callbacks); era -O2 -G0 + patch 3.
+      - [0x731C4, c, func_800829C4]
       # Phase 5EF: return-and-clear int state flag.
       - [0x732DC, c, func_80082ADC]
       # two bit-0 guards through pointer global D_8009B784, optional D_8009B74C() call, return 1
       - [0x73308, c, func_80082B08]
-      - [0x73370, asm]
+      # func_80082B70 — pad VSync tick: timeout counters, port rescan via func_80082E00/func_80083014. era -O2 -G0 + patch 10.
+      - [0x73370, c, func_80082B70]
       - [0x734DC, c, func_80082CDC]
       # 14 -> 0 with three levers, one of them NEW. (a) `register int *p asm("$3")` for the D_8009B784 r
       - [0x734F0, c, func_80082CF0]
       # Phase 5CK: C leaf func_800835A4 — file 0x73DA4, size 0xC.
       - [0x735BC, c, func_80082DBC]
-      - [0x73600, asm]
+      # func_80082E00 — SIO port select + pending-slot drain; era -O2 -G0 + maspsx patches 10 and 3.
+      - [0x73600, c, func_80082E00]
       # jal/j/jalr slot macro split (maspsx patch 8, MASPSX_FILL_CALL_DELAY_SLOT)
       - [0x73814, c, func_80083014]
-      - [0x738DC, asm]
+      - [0x738DC, c, func_800830DC]
+      - [0x73AB4, c, func_800832B4]
       # clear D_8009B784, spin on D_8009B788[2]&0x80 calling func_80084FE4; an entry-test through a pre-
       - [0x73CE8, c, func_800834E8]
-      - [0x73D78, asm]
+      # 2.8.1 + patch 14 (load-delay nop before the volatile poll-loop label).
+      - [0x73D78, c, func_80083578]
+      - [0x73DA0, asm]
       - [0x73DA4, c, func_800835A4]
       # Phase 5CL: C leaf func_800835B0 — file 0x73DB0, size 0x10.
       - [0x73DB0, c, func_800835B0]
       # switch(a0[0x46]) 2/3/4 dispatch to three handlers
       - [0x73DC0, c, func_800835C0]
-      - [0x73E44, asm]
+      # epilogue fill; case-4 pins
+      - [0x73E44, c, func_80083644]
       # func_80083790 — record offset = ((hE3+1)>>1)<<2 plus 0x11C-stride
       # (5*hE9+3 & 0xFFC)+4, added to *(u32*)(a0+0xEC). era -O2 -G0.
       - [0x73F90, c, func_80083790]
@@ -2939,7 +3393,10 @@ segments:
       # Volume campaign: callback func_80083C20, exact-start address stored by
       # func_80083BB8; size 0x1C, era -O2 -G0.
       - [0x74420, c, func_80083C20]
-      - [0x7443C, asm]
+      # func_80083C3C — slot remap counter (guarded do/while outer loop). era -O2 -G0.
+      - [0x7443C, c, func_80083C3C]
+      # spill $s3 before the D_8009B740 load; epilogue fill
+      - [0x74504, c, func_80083D04]
       # switch on a0[0x46]; case 2 stores the switch VALUE (int t) which defeats cc1's tail-merge of the
       - [0x7459C, c, func_80083D9C]
       # nested gate; the compare constants land in the branch delay slots
@@ -2962,18 +3419,26 @@ segments:
       - [0x746F8, asm]
       # D_8009B7A4 = D_8009B73C(a0); func_800830DC(a0,-2)
       - [0x74704, c, func_80083F04]
-      - [0x74744, asm]
+      - [0x74744, c, func_80083F44]
       # optional double D_8009B73C dispatch, then func_800832B4 with a 4-way result classifier writing D
       - [0x7481C, c, func_8008401C]
-      - [0x748DC, asm]
+      # func_800840DC — padseqd status probe; era cc1 2.8.1 -mno-split-addresses.
+      - [0x748DC, c, func_800840DC]
+      # func_80084168 — libpad padseqd driver loop; era cc1 2.8.1 -mno-split-addresses + maspsx patch 10.
+      - [0x74968, c, func_80084168]
+      # cc1 2.8.1 no-split
+      - [0x74CE4, c, func_800844E4]
       # bulk field clear + 6-byte 0xFF fill; the duplicate sh at +0xE6 needs a volatile cast; a named fi
       - [0x74E44, c, func_80084644]
-      - [0x74EAC, asm]
+      # epilogue fill
+      - [0x74EAC, c, func_800846AC]
       # Phase 5CO: C leaf func_800847A0 — file 0x74FA0, size 0x10.
       - [0x74FA0, c, func_800847A0]
       # Tier-2 probe: root-counter checkpoint func_80084FC4.
       # Former 74FB0 asm prefix: 0x814, C 0x20, resume 0xA0.
-      - [0x74FB0, asm]
+      # default O2
+      - [0x74FB0, c, func_800847B0]
+      - [0x7506C, asm]
       # Probe: two-entry D_800A5B70 address-to-slot mapper.
       - [0x752E8, c, func_80084AE8]
       # Probe: conditional D_800A5B70 address selector.
@@ -2981,7 +3446,9 @@ segments:
       - [0x75340, asm]
       # Probe: three-entry callback table initializer.
       - [0x75344, c, func_80084B44]
-      - [0x75378, asm]
+      # restored after lane merge (row belongs to another agent)
+      - [0x75378, c, func_80084B78]
+      - [0x7544C, asm]
       # per-frame state machine over a0[0x46]/[0x4A]; `goto bump` shares the a0[0x4A] increment between 
       - [0x756B0, c, func_80084EB0]
       - [0x7578C, c, func_80084F8C]
@@ -3005,12 +3472,17 @@ segments:
       # Dual pre-jr $at store of base / base+0x800 into D_8009D240 / D_8009D260.
       # Types proven by reader func_8008AB1C. Era -O2 -G0.
       # Mid-74FB0 carve: prefix 0xF78, C 0x1C, resume 75F44.s 0x199C.
-      - [0x759A8, asm]
+      # SPU upload; callee-saved pins and register barriers
+      - [0x759A8, c, func_800851A8]
+      # LINK_EXACT on swept stable source
+      - [0x75A90, c, func_80085290]
       - [0x75E44, c, func_80085644]
       - [0x75F28, c, func_80085728]
       # boot/reset spine: conditional init then three polled waits; cc1 emits the 0xF2000002 li as separ
       - [0x75F44, c, func_80085744]
       - [0x75FE4, asm]
+      # func_80085814 — SPU voice attribute setter over volatile *D_8009B7D0 records. era -O2 -G0.
+      - [0x76014, c, func_80085814]
       # func_800858B0 — bounded halfword getter through D_8009B7D0 with a
       # 16-byte stride; `a0 & 0xFFFF` in $v1 and the table base in $v0 are
       # pinned (retail's allocation, cc1 otherwise swaps them). era -O2 -G0,
@@ -3032,11 +3504,17 @@ segments:
       # positive-gate DMA seed; register int r asm("$2") plus a named sh=D_8009B424 local fix the param 
       - [0x76204, c, func_80085A04]
       - [0x76258, asm]
+      # func_80085A64 — SPU flag mode set; returns D_8009B390. era cc1 2.8.1 -mno-split-addresses.
+      - [0x76264, c, func_80085A64]
+      - [0x76330, asm]
       # walk of the 8-byte D_8009B464 block list. Three levers: `goto done` for the null guard (flips cc
       - [0x76334, c, func_80085B34]
       # twin of func_80085B34 with the query shifted by D_8009B424 first
       - [0x763B4, c, func_80085BB4]
       - [0x76440, asm]
+      # func_80085C44 — SPU ctrl bit-6 set/clear with 0xF00-poll timeout (error via func_80071A74). era -O2 -G0 + patch 8.
+      - [0x76444, c, func_80085C44]
+      - [0x76580, asm]
       # jal/j/jalr slot macro split (maspsx patch 8, MASPSX_FILL_CALL_DELAY_SLOT)
       - [0x76584, c, func_80085D84]
       - [0x765C0, asm]
@@ -3051,6 +3529,8 @@ segments:
       # twin of func_80085DF4 through func_8007D9F8
       - [0x76654, c, func_80085E54]
       - [0x766B0, asm]
+      - [0x766B4, c, func_80085EB4]
+      - [0x76710, asm]
       # func_80085F44 — guarded setter: if (a0 != D_8009B434) D_8009B434 = a0;
       # era -O2 -G0, +8-byte gas pad, LINK_EXACT.
       - [0x76714, c, func_80085F14]
@@ -3063,6 +3543,14 @@ segments:
       # -O2 -G0, all LINK_EXACT. func_80086608 (guarded call) is registered
       # above at its own span.
       - [0x76768, asm]
+      # 223w + 1 pad word SpuSetCommonAttr. Closes the MASPSX_DISPATCH_FOLD single-symbol hard block WIT
+      # 223w + 1 pad SpuSetCommonAttr: two real switches, multi-table MASPSX_DISPATCH_FOLD
+      # (jtbl_800120BC,jtbl_800120DC) under cc1 2.8.1. LEAF_STRONG=EXACT.
+      - [0x76774, c, func_80085F74]
+      - [0x76AF0, asm]
+      # libspu voice-volume setter: two switches + volatile x13 busy-wait; patch 11 fills j slot.
+      - [0x76AF4, c, func_800862F4]
+      - [0x76C60, asm]
       - [0x76C64, c, func_80086464]
       - [0x76C98, c, func_80086498]
       - [0x76CCC, c, func_800864CC]
@@ -3133,7 +3621,10 @@ segments:
       - [0x77998, c, func_80087198]
       - [0x779AC, asm]
       - [0x77C14, c, func_80087414]
-      - [0x77C28, asm]
+      # matching C leaf
+      - [0x77C28, c, func_80087428]
+      # sched1 off keeps s5/s0 order
+      - [0x77DFC, c, func_800875FC]
       # Volume campaign: hardware halfword pair setter func_8008770C,
       # size 0x1C, using the proven one-base MMIO idiom.
       - [0x77F0C, c, func_8008770C]
@@ -3164,21 +3655,27 @@ segments:
       - [0x7808C, c, func_8008788C]
       # Volume campaign: per-voice SPU halfword bitfield update, era -O2 -G0.
       - [0x780C0, c, func_800878C0]
-      - [0x780F0, asm]
+      - [0x780F0, c, func_800878F0]
+      # LINK_EXACT on swept stable source
+      - [0x782A8, c, func_80087AA8]
+      - [0x787A0, c, func_80087FA0]
+      - [0x78B44, asm]
+      - [0x79664, c, func_80088E64]
       # two func_800878F0 calls around a 0x11C-stride D_800B8AC0 record copy; asm barrier on the index c
       - [0x7976C, c, func_80088F6C]
-      - [0x7980C, asm]
+      - [0x7980C, c, func_8008900C]
       - [0x79A18, c, func_80089218]
-      - [0x79A50, asm]
+      - [0x79A50, c, func_80089250]
+      - [0x79B28, asm]
       # bit-walk over 0x11C-stride records OR-ing 1<<rec[0xF0] into *a1, then *a1 &= a3
       - [0x79F24, c, func_80089724]
-      - [0x79F84, asm]
+      - [0x79F84, c, func_80089784]
       - [0x7A160, c, func_80089960]
-      - [0x7A180, asm]
+      - [0x7A180, c, func_80089980]
       - [0x7A328, c, func_80089B28]
-      - [0x7A348, asm]
+      - [0x7A348, c, func_80089B48]
       - [0x7A4F0, c, func_80089CF0]
-      - [0x7A510, asm]
+      - [0x7A510, c, func_80089D10]
       # clamp 0..0x3F then insert into the +0x1AA halfword; pins $2/$5 plus a `w |= t` compound assign f
       - [0x7A6B8, c, func_80089EB8]
       - [0x7A700, asm]
@@ -3199,10 +3696,13 @@ segments:
       - [0x7A868, asm]
       # guarded 24-record template init; an explicit `goto body` flips cc1's branch polarity where if/el
       - [0x7AB54, c, func_8008A354]
-      - [0x7AC00, asm]
+      - [0x7AC00, c, func_8008A400]
+      # unfill epilogue
+      - [0x7AF50, c, func_8008A750]
       # find records whose +0xF0 == a1, reset to 0x18, clear the bit in D_8009D2C8[5]; named constant lo
       - [0x7B0CC, c, func_8008A8CC]
-      - [0x7B12C, asm]
+      # two-bit and single-bit D_800BCD50 scan, then func_8008A750
+      - [0x7B12C, c, func_8008A92C]
       # Phase 5EG-readers: func_8008AB1C — VRAM 0x8008AB1C, size 0x80.
       # Pins D_8009D240 as unsigned short * and D_8009D260 as unsigned char *
       # via lhu / unscaled addu. Era -O1 -G0.
@@ -3212,7 +3712,8 @@ segments:
       - [0x7B39C, c, func_8008AB9C]
       # same walk over D_800BC000 from bit 12; a separate `base` local keeps &D_800BC000 unfolded from t
       - [0x7B3F0, c, func_8008ABF0]
-      - [0x7B440, asm]
+      # 24-slot bit walk over D_800B8AC0
+      - [0x7B440, c, func_8008AC40]
       # D_800B89BC vs record+0xC selects func_8008AC40 or func_8008A068 + a D_8009D2C8[0x54] write-back
       - [0x7B694, c, func_8008AE94]
       # two func_8008D820 block copies then a 24-record halfword clamp; passing D_800B6B80 directly at t
@@ -3310,20 +3811,27 @@ segments:
       - [0x7D308, c, func_8008CB08]
       # stack int + compare, 3 guarded calls
       - [0x7D354, c, func_8008CB54]
-      - [0x7D3A8, asm]
+      # LINK_EXACT on swept stable source
+      - [0x7D3A8, c, func_8008CBA8]
+      - [0x7D770, c, func_8008CF70]
+      - [0x7D93C, asm]
       # Phase 5BV: C leaf func_8008D7C0 — VRAM 0x8008D7C0, size 0x10.
       # Store D_8009B3A0 into *a0 (lui/lw/jr/sw).
       - [0x7D940, c, func_8008D140]
-      - [0x7DE10, asm]
+      # matching C leaf
+      - [0x7DE10, c, func_8008D610]
+      - [0x7DFA4, asm]
       - [0x7DFC0, c, func_8008D7C0]
       # explicit `unsigned int *p = &D_800C0D90;` makes the first store go through the call-argument bas
       - [0x7DFD0, c, func_8008D7D0]
       # Phase 5DB: C leaf func_8008D820 — file 0x7E020, size 0x24.
       - [0x7E020, c, func_8008D820]
-      - [0x7E044, asm]
+      - [0x7E044, c, func_8008D844]
+      # LINK_EXACT on swept stable source
+      - [0x7E37C, c, func_8008DB7C]
       # frame-time shift register D_8009B7EC/F0/F4/F8 + sum into D_8009CDE4; a single `register int tc a
       - [0x7EA3C, c, func_8008E23C]
-      - [0x7EADC, asm]
+      - [0x7EADC, c, func_8008E2DC]
       # note-list forward scan + rate publish; unsigned counter selects sltu, a 6-byte unused local supp
       - [0x7ECE8, c, func_8008E4E8]
       # backward variant of the same scan; goto-form loop defeats cc1's rotation, pin+barrier on e/v/bas
@@ -3567,7 +4075,8 @@ segments:
       - [0x81474, c, func_80090C74]
       # two 16-bit relative pointers (0 -> NULL) then func_8008A92C with the D_800B89D0 block
       - [0x81488, c, func_80090C88]
-      - [0x81554, asm]
+      - [0x81554, c, func_80090D54]
+      - [0x81620, c, func_80090E20]
       # Phase 5D: C leaf func_80090F54 — VRAM 0x80090F54, size 0x14.
       # File span 0x81754–0x81768 exclusive. Bit-set 0x100000 at *(arg0+0x38).
       - [0x81754, c, func_80090F54]
@@ -3618,6 +4127,8 @@ segments:
       - [0xB3934, c, func_800C3134]
       - [0xB3A38, c, func_800C3238]
       - [0xB3B24, asm]
+      - [0xB5650, c, func_800C4E50]
+      - [0xB57C4, asm]
       # CLOSED from band7's 12. band7's five register pins are kept unchanged; two edits. (a) The epilog
       - [0xB66B0, c, func_800C5EB0]
       # 3-channel scale/clamp; `t = a1[i]; t = t * a0;` and in-place `t = t >> 7;` pin retail's single-r
@@ -3643,10 +4154,10 @@ segments:
       - [0xB7320, c, func_800C6B20]
       # same distance test reading D_8009D254; int temps keep the loaded values in registers
       - [0xB7390, c, func_800C6B90]
-      - [0xB7418, asm]
+      - [0xB7418, c, func_800C6C18]
       # 5-state classifier; `r = 3; if (x <= 0) r = 2;` puts the li in the bgtz delay slot
       - [0xB74E0, c, func_800C6CE0]
-      - [0xB755C, asm]
+      - [0xB755C, c, func_800C6D5C]
       - [0xB76C0, c, func_800C6EC0]
       - [0xB76D8, c, func_800C6ED8]
       # Phase 5EF: absolute unsigned-halfword setter D_800F3420.
@@ -3658,7 +4169,7 @@ segments:
       # increment must sit in the loop body before the copy.  era -O2 -G0.
       - [0xB76F8, c, func_800C6EF8]
       - [0xB774C, c, func_800C6F4C]
-      - [0xB77A0, asm]
+      - [0xB77A0, c, func_800C6FA0]
       # byte-triple fill loop; `while (i<n) { i++; ... }` puts the increment at the loop top (unfilled l
       - [0xB7898, c, func_800C7098]
       # matching C leaf
@@ -3697,6 +4208,7 @@ segments:
       # matching C leaf
       - [0xB8A70, c, func_800C8270]
       - [0xB8BA0, asm]
+      - [0xB9070, c, func_800C8870]
       # matching C leaf
       - [0xB9170, c, func_800C8970]
       # matching C leaf
@@ -3725,7 +4237,7 @@ segments:
       - [0xB9720, c, func_800C8F20]
       # twin of func_800C7DE4
       - [0xB9728, c, func_800C8F28]
-      - [0xB9794, asm]
+      - [0xB9794, c, func_800C8F94]
       # Phase 5U: C leaf func_800C9260 — VRAM 0x800C9260, size 0x8.
       # File span 0xB9A60–0xB9A68 exclusive. Empty jr/nop stub.
       - [0xB98A4, c, func_800C90A4]
@@ -3735,6 +4247,7 @@ segments:
       # matching C leaf
       - [0xB9A68, c, func_800C9268]
       - [0xB9B98, asm]
+      - [0xBA068, c, func_800C9868]
       # Phase 5CQ: C leaf func_800C9968 — file 0xBA168, size 0xC.
       - [0xBA168, c, func_800C9968]
       # Phase 5ED: mid-BA174 hole — sb+ret0 func_800C9C00.
@@ -3761,7 +4274,7 @@ segments:
       - [0xBA418, c, func_800C9C18]
       # twin of func_800C7DE4
       - [0xBA420, c, func_800C9C20]
-      - [0xBA48C, asm]
+      - [0xBA48C, c, func_800C9C8C]
       # Phase 5V: C leaf func_800C9EA0 — VRAM 0x800C9EA0, size 0x8.
       # File span 0xBA6A0–0xBA6A8 exclusive. Empty jr/nop stub.
       - [0xBA59C, c, func_800C9D9C]
@@ -3853,12 +4366,13 @@ segments:
       - [0xBCAC4, c, func_800CC2C4]
       # twin of func_800CC244 (0x224)
       - [0xBCC40, c, func_800CC440]
-      - [0xBCC80, asm]
+      - [0xBCC80, c, func_800CC480]
+      - [0xBCD5C, c, func_800CC55C]
       # 4 setup calls + 7 field->global copies; ONE pinned `register int v asm("$2")` reused for every v
       - [0xBCE44, c, func_800CC644]
       # twin of func_800CC644 (D_800F3380 block, func_800C3B04)
       - [0xBCEF8, c, func_800CC6F8]
-      - [0xBCFAC, asm]
+      - [0xBCFAC, c, func_800CC7AC]
       # twin of func_800CC644 (D_800F3338 block)
       - [0xBD078, c, func_800CC878]
       # field RMW + signed-char reload compare; statement order f8 before f3 is load-bearing
@@ -3910,7 +4424,7 @@ segments:
       - [0xBDAE4, c, func_800CD2E4]
       # matching C leaf
       - [0xBDAEC, c, func_800CD2EC]
-      - [0xBDC04, asm]
+      - [0xBDC04, c, func_800CD404]
       # 4 setup calls + 4 field->global copies then func_800C42A4(q-5, p-5, 1); one pinned `register int
       - [0xBDD0C, c, func_800CD50C]
       # Phase 5Z: C leaf func_800CD59C — VRAM 0x800CD59C, size 0x8.
@@ -3944,7 +4458,8 @@ segments:
       - [0xBE178, c, func_800CD978]
       # matching C leaf
       - [0xBE180, c, func_800CD980]
-      - [0xBE25C, asm]
+      - [0xBE25C, c, func_800CDA5C]
+      - [0xBE424, c, func_800CDC24]
       # Phase 5AA: C leaf func_800CDD04 — VRAM 0x800CDD04, size 0x8.
       # File span 0xBE504–0xBE50C exclusive. Empty jr/nop stub.
       - [0xBE504, c, func_800CDD04]
@@ -3999,9 +4514,10 @@ segments:
       - [0xBED60, c, func_800CE560]
       # func_800CE560 sibling through D_800F33E0->f8 + a1, 5th arg on the stack; i pinned $8
       - [0xBEDAC, c, func_800CE5AC]
-      - [0xBEE10, asm]
+      # default O2 G0
+      - [0xBEE10, c, func_800CE610]
       - [0xBEE88, c, func_800CE688]
-      - [0xBEF8C, asm]
+      - [0xBEF8C, c, func_800CE78C]
       - [0xBF070, c, func_800CE870]
       - [0xBF0F0, asm]
       # Phase 5ED: mid-BEC9C hole — sb+ret0 func_800D4850.
@@ -4013,6 +4529,10 @@ segments:
       # func_800CED3C wrapped in a D_800F34E4 != a0 guard. TRUE SIZE 0x78 (band said 0x7C)
       - [0xBF5A8, c, func_800CEDA8]
       - [0xBF620, asm]
+      # expand div
+      - [0xBFBAC, c, func_800CF3AC]
+      - [0xBFCB4, c, func_800CF4B4]
+      - [0xBFDB0, asm]
       # OT primitive linker: allocates 8 bytes from D_8009CDD8 inside D_800B0E58[D_8009CDDC], calls func
       - [0xBFEF8, c, func_800CF6F8]
       - [0xC0044, asm]
@@ -4021,7 +4541,8 @@ segments:
       - [0xC037C, asm]
       # signed angle delta with sign flag; `register int d asm("$2") / ad asm("$3")` pins stop cc1 coale
       - [0xC04F4, c, func_800CFCF4]
-      - [0xC0550, asm]
+      # lhu before volatile stack half
+      - [0xC0550, c, func_800CFD50]
       # 3D squared distance -> func_80078004, 0-to-1 clamp; needs 2.30 (nop between subu and mult after 
       - [0xC0694, c, func_800CFE94]
       # twin of func_800CFFAC with the three stores shifted one slot
@@ -4035,6 +4556,9 @@ segments:
       # (a2<<10)/a1 then func_80077DC4, *a0/4096 with the bgez/+0xFFF rounding, four -0x80/0x80 stores t
       - [0xC2524, c, func_800D1D24]
       - [0xC25EC, asm]
+      # default O2 G0
+      - [0xC42FC, c, func_800D3AFC]
+      - [0xC43C8, asm]
       # three short locals stored to the frame then passed by value to func_8006DCE4
       - [0xC4764, c, func_800D3F64]
       # D_800F32D0->f8->f0 clamp, 0x80 fallback via if/else into one exit
@@ -4053,10 +4577,11 @@ segments:
       - [0xC5060, c, func_800D4860]
       # Template sibling with two REAL divisions (needs MASPSX_EXPAND_DIV=1 for retail's div/bnez/break 
       - [0xC5128, c, func_800D4928]
-      - [0xC5424, asm]
+      - [0xC5424, c, func_800D4C24]
       # matching C leaf
       - [0xC56A4, c, func_800D4EA4]
-      - [0xC5810, asm]
+      - [0xC5810, c, func_800D5010]
+      - [0xC5A90, asm]
       # matching C leaf
       - [0xC6098, c, func_800D5898]
       - [0xC6200, asm]
@@ -4066,53 +4591,79 @@ segments:
       # Template sibling with two signed /24 magic divisions and a 4-byte unaligned blk copy from D_800C
       - [0xC6A9C, c, func_800D629C]
       - [0xC6D14, asm]
+      - [0xC721C, c, func_800D6A1C]
       # Same template family with an unaligned 4-byte struct copy at the top (blk = D_800C22D0 where D_8
       - [0xC7458, c, func_800D6C58]
       # Previously parked at 17 on the absolute-short-store blocker; CLOSED by the three-part recipe bel
       - [0xC763C, c, func_800D6E3C]
       # NEW LEVER (x4 so far): `if (c) break;` out of a switch case, with a shared `return 0` after the 
       - [0xC78C0, c, func_800D70C0]
-      - [0xC79B8, asm]
+      - [0xC79B8, c, func_800D71B8]
+      - [0xC7D1C, asm]
+      - [0xC7F64, c, func_800D7764]
       # matching C leaf
       - [0xC821C, c, func_800D7A1C]
-      - [0xC8370, asm]
+      - [0xC8370, c, func_800D7B70]
       # FieldEng effect dispatcher template: `switch (a0) { case 1: <field updates>; if (T < K) break; r
       - [0xC8678, c, func_800D7E78]
-      - [0xC87BC, asm]
+      - [0xC87BC, c, func_800D7FBC]
+      - [0xC8B88, asm]
+      - [0xC936C, c, func_800D8B6C]
       # FieldEng effect dispatcher template: `switch (a0) { case 1: <field updates>; if (T < K) break; r
       - [0xC9514, c, func_800D8D14]
-      - [0xC9674, asm]
+      - [0xC9674, c, func_800D8E74]
+      - [0xC9A7C, asm]
+      - [0xC9D54, c, func_800D9554]
+      - [0xC9EF4, asm]
       # FieldEng effect dispatcher template: `switch (a0) { case 1: <field updates>; if (T < K) break; r
       - [0xCA65C, c, func_800D9E5C]
-      - [0xCA7D4, asm]
+      - [0xCA7D4, c, func_800D9FD4]
+      - [0xCA9FC, asm]
+      - [0xCADD4, c, func_800DA5D4]
       # effect-dispatcher template; the `vec[3] = 0` store must be written AFTER the vec[2] expression s
       - [0xCAF80, c, func_800DA780]
-      - [0xCB134, asm]
+      - [0xCB134, c, func_800DA934]
       # unlocked by the switch-break lever (was 8). MASPSX_EXPAND_DIV=1.
       - [0xCB398, c, func_800DAB98]
-      - [0xCB4A4, asm]
+      - [0xCB4A4, c, func_800DACA4]
       # FieldEng effect dispatcher: case 1 updates fields with /64 rounding divisions and a 1000*T shift
       - [0xCB78C, c, func_800DAF8C]
-      - [0xCB8D0, asm]
+      - [0xCB8D0, c, func_800DB0D0]
+      - [0xCBA5C, asm]
       # unlocked by the switch-break lever (was 33 mismatches with return 0/return 1).
       - [0xCBDF4, c, func_800DB5F4]
       - [0xCBEBC, asm]
+      - [0xCC29C, c, func_800DBA9C]
       # effect-dispatcher template; `t = func_80077AA4(...) & 0xFFFF;` (masking at the assignment, not a
       - [0xCC4D8, c, func_800DBCD8]
-      - [0xCC66C, asm]
+      - [0xCC66C, c, func_800DBE6C]
+      - [0xCC858, asm]
+      - [0xCCDBC, c, func_800DC5BC]
+      - [0xCCF50, c, func_800DC750]
       # FieldEng effect dispatcher template: `switch (a0) { case 1: <field updates>; if (T < K) break; r
       - [0xCD110, c, func_800DC910]
-      - [0xCD280, asm]
+      - [0xCD280, c, func_800DCA80]
+      # default O2 G0
+      - [0xCD4CC, c, func_800DCCCC]
+      - [0xCD694, c, func_800DCE94]
       # 3-case (0/1/2) effect dispatcher; switch-break lever for case 1, and the case-0 `*(int*)(a1+4) =
       - [0xCD99C, c, func_800DD19C]
-      - [0xCDB80, asm]
+      - [0xCDB80, c, func_800DD380]
+      - [0xCDF6C, c, func_800DD76C]
+      - [0xCE1E4, asm]
+      - [0xCE570, c, func_800DDD70]
+      - [0xCE8A8, asm]
+      - [0xCF230, c, func_800DEA30]
+      - [0xCF7FC, c, func_800DEFFC]
+      - [0xCFEAC, c, func_800DF6AC]
       # matching C leaf
       - [0xD007C, c, func_800DF87C]
       # matching C leaf
       - [0xD01B0, c, func_800DF9B0]
       # guarded sub-object update; (unsigned int) cast on the f1A>=fF compare selects sltu
       - [0xD0320, c, func_800DFB20]
-      - [0xD0378, asm]
+      # Lead-found leftover: LINK_EXACT src written 04:55 UTC (pre-outage), never manifested. Re-verifie
+      - [0xD0378, c, func_800DFB78]
   # End of file: 0x1EE800 = 2,025,472 bytes (verified size).
       - [0xD0444, c, func_800DFC44]
       # matching C leaf
@@ -4131,8 +4682,10 @@ segments:
       - [0xD0824, c, func_800E0024]
       # walk D_800B0E5C backwards in 0x14 steps clearing non-zero bytes, counter only advances on a hit
       - [0xD0860, c, func_800E0060]
-      - [0xD08CC, asm]
+      - [0xD08CC, c, func_800E00CC]
       # switch(p[0xA]) dispatch over a 0x14-stride table walked backwards
       - [0xD09BC, c, func_800E01BC]
-      - [0xD0A6C, asm]
+      - [0xD0A6C, c, func_800E026C]
+      - [0xD0BA0, c, func_800E03A0]
+      - [0xD0D1C, asm]
   - [0x1EE800]

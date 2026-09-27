@@ -7,13 +7,6 @@
  */
 #include "psx_compat.h"
 
-void func_8005E57C(int value)
-{
-    PE_StoreU32(0x8009D120u, (uint32_t)value);
-}
+/* func_8005E57C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8005E57C_port.c (src/func_8005E57C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-/* Matched three-word leaf: standalone menu background source. */
-void func_8005E6E4(int value)
-{
-    PE_StoreU32(0x8009D134u, (uint32_t)value);
-}
+/* func_8005E6E4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8005E6E4_port.c (src/func_8005E6E4.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

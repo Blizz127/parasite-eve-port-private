@@ -8,6 +8,8 @@ void PE_Timer1_Reset(void);
 void PE_Timer1_InitializeVBlankCounter(void);
 uint32_t PE_Timer1_ReadCounter(void);
 uint32_t PE_Timer1_ReadMode(void);
+/* Same value as ReadMode without clearing the reached flags (pe_mmio shadow). */
+uint32_t PE_Timer1_PeekMode(void);
 int PE_Timer1_HBlankEdge(PeIrqGeneration generation);
 int PE_Timer1_VBlankEdge(PeIrqGeneration generation);
 #endif

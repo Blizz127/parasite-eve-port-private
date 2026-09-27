@@ -13,11 +13,7 @@
 #define SW(o,v) PE_StoreU32(A(o),(uint32_t)(v))
 #define CHECK() do {if(PE_Port_StopEpoch()!=epoch)goto done;} while(0)
 
-void func_80038940(int id,uint32_t r,uint32_t g,uint32_t b)
-{
-    (void)id;
-    PE_StoreU8(0x8009CEC4u,(uint8_t)r);PE_StoreU8(0x8009CEC8u,(uint8_t)g);PE_StoreU8(0x8009CECCu,(uint8_t)b);
-}
+/* func_80038940: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80038940_port.c (src/func_80038940.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 static int message_list(pe_addr_t scratch,const uint16_t *tail)
 {

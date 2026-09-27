@@ -213,23 +213,11 @@ int func_8007F72C(void)
     return (func_8007F778() > 0) ? 2 : 1;
 }
 
-int func_8007F778(void)
-{
-    return (int)PE_LoadU32(0x800A3608u);
-}
+/* func_8007F778: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8007F778_port.c (src/func_8007F778.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-int func_80080CC8(int v)
-{
-    int old = (int)PE_LoadU32(0x8009AFC0u);
-    PE_StoreU32(0x8009AFC0u, (uint32_t)v);
-    return old;
-}
+/* func_80080CC8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80080CC8_port.c (src/func_80080CC8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-int func_8007F7A8(void)
-{
-    /* func_8007FCAC — src C leaf getter D_8009B590 */
-    return (int)PE_LoadU32(0x8009B590u);
-}
+/* func_8007F7A8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8007F7A8_port.c (src/func_8007F7A8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 /* ── Batch 3: real-disc providers ────────────────────────────────────── */
 
@@ -251,14 +239,7 @@ static int PE_Cd_BcdByte(uint8_t b)
     return ((b >> 4) * 10) + (b & 0x0F);
 }
 
-/* func_80080C48 — CdPosToInt: BCD mm/ss/ff at fp → ((m*60+s)*75+f) - 150. */
-int func_80080C48(pe_addr_t fp)
-{
-    int m = PE_Cd_BcdByte(PE_LoadU8(fp + 0));
-    int s = PE_Cd_BcdByte(PE_LoadU8(fp + 1));
-    int f = PE_Cd_BcdByte(PE_LoadU8(fp + 2));
-    return ((m * 60 + s) * 75 + f) - 150;
-}
+/* func_80080C48: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80080C48_port.c (src/func_80080C48.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 /* func_80080D5C is the blocking command wrapper at [0x80080D5C,
  * 0x80080DC4). With the device enabled it uses the original queue/poll
@@ -417,24 +398,7 @@ pe_addr_t func_8007E6B0(void)
     return 0x800A3540u + idx * 0x18u;
 }
 
-/* func_80080950 — 4-byte copy-or-clear helper (asm/disc1/71150.s, 18
- * words).  src != 0: copies 4 bytes src -> dst when dst != 0, else
- * nothing.  src == 0: clears one byte at dst when dst != 0.  Callers
- * discard the result. */
-void func_80080950(pe_addr_t dst, pe_addr_t src)
-{
-    uint32_t i;
-
-    if (src == 0u) {
-        if (dst != 0u)
-            PE_StoreU8(dst, 0u);
-        return;
-    }
-    if (dst == 0u)
-        return;
-    for (i = 0u; i < 4u; i++)
-        PE_StoreU8(dst + i, PE_LoadU8(src + (pe_addr_t)i));
-}
+/* func_80080950: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80080950_port.c (src/func_80080950.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 /* func_8007C214 — streaming DMA-completion callback (asm/disc1/6C93C.s,
  * 35 words).  Publishes status 2 to the active 32-byte stream record
@@ -523,13 +487,7 @@ int func_8007FB44(uint32_t cmd, uint32_t data)
     return func_8007FCFC(cmd & 0xFFu, data);
 }
 
-/* Phase 6E-B558 — func_80073DE8 (4 words, 0x80073DE8..0x80073DF8):
- * already a matching src/ leaf (src/func_80073DE8.c): 16-bit unsigned
- * getter for D_800945E6.  Ported as the same guest halfword read. */
-unsigned short func_80073DE8(void)
-{
-    return PE_LoadU16(0x800945E6u);
-}
+/* func_80073DE8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80073DE8_port.c (src/func_80073DE8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 /* Phase 6E-B558 — func_8007B9EC (53 words, 0x8007B9EC..0x8007BAC0):
  * CD latch block, transcribed through the CD-register shadow

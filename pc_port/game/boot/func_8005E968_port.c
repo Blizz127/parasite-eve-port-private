@@ -28,8 +28,4 @@
 #define GA_COLOR_ORIG   (0x8009CD70u + 0x3A0u)  /* D_8009D110 */
 #define GA_COLOR_HALF   (0x8009CD70u + 0x3A4u)  /* D_8009D114 */
 
-void func_8005E968(uint32_t packed)
-{
-    PE_StoreU32(GA_COLOR_ORIG, packed);
-    PE_StoreU32(GA_COLOR_HALF, (packed >> 1) & 0x007F7F7Fu);
-}
+/* func_8005E968: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8005E968_port.c (src/func_8005E968.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

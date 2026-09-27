@@ -58,6 +58,18 @@ class BoundaryCheckTest(unittest.TestCase):
         self.assertEqual(interior, [])
         self.assertTrue(interior_ok)
 
+    def test_indirect_tail_jr_is_ok(self) -> None:
+        vram = 0x80010000
+        # lui / lw / nop / jr $t1 / nop  (func_8007E204 shape, shortened)
+        words = [0x3C09000A, 0x8D2934C8, 0x00000000, 0x01200008, 0x00000000]
+        retail = make_retail(vram, words)
+        label, ok, total, interior, interior_ok = boundary_check(retail, vram, 0x14)
+        self.assertEqual(label, "tail_jr")
+        self.assertTrue(ok)
+        self.assertEqual(total, 0)
+        self.assertEqual(interior, [])
+        self.assertTrue(interior_ok)
+
     def test_non_boundary_terminator_fails(self) -> None:
         vram = 0x80010000
         words = [0x24020001, 0x24630001]  # li v0,1; addiu v1,v1,1

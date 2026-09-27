@@ -221,90 +221,15 @@ int func_80017588(pe_addr_t args)
     return 1;
 }
 
-int func_80017D5C(pe_addr_t args)
-{
-    (void)args;
-    PE_StoreU32(0x8009D2E8u, PE_LoadU32(0x8009D2E8u) & ~1u);
-    return 1;
-}
+/* func_80017D5C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80017D5C_port.c (src/func_80017D5C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-int func_80017D7C(pe_addr_t args)
-{
-    (void)args;
-    PE_StoreU32(0x8009D2E8u, PE_LoadU32(0x8009D2E8u) | 1u);
-    return 1;
-}
+/* func_80017D7C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80017D7C_port.c (src/func_80017D7C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-int func_80017D9C(pe_addr_t args)
-{
-    pe_addr_t actor;
+/* func_80017D9C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80017D9C_port.c (src/func_80017D9C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-    (void)args;
-    actor = PE_LoadU32(GA_D_8009D2F0);
-    PE_StoreU32(actor + 0x98u, PE_LoadU32(actor + 0x98u) | 0x40u);
-    return 1;
-}
+/* func_80017AE8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80017AE8_port.c (src/func_80017AE8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-int func_80017AE8(pe_addr_t args)
-{
-    pe_addr_t actor;
-    unsigned int command;
-
-    actor = PE_LoadU32(GA_D_8009D2F0);
-    command = PE_LoadU16(PE_LoadU32(args));
-    func_8001A680_command_cut(actor, command);
-    PE_StoreU32(actor + 0x98u, PE_LoadU32(actor + 0x98u) & ~0x100u);
-    return 1;
-}
-
-/*
- * PE-BTL89 — opcode 0xC6 command-wait 13300.
- *
- * 58 words 0x80013300..0x800133E8, SHA-256 27e1042f…81a9.
- * D_800910A0[0xC6]. jal 1A680. First visit sets task+8
- * bit 0x20, starts the command, clears +0x98 bit 0x100,
- * rewinds CE00 by 0xC, delay=1, v0=0. Later visits wait
- * until actor+0x0F!=0 and sltu(+0x14,+0x18) (or swapped
- * when +0x1C<0), then clear bit 0x20 and return 1.
- * Type-0 +0x12D4 imm 0x1D is after the 0x20 sleep.
- */
-int func_80013300(pe_addr_t args)
-{
-    pe_addr_t task;
-    pe_addr_t actor;
-    uint16_t flags;
-    uint32_t ready;
-
-    task = PE_LoadU32(GA_D_8009D300);
-    flags = PE_LoadU16(task + 8u);
-    actor = PE_LoadU32(GA_D_8009D2F0);
-    if ((flags & 0x20u) == 0u) {
-        unsigned int command;
-
-        PE_StoreU16(task + 8u, (uint16_t)(flags | 0x20u));
-        command = PE_LoadU16(PE_LoadU32(args));
-        func_8001A680_command_cut(actor, command);
-        PE_StoreU32(actor + 0x98u, PE_LoadU32(actor + 0x98u) & ~0x100u);
-        PE_StoreU32(GA_D_8009CE00, PE_LoadU32(GA_D_8009CE00) - 0xCu);
-        PE_StoreU32(task + 0x10u, 1u);
-        return 0;
-    }
-    if (PE_LoadU8(actor + 0x0Fu) == 0u) {
-        PE_StoreU16(task + 8u, (uint16_t)(flags & 0xFFDFu));
-        return 1;
-    }
-    if ((int32_t)PE_LoadU32(actor + 0x1Cu) >= 0)
-        ready = PE_LoadU32(actor + 0x14u) < PE_LoadU32(actor + 0x18u);
-    else
-        ready = PE_LoadU32(actor + 0x18u) < PE_LoadU32(actor + 0x14u);
-    if (ready == 0u) {
-        PE_StoreU32(GA_D_8009CE00, PE_LoadU32(GA_D_8009CE00) - 0xCu);
-        PE_StoreU32(task + 0x10u, 1u);
-        return 0;
-    }
-    PE_StoreU16(task + 8u, (uint16_t)(flags & 0xFFDFu));
-    return 1;
-}
+/* func_80013300: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80013300_port.c (src/func_80013300.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 int func_80017EC4(pe_addr_t args)
 {
@@ -321,32 +246,6 @@ int func_80017EC4(pe_addr_t args)
     return 1;
 }
 
-int func_80017B34(pe_addr_t args)
-{
-    pe_addr_t actor;
-    uint32_t imm;
-    uint32_t cur;
+/* func_80017B34: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80017B34_port.c (src/func_80017B34.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-    actor = PE_LoadU32(GA_D_8009D2F0);
-    imm = PE_LoadU16(PE_LoadU32(args));
-    cur = PE_LoadU8(actor + 0x0Fu);
-    if (cur < imm)
-        imm = cur;
-    PE_StoreU16(actor + 0x12u, (uint16_t)imm);
-    PE_StoreU32(actor + 0x98u, PE_LoadU32(actor + 0x98u) | 0x200u);
-    return 1;
-}
-
-int func_80017B74(pe_addr_t args)
-{
-    pe_addr_t actor;
-    pe_addr_t task;
-
-    (void)args;
-    task = PE_LoadU32(0x8009D300u);
-    actor = PE_LoadU32(GA_D_8009D2F0);
-    PE_StoreU32(task + 0x10u, 1u);
-    if (PE_LoadU16(actor + 0x16u) != PE_LoadU16(actor + 0x12u))
-        PE_StoreU32(0x8009CE00u, PE_LoadU32(0x8009CE00u) - 8u);
-    return 0;
-}
+/* func_80017B74: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80017B74_port.c (src/func_80017B74.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

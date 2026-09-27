@@ -1,0 +1,12 @@
+extern int func_800824C8(void (*)());
+extern int func_800824DC(void (*)());
+extern void func_80081E70();
+extern void func_8008214C();
+extern int D_8009B70C;
+
+int func_80081D74(int a0, int a1)
+{
+    int *p = &D_8009B70C;
+
+    if (*p == 1) goto ret0; p[-8] = -1; p[-7] = 0; p[-5] = 0; p[-6] = a0; p[-4] = a1; p[-3] = func_800824C8(func_80081E70); p[-2] = func_800824DC(func_8008214C); *p = 1; return 1; ret0: return 0;
+}

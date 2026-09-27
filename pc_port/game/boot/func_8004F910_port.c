@@ -12,8 +12,8 @@ void func_8005F354(pe_addr_t text,int32_t width)
     func_8005E8A4((int32_t)((uint32_t)width-measured-4u)>>1,0);
     func_8005F27C(text);func_8005E914();
 }
-void func_8005F594(pe_addr_t text) {func_8005F354(text,(int32_t)PE_LoadU32(0x8009D138u));}
-void func_80064C30(pe_addr_t text) {func_8005F354(text,(int32_t)PE_LoadU32(0x8009D164u));}
+/* func_8005F594: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8005F594_port.c (src/func_8005F594.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_80064C30: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80064C30_port.c (src/func_80064C30.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 void func_80064C54(uint32_t id) {func_80064C30(func_8005DC4C(id));}
 void func_80062A7C(uint32_t id) {func_8005F594(func_8005DC4C(id));}
 
@@ -30,16 +30,8 @@ pe_addr_t func_80053068(int32_t index)
     return 0u;
 }
 
-void func_80052BCC(pe_addr_t destination,pe_addr_t source)
-{
-    uint8_t value;
-    do {value=PE_LoadU8(source++);PE_StoreU8(destination++,value);} while (value!=255u);
-}
-void func_80052C08(pe_addr_t destination,pe_addr_t source)
-{
-    while (PE_LoadU8(destination)!=255u) destination++;
-    func_80052BCC(destination,source);
-}
+/* func_80052BCC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80052BCC_port.c (src/func_80052BCC.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_80052C08: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80052C08_port.c (src/func_80052C08.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 void func_80050878(uint32_t index)
 {
@@ -54,16 +46,14 @@ void func_80050878(uint32_t index)
     else if (action==3u) func_8005EB58(PE_LoadU32(0x8009CF08u));
     func_80064C30(func_8005DC4C(action));
 }
-void func_8004F910(pe_addr_t list)
-{func_80052E30(PE_LoadU32(0x8009CF10u));func_800638D8(list,0x80050878u);}
-void func_800509A8(uint32_t index)
-{func_8005EB58(0u);func_80064C54(PE_LoadU32(0x8009CF14u)+index);}
-void func_8004F950(pe_addr_t list) {func_800638D8(list,0x800509A8u);}
-void func_80050CF8(void) {func_80064C54(8u);}
-void func_8004FFA8(pe_addr_t list) {func_800638D8(list,0x80050CF8u);}
+/* func_8004F910: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8004F910_port.c (src/func_8004F910.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_800509A8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800509A8_port.c (src/func_800509A8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_8004F950: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8004F950_port.c (src/func_8004F950.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_80050CF8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80050CF8_port.c (src/func_80050CF8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_8004FFA8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8004FFA8_port.c (src/func_8004FFA8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-void func_800631AC(pe_addr_t window) {if (window) PE_StoreU32(window+72u,1u);}
-void func_8004D024(pe_addr_t callback) {PE_StoreU32(0x8009CFFCu,callback);}
+/* func_800631AC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800631AC_port.c (src/func_800631AC.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_8004D024: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8004D024_port.c (src/func_8004D024.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 void func_8004CDD4(pe_addr_t window)
 {func_8005E8A4(0,10);func_8005F594(PE_LoadU32(window+36u)==61u?0x800A1A60u:0x800A1A20u);}
 

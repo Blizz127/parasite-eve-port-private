@@ -22,19 +22,4 @@
 #include "psx_compat.h"
 #include "pe_port_compat.h"
 
-int func_8004AFA4(pe_addr_t node, uint32_t event)
-{
-    pe_addr_t list = func_80062A20(node, 0u);
-
-    if (event & 0x10000u) {
-        func_800525EC();
-        func_80052790(func_80063428(list));
-        func_80062F1C(node);
-        return 1;
-    }
-    if (event & 0x40u) {
-        func_80062F1C(node);
-        func_80052634();
-    }
-    return 1;
-}
+/* func_8004AFA4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8004AFA4_port.c (src/func_8004AFA4.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

@@ -45,45 +45,7 @@
 
 
 
-int func_8006C4C4(int a0)
-{
-    unsigned int status;
-    unsigned int overlay_word;
-    int slot;
-    int current;
-
-    if (a0 == -1) {
-        status = PE_LoadU8(GA_OVERLAY + 0x0Du);
-        PE_StoreU8(GA_OVERLAY + 0x0Cu, (uint8_t)status);
-        PE_StoreU8(GA_OVERLAY + 0x0Eu,
-                   (uint8_t)(PE_LoadU8(GA_OVERLAY + 0x0Eu) | 3u));
-    }
-
-    overlay_word = PE_LoadU32(GA_OVERLAY);
-    if (((D_8009D1A0 & 2u) != 0u) || ((overlay_word & 2u) != 0u)) {
-        PE_StoreU8(GA_OVERLAY + 0x0Eu,
-                   (uint8_t)(PE_LoadU8(GA_OVERLAY + 0x0Eu) | 2u));
-        PE_StoreU32(GA_D2E8, PE_LoadU32(GA_D2E8) & ~2u);
-    }
-
-    status = PE_LoadU8(GA_OVERLAY + 0x0Eu);
-    if ((status & 4u) != 0u) {
-        PE_StoreU8(GA_OVERLAY + 0x0Eu, (uint8_t)((status | 3u) & ~4u));
-    }
-
-    if ((unsigned int)(a0 - 1) < 8u) {
-        current = (int)(int8_t)PE_LoadU8(GA_OVERLAY + 0x0Du);
-        if (a0 != current) {
-            slot = a0;
-            PE_StoreU8(GA_OVERLAY + 0x0Du, (uint8_t)slot);
-            PE_StoreU8(GA_OVERLAY + 0x0Cu, (uint8_t)slot);
-            PE_StoreU8(GA_OVERLAY + 0x0Eu,
-                       (uint8_t)(PE_LoadU8(GA_OVERLAY + 0x0Eu) | 1u));
-        }
-    }
-
-    return 0;
-}
+/* func_8006C4C4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8006C4C4_port.c (src/func_8006C4C4.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 void func_8006C5BC_ee13_epilogue_cut(void)
 {

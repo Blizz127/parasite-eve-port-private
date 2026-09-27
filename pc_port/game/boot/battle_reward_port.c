@@ -135,7 +135,7 @@ void func_80050D20(uint32_t index)
     func_800605F8((int32_t)((uint32_t)level+1u));
 }
 
-void func_8004FFF8(pe_addr_t list) {func_800638D8(list,0x80050D20u);}
+/* func_8004FFF8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8004FFF8_port.c (src/func_8004FFF8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 /* 4BF40..4C1E0: animate level, max HP, BP and six stat bars before voice stop. */
 void func_8004BF40(void)
@@ -199,13 +199,9 @@ int32_t func_80051DF8(int32_t index)
     return product/20;
 }
 
-int32_t func_80057ECC(void) { return reward_word(0x8009D078u); }
+/* func_80057ECC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80057ECC_port.c (src/func_80057ECC.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-void func_80052764(void)
-{
-    uint32_t voice=PE_LoadU32(0x8009D01Cu);
-    if (voice) {func_800866A4(voice,0u);PE_StoreU32(0x8009D01Cu,0u);}
-}
+/* func_80052764: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80052764_port.c (src/func_80052764.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 void func_8004B90C(void)
 {
@@ -253,8 +249,7 @@ void func_8004BC80(void)
     PE_StoreU32(window+48u,0x8004BCB4u);
 }
 
-void func_8004BCB4(void)
-{ func_8005E8A4(0,4);func_8005F594(func_8005DC4C(25u)); }
+/* func_8004BCB4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8004BCB4_port.c (src/func_8004BCB4.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 void func_8004B970(void)
 {
@@ -311,12 +306,7 @@ void func_8004C4B4(uint32_t ability)
     PE_StoreU32(0x8009CFF4u,ability);
 }
 
-void func_8004C520(void)
-{
-    func_8005E8A4(2,4);func_8005F594(func_8005DC4C(38u));
-    func_8005E8A4(0,16);func_8005F594(func_8005DC9C(PE_LoadU32(0x8009CFF4u)+235u));
-    func_8005E8A4(2,20);func_8005F27C(func_8005DCEC(PE_LoadU32(0x8009CFF4u)+235u));
-}
+/* func_8004C520: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8004C520_port.c (src/func_8004C520.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 int func_80055668(uint32_t level)
 {
@@ -372,22 +362,7 @@ int32_t func_8005382C(int32_t count)
     return -1;
 }
 
-void func_80063D78(pe_addr_t list,int32_t column,int32_t row)
-{
-    int32_t top,rows;
-    if (column<0) column=0;
-    else if (column>=reward_word(list+84u)) column=(int32_t)(PE_LoadU32(list+84u)-1u);
-    if (row<0) row=0;
-    else if (row>=reward_word(list+88u)) row=(int32_t)(PE_LoadU32(list+88u)-1u);
-    top=reward_word(list+92u);
-    PE_StoreU32(list+68u,(uint32_t)column);PE_StoreU32(list+72u,(uint32_t)row);
-    if (row<top) PE_StoreU32(list+92u,(uint32_t)row);
-    else {
-        rows=reward_word(list+56u);
-        if (row>=(int32_t)((uint32_t)top+(uint32_t)rows))
-            PE_StoreU32(list+92u,(uint32_t)row-(uint32_t)rows+1u);
-    }
-}
+/* func_80063D78: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80063D78_port.c (src/func_80063D78.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 void func_80048654(void)
 {
@@ -422,14 +397,9 @@ void func_8004FCF8(pe_addr_t list)
     }
 }
 
-void func_8004FD68(pe_addr_t list)
-{ func_80052E30(1u);func_800638D8(list,0x80050BE8u); }
+/* func_8004FD68: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8004FD68_port.c (src/func_8004FD68.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-void func_80050B94(uint32_t index)
-{
-    if (index!=(uint32_t)func_80063428(PE_LoadU32(0x8009CEF4u))) func_8005EB58(1u);
-    func_8005E8A4(-2,-2);func_8005EB64(index+96u);
-}
+/* func_80050B94: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80050B94_port.c (src/func_80050B94.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 void func_80050BE8(uint32_t index) {func_80057F14(index);}
 

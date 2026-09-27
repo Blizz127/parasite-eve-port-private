@@ -100,29 +100,12 @@ int func_80067730(uint32_t index, uint32_t on, uint32_t a2, uint32_t a3)
     return 0;
 }
 
-void func_8003746C(int id)
-{
-    unsigned int slot;
-    for (slot = 0u; slot < 4u; slot++) {
-        pe_addr_t rec = GA_MSG_POOL + slot * MSG_STRIDE;
-        if ((int)(int16_t)PE_LoadU16(rec + 0x10u) == (int)(int16_t)id &&
-            PE_LoadU8(rec) != 0u) {
-            PE_StoreU8(rec, 0u);
-            return;
-        }
-    }
-}
+/* func_800375B4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800375B4_port.c (src/func_800375B4.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_8003746C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8003746C_port.c (src/func_8003746C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-void func_80037454(int a0, int a1, int a2, int a3)
-{
-    PE_StoreU16(0x8009CE98u, (uint16_t)a0);
-    PE_StoreU16(0x8009CE9Au, (uint16_t)a1);
-    PE_StoreU16(0x8009CE9Cu, (uint16_t)a2);
-    PE_StoreU16(0x8009CE9Eu, (uint16_t)a3);
-}
+/* func_80037454: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80037454_port.c (src/func_80037454.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-void func_800375B4(void) { PE_StoreU8(0x8009CED0u, 1u); }
-void func_800375C4(void) { PE_StoreU8(0x8009CED0u, 0u); }
+/* func_800375C4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800375C4_port.c (src/func_800375C4.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 /*
  * 6F820 (51w 0x8006F820..0x8006F8EC): progress-flag record access.

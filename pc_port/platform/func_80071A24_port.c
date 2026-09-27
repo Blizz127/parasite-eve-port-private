@@ -25,8 +25,15 @@
 
 pe_addr_t func_80071A24(pe_addr_t dst, uint32_t len)
 {
+    /* psx-spx "BIOS Memory Fill/Copy/Compare": A(28h) bzero is "Same as
+     * memset, but uses 00h as fixed fillbyte value", and memset "Refuses to
+     * fill memory when dst=00000000h or when len>7FFFFFFFh. The return value
+     * is the incoming 'dst' value (or zero, when len=0 or len>7FFFFFFFh)."
+     * (see pe_bios_string.h). */
+    if (len == 0u || len > 0x7FFFFFFFu)
+        return 0u;
+    if (dst == 0u)
+        return dst;
     PE_Fill(dst, len, 0);
-    /* A(28h) is the BIOS memset-family routine: return the incoming dst.
-     * func_80064964 ignores this value, but other retail call sites do not. */
     return dst;
 }

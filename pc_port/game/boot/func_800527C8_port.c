@@ -84,7 +84,7 @@ extern void func_80042C78(void);
 void func_800527C8(void)
 {
     func_8005B890(0);
-    func_8005BC98(0);                /* a0 ignored by the retail leaf */
+    func_8005BC98();                 /* a0 ignored by the retail leaf */
     PE_StoreU32(GA_D_8009D02C, 0u);
     PE_StoreU32(GA_D_8009D030, 0u);
     PE_StoreU32(GA_D_8009D034, 0u);
@@ -101,7 +101,7 @@ void func_800527C8(void)
     func_8005D6F4();
     func_80051CC4();
     func_80042C78();
-    func_8005BC98(1);                /* a0 ignored by the retail leaf */
+    func_8005BC98();                 /* a0 ignored by the retail leaf */
     D_800B0CD8 |= 0x40000000u;       /* jal delay slot: before 371A4 */
     func_800371A4(1);
 }

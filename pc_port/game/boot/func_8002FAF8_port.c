@@ -34,12 +34,7 @@ static void pe_2faf8_1a680(pe_addr_t actor, unsigned int command)
     func_8001A680_command_cut(actor,command&0xFFFFu);
 }
 
-/* 6DCE4 forwards the current battle sound bank and signed coordinates. */
-int32_t func_8006DCE4(unsigned int id, unsigned int group, int x, int y, int z)
-{
-    return func_8006DED4(PE_LoadU32(0x800B0E64u),(int)id,(int)group,
-        (int16_t)x,(int16_t)y,(int16_t)z);
-}
+/* func_8006DCE4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8006DCE4_port.c (src/func_8006DCE4.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 static void pe_2faf8_activate(pe_addr_t slot, pe_addr_t actor,
                              unsigned int code)

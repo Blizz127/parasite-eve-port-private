@@ -48,31 +48,11 @@ extern void func_80087024(void);
 static uint32_t ea_value(pe_addr_t args,unsigned index)
 {return PE_LoadU32(PE_LoadU32(args+index*4u));}
 
-/* SEW21: two signed-byte music-channel records, 6DB48..6DC18. */
-int func_8006DB48(uint32_t slot,uint32_t id,uint32_t handle,uint32_t volume)
-{
-    PE_StoreU8(0x800B0DB4u+slot*2u,(uint8_t)id);
-    PE_StoreU8(0x800B0DB5u+slot*2u,(uint8_t)handle);
-    PE_StoreU8(0x800B0DD6u+slot,(uint8_t)volume);
-    if (slot<2u)
-        PE_StoreU32(0x800B0CD8u,PE_LoadU32(0x800B0CD8u)|(0x40u<<slot));
-    return 0;
-}
+/* func_8006DB48: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8006DB48_port.c (src/func_8006DB48.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-int func_8006DB9C(int32_t id)
-{
-    for (unsigned i=0;i<2;i++)
-        if ((int8_t)PE_LoadU8(0x800B0DB4u+i*2u)==id)
-            return (int8_t)PE_LoadU8(0x800B0DB5u+i*2u);
-    return -1;
-}
+/* func_8006DB9C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8006DB9C_port.c (src/func_8006DB9C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-int func_8006DBE0(int32_t id)
-{
-    for (unsigned i=0;i<2;i++)
-        if ((int8_t)PE_LoadU8(0x800B0DB4u+i*2u)==id) return (int)i;
-    return -1;
-}
+/* func_8006DBE0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8006DBE0_port.c (src/func_8006DBE0.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 /* Original EA205/206/207 share the channel-record update at16150. */
 static int ea_music_volume(pe_addr_t args,uint32_t key)
@@ -244,14 +224,7 @@ static int ea_animation_sound(pe_addr_t args, uint32_t key)
     return 1;
 }
 
-/* Original6D24C..6D2B8, reached by EA217 at162A0. */
-void func_8006D24C(void)
-{
-    for (unsigned i=0;i<6u;i++)
-        PE_StoreU8(0x800B0DB2u+i,0xFFu);
-    PE_StoreU32(0x800B0CD8u,PE_LoadU32(0x800B0CD8u)&~0xF0u);
-    func_80086FF8();
-}
+/* func_8006D24C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8006D24C_port.c (src/func_8006D24C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 int func_80015DAC_default_cut(pe_addr_t args)
 {
@@ -345,20 +318,4 @@ int func_800173F4(pe_addr_t args)
     return 1;
 }
 
-int func_80017E20(pe_addr_t args)
-{
-    uint32_t left;
-    uint32_t right;
-    pe_addr_t actor;
-    uint32_t off;
-
-    left = PE_LoadU32(PE_LoadU32(args));
-    right = PE_LoadU32(PE_LoadU32(args + 4u));
-    if (left != right) {
-        actor = PE_LoadU32(GA_D_8009D2F0);
-        off = PE_LoadU32(PE_LoadU32(args + 8u));
-        PE_StoreU32(GA_D_8009CE00,
-                    PE_LoadU32(actor + 0x9Cu) + (off << 1));
-    }
-    return 1;
-}
+/* func_80017E20: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80017E20_port.c (src/func_80017E20.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

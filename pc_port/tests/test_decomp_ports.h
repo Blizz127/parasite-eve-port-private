@@ -58,7 +58,6 @@ extern void func_8007DD14(unsigned int value);     /* 73CF4(4, value)    */
 extern void func_80085DC4(int value);              /* 73CC4(9, value)    */
 extern void func_8007DE78(void);                   /* two boundaries     */
 extern void func_8004E94C(void);                   /* boundary with arg  */
-extern void func_800506E8(void);                   /* zero-arg boundary  */
 
 /* Retail .data: eight 32-bit DMA callback identities (see pe_libetc.c). */
 #define DECOMP_DMA_CB_TABLE 0x800956C0u
@@ -322,9 +321,13 @@ static void test_DECOMP_boundary_argument_vector(void)
     PE_Decomp_ResetBoundaries();
     Bootstrap_ResetArg4CallLog();
 
-    /* func_8004E94C: func_8004E704(D_8009CF0C - 1). */
+    /* The generated shim a TU emits for an unresolved 1-argument callee,
+     * exactly as func_8004E94C (`func_8004E704(D_8009CF0C - 1)`) spelled it
+     * before func_8004E704 got a hand adapter (absent_lo2_port.c, 2026-09-24);
+     * func_8004E94C itself now calls the real window builder. */
     PE_StoreU32(0x8009CF0Cu, 7u);
-    func_8004E94C();
+    (void)PE_D_COMP_BOUNDARY1("func_8004E704", 0x8004E704u,
+                              (int)PE_LoadU32(0x8009CF0Cu) - 1);
     ASSERT(PE_Decomp_BoundaryCount() == 1,
            "the unresolved callee must register exactly one boundary");
     ASSERT(strcmp(PE_Decomp_BoundaryName(0), "func_8004E704") == 0,
@@ -336,11 +339,11 @@ static void test_DECOMP_boundary_argument_vector(void)
     /* Zero-argument boundaries forward no registers. */
     PE_Decomp_ResetBoundaries();
     Bootstrap_ResetArg4CallLog();
-    func_800506E8();
-    /* 50BE8 now forwards its live item index to the native loot renderer. */
+    /* (func_800506E8 used to be the second example; it forwards its live
+     * $a0 to func_80058AA8 and is now a hand adapter with that argument.) */
     func_8007DE78();
-    ASSERT(PE_Decomp_BoundaryCount() == 3,
-           "two zero-arg leaves must register their three distinct callees");
+    ASSERT(PE_Decomp_BoundaryCount() == 2,
+           "a zero-arg leaf must register its two distinct callees");
     ASSERT(g_bootstrap_arg4_call_count == 0,
            "zero-argument boundaries must not fabricate an argument vector");
     PASS();

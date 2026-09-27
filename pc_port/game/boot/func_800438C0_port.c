@@ -13,11 +13,4 @@
 
 #define GA_438C0_STATE  0x8009CEF0u  /* $gp+0x180 */
 
-int func_800438C0(int arg0)
-{
-    int m = arg0 & 0x1FF;
-    if (m == 0)
-        m = 0x1FF;
-    PE_StoreU32(GA_438C0_STATE, (uint32_t)m);
-    return 0;
-}
+/* func_800438C0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800438C0_port.c (src/func_800438C0.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

@@ -1,0 +1,25 @@
+extern void func_80072714(void);
+extern void func_80072724(void);
+extern void func_8007E1F4(int, int *);
+extern void func_8007E1E4(int, int *);
+extern int func_8007E0F8();
+extern int func_8007E160();
+extern void *D_800A34B4[];
+extern int D_800A34B0;
+extern int D_800A34BC;
+
+int func_8007E048(void)
+{
+    int *p;
+
+    func_80072714();
+    p = (int *)D_800A34B4 - 1;
+    D_800A34B4[0] = func_8007E0F8;
+    D_800A34B4[1] = func_8007E160;
+    D_800A34B0 = 0;
+    D_800A34BC = 0;
+    func_8007E1F4(1, p);
+    func_8007E1E4(1, p);
+    func_80072724();
+    return 1;
+}

@@ -16,7 +16,4 @@
  */
 #include "psx_compat.h"
 
-void func_8005B890(int a0)
-{
-    PE_StoreU32(0x8009D028u, (uint32_t)a0);
-}
+/* func_8005B890: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8005B890_port.c (src/func_8005B890.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

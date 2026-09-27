@@ -52,21 +52,17 @@ int func_80015AF0(pe_addr_t args)
     return 1;
 }
 
-uint32_t func_80042770(uint32_t index)
-{
-    return PE_LoadU8(0x800A0ED4u+index*0x418u)&1u;
-}
+/* func_80042AD8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80042AD8_port.c (src/func_80042AD8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_80042910: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80042910_port.c (src/func_80042910.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_800428C4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800428C4_port.c (src/func_800428C4.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_80042770: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80042770_port.c (src/func_80042770.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 int func_8004FDA4(uint32_t index)
 {
     return index==2u || func_80042770(index)!=0u;
 }
 
-void func_80050C08(int32_t index)
-{
-    func_8005E8A4(-2,-2);
-    func_8005EB64(index<2?(uint32_t)index+0x84u:0x62u);
-}
+/* func_80050C08: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80050C08_port.c (src/func_80050C08.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 void func_8004FDE8(pe_addr_t list)
 {
@@ -83,28 +79,9 @@ void func_8004FDE8(pe_addr_t list)
     }
 }
 
-uint32_t func_800428C4(void) { return PE_LoadU32(0x800A1860u)-1u; }
-void func_80042910(void)
-{ PE_StoreU32(0x800A1860u,0);PE_StoreU32(0x800A1868u,0); }
-uint32_t func_80042B28(void) { return PE_LoadU32(0x800A1838u); }
-uint32_t func_80042AD8(uint32_t index)
-{
-    uint32_t state=PE_LoadU8(0x800A0ED5u+index*0x418u);
-    return state==3u || state==8u || state==10u;
-}
-void func_80062CD0(pe_addr_t selection)
-{
-    uint32_t previous=PE_LoadU32(0x8009D15Cu);
-    PE_StoreU32(0x8009D15Cu,selection);PE_StoreU32(0x8009D160u,previous);
-}
-void func_8004298C(uint32_t index,uint32_t mode)
-{
-    pe_addr_t record=0x800A0ED4u+index*0x418u;
-    uint32_t state=PE_LoadU8(record+1u);
-    if(state!=0u && state!=12u)return;
-    PE_StoreU8(record+1u,1);PE_StoreU8(record+11u,2);PE_StoreU16(record+22u,10);
-    func_80062CD0(0);PE_StoreU32(0x800A186Cu,mode);
-}
+/* func_80042B28: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80042B28_port.c (src/func_80042B28.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_80062CD0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80062CD0_port.c (src/func_80062CD0.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_8004298C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8004298C_port.c (src/func_8004298C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 void func_80042A10(void)
 {
     /* Identical two-record cleanup loop to42798, followed by these resets. */
@@ -153,14 +130,7 @@ void func_8004DAA4(void)
     }
 }
 
-int func_80042848(uint32_t index)
-{
-    uint32_t flagged=PE_LoadU8(0x800A0ED4u+index*0x418u)&4u;
-    if(flagged && !PE_LoadU32(0x800A1860u)) {
-        PE_StoreU32(0x800A1860u,index+1u);func_8004DAA4();
-    }
-    return flagged==0u;
-}
+/* func_80042848: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80042848_port.c (src/func_80042848.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 int func_8004D2DC(pe_addr_t window,uint32_t event)
 {
@@ -193,10 +163,9 @@ int func_8004D2DC(pe_addr_t window,uint32_t event)
 void func_800428D4(void)
 { PE_StoreU8(0x800A0ED5u+(PE_LoadU32(0x800A1860u)-1u)*0x418u,13u); }
 
-void func_80042B50(pe_addr_t callback)
-{ PE_StoreU32(0x800A1870u,callback);PE_StoreU32(0x800A1874u,1u); }
+/* func_80042B50: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80042B50_port.c (src/func_80042B50.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-int func_8004DA9C(void) { return 1; }
+/* func_8004DA9C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8004DA9C_port.c (src/func_8004DA9C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 int32_t func_80042464(void)
 {

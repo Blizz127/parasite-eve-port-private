@@ -3,34 +3,14 @@
 #include "psx_compat.h"
 #include "pe_port_compat.h"
 
-int func_8005BCB0(void) { return (int32_t)PE_LoadU32(0x8009D218u); }
-pe_addr_t func_8005BEDC(void) { return PE_LoadU32(0x8009D0C0u); }
-pe_addr_t func_8005BEE8(void) { return 0x800C0DE0u+(PE_LoadU32(0x8009D218u)?16u:0u); }
+/* func_8005BCB0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8005BCB0_port.c (src/func_8005BCB0.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_8005BEDC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8005BEDC_port.c (src/func_8005BEDC.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_8005BEE8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8005BEE8_port.c (src/func_8005BEE8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 pe_addr_t func_80062A20(pe_addr_t node,uint32_t index) { return PE_LoadU32(node+8u+index*4u); }
 
-int32_t func_80063428(pe_addr_t node)
-{
-    if (node && (int32_t)PE_LoadU32(node+68u)>=0 && (int32_t)PE_LoadU32(node+72u)>=0)
-        return (int32_t)(PE_LoadU32(node+52u)*PE_LoadU32(node+72u)+PE_LoadU32(node+68u));
-    return -1;
-}
+/* func_80063428: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80063428_port.c (src/func_80063428.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-void func_8005BD10(uint32_t character)
-{
-    int32_t count=0,limit=(int32_t)PE_LoadU32(0x8009D0C4u);
-    pe_addr_t p=func_8005BEDC();
-    if (limit>0) {
-        while (PE_LoadU8(p)!=255u) {
-            count+=PE_LoadU8(p)<250u;p++;
-            if (count>=limit) break;
-        }
-        if (count<(int32_t)PE_LoadU32(0x8009D0C4u)) {
-            PE_StoreU8(p,(uint8_t)character);PE_StoreU8(p+1u,255u);return;
-        }
-    }
-    if (PE_LoadU8(p-2u)>=250u) {p--;PE_StoreU8(p,255u);}
-    PE_StoreU8(p-1u,(uint8_t)character);
-}
+/* func_8005BD10: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8005BD10_port.c (src/func_8005BD10.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 int func_8005BD94(void)
 {
@@ -63,15 +43,7 @@ int32_t func_8005BF08(void)
     return (int32_t)remaining;
 }
 
-void func_80052FCC(pe_addr_t record)
-{
-    pe_addr_t p;unsigned armor;
-    if (!record) return;
-    armor=PE_LoadU8(record+6u)==9u;
-    for (p=0x800C0EACu;p<0x800C1EACu;p+=32u)
-        if ((PE_LoadU8(p+6u)==9u)==armor) PE_StoreU8(p+5u,PE_LoadU8(p+5u)&0xEFu);
-    PE_StoreU8(record+5u,PE_LoadU8(record+5u)|16u);
-}
+/* func_80052FCC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80052FCC_port.c (src/func_80052FCC.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 void func_8004DD64(int32_t id)
 {

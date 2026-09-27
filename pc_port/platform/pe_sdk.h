@@ -28,7 +28,7 @@ extern "C" {
 #endif
 
 int func_8007B290(uint32_t mode, pe_addr_t result);
-int func_8007A488(uint32_t mode, pe_addr_t result);
+int func_8007A488(int mode, pe_addr_t pe_result);
 void func_8007C564(void);
 void func_8007C13C(void);
 void func_8007CEAC(uint32_t channel,pe_addr_t address,uint32_t blocks,uint32_t words,
@@ -36,7 +36,7 @@ void func_8007CEAC(uint32_t channel,pe_addr_t address,uint32_t blocks,uint32_t w
 void func_8007F960(uint32_t status, pe_addr_t response);
 int func_8007F994(void);
 int func_8007BAC0(void);
-void func_800812F4(uint32_t mode);
+void func_800812F4(unsigned int value);
 uint32_t func_80073D58(uint32_t slot, pe_addr_t handler);
 void func_8007FE24(void);
 void func_800800F4(void);
@@ -175,9 +175,9 @@ void func_8008CA84(void);
 
 /* ── libgpu (pc_port/platform/pe_libgpu.c) ──────────────────────────── */
 pe_addr_t func_80074924(pe_addr_t env, int x, int y, int w, int h); /* SetDefDrawEnv */
-pe_addr_t func_800749D8(pe_addr_t env, int x, int y, int w, int h); /* SetDefDispEnv */
+pe_addr_t func_800749D8(pe_addr_t pe_env, int x, int y, int w, int h); /* SetDefDispEnv */
 int       func_80074A44(int mode);   /* ResetGraph */
-int       func_80074BB8(int level);  /* SetGraphDebug */
+unsigned char func_80074BB8(unsigned char a0);  /* SetGraphDebug */
 pe_addr_t func_80075424(pe_addr_t env); /* PutDrawEnv */
 void PE_SetTexWindowValues75B4C(pe_addr_t packet,const int16_t rect[4]);
 void PE_SetDrawAreaValues75B84(pe_addr_t packet,const int16_t rect[4]);
@@ -193,7 +193,7 @@ void func_8007D15C(void);            /* SPU IRQ event install */
 void func_80085644(void);            /* streaming bring-up */
 void func_80086FF8(void);            /* stream command 0xF0 */
 void func_80087024(void);            /* stream command 0xF1 */
-void func_8008682C(int a);           /* stream command select */
+void func_8008682C(int a0);           /* stream command select */
 int  func_8008CBA8(void);            /* streaming command dispatcher */
 void func_8008D140(pe_addr_t attributes); /* masked SPU mode registers */
 void func_8008CB54(uint32_t mode); /* SPU reverb mode transition */
@@ -206,8 +206,8 @@ int  func_8007EC14(void);            /* CdInit */
 int  func_8007ED58(void);            /* Cd reset + state clear (returns 1) */
 int  func_8007FBF0(int idx);         /* CdStatus lane getter D_8009B574[idx] */
 int  func_8007F72C(void);            /* CdReady */
-int  func_8007F778(void);            /* CdReady queue-depth getter D_800A3608 */
-void func_800870F0(uint32_t a0);
+int func_8007F778(void);            /* CdReady queue-depth getter D_800A3608 */
+void func_800870F0(unsigned int a0);
 void func_8010BD4C(pe_addr_t dst, uint32_t count);
 int  func_8010C89C(uint32_t a0, pe_addr_t a1, pe_addr_t a2,
                    uint32_t a3); /* VLC frame decoder; a3 dead */
@@ -219,20 +219,20 @@ typedef struct PeC89CTelemetry {
 } PeC89CTelemetry;
 void PE_C89C_GetTelemetry(PeC89CTelemetry *out); /* host-only, never guest */
 void func_8007C214(void);
-int func_8007A88C(pe_addr_t p);
+int func_8007A88C(pe_addr_t pe_buffer);
 void func_8007B964(pe_addr_t p);
 int32_t func_80191B64(pe_addr_t a0);
-int  func_80080CC8(int v);           /* exchange D_8009AFC0 */
-int  func_8007F7A8(void);            /* getter D_8009B590 */
-int  func_80080C48(pe_addr_t fp);    /* CdPosToInt: BCD mm/ss/ff @fp → LBA */
+int func_80080CC8(int value);           /* exchange D_8009AFC0 */
+int func_8007F7A8(void);            /* getter D_8009B590 */
+int func_80080C48(pe_addr_t pe_a0);    /* CdPosToInt: BCD mm/ss/ff @fp → LBA */
 uint32_t func_8007EE84(uint32_t command,pe_addr_t param,uint32_t extra,uint32_t callback);
-void func_80080998(pe_addr_t dest,pe_addr_t source);
-int func_8007FC64(pe_addr_t response);
+void func_80080998(pe_addr_t pe_a0, pe_addr_t pe_a1);
+int func_8007FC64(pe_addr_t pe_result);
 int func_8007F418(uint32_t sequence,pe_addr_t response);
 int func_80080DC4(int command,pe_addr_t param,pe_addr_t response);
 int  func_80080D5C(int command, pe_addr_t param, pe_addr_t result);
 uint32_t PE_Cd_GetSetlocRaw(void);    /* host telemetry: last proven CdlLOC */
-pe_addr_t func_800824C8(pe_addr_t callback);
+int func_800824C8(int value);
 pe_addr_t func_800824F0(pe_addr_t callback);
 int  func_80081314(pe_addr_t location, uint32_t mode);
 int  func_80082314(void);            /* PVD verify; result word D_800B28F8 */
@@ -240,13 +240,15 @@ int  func_80081414(pe_addr_t fp, const char *name); /* DsSearchFile */
 int  func_8006E6D4(int lba_base, int lba_off, pe_addr_t dest, int sectors);
 int  func_800811E4(pe_addr_t fp);    /* read poll: 0 done, -1 timeout */
 pe_addr_t func_8007E6B0(void);       /* request-slot ring allocator */
-void func_80080950(pe_addr_t dst, pe_addr_t src); /* 4-byte copy-or-clear */
+void func_80080950(pe_addr_t pe_a0, pe_addr_t pe_a1); /* 4-byte copy-or-clear */
 void func_8007C214(void);            /* streaming DMA-completion callback */
-pe_addr_t func_8007A930(int32_t lba,pe_addr_t location);
-int32_t func_8007AA34(pe_addr_t location);
-int32_t func_8007C2A0(pe_addr_t location);
+pe_addr_t func_8007A930(int arg0, pe_addr_t pe_arg1);
+int func_8007AA34(pe_addr_t pe_a0);
+int func_8007C2A0(int a0);
+/* matched src/func_8007A4BC.c: `func_8009AFB8_t func_8007A4BC(func_8009AFB8_t)`;
+ * a PS1 function pointer is a 32-bit guest code address (pe_guestcode.h). */
 pe_addr_t func_8007A4BC(pe_addr_t callback);
-pe_addr_t func_8007A8EC(pe_addr_t callback);
+void func_8007A8EC(unsigned int value);
 void func_8007A2A4(void);
 void func_8007C394(uint32_t sector); /* stream-record index update */
 int  func_8007F0C8(uint32_t mode, pe_addr_t loc, int count, uint32_t a3,
@@ -266,13 +268,13 @@ void func_8010C01C(pe_addr_t destination,uint32_t words);
 void func_8010BE3C(int mode);         /* libpress DecDCTReset wrapper */
 
 /* ── streaming wrappers (pc_port/game/boot/, Phase 6E-B16) ────────── */
-int       func_8006E6A8(int lba, pe_addr_t dest, int sectors); /* issue */
+int func_8006E6A8(int lba, pe_addr_t pe_dest, int sectors); /* issue */
 int       func_8006E7E8(void);              /* poll + D_800B0CD8 RMW */
 pe_addr_t func_8006E498(pe_addr_t base, uint32_t key); /* archive lookup */
 
 /* ── dispatcher leaves (pc_port/game/boot/, Phase 6E-B17/18) ──────── */
 void func_8005B890(int a0);                 /* D_8009D028 = a0 */
-void func_8005BC98(int a0_ignored);         /* D_8009D218 = 1 */
+void func_8005BC98(void);         /* D_8009D218 = 1 */
 void func_8004F808(void);                   /* ten-word clear */
 void func_80042B38(void);                   /* D_800A1870/1874 = 0 */
 void func_80051084(void);                   /* D_8009D014 = 0x800A1AA0 */
@@ -285,8 +287,8 @@ void func_80062568(void);                   /* free-list pool init, 24 0x90-byte
 void func_80064964(void);                   /* A(28h) clear + 8 0xFF flag bytes */
 void func_8005DE88(void);                   /* resource-list/state initializer */
 pe_addr_t func_80071A24(pe_addr_t dst, uint32_t len);  /* BIOS A(28h) bzero trampoline */
-void func_8005E968(uint32_t packed);         /* pack-color halver */
-void func_8005F844(int a0);                 /* conditional constant stores */
+void func_8005E968(int a0);         /* pack-color halver */
+void func_8005F844(int enabled);                 /* conditional constant stores */
 void func_80052E30(uint32_t a0);            /* resource-buffer init/reuse */
 uint32_t func_80052F0C(void);                /* buffer-identity comparison */
 

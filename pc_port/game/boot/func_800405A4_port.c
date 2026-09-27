@@ -26,7 +26,8 @@ static int card_status_events(pe_addr_t handles)
     return 1;
 }
 
-int func_8004D4A0(void) { return func_80062A34(1u,36u)!=0u; }
+/* func_8004D9D8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8004D9D8_port.c (src/func_8004D9D8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
+/* func_8004D4A0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8004D4A0_port.c (src/func_8004D4A0.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 void func_800405A4(uint32_t index)
 {
@@ -99,8 +100,7 @@ void func_800405A4(uint32_t index)
     PE_StoreU8(record+8u,1u);
 }
 
-void func_8004D9D8(void) { func_80062F1C(func_80062A34(1u,39u)); }
-void func_8004DC84(void) { func_80062F3C(42u); }
+/* func_8004DC84: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8004DC84_port.c (src/func_8004DC84.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 void func_8004CDAC(void)
 {
     unsigned epoch=PE_Port_StopEpoch();func_80062F3C(40u);

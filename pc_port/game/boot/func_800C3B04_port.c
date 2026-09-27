@@ -272,46 +272,6 @@ void func_800C3B04(pe_addr_t style)
     PE_StoreU32(ot, (PE_LoadU32(ot) & 0xFF000000u) | (packet & 0xFFFFFFu));
 }
 
-void func_800CDD0C(pe_addr_t slot, pe_addr_t rec, pe_addr_t data)
-{
-    unsigned i;
-    uint32_t scale;
-    (void)slot;
-    (void)rec;
-    func_800C2EAC(3u);
-    func_800C3098(256);
-    func_800C2FF0(32u, 32u);
-    func_800C3238(2u);
-    PE_StoreU16(0x800E27B0u, (uint16_t)(PE_LoadU16(data + 4u) + PE_LoadU16(data + 10u)));
-    PE_StoreU16(0x800E27B2u, (uint16_t)(PE_LoadU16(data + 6u) + PE_LoadU16(data + 12u)));
-    PE_StoreU16(0x800E27B4u, (uint16_t)(PE_LoadU16(data + 8u) + PE_LoadU16(data + 14u)));
-    scale = (uint32_t)((int32_t)(int8_t)PE_LoadU8(data + 3u) << 3) + 0x20Cu;
-    PE_StoreU32(0x800E27C0u, scale);
-    PE_StoreU32(0x800E27C4u, scale);
-    PE_StoreU32(0x800E27C8u, scale);
-    PE_StoreU16(0x800E27D8u, (uint16_t)(int16_t)(int8_t)PE_LoadU8(data + 1u));
-    func_800C3B04(0x800E27B0u);
-    func_800C3098(16);
-    for (i = 0; i < 8; i++) {
-        PE_StoreU16(0x800E2770u, (uint16_t)(PE_LoadU16(data + 16u + i * 2u) + PE_LoadU16(data + 10u)));
-        PE_StoreU16(0x800E2772u, (uint16_t)(PE_LoadU16(data + 32u + i * 2u) + PE_LoadU16(data + 12u)));
-        PE_StoreU16(0x800E2774u, (uint16_t)(PE_LoadU16(data + 48u + i * 2u) + PE_LoadU16(data + 14u)));
-        PE_StoreU16(0x800E2798u, (uint16_t)(int16_t)(int8_t)PE_LoadU8(data + 1u));
-        func_800C3B04(0x800E2770u);
-    }
-}
+/* func_800CDD0C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800CDD0C_port.c (src/func_800CDD0C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-void func_800CDE90(pe_addr_t slot, pe_addr_t rec, pe_addr_t data)
-{
-    (void)slot;
-    (void)rec;
-    func_800C2EAC(3u);
-    func_800C3098(256);
-    func_800C2FF0(32u, 32u);
-    func_800C3238(3u);
-    PE_StoreU16(0x800F33E8u, (uint16_t)(PE_LoadU16(data + 4u) + PE_LoadU16(data + 10u)));
-    PE_StoreU16(0x800F33EAu, (uint16_t)(PE_LoadU16(data + 6u) + PE_LoadU16(data + 12u)));
-    PE_StoreU16(0x800F33ECu, (uint16_t)(PE_LoadU16(data + 8u) + PE_LoadU16(data + 14u)));
-    PE_StoreU16(0x800F3410u, (uint16_t)(int16_t)(int8_t)PE_LoadU8(data + 1u));
-    func_800C3B04(0x800F33E8u);
-}
+/* func_800CDE90: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800CDE90_port.c (src/func_800CDE90.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

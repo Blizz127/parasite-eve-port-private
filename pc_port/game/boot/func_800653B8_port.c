@@ -43,21 +43,4 @@
 #define GA_D_8009CDB4 0x8009CDB4u
 #define TABLE_STRIDE  0xCu
 
-void func_800653B8(unsigned int payload, unsigned int dest_id,
-                   unsigned int dest_type, unsigned int sender,
-                   unsigned int extra)
-{
-    unsigned int count;
-    pe_addr_t rec;
-
-    count = PE_LoadU8(GA_D_8009CDB4);
-    rec = GA_D_800A3180 + count * TABLE_STRIDE;
-
-    /* ROM store order: payload, id, sender, type, extra, then count++. */
-    PE_StoreU8(rec + 3u, (uint8_t)payload);
-    PE_StoreU8(rec + 2u, (uint8_t)dest_id);
-    PE_StoreU32(rec + 8u, sender);
-    PE_StoreU16(rec + 0u, (uint16_t)dest_type);
-    PE_StoreU32(rec + 4u, extra);
-    PE_StoreU8(GA_D_8009CDB4, (uint8_t)(count + 1u));
-}
+/* func_800653B8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800653B8_port.c (src/func_800653B8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
