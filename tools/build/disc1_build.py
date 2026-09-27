@@ -980,6 +980,11 @@ def prepare_absolute_symbols(target: Target = MAIN_TARGET) -> Path:
         path = ROOT / name
         if path.is_file():
             pieces.append(path.read_text(encoding="utf-8"))
+    # Library-named callees (cc1's soft-float helpers, memset) bind to their
+    # retail addresses; unreferenced entries have no effect on the image.
+    aliases = ROOT / "configs" / "USA" / "libcall_aliases.ld"
+    if target.is_main and aliases.is_file():
+        pieces.append(aliases.read_text(encoding="utf-8"))
     pieces.extend([".L00000000_main = 0;\n", "_gp = 0x8009CD70;\n"])
     output.write_text("".join(pieces), encoding="utf-8")
     return output

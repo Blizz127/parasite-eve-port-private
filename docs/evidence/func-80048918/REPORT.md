@@ -46,3 +46,11 @@ optionally pre-selects the list row whose `func_800556E8(i)` equals `a2`, fills 
 5. **`j = 0` initialised between `ps` and the other pointers** (`for (j = 0, pd = …, pb = …,
    pf = …; …)`): flips the `j`/`pd` allocation to retail's `$s1`/`$s0` (last 13 words).
 6. `neg = (unsigned int)o->f44 >> 31` for retail's `srl s0,s0,31` sign test.
+
+## Main-tree integration (2026-09-27)
+
+Integrated into `configs/USA/disc1.yaml` / `disc1_build_profiles.json` and re-verified against the
+main config (not the lane copy): `disc1_preflight.py --deep --only func_80048918` PASS,
+`leaf_strong_check.py func_80048918` → `LEAF_STRONG=EXACT`, `profile_necessity.py --only func_80048918` PASS.
+Full gate: `EXACT_REBUILD_GATE=PASS plan=cda0547790149322… spans=[2041 c, 218 asm, 2 rodata]`,
+sha1 `452fb033f2eaa4b18aa20a5bca60b8125af3a37b`.

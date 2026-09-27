@@ -36,18 +36,20 @@ doing anything**.
 
 ## Current phase
 
-**2036 matching C leaves** (EXE) + **2545 overlay `c` spans** across 72
+**2041 matching C leaves** (EXE) + **2545 overlay `c` spans** across 72
 PE.IMG targets — exact count via
 `python3 tools/build/disc1_plan.py --check` (prints
-`2257 spans (2036 c, 219 asm, 2 rodata)`) or equivalently
+`2261 spans (2041 c, 218 asm, 2 rodata)`) or equivalently
 `grep -cE ',[[:space:]]*c,' configs/USA/disc1.yaml`; overlays via
 `cat configs/USA/overlays/*.yaml | grep -cE ',[[:space:]]*c,'` (hand-matched
 leaves plus masked-body ports of shared room bodies). This count is the
 authoritative number; re-derive it, do not trust prose here.
 
-**Newest (2026-09-26): 2036 EXE gate PASS** (`plan=b6ebd320af1a…`,
-`yaml=4ba194d202f8…`, retail SHA-1 `452fb033…` reproduced,
-`VERIFY_SWEEP=PASS leaves=2036`) plus per-overlay `EXACT_REBUILD_GATE[<id>]`
+**Newest (2026-09-27): 2041 EXE gate PASS** (`plan=cda054779014…`,
+`yaml=ca87f884d909…`, retail SHA-1 `452fb033…` reproduced,
+`VERIFY_SWEEP=PASS leaves=2041`). Five stranded lane leaves integrated; new
+`configs/USA/libcall_aliases.ld` resolves cc1's soft-float libcalls and
+`memset` to retail addresses plus per-overlay `EXACT_REBUILD_GATE[<id>]`
 passes; details at the top of `docs/ai_context/ACTIVE_HANDOFF.md`. The five
 `gte-inline` EXE spans stay instruction-blocked (era cc1 emits no COP2
 transfers).

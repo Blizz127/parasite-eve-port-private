@@ -151,8 +151,23 @@ def elf_section(data: bytes, want: str) -> bytes | None:
     return None
 
 
+LIBCALL_ALIASES = Path(__file__).resolve().parent.parent.parent / "configs" / "USA" / "libcall_aliases.ld"
+_ALIAS_RE = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_.]*)\s*=\s*(0x[0-9A-Fa-f]+)\s*;", re.M)
+
+
+def libcall_aliases() -> dict:
+    """Library-named routines (`__divdf3`, `memset`, ...) -> retail VMA."""
+    if not LIBCALL_ALIASES.is_file():
+        return {}
+    text = re.sub(r"/\*.*?\*/", "", LIBCALL_ALIASES.read_text(encoding="utf-8"), flags=re.S)
+    return {name: int(value, 16) for name, value in _ALIAS_RE.findall(text)}
+
+
 def sym_address(name: str) -> int | None:
     """Resolve a repo address-named symbol to its retail VMA."""
+    aliases = libcall_aliases()
+    if name in aliases:
+        return aliases[name]
     m = SYM_TAIL_RE.search(name)
     if not m:
         return None

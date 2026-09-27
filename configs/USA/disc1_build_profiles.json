@@ -1975,6 +1975,59 @@
         "MASPSX_FILL_CALL_DELAY_SLOT": "1",
         "MASPSX_INDEX_PAIR_JAL_SCHEDULE": "1"
       }
+    },
+    "era_o2_g8_abs_800b0e64": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_800B0E64"
+      }
+    },
+    "era_o2_g8_dispatch_80011508_abs": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_DISPATCH_FOLD": "jtbl_80011508",
+        "MASPSX_THREE_WORD_SYMBOL_STORE": "1",
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_800B0E08,D_8009CDA4"
+      }
+    },
+    "era_o2_g8_force_d8009d254_d8009d1a0_d8009d1f4_d8009d278_d8009d288_d8009d2b0_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009D254,D_8009D1A0,D_8009D1F4,D_8009D278,D_8009D288,D_8009D2B0"
+      }
+    },
+    "era_o2_g8_force_d800c0e10_d800a1960_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_800C0E10,D_800A1960"
+      }
+    },
+    "era_o2_g0_expand_div_rodata_fold_800108e4": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0"
+      ],
+      "environment": {
+        "MASPSX_EXPAND_DIV": "1",
+        "MASPSX_RODATA_FOLD": "D_800108E4"
+      }
     }
   },
   "assignments": {
@@ -3214,6 +3267,21 @@
     ],
     "era_o2_g0_cc1_281_beqz_sym_store_delay_fill_call_delay_slot_index_pair_jal_schedule": [
       "func_8007BDDC"
+    ],
+    "era_o2_g8_abs_800b0e64": [
+      "func_8006D2B8"
+    ],
+    "era_o2_g8_dispatch_80011508_abs": [
+      "func_8006D60C"
+    ],
+    "era_o2_g8_force_d8009d254_d8009d1a0_d8009d1f4_d8009d278_d8009d288_d8009d2b0_absolute": [
+      "func_80025EE8"
+    ],
+    "era_o2_g8_force_d800c0e10_d800a1960_absolute": [
+      "func_80048918"
+    ],
+    "era_o2_g0_expand_div_rodata_fold_800108e4": [
+      "func_80028574"
     ]
   }
 }

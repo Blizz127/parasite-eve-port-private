@@ -632,6 +632,8 @@ segments:
       # Battle target cursor: cycle target on L/R, then draw the status panel for the mode.
       - [0x160CC, c, func_800258CC]
       - [0x163D8, asm]
+      - [0x166E8, c, func_80025EE8]
+      - [0x16E00, asm]
       - [0x177D0, c, func_80026FD0]
       # battle target highlight flash
       - [0x177F8, c, func_80026FF8]
@@ -641,7 +643,8 @@ segments:
       - [0x18208, c, func_80027A08]
       # battle enemy update
       - [0x18514, c, func_80027D14]
-      - [0x18D74, asm]
+      - [0x18D74, c, func_80028574]
+      - [0x19448, asm]
       # enemy death state step
       - [0x19694, c, func_80028E94]
       # C leaf func_80029388 — VRAM 0x80029388, size 0x6C (27 words).
@@ -1228,7 +1231,7 @@ segments:
       - [0x38E54, c, func_80048654]
       # Event handler with a 3-case compare-tree switch on a call result.
       - [0x39038, c, func_80048838]
-      - [0x39118, asm]
+      - [0x39118, c, func_80048918]
       # PARK CLOSED (was 38 -> 2 -> 0). Same body as the 0x4000 arm of func_800491C8. Four pins: `p asm(
       - [0x39724, c, func_80048F24]
       # Three lookup+release pairs.
@@ -2347,7 +2350,8 @@ segments:
       - [0x5D5A4, asm]
       - [0x5D878, c, func_8006D078]
       - [0x5DA4C, c, func_8006D24C]
-      - [0x5DAB8, asm]
+      - [0x5DAB8, c, func_8006D2B8]
+      - [0x5DE0C, c, func_8006D60C]
       - [0x5E348, c, func_8006DB48]
       # func_8006DB9C — VRAM 0x8006DB9C, size 0x44 (17 words). Signed-byte
       # search over the two tagged pairs at D_800B0CD8+0xDC/0xDE; returns the

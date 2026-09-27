@@ -1,3 +1,18 @@
+## UPDATE 2026-09-27: 2041 gate PASS — five stranded lane leaves integrated
+
+`EXACT_REBUILD_GATE=PASS plan=cda0547790149322a171c09bd36abc8a3817ee1cebbfd3c165c27f9aad10d975 yaml=ca87f884d90962500c72f672e1e6dd0ce046859460ec0857a3607e45c5785ba8 spans=[2041 c, 218 asm, 2 rodata] sha1_orig=452fb033f2eaa4b18aa20a5bca60b8125af3a37b sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=2041`. Command: `TMPDIR=$PWD/build/tmp bash scripts/exact_rebuild.sh` (log `build/tmp/exact-rebuild-2041b.log`). The first run (`exact-rebuild-2041.log`) was already `RESULT=EXACT_MATCH` but failed verify on the staging-gap rule until the five sources were `git add`ed.
+
+Five leaves were leaf-verified only in private lane configs (`build/fanout/decompB`, `decompC`) and never merged into `disc1.yaml`; a sweep of every `build/fanout/*` YAML and `.claude/worktrees/*` against the main config found no other stranded EXE or overlay `c` rows. Each is now `LEAF_STRONG=EXACT`, `disc1_preflight.py --deep --only` PASS and `profile_necessity.py --only` PASS against the **main** config:
+
+- `func_8006D2B8` (`0x354`, `era_o2_g8_abs_800b0e64`) and `func_8006D60C` (`0x53C`, `era_o2_g8_dispatch_80011508_abs`) — carved from `[0x5DAB8, asm]`.
+- `func_80025EE8` (`0x718`, six-symbol force-absolute `-O2 -G8` profile) — `[0x166E8, c]` between `[0x163D8, asm]` and `[0x16E00, asm]`.
+- `func_80048918` (`0x60C`, `era_o2_g8_force_d800c0e10_d800a1960_absolute`) — replaces `[0x39118, asm]`.
+- `func_80028574` (`0x6D4`, `era_o2_g0_expand_div_rodata_fold_800108e4`) — `[0x18D74, c]` + `[0x19448, asm]`. Previously "BLOCKED on tooling": cc1 emits `jal __floatsidf/__muldf3/__adddf3/__divdf3/__fixdfsi` itself.
+
+**New tooling: `configs/USA/libcall_aliases.ld`** maps library-named callees to retail addresses (the five soft-float helpers, each with exactly one caller in the image, all inside `func_80028574`; plus `memset` = BIOS `A(2Bh)` stub `0x80071A44`). Read by `disc1_build.py` (appended to the EXE `abs_syms.ld`), `era_link_check.py` and `leaf_strong_check.py` (`sym_address` falls back to it). A wrong alias cannot fake a match — the `jal` target is in the compared word. The lane's private `elc.py` also mapped `__subdf3` to `0x80072F64` (the `__divdf3` address); that entry was **not** carried over. Test: `tools/build/test_leaf_strong_check.py::test_libcall_alias_resolves`.
+
+Next: `func_80031760` (its blocker was the unresolved `memset`; now aliased). The five `gte-inline` EXE spans stay instruction-blocked. Overlays unchanged (72 targets, fast preflight PASS for all).
+
 ## UPDATE 2026-09-26: room_m0418i func_80192704 gated
 
 `func_80192704` (`room_m0418i`, `0x84`) is `LINK_EXACT` on default `-O2 -G0`. The early half stays in `$a2`: an empty `asm` barrier on a `$a2`-pinned base stops the `+0x28` store from following the pointer copy. The copy into `$a0` is written in both arms of `v < 0x960`, so it fills that `beqz` delay and later halfword updates use `$a0`. The same barrier leaves an 8-byte frame with no stack store; `addiu $sp,-8` stays at the entry. Linked size `0x90` against span `0x84`; the extra 12 bytes are a zero alignment pad (`nonzero_pad=0`). `disc1_preflight.py --target room_m0418i --deep --only func_80192704` passed before the rebuild.

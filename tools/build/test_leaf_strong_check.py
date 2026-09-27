@@ -122,6 +122,12 @@ class SymAddressTest(unittest.TestCase):
         self.assertIsNone(sym_address("printf"))
         self.assertIsNone(sym_address("__udivsi3"))
 
+    def test_libcall_alias_resolves(self) -> None:
+        # configs/USA/libcall_aliases.ld: cc1's soft-float helpers and memset.
+        self.assertEqual(sym_address("__divdf3"), 0x80072F64)
+        self.assertEqual(sym_address("__floatsidf"), 0x80073454)
+        self.assertEqual(sym_address("memset"), 0x80071A44)
+
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()

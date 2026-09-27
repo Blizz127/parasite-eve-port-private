@@ -49,3 +49,11 @@ and `0x400` flag reactions), and otherwise the `func_80026824()` result dispatch
    `if (--D_8009D2D8 != 0)` (no reload; `sll 24` zero test).
 6. `D_800BE834` as an 8-byte `Slot` array (`sll 3` index, `lhu` at +0); `D_8009E000` as 12-byte `Entry`
    rows (`&D_8009E000[D_8009CE44]` -> `x*3<<2`).
+
+## Main-tree integration (2026-09-27)
+
+Integrated into `configs/USA/disc1.yaml` / `disc1_build_profiles.json` and re-verified against the
+main config (not the lane copy): `disc1_preflight.py --deep --only func_80025EE8` PASS,
+`leaf_strong_check.py func_80025EE8` → `LEAF_STRONG=EXACT`, `profile_necessity.py --only func_80025EE8` PASS.
+Full gate: `EXACT_REBUILD_GATE=PASS plan=cda0547790149322… spans=[2041 c, 218 asm, 2 rodata]`,
+sha1 `452fb033f2eaa4b18aa20a5bca60b8125af3a37b`.

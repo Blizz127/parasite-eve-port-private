@@ -789,3 +789,14 @@ reproducible; provenance is the plan SHA-256. Read the narrative in
 - **provably non-C-matchable**: 77 funcs, 5417 words (4.9%)
 - **real remaining asm**: 115 funcs, 35567 words (32.4%)
 - non-C classes: handwritten-cop:22 handwritten-gte-wrapper:107 handwritten-jr-t2:53 handwritten-syscall:2
+
+### 2026-11-14T02:26:04Z
+
+- plan SHA-256: `cda0547790149322a171c09bd36abc8a3817ee1cebbfd3c165c27f9aad10d975`
+- yaml SHA-256: `ca87f884d90962500c72f672e1e6dd0ce046859460ec0857a3607e45c5785ba8`
+- spans: 2041 c, 218 asm, 2 rodata
+- union (on-path): 1441 functions
+- **matched C**: 1257 funcs, 70275 words (64.6%)
+- **provably non-C-matchable**: 77 funcs, 5417 words (5.0%)
+- **real remaining asm**: 107 funcs, 33139 words (30.4%)
+- non-C classes: handwritten-cop:22 handwritten-gte-wrapper:107 handwritten-jr-t2:53 handwritten-syscall:2

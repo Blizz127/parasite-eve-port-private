@@ -51,3 +51,14 @@ the `D_8009D278` record — (1) `f4C & 0x80000`: double math
    falls out naturally.
 8. `MASPSX_EXPAND_DIV` (two trap-checked `div`s) and `MASPSX_RODATA_FOLD=D_800108E4`
    (`{0,100,60,41,0,25,0,18,0,0,13}`, copied with lwl/lwr + `lb`/`sb` tail).
+
+## Main-tree integration (2026-09-27)
+
+Integrated into `configs/USA/disc1.yaml` / `disc1_build_profiles.json` and re-verified against the
+main config (not the lane copy): `disc1_preflight.py --deep --only func_80028574` PASS,
+`leaf_strong_check.py func_80028574` → `LEAF_STRONG=EXACT`, `profile_necessity.py --only func_80028574` PASS.
+Full gate: `EXACT_REBUILD_GATE=PASS plan=cda0547790149322… spans=[2041 c, 218 asm, 2 rodata]`,
+sha1 `452fb033f2eaa4b18aa20a5bca60b8125af3a37b`.
+The tooling block is lifted by `configs/USA/libcall_aliases.ld` (the five soft-float names at the
+addresses above); `MASPSX_EXPAND_DIV=1 MASPSX_RODATA_FOLD=D_800108E4 era_link_check.py
+src/func_80028574.c 0x80028574 0x6D4 -O2 -G0` → `LINK_EXACT`, 0 word mismatches.
