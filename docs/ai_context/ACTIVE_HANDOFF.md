@@ -1,3 +1,11 @@
+## UPDATE 2026-09-27: batch 2 — 2070 EXE c spans, gate PASS
+
+`EXACT_REBUILD_GATE=PASS plan=15be39463e3f702243b643a80c7a65d4add4981fe9966f12c8e30b535f7a9811 yaml=6f565ac9090d3438f53eb70a581d8582dae3c2e72a10f915864378c4498d231a spans=[2070 c, 202 asm, 2 rodata] sha1_orig=sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=2070` (log `build/tmp/gate-2070.log`).
+
+14 lane leaves, each `LEAF_STRONG=EXACT` + deep preflight + `PROFILE_NECESSITY=PASS` on the main config: exeA `func_80025BD8`, `func_80026824`, `func_80013988`, **`func_8001F814`** (the former `NONMATCHING_C` native-cut jump-table leaf — removed from `disc1_nonmatching_sources.json`; old file kept at `build/lanes/exeA/drafts/func_8001F814.orig.c`); exeB `func_800466C0`, `func_800328DC`, `func_8003BCE0`; exeC **`func_80069B08`** (former in-progress checkpoint, removed from the nonmatching registry), `func_800710A4`, `func_8006914C`, **`func_8006F9F0`** (PARK resolved), `func_80061C34`; exeD `func_8008A068`, **`func_80073A44`** (VSync, fan-in 17 — PARK resolved on cc1 2.8.1 + `-fno-schedule-insns`).
+
+Lane levers (per-leaf REPORTs): queue-append rewrite (`Slot *s = &D_800BE830[D_8009CE3C];` + separate count increment) for the `D_800BE830` table; `short` loop counter vs `int`; `MASPSX_DISPATCH_FOLD` only folds with `MASPSX_THREE_WORD_SYMBOL_STORE=1`; this cc1 marks `p[i]`/`*(p+k)`/field MEMs in_struct vs plain `*q` scalar — the alias class decides load-above-store scheduling. **Checker caveat:** `era_link_check.py` compares `min(len)` words, so a too-SHORT link can print `mismatches=0`; always confirm with `leaf_strong_check.py`/deep preflight.
+
 ## UPDATE 2026-09-27: batch 1 — 2056 EXE c spans, gate PASS
 
 `EXACT_REBUILD_GATE=PASS plan=2c59232dc7f559d091b5b9a70e97976a89d639d47e4e5295b55df63228e1007e yaml=86709c615e13382b7b5d3dab627e586843a5d5a140568178ca44b33e79e884d1 spans=[2056 c, 209 asm, 2 rodata] sha1_orig=sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=2056` (log `build/tmp/gate-2056.log`).

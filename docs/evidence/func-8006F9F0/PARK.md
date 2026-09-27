@@ -1,3 +1,5 @@
+> **RESOLVED 2026-09-27 (lane exeC): LINK_EXACT — see `REPORT.md` in this directory.** Historical park record below.
+
 # `func_8006F9F0` — PARK (delayed-branch fill residual)
 
 Status: **PARKED** (not counted). VRAM `0x8006F9F0`..`0x8006FC18`

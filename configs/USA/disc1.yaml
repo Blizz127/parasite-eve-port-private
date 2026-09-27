@@ -88,7 +88,7 @@ segments:
       - [0x3D14, c, func_80013514]
       # lane1: func_800136C0 VRAM 0x800136C0 size 0x2C8.
       - [0x3EC0, c, func_800136C0]
-      - [0x4188, asm]
+      - [0x4188, c, func_80013988]
       # lane1: func_80013C34 VRAM 0x80013C34 size 0x250.
       - [0x4434, c, func_80013C34]
       # lane1: func_80013E84 VRAM 0x80013E84 size 0x3A4.
@@ -554,7 +554,7 @@ segments:
       - [0xDB40, asm]
       # lane1: func_8001F4D4 VRAM 0x8001F4D4 size 0x340.
       - [0xFCD4, c, func_8001F4D4]
-      - [0x10014, asm]
+      - [0x10014, c, func_8001F814]
       # entity status timers + auto-cure
       - [0x101C4, c, func_8001F9C4]
       # lane1: func_800201DC VRAM 0x800201DC size 0xAC.
@@ -633,10 +633,11 @@ segments:
       - [0x15DE4, c, func_800255E4]
       # Battle target cursor: cycle target on L/R, then draw the status panel for the mode.
       - [0x160CC, c, func_800258CC]
-      - [0x163D8, asm]
+      - [0x163D8, c, func_80025BD8]
       - [0x166E8, c, func_80025EE8]
       - [0x16E00, c, func_80026600]
-      - [0x17024, asm]
+      - [0x17024, c, func_80026824]
+      - [0x174F0, asm]
       - [0x177D0, c, func_80026FD0]
       # battle target highlight flash
       - [0x177F8, c, func_80026FF8]
@@ -752,7 +753,8 @@ segments:
       # row+index pointer form for the sprite; if/else-if ladder whose 'n--' tails cc1 cross-jumps like retail.
       - [0x22DDC, c, func_800325DC]
       - [0x22FD8, c, func_800327D8]
-      - [0x230DC, asm]
+      - [0x230DC, c, func_800328DC]
+      - [0x2330C, asm]
       # struct-array copy; pointer local for 4 of the 5 stores + the symbol-indexed form for the 5th, an
       - [0x23B5C, c, func_8003335C]
       # stride-28 struct array + gp byte decrement; patch 5 + forced-absolute index base
@@ -901,6 +903,8 @@ segments:
       # matching C leaf
       - [0x2BF08, c, func_8003B708]
       - [0x2C17C, asm]
+      - [0x2C4E0, c, func_8003BCE0]
+      - [0x2C8B4, asm]
       # Volume 97: reciprocal-byte initializer; era -O2 -G0 with the
       # sanctioned ASPSX signed-division guard expansion.
       - [0x2CDD8, c, func_8003C5D8]
@@ -1170,7 +1174,7 @@ segments:
       - [0x36B78, c, func_80046378]
       # G8
       - [0x36D74, c, func_80046574]
-      - [0x36EC0, asm]
+      - [0x36EC0, c, func_800466C0]
       - [0x372BC, c, func_80046ABC]
       # Event handler with a 0/1 result local set in three jal delay slots.
       - [0x37358, c, func_80046B58]
@@ -2097,7 +2101,7 @@ segments:
       - [0x5223C, c, func_80061A3C]
       # short-pair emitter into D_800A22B0 with a 0x30-byte cap; the limit must be written inside the lo
       - [0x52380, c, func_80061B80]
-      - [0x52434, asm]
+      - [0x52434, c, func_80061C34]
       - [0x52890, c, func_80062090]
       - [0x52AB0, c, func_800622B0]
       - [0x52ABC, c, func_800622BC]
@@ -2305,7 +2309,7 @@ segments:
       - [0x594E0, c, func_80068CE0]
       - [0x59528, c, func_80068D28]
       - [0x59624, c, func_80068E24]
-      - [0x5994C, asm]
+      - [0x5994C, c, func_8006914C]
       # near-twin of the already-matched func_80069660; second loop gates on (D_8009D1A0&0x100)==0 || (c
       - [0x59D94, c, func_80069594]
       # D_8009D1A0 gated two 0xB-iteration call loops with a mid 0x104 re-check
@@ -2313,6 +2317,7 @@ segments:
       # asset/Asset_UnloadTableEntries. The hinted -fno-force-mem changes nothing (matches with and with
       - [0x59EF0, c, func_800696F0]
       - [0x5A0D4, asm]
+      - [0x5A308, c, func_80069B08]
       - [0x5A8E8, c, func_8006A0E8]
       - [0x5AA5C, c, func_8006A25C]
       - [0x5AAE8, c, func_8006A2E8]
@@ -2490,7 +2495,7 @@ segments:
       # 0x104). State byte must be 1 or 2; handler byte clamps to 0x55 and
       # indexes D_800942E0; null -> -1. Era -O2 -G0.
       - [0x600EC, c, func_8006F8EC]
-      - [0x601F0, asm]
+      - [0x601F0, c, func_8006F9F0]
       # func_8006FC18 — record handler invoke + clear (127 words, 0x1FC).
       # idx>=0x16 -> -0x16; D_800942E0 arena select; state 0/6 -> 0; if the
       # caller passed a2==0 the record's +8 must equal a1 else 0; clamped
@@ -2541,7 +2546,8 @@ segments:
       - [0x617AC, c, func_80070FAC]
       # D_8009D1A0&2 gate else zero 0x68/0x6C/0x70 + func_8001A680
       - [0x61834, c, func_80071034]
-      - [0x618A4, asm]
+      - [0x618A4, c, func_800710A4]
+      - [0x61B6C, asm]
       # D_8009D1A0&2 two-arm state sync; the +0x12 byte read hoisted into a $5-pinned local
       - [0x61EA4, c, func_800716A4]
       # D_8009D26C direction cascade + D_8009D254 adjust. NEW LEVER: each arm of the flag cascade must d
@@ -2589,6 +2595,7 @@ segments:
       - [0x640D8, c, func_800738D8]
       - [0x641C4, c, func_800739C4]
       - [0x64228, asm]
+      - [0x64244, c, func_80073A44]
       # jal/j/jalr slot macro split (maspsx patch 8, MASPSX_FILL_CALL_DELAY_SLOT)
       - [0x643BC, c, func_80073BBC]
       - [0x64454, asm]
@@ -3703,7 +3710,7 @@ segments:
       # gather 1<<rec[0xF0] for each set bit of a1 over 24 records
       - [0x7A7E0, c, func_80089FE0]
       - [0x7A82C, c, func_8008A02C]
-      - [0x7A868, asm]
+      - [0x7A868, c, func_8008A068]
       # guarded 24-record template init; an explicit `goto body` flips cc1's branch polarity where if/el
       - [0x7AB54, c, func_8008A354]
       - [0x7AC00, c, func_8008A400]

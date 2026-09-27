@@ -1,3 +1,6 @@
+> **RESOLVED 2026-09-27 (lane exeC): LINK_EXACT — see `REPORT.md` in this directory.** The notes below are the
+> historical park record.
+
 # func_80069B08 — PARKED (prologue save-batching + jumptable $at form)
 
 **Status:** not C-matchable with the current toolchain. Not a YAML `c` span.

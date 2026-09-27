@@ -18,7 +18,6 @@ extern unsigned char D_800BCDC8[][92];
 extern unsigned char *D_800B0E38;
 extern unsigned char D_800B0DCD;
 extern unsigned short D_800B0DD4;
-extern void *jtbl_80011388[];
 
 extern void func_80073A44(int a0);
 extern void func_80074D28(int a0);
@@ -53,7 +52,6 @@ int func_80069B08(int a0) {
         short t20;
         char pad[12];
     } loc;
-    register int s4 asm("$20");
     register unsigned int s2 asm("$18");
     register int s6 asm("$22");
     register int s7 asm("$23");
@@ -65,7 +63,6 @@ int func_80069B08(int a0) {
     int a2;
 
     (void)loc.pad;
-    s4 = a0;
     s2 = 0;
     s6 = 0;
     s7 = -1;
@@ -131,14 +128,17 @@ after_reads:
 
 state_loop:
     func_800752AC(*(unsigned char **)((unsigned char *)&D_800B0E38 + (D_8009CDDC << 2)), 0x1000);
-    {
-        static void *const keep[] = {
-            &&case0, &&case1, &&case2, &&case3, &&case4, &&case5,
-            &&case678, &&case678, &&case678, &&case9
-        };
-        (void)keep;
-        if ((unsigned int)s2 < 0xAu)
-            goto *jtbl_80011388[s2];
+    switch (s2) {
+    case 0: goto case0;
+    case 1: goto case1;
+    case 2: goto case2;
+    case 3: goto case3;
+    case 4: goto case4;
+    case 5: goto case5;
+    case 6:
+    case 7:
+    case 8: goto case678;
+    case 9: goto case9;
     }
     goto merge;
 case0:
@@ -178,18 +178,20 @@ case3:
             goto case3_one;
         goto merge;
     }
-    if (v1 == 3) {
-        s1 = 0xB4;
-        s2 = 6;
-        goto merge;
-    }
+    if (v1 == 3)
+        goto case3_three;
     goto merge;
 
 case3_one:
     func_800374E8();
-    func_800375E0(s4 != s0 ? 4 : 3, 0, &loc.t20);
+    func_800375E0(a0 == s0 ? 3 : 4, 0, &loc.t20);
     s1 = 0xB4;
     s2 = 5;
+    goto merge;
+
+case3_three:
+    s1 = 0xB4;
+    s2 = 6;
     goto merge;
 
 case5:
@@ -202,13 +204,14 @@ case4:
     v1 = func_800698D4();
     if (v1 == -1)
         goto case4_m1;
-    if (v1 >= 0) {
-        if (v1 == 0)
-            goto case4_zero;
-        goto merge;
-    }
+    if (v1 >= 0)
+        goto case4_nonneg;
     if (v1 == -2)
         goto case4_m2;
+    goto merge;
+case4_nonneg:
+    if (v1 == 0)
+        goto case4_zero;
     goto merge;
 
 case4_m1:
@@ -226,20 +229,19 @@ case4_m2:
     goto merge;
 
 case4_zero:
-    if (s4 == s0) {
+    if (a0 == s0) {
         if (D_800B0DCD & 1)
             goto set_s6;
     }
-    if (s4 == 2) {
-        if (D_800B0DCD & 2)
-            goto set_s6;
+    if (a0 == 2) {
+        if (D_800B0DCD & 2) {
+        set_s6:
+            s6 = 1;
+            goto merge;
+        }
     }
     s1 = 0xB4;
     s2 = 9;
-    goto merge;
-
-set_s6:
-    s6 = 1;
     goto merge;
 
 case678:
@@ -252,13 +254,14 @@ case9:
     if (s1 == 0)
         goto f24;
 dec_s1:
+    asm("");
     s1 = s1 - 1;
     goto merge;
 
 f24:
     func_800374E8();
 f2c:
-    func_800375E0(s4 != s0 ? 2 : 1, 0, &loc.t20);
+    func_800375E0(a0 == s0 ? 1 : 2, 0, &loc.t20);
     s2 = 2;
 
 merge:
@@ -279,12 +282,12 @@ done_loop:
     func_80073A44(0);
     func_80074D28(0);
     loc.rect.w = 0x140;
-    loc.rect.h = 0x1C0;
     loc.rect.x = 0;
     loc.rect.y = 0;
+    loc.rect.h = 0x1C0;
     func_80074F44(&loc.rect, 0, 0, 1);
     func_80074DC0(0);
-    D_800B0DCD = (s4 == 1) ? 1 : 2;
+    D_800B0DCD = (a0 == 1) ? 1 : 2;
     s0 = 1;
     while (func_8007F72C() != s0)
         func_80073A44(0);
