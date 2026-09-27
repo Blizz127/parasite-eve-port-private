@@ -89,7 +89,7 @@ segments:
       - [0x3558, c, func_80192540]
       - [0x3560, asm]
       - [0x9F5C, c, func_80198F44]
-      - [0x9F6C, asm]
+      - [0x9F6C, c, func_80198F54]
       - [0xA040, c, func_80199028]
       - [0xA050, c, func_80199038]
       - [0xA060, c, func_80199048]

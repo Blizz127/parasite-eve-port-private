@@ -1,3 +1,7 @@
+## UPDATE 2026-09-27: overlay lane — 53 distinct bodies, 32 room targets gated
+
+Lane `ovl` matched **53 distinct overlay bodies** (hand-matched, default `era_o2_g0`) and propagated them to their identical room copies; every touched target — 32 rooms — re-gated one at a time to a clean `EXACT_REBUILD_GATE[<id>]=PASS` (gate lines with plan/yaml hashes in `build/lanes/ovl/results.jsonl`; each target's current config sha256 re-checked against its gate line before commit). Report + levers: `docs/evidence/ovl-lane-2026-09-27/REPORT.md` — notably this cc1 marks `p[i]`/`*(p+k)`/field MEMs in_struct vs plain `*q` scalar, and the alias class decides load-above-store scheduling. m0145i/m0153i/m0401i start their code window with two data words (now `bin` rows). 11 parked (drafts `build/lanes/ovl/drafts/park_*.c`), 1 non-C (`ovl_03C5` `func_80121000` is a header word), 6 blocked on maspsx K3 (`int >> 21` sin-table narrowing to `lh SYM+2; sra 5`, being built by exeD2). ~290 bodies remain (lane `ovl2`). Hazard: never create files under `src/`/`configs/` while an overlay gate's split step runs.
+
 ## UPDATE 2026-09-27: batch 3 — 2076 EXE c spans, gate PASS; maspsx patches 34/35
 
 `EXACT_REBUILD_GATE=PASS plan=bc7551f695e2bdf3266c04b5aea5bfe04865a4a3f9052f85cd7bdbf848652324 yaml=8ac7b05e5e65214175b02e8fcf1b79993da4a668a6403eccde9a325308c47fc4 spans=[2076 c, 196 asm, 2 rodata] sha1_orig=sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=2076` (log `build/tmp/gate-2076.log`).

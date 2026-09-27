@@ -35,6 +35,6 @@ segments:
       - [0x54, asm]
       - [0x3A00, c, func_801929E8]
       - [0x3A10, c, func_801929F8]
-      - [0x3A54, asm]
+      - [0x3A54, c, func_80192A3C]
       - [0x3AF4, bin]
   - [0x43800]
