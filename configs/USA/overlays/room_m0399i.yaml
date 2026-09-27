@@ -102,7 +102,7 @@ segments:
       - [0x4514, c, func_801934FC]
       - [0x4578, c, func_80193560]
       - [0x468C, c, func_80193674]
-      - [0x4694, asm]
+      - [0x4694, c, func_8019367C]
       - [0x47E4, c, func_801937CC]
       - [0x4918, asm]
       - [0x4CD8, c, func_80193CC0]

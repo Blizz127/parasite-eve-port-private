@@ -91,7 +91,7 @@ segments:
       - [0x3554, c, func_8019253C]
       - [0x35B8, c, func_801925A0]
       - [0x36CC, c, func_801926B4]
-      - [0x36D4, asm]
+      - [0x36D4, c, func_801926BC]
       - [0x3824, c, func_8019280C]
       - [0x3958, asm]
       - [0x3D18, c, func_80192D00]
