@@ -546,7 +546,8 @@ segments:
       - [0xCFDC, asm]
       # lane1: func_8001CAB0 VRAM 0x8001CAB0 size 0xF0.
       - [0xD2B0, c, func_8001CAB0]
-      - [0xD3A0, asm]
+      - [0xD3A0, c, func_8001CBA0]
+      - [0xD688, asm]
       # -G8 with D_8009D254 forced absolute
       - [0xD970, c, func_8001D170]
       - [0xDA68, c, func_8001D268]
@@ -619,11 +620,12 @@ segments:
       # lane1: func_80023008 VRAM 0x80023008 size 0x124.
       - [0x13808, c, func_80023008]
       - [0x1392C, asm]
+      - [0x13EE8, c, func_800236E8]
       # Battle item-use effect switch (heal amounts, status toggles, clears).
       - [0x14614, c, func_80023E14]
       # restored after lane merge (row belongs to another agent)
       - [0x14A50, c, func_80024250]
-      - [0x1523C, asm]
+      - [0x1523C, c, func_80024A3C]
       - [0x15CBC, c, func_800254BC]
       # real `switch` on the command word; ERA_ASPSX_VER=2.30 is load-bearing - ASPSX 2.30 expands the a
       - [0x15D68, c, func_80025568]
@@ -633,7 +635,8 @@ segments:
       - [0x160CC, c, func_800258CC]
       - [0x163D8, asm]
       - [0x166E8, c, func_80025EE8]
-      - [0x16E00, asm]
+      - [0x16E00, c, func_80026600]
+      - [0x17024, asm]
       - [0x177D0, c, func_80026FD0]
       # battle target highlight flash
       - [0x177F8, c, func_80026FF8]
@@ -644,7 +647,7 @@ segments:
       # battle enemy update
       - [0x18514, c, func_80027D14]
       - [0x18D74, c, func_80028574]
-      - [0x19448, asm]
+      - [0x19448, c, func_80028C48]
       # enemy death state step
       - [0x19694, c, func_80028E94]
       # C leaf func_80029388 — VRAM 0x80029388, size 0x6C (27 words).
@@ -710,7 +713,7 @@ segments:
       - [0x20210, c, func_8002FA10]
       - [0x202A4, c, func_8002FAA4]
       - [0x202D8, c, func_8002FAD8]
-      - [0x202F8, asm]
+      - [0x202F8, c, func_8002FAF8]
       # func_80030534 — 2D distance helper, VRAM 0x80030534, size 0x50
       # (20 words). era -O2 -G0 + maspsx --aspsx-version=2.30 (mflo/mult
       # two-instruction gap nop). Mid-20210 carve: prefix 0xB24, C 0x50,
@@ -857,7 +860,7 @@ segments:
       # D_80091A20 is byte-width (lbu/sb); D_80091A24 is word-width (lw/sw).
       - [0x2951C, c, func_80038D1C]
       - [0x29548, c, func_80038D48]
-      - [0x29574, asm]
+      - [0x29574, c, func_80038D74]
       # func_80039184 — font glyph code -1 (floor 3 -> reset to 1), reload the page, place the cursor on the first slot of
       # class (code%10 != 0). era -O2 -G0. Same helpers/levers as func_80039310/func_8003944C.
       - [0x29984, c, func_80039184]
@@ -974,7 +977,7 @@ segments:
       - [0x2F2C8, asm]
       # pad input step
       - [0x2F304, c, func_8003EB04]
-      - [0x2F874, asm]
+      - [0x2F874, c, func_8003F074]
       # read `*s | 2` BEFORE the D_8009D1A0 RMW; &D_800B0CD8 kept in a register by the zero-code asm bar
       - [0x2FAFC, c, func_8003F2FC]
       - [0x2FBC4, c, func_8003F3C4]
@@ -1224,7 +1227,7 @@ segments:
       - [0x388AC, c, func_800480AC]
       # Six-call draw sequence.
       - [0x389FC, c, func_800481FC]
-      - [0x38A54, asm]
+      - [0x38A54, c, func_80048254]
       # func_80048654 — open the item list screen: three window/list pairs (ids 12/13/14) with handler slots,
       # initial cursor via func_8005382C. era -O2 -G8. LEVER: shared handler addresses as locals pinned
       # h1 asm("$17") = func_80044444, h2 asm("$16") = func_80058030.
@@ -1278,7 +1281,7 @@ segments:
       - [0x3BDDC, c, func_8004B5DC]
       # Four-way event handler; cc1 cross-jumps the two identical func_8005E850/func_8005267C tails on i
       - [0x3BE50, c, func_8004B650]
-      - [0x3BF0C, asm]
+      - [0x3BF0C, c, func_8004B70C]
       # Object construct plus a data-symbol field store.
       - [0x3C10C, c, func_8004B90C]
       # func_8004B970 — EXP review panel step: count D_8009CFE8 up to D_8009CFEC, level lookup, 60-frame banner, draw three rows.
@@ -1395,7 +1398,7 @@ segments:
       - [0x3F730, c, func_8004EF30]
       # Adjacent Tier-2 callback wrapper func_8004F2E4.  Former 0x3F758 span:
       # prefix 0x38C, C 0x28, resume 0x13C (0x38C + 0x28 + 0x13C = 0x4F0).
-      - [0x3F758, asm]
+      - [0x3F758, c, func_8004EF58]
       # Two-object construct plus three release calls.
       - [0x3FA3C, c, func_8004F23C]
       - [0x3FAE4, c, func_8004F2E4]
@@ -2085,6 +2088,7 @@ segments:
       - [0x50DC4, c, func_800605C4]
       - [0x50DF8, c, func_800605F8]
       - [0x50E2C, asm]
+      - [0x51844, c, func_80061044]
       - [0x51CA0, c, func_800614A0]
       # colour average packer; LEVER: `register int *p asm("$7")` or cc1 folds the store into an absolut
       - [0x51CAC, c, func_800614AC]
@@ -2160,7 +2164,7 @@ segments:
       - [0x53C28, c, func_80063428]
       # Volume 99: companion guarded bit-index query; era -O2 -G0.
       - [0x53C6C, c, func_8006346C]
-      - [0x53CD4, asm]
+      - [0x53CD4, c, func_800634D4]
       # walks a node's parent chain accumulating +0x18/+0x1C offsets (finding the parent by searching ea
       - [0x53F4C, c, func_8006374C]
       # LINK_EXACT on swept stable source
@@ -2907,6 +2911,8 @@ segments:
       # packed halfword scale by three weights; multu via mflo
       - [0x694C4, c, func_80078CC4]
       - [0x695FC, asm]
+      - [0x6A7B4, c, func_80079FB4]
+      - [0x6A928, asm]
       # Phase 5BK: C leaf func_8007A324 — VRAM 0x8007A324, size 0x10.
       # Unsigned-byte global getter on D_8009AFC4; plain -O1 matches.
       - [0x6AA44, c, func_8007A244]

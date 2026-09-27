@@ -36,18 +36,18 @@ doing anything**.
 
 ## Current phase
 
-**2042 matching C leaves** (EXE) + **2545 overlay `c` spans** across 72
+**2056 matching C leaves** (EXE) + **2545 overlay `c` spans** across 72
 PE.IMG targets — exact count via
 `python3 tools/build/disc1_plan.py --check` (prints
-`2261 spans (2042 c, 217 asm, 2 rodata)`) or equivalently
+`2267 spans (2056 c, 209 asm, 2 rodata)`) or equivalently
 `grep -cE ',[[:space:]]*c,' configs/USA/disc1.yaml`; overlays via
 `cat configs/USA/overlays/*.yaml | grep -cE ',[[:space:]]*c,'` (hand-matched
 leaves plus masked-body ports of shared room bodies). This count is the
 authoritative number; re-derive it, do not trust prose here.
 
-**Newest (2026-09-27): 2042 EXE gate PASS** (`plan=d6f98edc2872…`,
-`yaml=086b772c5310…`, retail SHA-1 `452fb033…` reproduced,
-`VERIFY_SWEEP=PASS leaves=2042`). `func_80031760` closed with the
+**Newest (2026-09-27): 2056 EXE gate PASS** (`plan=2c59232dc7f5…`,
+`yaml=86709c615e13…`, retail SHA-1 `452fb033…` reproduced,
+`VERIFY_SWEEP=PASS leaves=2056`; fan-out batch 1 on top of 2042). `func_80031760` closed with the
 **asm-label alias lever** (`extern int X asm("D_…")` read in one arm stops
 cc1's cross-jump where retail's stopped). Five stranded lane leaves integrated; new
 `configs/USA/libcall_aliases.ld` resolves cc1's soft-float libcalls and

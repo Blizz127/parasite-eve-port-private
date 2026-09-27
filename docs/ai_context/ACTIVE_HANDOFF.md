@@ -1,3 +1,11 @@
+## UPDATE 2026-09-27: batch 1 — 2056 EXE c spans, gate PASS
+
+`EXACT_REBUILD_GATE=PASS plan=2c59232dc7f559d091b5b9a70e97976a89d639d47e4e5295b55df63228e1007e yaml=86709c615e13382b7b5d3dab627e586843a5d5a140568178ca44b33e79e884d1 spans=[2056 c, 209 asm, 2 rodata] sha1_orig=sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=2056` (log `build/tmp/gate-2056.log`).
+
+14 lane leaves, integrated with `build/lanes/integrate.py` and re-verified on the main config (`leaf_strong_check.py` 14/14 `LEAF_STRONG=EXACT`, `disc1_preflight.py --deep --only` and `profile_necessity.py --only` PASS each): exeA `func_80024A3C` (672w), `func_8001CBA0`, `func_80028C48`, `func_800236E8`, `func_80026600`; exeB `func_80038D74`, `func_8002FAF8`, `func_8003F074`; exeC `func_8004EF58`, `func_800634D4`, `func_80048254`, `func_8004B70C`, `func_80061044`; exeD `func_80079FB4` (ratan2, fan-in 19 — old PARK closed on cc1 2.8.1 + expand-div + div-no-reuse-nop + symbol-load-dest-temp). Per-leaf evidence `docs/evidence/func-<addr>/REPORT.md`.
+
+exeD non-C (instruction evidence in `build/lanes/exeD/results.jsonl`): crt0 `func_80072534`, SN ctor runners `func_800725DC`/`func_8007264C`, libgte `$t`-register stubs `func_80078120`/`func_80078134`, `$t`-only rotation templates `func_800794C4`/`79754`/`799E4`/`79C74`/`79E14`, libapi BIOS patchers `func_8007A134`/`7A1E0`/`7E22C`/`7E2A4`/`7E334`/`7E3B4`/`7E3DC`/`7E470`/`7E514`; exeC `func_80070DD0` (frameless `$ra`-in-`$v1` call, trapping `sub`/`add`).
+
 ## UPDATE 2026-09-27: 2042 gate PASS — func_80031760 closed (park resolved)
 
 `EXACT_REBUILD_GATE=PASS plan=d6f98edc2872d0ad98d519284cb9035c61893792ab2d4494572ef6e3af21f156 yaml=086b772c531061a810992b2ca2b0f614fc00831d5af149d00d0e169a2aa0838f spans=[2042 c, 217 asm, 2 rodata] sha1_orig=452fb033f2eaa4b18aa20a5bca60b8125af3a37b sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=2042` (log `build/tmp/gate-2042.log`).
