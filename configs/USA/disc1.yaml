@@ -668,12 +668,16 @@ segments:
       - [0x19DE4, c, func_800295E4]
       # lane1: func_80029810 VRAM 0x80029810 size 0x1BC.
       - [0x1A010, c, func_80029810]
-      - [0x1A1CC, asm]
+      - [0x1A1CC, c, func_800299CC]
       # battle finisher sequence state machine
       - [0x1B298, c, func_8002AA98]
       # lane1: func_8002B0E8 VRAM 0x8002B0E8 size 0x1B4.
       - [0x1B8E8, c, func_8002B0E8]
       - [0x1BA9C, asm]
+      - [0x1C14C, c, func_8002B94C]
+      - [0x1C490, asm]
+      - [0x1D9F0, c, func_8002D1F0]
+      - [0x1E458, asm]
       # func_8002F0B0 — battle death step (3-state D_8009CE74 machine over the D_8009D20C actor list). era -O2 -G8 with
       # D_8009D20C/D_8009D254 absolute. LEVERS: 'info == 0' arm first; one volatile-qualified read of the +0x98 flag word
       # after the |= 0x1000 store (retail reloads it).
@@ -754,7 +758,7 @@ segments:
       - [0x22DDC, c, func_800325DC]
       - [0x22FD8, c, func_800327D8]
       - [0x230DC, c, func_800328DC]
-      - [0x2330C, asm]
+      - [0x2330C, c, func_80032B0C]
       # struct-array copy; pointer local for 4 of the 5 stores + the symbol-indexed form for the 5th, an
       - [0x23B5C, c, func_8003335C]
       # stride-28 struct array + gp byte decrement; patch 5 + forced-absolute index base
@@ -1252,7 +1256,7 @@ segments:
       - [0x399C8, c, func_800491C8]
       # Event handler sharing func_800490B0's 7-entry lhu->sh copy loop; same ERA_ASPSX_VER=2.30 require
       - [0x39B54, c, func_80049354]
-      - [0x39CAC, asm]
+      - [0x39CAC, c, func_800494AC]
       # menu equip slot select step 2
       - [0x3A8C8, c, func_8004A0C8]
       # Object construct + 32-byte record copy. NEW LEVER: a byte-aligned struct (`typedef struct { char
@@ -2300,7 +2304,8 @@ segments:
       - [0x58814, asm]
       # double 3-byte row write; pins $8/$9/$4, second base folded back into the $4 offset variable
       - [0x58EA0, c, func_800686A0]
-      - [0x58F10, asm]
+      - [0x58F10, c, func_80068710]
+      - [0x59394, asm]
       # Phase 5EZ: C leaf func_8006A5BC — VRAM 0x8006A5BC, size 0x90 (36 words).
       # Boot init with two VSync-polled wait loops (VSync = func_80073A44,
       # SDK). era -O1 -G0: per-use $s0=1 materialization (in 86FF8's delay
@@ -3124,7 +3129,8 @@ segments:
       - [0x6F558, c, func_8007ED58]
       # Phase 5EF: direct func_8007FB04 forwarding wrapper.
       - [0x6F664, c, func_8007EE64]
-      - [0x6F684, asm]
+      - [0x6F684, c, func_8007EE84]
+      - [0x6F8C8, asm]
       # dest-temp load plus epilogue delay fill
       - [0x6FC18, c, func_8007F418]
       # duplicate the whole body in BOTH arms (cc1 cross-jumps the tail) and pin the outgoing arg 'regis
@@ -3316,7 +3322,7 @@ segments:
       - [0x725F8, c, func_80081DF8]
       # Phase 5EF: D_8009B708 integer exchange.
       - [0x7265C, c, func_80081E5C]
-      - [0x72670, asm]
+      - [0x72670, c, func_80081E70]
       # D_8009B6EC[9] double guard, command==2 branch, else two teardown calls + a nulled handler dispat
       - [0x7294C, c, func_8008214C]
       # jal/j/jalr slot macro split (maspsx patch 8, MASPSX_FILL_CALL_DELAY_SLOT)

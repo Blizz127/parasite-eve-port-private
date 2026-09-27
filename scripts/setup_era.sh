@@ -97,6 +97,7 @@ MASPSX_TRACKED=(
     "tests/test_extern_gp_load_delay.py"
     "tests/test_fill_call_delay_slot.py"
     "tests/test_narrow_shifted_word_load.py"
+    "tests/test_hoist_block_li.py"
 )
 
 if [[ -f "$ERA/maspsx/maspsx.py" ]]; then

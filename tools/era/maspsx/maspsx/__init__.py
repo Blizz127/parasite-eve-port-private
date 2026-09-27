@@ -1144,6 +1144,7 @@ class MaspsxProcessor:
         mult_mflo_to_multu=False,
         mflo_before_mfhi=False,
         narrow_shifted_word_load=False,
+        hoist_block_li=None,
     ):
         self.lines = [x.strip() for x in lines]
 
@@ -1493,6 +1494,25 @@ class MaspsxProcessor:
             narrow_shifted_word_load
             or os.environ.get("MASPSX_NARROW_SHIFTED_WORD_LOAD") == "1"
         )
+        # LOCAL PATCH K4: MASPSX_HOIST_BLOCK_LI. In a straight-line run of
+        # store groups that each reload the same absolute word
+        # (`lw $x,SYM`), cc1 emits every group constant as `li $r,K` in
+        # the reload's delay slot. Retail (HUD colour blocks of
+        # func_800299CC / func_8002BC90 / func_8001D340) materialises the
+        # first n-2 constants before reload 1 and the last two directly
+        # after reloads 1 and 2. "1" = any symbol; otherwise a comma list
+        # of the reloaded symbols the pass may touch. Opt-in.
+        if hoist_block_li is None:
+            hoist_block_li = os.environ.get("MASPSX_HOIST_BLOCK_LI", "")
+        hoist_block_li = (hoist_block_li or "").strip()
+        if hoist_block_li in ("", "0"):
+            self.hoist_block_li = None
+        elif hoist_block_li == "1":
+            self.hoist_block_li = True
+        else:
+            self.hoist_block_li = {
+                s.strip() for s in hoist_block_li.split(",") if s.strip()
+            }
         # LOCAL PATCH 21: load-delay nop before a loop-head label.
         self.load_delay_nop_before_loop_label = (
             load_delay_nop_before_loop_label
@@ -2142,6 +2162,8 @@ class MaspsxProcessor:
         self.preprocess_lines()
         if self.narrow_shifted_word_load:
             self.lines = self._narrow_shifted_word_load(self.lines)
+        if self.hoist_block_li:
+            self.lines = self._hoist_block_li(self.lines)
         if self.unaligned_word_copy_return_temp:
             self._rename_unaligned_word_copy_temp()
         if self.drop_unused_var8:
@@ -2696,6 +2718,105 @@ class MaspsxProcessor:
             if i in drop:
                 continue
             out.append(repl.get(i, line))
+        return out
+
+    def _hoist_block_li(self, res):
+        """K4: re-place the constants of a repeated-reload store run.
+
+        A region is a maximal run with no label, directive, branch, jump
+        or call. Its group loads are the lines textually equal to the
+        first absolute `lw $x,SYM` in it that is directly followed by an
+        `li $r,imm` (comment-only lines are skipped). Its constants are
+        the `li` lines directly following a group load. With at least two
+        constants and two group loads, constants 0..n-3 move to just
+        before load 1, constant n-2 to just after load 1 and constant n-1
+        to just after load 2. Every move must go strictly earlier and
+        cross no line (other than another moved constant) naming the
+        constant's register; otherwise the region is left unchanged.
+        """
+        def bare(line):
+            return line.split("#", 1)[0].strip()
+
+        ctl_re = re.compile(r"^(b\w*|j|jal|jr|jalr|syscall|break)\b")
+        li_re = re.compile(r"^li\s+(\$\w+),-?(0x[0-9a-fA-F]+|\d+)$")
+        lw_re = re.compile(r"^lw\s+(\$\w+),([A-Za-z_.][\w.$]*)$")
+        allowed = self.hoist_block_li
+
+        def boundary(s):
+            return s.startswith(".") or s.endswith(":") or bool(ctl_re.match(s))
+
+        out = list(res)
+        regions = []
+        i = 0
+        while i < len(out):
+            s = bare(out[i])
+            if s and boundary(s):
+                i += 1
+                continue
+            j = i
+            while j < len(out):
+                t = bare(out[j])
+                if t and boundary(t):
+                    break
+                j += 1
+            regions.append((i, j))
+            i = j
+
+        for start, end in reversed(regions):
+            real = [k for k in range(start, end) if bare(out[k])]
+            nxt = {real[a]: real[a + 1] for a in range(len(real) - 1)}
+            load_text = None
+            for k in real:
+                m = lw_re.match(bare(out[k]))
+                if not m:
+                    continue
+                if allowed is not True and m.group(2) not in allowed:
+                    continue
+                f = nxt.get(k)
+                if f is not None and li_re.match(bare(out[f])):
+                    load_text = bare(out[k])
+                    break
+            if load_text is None:
+                continue
+            loads = [k for k in real if bare(out[k]) == load_text]
+            consts = []
+            for k in loads:
+                f = nxt.get(k)
+                if f is None:
+                    continue
+                m = li_re.match(bare(out[f]))
+                if m:
+                    consts.append((f, m.group(1)))
+            n = len(consts)
+            if n < 2 or len(loads) < 2:
+                continue
+            # insert position: before line index `tgt`
+            targets = [loads[0]] * (n - 2) + [loads[0] + 1, loads[1] + 1]
+            moved = {pos for pos, _ in consts}
+            ok = True
+            for (pos, reg), tgt in zip(consts, targets):
+                if tgt > pos:
+                    ok = False
+                    break
+                reg_re = re.compile(re.escape(reg) + r"(?!\w)")
+                for k in range(tgt, pos):
+                    s = bare(out[k])
+                    if k not in moved and s and reg_re.search(s):
+                        ok = False
+                        break
+                if not ok:
+                    break
+            if not ok or all(t == p for (p, _), t in zip(consts, targets)):
+                continue
+            inserts = {}
+            for (pos, _), tgt in zip(consts, targets):
+                inserts.setdefault(tgt, []).append(out[pos])
+            new = []
+            for k in range(start, end):
+                new.extend(inserts.get(k, []))
+                if k not in moved:
+                    new.append(out[k])
+            out[start:end] = new
         return out
 
     def _narrow_shifted_word_load(self, res):

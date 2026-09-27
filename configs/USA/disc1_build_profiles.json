@@ -2211,6 +2211,39 @@
         "ERA_CC1_VER": "2.8.1",
         "MASPSX_DROP_TARGET_DUP_LI": "1"
       }
+    },
+    "era_o2_g8_force_d800b0d88_actor": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009D20C,D_800B0D88,D_800B0D8A,D_8009D254,D_800B0CEC"
+      }
+    },
+    "era_o2_g8_hud_colour_block": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_THREE_WORD_SYMBOL_STORE": "1",
+        "MASPSX_HOIST_BLOCK_LI": "D_8009CDDC",
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009D254,D_8009D230,D_8009D250,D_8009CDDC,D_8009D1F4,D_8009D1F0,D_8009D1A0,D_8009D290,D_8009D294,D_8009D1AC,D_8009D20C,D_8009D235,D_8009D298,D_800B0CE6,D_8009D29A,D_8009D29C,D_8009D2E8,D_8009D1CE"
+      }
+    },
+    "era_o2_g8_hoist_block_li_force_cddc_d250_d254_d20c": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009CDDC,D_8009D250,D_8009D254,D_8009D20C",
+        "MASPSX_HOIST_BLOCK_LI": "D_8009CDDC"
+      }
     }
   },
   "assignments": {
@@ -2683,7 +2716,8 @@
       "func_80061C34",
       "func_800375E0",
       "func_8006062C",
-      "func_80063E0C"
+      "func_80063E0C",
+      "func_80068710"
     ],
     "era_o2_g8_force_d8009d2e8_absolute": [
       "func_800293F4"
@@ -3015,7 +3049,8 @@
     ],
     "era_o2_g8_force_d800a1888_plus3_absolute": [
       "func_800430A0",
-      "func_80048254"
+      "func_80048254",
+      "func_800494AC"
     ],
     "era_o2_g0_no_schedule_insns_dispatch_80011d0c": [
       "func_80080220"
@@ -3056,7 +3091,8 @@
       "func_80016F10"
     ],
     "era_o2_g8_force_d8009cddc_absolute": [
-      "func_80033430"
+      "func_80033430",
+      "func_80032B0C"
     ],
     "era_o2_g8_force_d800c0e22_absolute": [
       "func_80057D30",
@@ -3127,7 +3163,8 @@
       "func_80077904",
       "func_80077294",
       "func_800777C0",
-      "func_800844E4"
+      "func_800844E4",
+      "func_80081E70"
     ],
     "era_o2_g0_cc1_281_fill_call_delay_slot_symbol_at_temp_symbol_load_dest_temp": [
       "func_80074A44"
@@ -3437,7 +3474,8 @@
       "func_800677FC"
     ],
     "era_o2_g0_cc1_281_fill_branch_macro_split_symbol_load_dest_temp": [
-      "func_80076EE4"
+      "func_80076EE4",
+      "func_8007EE84"
     ],
     "era_o2_g0_cc1_281_addu_neg1_beq_delay": [
       "func_8007E964"
@@ -3528,6 +3566,15 @@
     ],
     "era_o2_g0_cc1_281_drop_target_dup_li": [
       "func_80084C4C"
+    ],
+    "era_o2_g8_force_d800b0d88_actor": [
+      "func_8002B94C"
+    ],
+    "era_o2_g8_hud_colour_block": [
+      "func_800299CC"
+    ],
+    "era_o2_g8_hoist_block_li_force_cddc_d250_d254_d20c": [
+      "func_8002D1F0"
     ]
   }
 }
