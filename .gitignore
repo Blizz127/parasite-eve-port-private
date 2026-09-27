@@ -110,6 +110,7 @@ tools/era/maspsx/tests/*
 !tools/era/maspsx/tests/test_fill_branch_delay_slot.py
 !tools/era/maspsx/tests/test_extern_gp_load_delay.py
 !tools/era/maspsx/tests/test_fill_call_delay_slot.py
+!tools/era/maspsx/tests/test_narrow_shifted_word_load.py
 build-port/
 pc_port/build/
 pc_port/build-san/

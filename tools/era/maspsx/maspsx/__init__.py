@@ -1143,6 +1143,7 @@ class MaspsxProcessor:
         dup_half_shift=False,
         mult_mflo_to_multu=False,
         mflo_before_mfhi=False,
+        narrow_shifted_word_load=False,
     ):
         self.lines = [x.strip() for x in lines]
 
@@ -1482,6 +1483,15 @@ class MaspsxProcessor:
         self.mflo_before_mfhi = (
             mflo_before_mfhi
             or os.environ.get("MASPSX_MFLO_BEFORE_MFHI") == "1"
+        )
+        # LOCAL PATCH (K3): `lw $d,SYM($b)` ... `sra $d,$d,N` (16 <= N <= 31)
+        # only uses the word's upper half. Retail narrows the load to
+        # `lh $d,SYM+2($b)` and shifts by N-16 (the Psy-Q sin table read
+        # `D_800966EC[i] >> 21` -> `lh D_800966EE` / `sra 5`). No vendored
+        # cc1 emits it. Opt-in; only symbolic word loads.
+        self.narrow_shifted_word_load = (
+            narrow_shifted_word_load
+            or os.environ.get("MASPSX_NARROW_SHIFTED_WORD_LOAD") == "1"
         )
         # LOCAL PATCH 21: load-delay nop before a loop-head label.
         self.load_delay_nop_before_loop_label = (
@@ -2130,6 +2140,8 @@ class MaspsxProcessor:
         self.extern_entries = {}
 
         self.preprocess_lines()
+        if self.narrow_shifted_word_load:
+            self.lines = self._narrow_shifted_word_load(self.lines)
         if self.unaligned_word_copy_return_temp:
             self._rename_unaligned_word_copy_temp()
         if self.drop_unused_var8:
@@ -2685,6 +2697,58 @@ class MaspsxProcessor:
                 continue
             out.append(repl.get(i, line))
         return out
+
+    def _narrow_shifted_word_load(self, res):
+        """`lw $d,SYM[+off][($b)]` ... `sra $d,$d,N` -> `lh $d,SYM+off+2` / `sra N-16`.
+
+        The window between the load and the shift must be straight-line
+        (no label, branch, jump or directive) and must neither read nor
+        write $d. N == 16 drops the shift.
+        """
+        def bare(line):
+            return line.split("#", 1)[0].strip()
+
+        load_re = re.compile(
+            r"^lw\s+(\$\w+),([A-Za-z_.$][\w.$]*)([+-]\d+)?(\(\$\w+\))?$"
+        )
+        ctl_re = re.compile(r"^(b\w*|j|jal|jr|jalr|syscall|break)\b")
+        out = list(res)
+        drop = set()
+        for i, line in enumerate(out):
+            m = load_re.match(bare(line))
+            if not m:
+                continue
+            d, sym, off, base = m.group(1), m.group(2), m.group(3), m.group(4) or ""
+            if sym.startswith("$"):
+                continue
+            reg_re = re.compile(re.escape(d) + r"(?!\w)")
+            k = i + 1
+            hit = None
+            while k < len(out):
+                s = bare(out[k])
+                if not s:
+                    k += 1
+                    continue
+                if s.startswith(".") or s.endswith(":") or ctl_re.match(s):
+                    break
+                sm = re.match(r"^sra\s+(\$\w+),(\$\w+),(\d+)$", s)
+                if sm and sm.group(1) == d and sm.group(2) == d:
+                    hit = (k, int(sm.group(3)))
+                    break
+                if reg_re.search(s):
+                    break
+                k += 1
+            if hit is None or not 16 <= hit[1] <= 31:
+                continue
+            k, n = hit
+            disp = (int(off) if off else 0) + 2
+            sign = "+" if disp >= 0 else "-"
+            out[i] = f"lh\t{d},{sym}{sign}{abs(disp)}{base}"
+            if n == 16:
+                drop.add(k)
+            else:
+                out[k] = f"sra\t{d},{d},{n - 16}"
+        return [x for j, x in enumerate(out) if j not in drop]
 
     def _mult_mflo_to_multu(self, res):
         """`mult $a,$b` / `mflo` -> `multu`. Does not touch a following `mfhi`."""
