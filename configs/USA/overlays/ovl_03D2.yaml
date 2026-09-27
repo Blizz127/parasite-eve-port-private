@@ -45,9 +45,16 @@ segments:
     vram: 0x8018EFF0
     subsegments:
       - [0x0, bin]
-      - [0x304, asm]
+      - [0x304, c, func_8018F2F4]
+      - [0x478, asm]
       - [0x800, c, func_8018F7F0]
       - [0x968, asm]
+      - [0xBD0, c, func_8018FBC0]
+      - [0xD14, c, func_8018FD04]
+      - [0xE2C, c, func_8018FE1C]
+      - [0x1074, asm]
+      - [0x3304, c, func_801922F4]
+      - [0x3508, asm]
       - [0x3C58, c, func_80192C48]
       - [0x3CAC, c, func_80192C9C]
       - [0x3CF8, asm]

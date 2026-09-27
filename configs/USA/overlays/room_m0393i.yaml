@@ -45,6 +45,8 @@ segments:
       - [0x528, c, func_8018F510]
       - [0x530, c, func_8018F518]
       - [0x5B0, asm]
+      - [0xA50, c, func_8018FA38]
+      - [0xDF4, c, func_8018FDDC]
       - [0x1220, c, func_80190208]
       - [0x1228, c, func_80190210]
       - [0x1254, c, func_8019023C]

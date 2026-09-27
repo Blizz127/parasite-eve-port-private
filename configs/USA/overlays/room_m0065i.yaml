@@ -43,5 +43,7 @@ segments:
       - [0x318, c, func_8018F300]
       - [0x320, c, func_8018F308]
       - [0x3A0, asm]
+      - [0x840, c, func_8018F828]
+      - [0xBE4, c, func_8018FBCC]
       - [0x1010, bin]
   - [0x1F800]
