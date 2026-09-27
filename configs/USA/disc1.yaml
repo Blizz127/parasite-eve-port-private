@@ -929,7 +929,7 @@ segments:
       - [0x2E02C, c, func_8003D82C]
       - [0x2E034, c, func_8003D834]
       # Volume 103: signed-index 16-byte-record initializer; era -O2 -G0.
-      - [0x2E14C, asm]
+      - [0x2E14C, c, func_8003D94C]
       - [0x2E3E4, c, func_8003DBE4]
       # matching C leaf
       - [0x2E508, c, func_8003DD08]
@@ -1781,7 +1781,7 @@ segments:
       - [0x45288, c, func_80054A88]
       - [0x454F8, c, func_80054CF8]
       - [0x4564C, c, func_80054E4C]
-      - [0x45758, asm]
+      - [0x45758, c, func_80054F58]
       # item/Inv_RollRandomItemType. Two more inlined copies of the PRNG-refill block. Levers: SEPARATE 
       - [0x45BA4, c, func_800553A4]
       # bit-scan of D_800C0E24 into the short table D_800A1D9C; `extern int SYM[]` keeps the far word ab
@@ -1863,7 +1863,7 @@ segments:
       - [0x49608, c, func_80058E08]
       # same lookup; bit 0x20
       - [0x49644, c, func_80058E44]
-      - [0x497EC, asm]
+      - [0x497EC, c, func_80058FEC]
       - [0x49D34, c, func_80059534]
       # item/Inv_ItemActions. THREE inlined dispatch blocks (two reaching D_800BEEAC as (int)D_800C0E22 
       - [0x49E8C, c, func_8005968C]
@@ -2222,7 +2222,7 @@ segments:
       - [0x55C00, c, func_80065400]
       # D_800B1624 sprite-reset sweep; fully pinned (incl. three vars sharing $3 and two sharing $2), sc
       - [0x55DD4, c, func_800655D4]
-      - [0x55E74, asm]
+      - [0x55E74, c, func_80065674]
       # D_800B1624 row setter; value temps pinned $4/$2 reproduce retail's sb-then-sw order
       - [0x5610C, c, func_8006590C]
       # D_800B1624 flag set/clear; pointer pair pinned $3/$2

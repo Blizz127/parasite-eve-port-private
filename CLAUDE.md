@@ -36,18 +36,18 @@ doing anything**.
 
 ## Current phase
 
-**2087 matching C leaves** (EXE) + **2545 overlay `c` spans** across 72
+**2091 matching C leaves** (EXE) + **2545 overlay `c` spans** across 72
 PE.IMG targets — exact count via
 `python3 tools/build/disc1_plan.py --check` (prints
-`2280 spans (2087 c, 191 asm, 2 rodata)`) or equivalently
+`2280 spans (2091 c, 187 asm, 2 rodata)`) or equivalently
 `grep -cE ',[[:space:]]*c,' configs/USA/disc1.yaml`; overlays via
 `cat configs/USA/overlays/*.yaml | grep -cE ',[[:space:]]*c,'` (hand-matched
 leaves plus masked-body ports of shared room bodies). This count is the
 authoritative number; re-derive it, do not trust prose here.
 
-**Newest (2026-09-27): 2087 EXE gate PASS** (`plan=755e7167149c…`,
-`yaml=fba92539056a…`, retail SHA-1 `452fb033…` reproduced,
-`VERIFY_SWEEP=PASS leaves=2087`; maspsx patches 34/35, K3, K4 `MASPSX_HOIST_BLOCK_LI`; fan-out batches 1–2 on top of 2042;
+**Newest (2026-09-27): 2091 EXE gate PASS** (`plan=907283378d8b…`,
+`yaml=31112baa9892…`, retail SHA-1 `452fb033…` reproduced,
+`VERIFY_SWEEP=PASS leaves=2091`; maspsx patches 34/35, K3, K4 `MASPSX_HOIST_BLOCK_LI`; fan-out batches 1–2 on top of 2042;
 `func_8001F814` is no longer NONMATCHING_C). `func_80031760` closed with the
 **asm-label alias lever** (`extern int X asm("D_…")` read in one arm stops
 cc1's cross-jump where retail's stopped). Five stranded lane leaves integrated; new

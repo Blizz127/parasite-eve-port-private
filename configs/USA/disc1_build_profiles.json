@@ -2303,7 +2303,8 @@
       "func_800D7FBC",
       "func_80068E24",
       "func_80066268",
-      "func_800CF3AC"
+      "func_800CF3AC",
+      "func_80065674"
     ],
     "era_o2_g0_fill_store_delay_slot": [
       "func_80074A14",
@@ -2717,7 +2718,8 @@
       "func_800375E0",
       "func_8006062C",
       "func_80063E0C",
-      "func_80068710"
+      "func_80068710",
+      "func_80054F58"
     ],
     "era_o2_g8_force_d8009d2e8_absolute": [
       "func_800293F4"
@@ -3238,7 +3240,8 @@
       "func_80022210"
     ],
     "era_o2_g0_no_rerun_cse_after_loop": [
-      "func_80014228"
+      "func_80014228",
+      "func_8003D94C"
     ],
     "era_o2_g0_cc1_281_return_via_epilogue_jump": [
       "func_80072334"
@@ -3326,7 +3329,8 @@
     ],
     "era_o2_g8_force_d800c0e20_d800c0e22_absolute": [
       "func_80058030",
-      "func_8004A0C8"
+      "func_8004A0C8",
+      "func_80058FEC"
     ],
     "era_o2_g8_dispatch_800112dc_force_d800c0e0c_absolute": [
       "func_8005D2B4"
