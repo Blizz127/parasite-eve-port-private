@@ -4,6 +4,18 @@ Owner decision, 2026-09-28. The Parasite Eve port follows this pattern, and
 the other ports on this dev box should follow it too. The goal is a port
 people can customize: better graphics, mods, cheats.
 
+## Accuracy standard (owner, 2026-09-28)
+
+The port must behave **1:1 like retail** — gameplay, logic, visuals and audio.
+No approximations, invented behaviour or silent cuts; the earlier
+"playable before matching" priority is superseded. Game code runs the
+byte-matched decomp C wherever it exists; hand-written stand-ins are temporary
+and listed. The only allowed differences are the platform layer (which must
+reproduce PS1 hardware behaviour faithfully) and opt-in mods/cheats that are
+off by default and inert when off. Every divergence is listed, with its reason,
+in [`docs/port/KNOWN_DIVERGENCES.md`](port/KNOWN_DIVERGENCES.md); "matches
+retail" is claimed only with objective evidence.
+
 ## Layers
 
 ```

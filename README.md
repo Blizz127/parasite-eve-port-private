@@ -17,6 +17,9 @@ Initial target:
 > Nothing from the game is committed: the build and the port read everything
 > from your own disc at runtime (`tools/analysis/retail_data_guard.py` enforces it).
 
+> **Native port accuracy:** the port's goal is 1:1 retail behaviour. Every
+> known difference is listed in [`docs/port/KNOWN_DIVERGENCES.md`](docs/port/KNOWN_DIVERGENCES.md).
+
 ## Project status
 
 **Matching decomp:** the exact matching-C count is generated from the YAML in
