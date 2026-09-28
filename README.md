@@ -10,6 +10,13 @@ Initial target:
 - Disc 1: `SLUS-00662`
 - Disc 2: `SLUS-00668`
 
+> **History rewritten on 2026-09-28.** All game data (retail bytes, game-frame
+> screenshots and decoded script text) was removed from every commit, and every
+> branch was force-pushed. If you cloned before that date, re-clone; old clones
+> and forks still contain the removed data and must not be pushed back.
+> Nothing from the game is committed: the build and the port read everything
+> from your own disc at runtime (`tools/analysis/retail_data_guard.py` enforces it).
+
 ## Project status
 
 **Matching decomp:** the exact matching-C count is generated from the YAML in
