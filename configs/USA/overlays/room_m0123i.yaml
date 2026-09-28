@@ -92,6 +92,8 @@ segments:
       - [0x3BF4, asm]
       - [0x5604, c, func_801945EC]
       - [0x5780, asm]
+      - [0x5F80, c, func_80194F68]
+      - [0x612C, asm]
       - [0x6368, c, func_80195350]
       - [0x6394, c, func_8019537C]
       - [0x63EC, c, func_801953D4]

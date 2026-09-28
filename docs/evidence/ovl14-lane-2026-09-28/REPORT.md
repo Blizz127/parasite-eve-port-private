@@ -54,3 +54,8 @@ Verify:
 - `python3 tools/build/disc1_preflight.py --target ovl_0700 --deep --only func_80195F6C` → `disc1_preflight: PASS (deep, 45 c / 8 asm / 1 rodata)`
 - `flock build/lanes/ovl.lock scripts/exact_rebuild_overlay.sh ovl_0700` →
   `EXACT_REBUILD_GATE[ovl_0700]=PASS plan=a938c4922252822d1c77a466ef619c48c078547a9a3d6895fead45187fc66c7c yaml=f8b9c95c5c8c7442a1bf7878c89ebc8ea2d9995e2937038bd97d365b12ee52f5 spans=[45 c, 8 asm, 1 rodata, 2 bin] sha1=9f8786a9d6f8b11548a14680d34fc540d8e909de`
+
+## Parked this lane (drafts in build/lanes/ovl14/drafts/park_*.c)
+- ovl_0700 func_80192800 — 1 misplaced insn (27 diff lines): docs/evidence/func-80192800/PARK.md
+- ovl_0700 func_8018F92C — 8w register permutation: docs/evidence/func-8018F92C/PARK.md
+- ovl_0700 func_80193B5C — first draft, spill-set residual: docs/evidence/func-80193B5C/PARK.md
