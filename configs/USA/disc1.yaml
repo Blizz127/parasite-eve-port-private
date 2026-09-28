@@ -2981,7 +2981,9 @@ segments:
       # BCD MSF -> LBA: ((m*60+s)*75+f)-150, nibble decode per byte
       - [0x6B234, c, func_8007AA34]
       - [0x6B2B4, c, func_8007AAB4]
-      - [0x6B810, asm]
+      - [0x6B810, c, func_8007B010]
+      - [0x6BA90, c, func_8007B290]
+      - [0x6BD58, c, func_8007B558]
       - [0x6C164, c, func_8007B964]
       # pin p=$3; non-volatile asm() re-opaque after p[2]=0 forces the reload; and '{ unsigned char *r =
       - [0x6C1EC, c, func_8007B9EC]
