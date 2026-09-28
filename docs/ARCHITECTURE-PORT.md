@@ -6,6 +6,9 @@ people can customize: better graphics, mods, cheats.
 
 ## Accuracy standard (owner, 2026-09-28)
 
+**Purpose: preservation.** The port exists to preserve Parasite Eve exactly as
+it shipped, which is why it must be 1:1.
+
 The port must behave **1:1 like retail** — gameplay, logic, visuals and audio.
 No approximations, invented behaviour or silent cuts; the earlier
 "playable before matching" priority is superseded. Game code runs the

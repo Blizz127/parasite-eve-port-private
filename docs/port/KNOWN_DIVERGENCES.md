@@ -1,5 +1,7 @@
 # Native port: known divergences from retail
 
+**Purpose: preservation** — the port preserves the game exactly as it shipped.
+
 **Standard (owner, 2026-09-28): the port must behave 1:1 like retail —
 gameplay, logic, visuals and audio. No approximations, invented behaviour or
 silent cuts.** The only allowed differences are:
