@@ -3047,7 +3047,11 @@
       "func_80054F58",
       "func_800562A4",
       "func_8005EED4",
-      "func_80014BA0"
+      "func_80014BA0",
+      "func_80015240",
+      "func_8003A6A8",
+      "func_8003B97C",
+      "func_8007041C"
     ],
     "era_o2_g8_force_d8009d2e8_absolute": [
       "func_800293F4"
@@ -3343,7 +3347,8 @@
       "func_800C5EB0",
       "func_800875FC",
       "func_80039D24",
-      "func_80039ED4"
+      "func_80039ED4",
+      "func_8003C0B4"
     ],
     "era_o2_g8_force_d800b0cd8_absolute": [
       "func_8003F2FC",

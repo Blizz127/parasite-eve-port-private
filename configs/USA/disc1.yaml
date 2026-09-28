@@ -77,7 +77,7 @@ segments:
       # func_80015AB8 — three-pointer wrapper around func_800677A0 reading
       # *a0[0] / *(short*)a0[1] / *(short*)a0[2]; return 1. era -O2 -G0.
       - [0x367C, c, func_80012E7C]
-      - [0x38B4, asm]
+      - [0x38B4, c, func_800130B4]
       # unregistered orphan in src/, verified at a default profile by orchestrator
       - [0x39E8, c, func_800131E8]
       # lane1: func_80013300 VRAM 0x80013300 size 0xE8.
@@ -111,7 +111,7 @@ segments:
       - [0x57D8, c, func_80014FD8]
       # lane1: func_80015108 VRAM 0x80015108 size 0x138.
       - [0x5908, c, func_80015108]
-      - [0x5A40, asm]
+      - [0x5A40, c, func_80015240]
       - [0x5DFC, c, func_800155FC]
       # lane1: func_80015648 VRAM 0x80015648 size 0x148.
       - [0x5E48, c, func_80015648]
@@ -900,16 +900,19 @@ segments:
       - [0x2A524, c, func_80039D24]
       # schedule-insns off
       - [0x2A6D4, c, func_80039ED4]
-      - [0x2A888, asm]
+      - [0x2A888, c, func_8003A088]
+      - [0x2AEA8, c, func_8003A6A8]
+      - [0x2B490, c, func_8003AC90]
       # func_8003AF14 — render-object update: flag-word (0x9C) driven reset/move/fade/colour steps then draw via
       # func_8003C0B4. era -O2 -G0. The repeated 'if (f9C & 8) draw' tails are cross-jumped by cc1 like retail.
       - [0x2B714, c, func_8003AF14]
-      - [0x2B944, asm]
+      - [0x2B944, c, func_8003B144]
       # matching C leaf
       - [0x2BF08, c, func_8003B708]
-      - [0x2C17C, asm]
+      - [0x2C17C, c, func_8003B97C]
       - [0x2C4E0, c, func_8003BCE0]
-      - [0x2C8B4, asm]
+      - [0x2C8B4, c, func_8003C0B4]
+      - [0x2CAE0, c, func_8003C2E0]
       # Volume 97: reciprocal-byte initializer; era -O2 -G0 with the
       # sanctioned ASPSX signed-division guard expansion.
       - [0x2CDD8, c, func_8003C5D8]
@@ -956,7 +959,7 @@ segments:
       - [0x2E8D0, c, func_8003E0D0]
       # NEW LEVER: `i++` BEFORE the pointer advance in the loop body fixes the biv emission order so the
       - [0x2E8FC, c, func_8003E0FC]
-      - [0x2E988, asm]
+      - [0x2E988, c, func_8003E188]
       - [0x2EC74, c, func_8003E474]
       - [0x2EDF0, c, func_8003E5F0]
       - [0x2EE0C, asm]
@@ -983,7 +986,7 @@ segments:
       # Boot-spine jal from func_8001220C. era -O2 -G8 + FORCE_ABSOLUTE for
       # in-range words retail keeps absolute; s2/s0/s1 pins; empty asm
       # barrier keeps addiu s0,s2,-0x12. LINK_EXACT. Resume 2FF58.s.
-      - [0x2F2C8, asm]
+      - [0x2F2C8, c, func_8003EAC8]
       # pad input step
       - [0x2F304, c, func_8003EB04]
       - [0x2F874, c, func_8003F074]
@@ -2260,22 +2263,23 @@ segments:
       - [0x56544, c, func_80065D44]
       # D_800B1624 +0x1C base, stride 52, four short restores
       - [0x565CC, c, func_80065DCC]
-      - [0x56648, asm]
+      - [0x56648, c, func_80065E48]
+      - [0x569A4, asm]
       # D_800BCF88 gate + viewport publish; hoisting (s & ~0xF) into a local kills the duplicated and
       - [0x569EC, c, func_800661EC]
       - [0x56A68, c, func_80066268]
-      - [0x56DA0, asm]
+      - [0x56DA0, c, func_800665A0]
       # func_80067B40 — D_800BCFFA = a0; D_800BCFFB = 0;
       # D_800BCF88 = (D_800BCF88 & ~0xC00) | 0x400; return 0. The two byte
       # stores are absolute while the word goes through a $v0 base pin.
       # era -O2 -G0, LINK_EXACT.
       - [0x57000, c, func_80066800]
-      - [0x5718C, asm]
+      - [0x5718C, c, func_8006698C]
       # D_800BCFE8.. save/overwrite block
       - [0x57360, c, func_80066B60]
       - [0x573D8, c, func_80066BD8]
       - [0x5747C, c, func_80066C7C]
-      - [0x574E8, asm]
+      - [0x574E8, c, func_80066CE8]
       - [0x57760, c, func_80066F60]
       - [0x579C8, c, func_800671C8]
       - [0x57A94, c, func_80067294]
@@ -2307,7 +2311,7 @@ segments:
       # double 3-byte row write; pins $8/$9/$4, second base folded back into the $4 offset variable
       - [0x58EA0, c, func_800686A0]
       - [0x58F10, c, func_80068710]
-      - [0x59394, asm]
+      - [0x59394, c, func_80068B94]
       # Phase 5EZ: C leaf func_8006A5BC — VRAM 0x8006A5BC, size 0x90 (36 words).
       # Boot init with two VSync-polled wait loops (VSync = func_80073A44,
       # SDK). era -O1 -G0: per-use $s0=1 materialization (in 86FF8's delay
@@ -2535,7 +2539,7 @@ segments:
       - [0x60ADC, c, func_800702DC]
       # Two-phase subsystem teardown wrapper: era -O2 -G0.
       - [0x60BF4, c, func_800703F4]
-      - [0x60C1C, asm]
+      - [0x60C1C, c, func_8007041C]
       # lagged-Fibonacci table seed; ori small li + pre-decrement bnez
       - [0x61510, c, func_80070D10]
       # pinned index walk over the embedded 0x80070E04 table; -O1
@@ -2921,6 +2925,15 @@ segments:
       # 2.8.1 + expand_div + patch 16 (no reuse nop after the expanded div's mflo). size 0x104.
       - [0x68664, c, func_80077E64]
       - [0x68768, asm]
+      - [0x68DD4, c, func_800785D4]
+      - [0x68EE0, asm]
+      - [0x68EE4, c, func_800786E4]
+      - [0x68FCC, asm]
+      - [0x69134, c, func_80078934]
+      - [0x69294, asm]
+      - [0x693E4, c, func_80078BE4]
+      - [0x69434, c, func_80078C34]
+      - [0x69490, asm]
       # func_80078C94 — copies 3 words from a1[0..2] into a0[5..7] and
       # returns a0. era -O1 -G0 + -fno-delayed-branch: cc1 puts the return
       # `move $2,$4` BEFORE `jr $31` (unfilled slot), which is exactly
@@ -2931,6 +2944,27 @@ segments:
       # packed halfword scale by three weights; multu via mflo
       - [0x694C4, c, func_80078CC4]
       - [0x695FC, asm]
+      - [0x69604, c, func_80078E04]
+      - [0x69634, c, func_80078E34]
+      - [0x69664, c, func_80078E64]
+      - [0x69694, c, func_80078E94]
+      - [0x696B4, asm]
+      - [0x697C4, c, func_80078FC4]
+      - [0x697E4, c, func_80078FE4]
+      - [0x69804, c, func_80079004]
+      - [0x6981C, asm]
+      - [0x69A44, c, func_80079244]
+      - [0x69A70, asm]
+      - [0x69A74, c, func_80079274]
+      - [0x69AC8, asm]
+      - [0x69AD4, c, func_800792D4]
+      - [0x69AFC, asm]
+      - [0x69B04, c, func_80079304]
+      - [0x69B7C, asm]
+      - [0x69B84, c, func_80079384]
+      - [0x69C0C, asm]
+      - [0x69C14, c, func_80079414]
+      - [0x69CC4, asm]
       - [0x6A7B4, c, func_80079FB4]
       - [0x6A928, asm]
       # Phase 5BK: C leaf func_8007A324 — VRAM 0x8007A324, size 0x10.
@@ -4568,7 +4602,8 @@ segments:
       # expand div
       - [0xBFBAC, c, func_800CF3AC]
       - [0xBFCB4, c, func_800CF4B4]
-      - [0xBFDB0, asm]
+      - [0xBFDB0, c, func_800CF5B0]
+      - [0xBFE58, asm]
       # OT primitive linker: allocates 8 bytes from D_8009CDD8 inside D_800B0E58[D_8009CDDC], calls func
       - [0xBFEF8, c, func_800CF6F8]
       - [0xC0044, asm]
