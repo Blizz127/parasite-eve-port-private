@@ -21,6 +21,9 @@
     ],
     "era_o2_g0_narrow_shifted_reg_load": [
       "func_8019A290"
+    ],
+    "room_m0273i_dispatch_8018F1CC": [
+      "func_80192E64"
     ]
   },
   "local_profiles": {
@@ -76,6 +79,17 @@
       ],
       "environment": {
         "MASPSX_NARROW_SHIFTED_REG_LOAD": "1"
+      }
+    },
+    "room_m0273i_dispatch_8018F1CC": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0"
+      ],
+      "environment": {
+        "MASPSX_THREE_WORD_SYMBOL_STORE": "1",
+        "MASPSX_DISPATCH_FOLD": "jtbl_8018F1CC"
       }
     }
   }
