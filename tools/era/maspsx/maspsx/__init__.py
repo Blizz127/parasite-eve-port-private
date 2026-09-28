@@ -1112,6 +1112,7 @@ class MaspsxProcessor:
         symbol_at_temp=False,
         dispatch_fold_symbol=None,
         fill_jump_stack_store=False,
+        fill_jump_reg_store=False,
         fill_jump_symbol_store=False,
         drop_target_dup_li=False,
         return_via_epilogue_jump=False,
@@ -1145,6 +1146,8 @@ class MaspsxProcessor:
         mflo_before_mfhi=False,
         narrow_shifted_word_load=False,
         hoist_block_li=None,
+        narrow_shifted_reg_load=False,
+        hoist_block_li_tail1=None,
     ):
         self.lines = [x.strip() for x in lines]
 
@@ -1258,6 +1261,15 @@ class MaspsxProcessor:
         self.fill_jump_stack_store = (
             fill_jump_stack_store
             or os.environ.get("MASPSX_FILL_JUMP_STACK_STORE") == "1"
+        )
+        # LOCAL PATCH K6: MASPSX_FILL_JUMP_REG_STORE. Patch 11 for any
+        # register base (not only $sp): cc1's multi-word block move
+        # (`movstrsi`, e.g. strcpy(dst, "..") -> lh/lb/sh/sb) is ONE insn,
+        # so reorg never splits its last store into the following `j`
+        # slot; ASPSX does (func_80081A7C 0x80081BE8 `j` / `sb $v1,34($s5)`).
+        self.fill_jump_reg_store = (
+            fill_jump_reg_store
+            or os.environ.get("MASPSX_FILL_JUMP_REG_STORE") == "1"
         )
         # LOCAL PATCH 34: indexed symbolic store into a plain `j <label>` slot.
         self.fill_jump_symbol_store = (
@@ -1494,6 +1506,15 @@ class MaspsxProcessor:
             narrow_shifted_word_load
             or os.environ.get("MASPSX_NARROW_SHIFTED_WORD_LOAD") == "1"
         )
+        # LOCAL PATCH K3b: MASPSX_NARROW_SHIFTED_REG_LOAD. The same
+        # narrowing for a register-base numeric-offset load:
+        # `lw $d,N($b)` ... `sra $d,$d,M` (16 <= M <= 31) ->
+        # `lh $d,N+2($b)` ... `sra $d,$d,M-16` (room func_8019A290's
+        # `*(int *)p >> 21`). Separate flag so K3 users stay identical.
+        self.narrow_shifted_reg_load = (
+            narrow_shifted_reg_load
+            or os.environ.get("MASPSX_NARROW_SHIFTED_REG_LOAD") == "1"
+        )
         # LOCAL PATCH K4: MASPSX_HOIST_BLOCK_LI. In a straight-line run of
         # store groups that each reload the same absolute word
         # (`lw $x,SYM`), cc1 emits every group constant as `li $r,K` in
@@ -1513,6 +1534,18 @@ class MaspsxProcessor:
             self.hoist_block_li = {
                 s.strip() for s in hoist_block_li.split(",") if s.strip()
             }
+        # LOCAL PATCH K4 tail-1: MASPSX_HOIST_BLOCK_LI_TAIL1=<sym,...>. A K4
+        # region any of whose lines names a listed symbol (func_8002BC90 /
+        # func_8001D340's stride-72 D_800B0130 gauge blocks) instead moves
+        # constants 0..n-2 before reload 1 and constant n-1 directly after
+        # reload 1; reload 2 keeps its delay-slot nop. Only read when K4 is
+        # on. Retail func_8002BC90 0x8002C724: five `li` / `lw D_8009CDDC` /
+        # `li $4,1` ... `lw D_8009CDDC` / `nop`.
+        if hoist_block_li_tail1 is None:
+            hoist_block_li_tail1 = os.environ.get("MASPSX_HOIST_BLOCK_LI_TAIL1", "")
+        self.hoist_block_li_tail1 = {
+            s.strip() for s in (hoist_block_li_tail1 or "").split(",") if s.strip()
+        }
         # LOCAL PATCH 21: load-delay nop before a loop-head label.
         self.load_delay_nop_before_loop_label = (
             load_delay_nop_before_loop_label
@@ -2160,7 +2193,7 @@ class MaspsxProcessor:
         self.extern_entries = {}
 
         self.preprocess_lines()
-        if self.narrow_shifted_word_load:
+        if self.narrow_shifted_word_load or self.narrow_shifted_reg_load:
             self.lines = self._narrow_shifted_word_load(self.lines)
         if self.hoist_block_li:
             self.lines = self._hoist_block_li(self.lines)
@@ -2791,7 +2824,15 @@ class MaspsxProcessor:
             if n < 2 or len(loads) < 2:
                 continue
             # insert position: before line index `tgt`
-            targets = [loads[0]] * (n - 2) + [loads[0] + 1, loads[1] + 1]
+            tail1 = self.hoist_block_li_tail1
+            if tail1 and any(
+                re.search(r"(?<![\w.$])" + re.escape(t) + r"(?![\w.$])", bare(out[k]))
+                for k in real
+                for t in tail1
+            ):
+                targets = [loads[0]] * (n - 1) + [loads[0] + 1]
+            else:
+                targets = [loads[0]] * (n - 2) + [loads[0] + 1, loads[1] + 1]
             moved = {pos for pos, _ in consts}
             ok = True
             for (pos, reg), tgt in zip(consts, targets):
@@ -2832,16 +2873,23 @@ class MaspsxProcessor:
         load_re = re.compile(
             r"^lw\s+(\$\w+),([A-Za-z_.$][\w.$]*)([+-]\d+)?(\(\$\w+\))?$"
         )
+        # K3b: register base with a decimal offset, `lw $d,N($b)`.
+        reg_load_re = re.compile(r"^lw\s+(\$\w+),(-?\d+)(\(\$\w+\))$")
         ctl_re = re.compile(r"^(b\w*|j|jal|jr|jalr|syscall|break)\b")
         out = list(res)
         drop = set()
         for i, line in enumerate(out):
-            m = load_re.match(bare(line))
-            if not m:
-                continue
-            d, sym, off, base = m.group(1), m.group(2), m.group(3), m.group(4) or ""
-            if sym.startswith("$"):
-                continue
+            m = load_re.match(bare(line)) if self.narrow_shifted_word_load else None
+            if m:
+                d, sym, off, base = m.group(1), m.group(2), m.group(3), m.group(4) or ""
+                if sym.startswith("$"):
+                    continue
+            else:
+                rm = (reg_load_re.match(bare(line))
+                      if self.narrow_shifted_reg_load else None)
+                if not rm:
+                    continue
+                d, sym, off, base = rm.group(1), None, rm.group(2), rm.group(3)
             reg_re = re.compile(re.escape(d) + r"(?!\w)")
             k = i + 1
             hit = None
@@ -2863,8 +2911,11 @@ class MaspsxProcessor:
                 continue
             k, n = hit
             disp = (int(off) if off else 0) + 2
-            sign = "+" if disp >= 0 else "-"
-            out[i] = f"lh\t{d},{sym}{sign}{abs(disp)}{base}"
+            if sym is None:
+                out[i] = f"lh\t{d},{disp}{base}"
+            else:
+                sign = "+" if disp >= 0 else "-"
+                out[i] = f"lh\t{d},{sym}{sign}{abs(disp)}{base}"
             if n == 16:
                 drop.add(k)
             else:
@@ -4934,11 +4985,16 @@ class MaspsxProcessor:
                 # pass moves a single-word stack store into the empty delay
                 # slot of the plain `j <label>` that follows it:
                 #   sw $0,0($sp) / j L / nop  ->  j L / sw $0,0($sp)
-                self.fill_jump_stack_store
+                (self.fill_jump_stack_store or self.fill_jump_reg_store)
                 and op in ("sb", "sh", "sw")
                 and not is_macro  # HJ4
                 and r_source
-                and canon_reg(r_source) == 29  # HJ2: $sp base only
+                and (
+                    canon_reg(r_source) == 29  # HJ2: $sp base only
+                    if not self.fill_jump_reg_store
+                    # K6: any base except $at; value not $at either
+                    else canon_reg(r_source) != 1 and canon_reg(r_dest) != 1
+                )
                 and re.match(r"^-?(0x[0-9A-Fa-f]+|\d+)$", operand)
                 and -32768 <= int(operand, 0) <= 32767  # HJ3: one word
                 and (jump := self._next_line_is_label_jump()) is not None

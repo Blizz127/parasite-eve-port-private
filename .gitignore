@@ -112,6 +112,9 @@ tools/era/maspsx/tests/*
 !tools/era/maspsx/tests/test_fill_call_delay_slot.py
 !tools/era/maspsx/tests/test_narrow_shifted_word_load.py
 !tools/era/maspsx/tests/test_hoist_block_li.py
+!tools/era/maspsx/tests/test_narrow_shifted_reg_load.py
+!tools/era/maspsx/tests/test_fill_jump_reg_store.py
+!tools/era/maspsx/tests/test_hoist_block_li_tail1.py
 build-port/
 pc_port/build/
 pc_port/build-san/

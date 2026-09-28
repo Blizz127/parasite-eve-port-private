@@ -551,7 +551,7 @@ segments:
       # -G8 with D_8009D254 forced absolute
       - [0xD970, c, func_8001D170]
       - [0xDA68, c, func_8001D268]
-      - [0xDB40, asm]
+      - [0xDB40, c, func_8001D340]
       # lane1: func_8001F4D4 VRAM 0x8001F4D4 size 0x340.
       - [0xFCD4, c, func_8001F4D4]
       - [0x10014, c, func_8001F814]
@@ -675,7 +675,7 @@ segments:
       - [0x1B8E8, c, func_8002B0E8]
       - [0x1BA9C, asm]
       - [0x1C14C, c, func_8002B94C]
-      - [0x1C490, asm]
+      - [0x1C490, c, func_8002BC90]
       - [0x1D9F0, c, func_8002D1F0]
       - [0x1E458, asm]
       # func_8002F0B0 — battle death step (3-state D_8009CE74 machine over the D_8009D20C actor list). era -O2 -G8 with
@@ -799,7 +799,7 @@ segments:
       - [0x26BF4, c, func_800363F4]
       # Phase 5FP-370A8: fixed-point quotient helper, era -O2 -G0.
       # Mid-26C48 carve: prefix 0xC60, C 0x14, resume 278BC.s.
-      - [0x26C48, asm]
+      - [0x26C48, c, func_80036448]
       # func_80036DC8 — three sequential init calls (36DF8/36E34/36E58) in one
       # frame; era -O2 -G0, LINK_EXACT.
       - [0x275C8, c, func_80036DC8]
@@ -1804,7 +1804,7 @@ segments:
       # era -O2 -G0 + MASPSX_SYMBOL_AT_TEMP=1, LINK_EXACT.
       # item/Inv_AmmoSelection. Three copies of a list-selection block (alt list vs D_800C0E48 + func_80
       - [0x4680C, c, func_8005600C]
-      - [0x46AA4, asm]
+      - [0x46AA4, c, func_800562A4]
       # two-pot transfer; LEVER: `goto done; ret3: ret = 3; done: return ret;` - putting the label BETWE
       - [0x47324, c, func_80056B24]
       - [0x47414, c, func_80056C14]
@@ -2361,7 +2361,7 @@ segments:
       - [0x5CDBC, c, func_8006C5BC]
       # D_800B0CD8 gate chain then func_800661A4 / func_8003A088 / func_8003AC90 / func_8003AF14 / func_
       - [0x5D468, c, func_8006CC68]
-      - [0x5D5A4, asm]
+      - [0x5D5A4, c, func_8006CDA4]
       - [0x5D878, c, func_8006D078]
       - [0x5DA4C, c, func_8006D24C]
       - [0x5DAB8, c, func_8006D2B8]
@@ -3233,7 +3233,7 @@ segments:
       - [0x70964, c, func_80080164]
       # libds sync/notify dispatcher, 121w. Jump-table switch over D_8009B558[0] plus an if/else-if ladd
       - [0x70A20, c, func_80080220]
-      - [0x70C04, asm]
+      - [0x70C04, c, func_80080404]
       # pins c=$7,p=$6,q=$4,f=$3; 'extern void (*volatile D_800A36A4)(int)' gives retail's two loads; ho
       - [0x70E8C, c, func_8008068C]
       # pointer local created AFTER the call; 'void (*volatile)' callback global gives retail's two inde
@@ -3314,7 +3314,7 @@ segments:
       - [0x71F14, asm]
       # 0x2C-stride keyed table search with a strcmp-style callback. Writing the loop with explicit `got
       - [0x721D8, c, func_800819D8]
-      - [0x7227C, asm]
+      - [0x7227C, c, func_80081A7C]
       # two setup calls with an 8-byte stack buffer then a do/while poll; returns r==0
       - [0x72518, c, func_80081D18]
       - [0x72574, c, func_80081D74]
@@ -3642,7 +3642,7 @@ segments:
       # func_80087198 / func_80087414 — store 1/2, return 0 (sb+ret0); size 0x14 each.
       # Mid-778F0 carve: prefix 0xA8, C, asm reader 871AC (0x268), C, resume 77C28 to 7B31C.
       - [0x77998, c, func_80087198]
-      - [0x779AC, asm]
+      - [0x779AC, c, func_800871AC]
       - [0x77C14, c, func_80087414]
       # matching C leaf
       - [0x77C28, c, func_80087428]
@@ -3682,7 +3682,8 @@ segments:
       # LINK_EXACT on swept stable source
       - [0x782A8, c, func_80087AA8]
       - [0x787A0, c, func_80087FA0]
-      - [0x78B44, asm]
+      - [0x78B44, c, func_80088344]
+      - [0x79180, asm]
       - [0x79664, c, func_80088E64]
       # two func_800878F0 calls around a 0x11C-stride D_800B8AC0 record copy; asm barrier on the index c
       - [0x7976C, c, func_80088F6C]
@@ -4676,6 +4677,7 @@ segments:
       - [0xCE1E4, asm]
       - [0xCE570, c, func_800DDD70]
       - [0xCE8A8, asm]
+      - [0xCEFA8, c, func_800DE7A8]
       - [0xCF230, c, func_800DEA30]
       - [0xCF7FC, c, func_800DEFFC]
       - [0xCFEAC, c, func_800DF6AC]

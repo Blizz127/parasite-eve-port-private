@@ -98,6 +98,9 @@ MASPSX_TRACKED=(
     "tests/test_fill_call_delay_slot.py"
     "tests/test_narrow_shifted_word_load.py"
     "tests/test_hoist_block_li.py"
+    "tests/test_narrow_shifted_reg_load.py"
+    "tests/test_fill_jump_reg_store.py"
+    "tests/test_hoist_block_li_tail1.py"
 )
 
 if [[ -f "$ERA/maspsx/maspsx.py" ]]; then
