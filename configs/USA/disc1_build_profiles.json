@@ -2539,6 +2539,34 @@
         "MASPSX_SYMBOL_LOAD_DEST_TEMP": "1",
         "MASPSX_FILL_BRANCH_MACRO_SPLIT": "1"
       }
+    },
+    "era_o2_g0_cc1_281_fill_call_delay_slot_numeric_load_aspsx": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-mno-split-addresses"
+      ],
+      "environment": {
+        "ERA_CC1_VER": "2.8.1",
+        "MASPSX_FILL_CALL_DELAY_SLOT": "1",
+        "MASPSX_NUMERIC_LOAD_ASPSX": "1"
+      }
+    },
+    "era_o2_g0_cc1_272cdk_hard_float_three_word_symbol_store_fill_epilogue_delay_slot_dispatch_fold_cdk_split_dispatch": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-mhard-float"
+      ],
+      "environment": {
+        "ERA_CC1_VER": "2.7.2-cdk",
+        "MASPSX_THREE_WORD_SYMBOL_STORE": "1",
+        "MASPSX_FILL_EPILOGUE_DELAY_SLOT": "1",
+        "MASPSX_DISPATCH_FOLD": "jtbl_80011644",
+        "MASPSX_CDK_SPLIT_DISPATCH": "1"
+      }
     }
   },
   "assignments": {
@@ -3963,6 +3991,12 @@
     ],
     "era_o2_g0_cc1_281_fill_call_delay_slot_symbol_load_dest_temp_branch_macro_split": [
       "func_8007B558"
+    ],
+    "era_o2_g0_cc1_281_fill_call_delay_slot_numeric_load_aspsx": [
+      "func_8007CEAC"
+    ],
+    "era_o2_g0_cc1_272cdk_hard_float_three_word_symbol_store_fill_epilogue_delay_slot_dispatch_fold_cdk_split_dispatch": [
+      "func_80071A84"
     ]
   }
 }

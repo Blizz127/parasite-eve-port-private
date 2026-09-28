@@ -2724,7 +2724,59 @@ class MaspsxProcessor:
                 continue
             lines[j] = "# DROP_TARGET_DUP_LI " + lines[j]
 
+    def _cdk_split_dispatch(self) -> None:
+        # LOCAL PATCH (K-CDKJT, MASPSX_CDK_SPLIT_DISPATCH=1): gcc-2.7.2-cdk
+        # always splits addresses, so its switch dispatch is
+        #     beq  $c,$0,L ; lui $t,%hi($Ln) (slot) ; addiu $t,$t,%lo($Ln)
+        #     sll  $x,$x,2 ; addu $x,$x,$t ; lw $t,0($x) ; [#nop] ; j $t
+        # Stock 2.7.2 (and retail ASPSX) index the table symbol directly:
+        #     beq  $c,$0,L ; sll $t,$x,2 (slot) ; lw $t,$Ln($t) ; j $t
+        # Rewrite the first shape into the second so the ordinary indexed-
+        # symbol load path (and MASPSX_DISPATCH_FOLD) applies. Guards: the
+        # exact 5-insn shape with one $Ln label in both halves, $t != $x,
+        # and the next instruction after the lw is `j $t`, so the only
+        # changed register value ($x ends as the scaled index instead of
+        # the entry address) is never read by the dispatch itself.
+        L = self.lines
+        out = []
+        i = 0
+        n = len(L)
+        while i < n:
+            m_lui = re.match(r"^lui\t(\$\w+),%hi\((\$L\d+)\)(\s*#.*)?$", L[i]) if i + 1 < n else None
+            if m_lui and out and re.match(r"^b\w*\t", out[-1]):
+                t, lab = m_lui.group(1), m_lui.group(2)
+                j = i + 1
+                sets = []
+                while j < n and L[j] in (".set\tmacro", ".set\treorder", ""):
+                    sets.append(L[j])
+                    j += 1
+                m_add = j < n and re.match(
+                    rf"^addiu\t{re.escape(t)},{re.escape(t)},%lo\({re.escape(lab)}\)(\s*#.*)?$", L[j])
+                m_sll = j + 1 < n and re.match(r"^sll\t(\$\w+),(\$\w+),2$", L[j + 1])
+                ok = bool(m_add and m_sll) and m_sll.group(1) == m_sll.group(2) and m_sll.group(1) != t
+                if ok:
+                    x = m_sll.group(1)
+                    ok = (j + 3 < n and L[j + 2] == f"addu\t{x},{x},{t}"
+                          and L[j + 3] == f"lw\t{t},0({x})")
+                if ok:
+                    k = j + 4
+                    while k < n and L[k] in ("", "#nop"):
+                        k += 1
+                    ok = k < n and L[k] == f"j\t{t}"
+                if ok and ".set\tmacro" in sets and ".set\treorder" in sets:
+                    out.append(f"sll\t{t},{x},2")
+                    out.extend(sets)
+                    out.append(f"# CDK_SPLIT_DISPATCH: {lab}")
+                    out.append(f"lw\t{t},{lab}({t})")
+                    i = j + 4
+                    continue
+            out.append(L[i])
+            i += 1
+        self.lines = out
+
     def process_lines(self):
+        if os.environ.get("MASPSX_CDK_SPLIT_DISPATCH") == "1":
+            self._cdk_split_dispatch()
         if getattr(self, "ulw_load_delay_nop", False):
             self._ulw_load_delay_nop()
         if getattr(self, "shift_count_const", False) or getattr(
@@ -5265,7 +5317,35 @@ class MaspsxProcessor:
                 res.extend(extra_nops)
 
             else:
-                if r_source and (int(operand, 0) > 32767 or int(operand, 0) < -32768):
+                if (
+                    os.environ.get("MASPSX_NUMERIC_LOAD_ASPSX") == "1"
+                    and r_source
+                    and (int(operand, 0) > 32767 or int(operand, 0) < -32768)
+                ):
+                    # LOCAL PATCH (K5, MASPSX_NUMERIC_LOAD_ASPSX=1): an indexed
+                    # load from a numeric address outside int16 (cc1 2.8.1
+                    # -mno-split-addresses, `lw $d,0x1F801088($b)` for a
+                    # hardware-register array). ASPSX uses the destination
+                    # register as the address temp when it differs from the
+                    # index (`lui $d / addu $d,$d,$b / lw $d,%lo($d)`), and
+                    # `$at` in ASPSX operand order otherwise. Retail
+                    # func_8007CEAC 0x8007CEE4 / 0x8007CF08 / 0x8007CF4C.
+                    if canon_reg(r_dest) != canon_reg(r_source):
+                        tmp = r_dest
+                    else:
+                        tmp = "$at"
+                    res.extend(
+                        [
+                            "# NUMERIC_LOAD_ASPSX START",
+                            ".set\tnoat",
+                            f"lui\t{tmp},%hi({operand})",
+                            f"addu\t{tmp},{tmp},{r_source}",
+                            f"{op}\t{r_dest},%lo({operand})({tmp})",
+                            ".set\tat",
+                            "# NUMERIC_LOAD_ASPSX END",
+                        ]
+                    )
+                elif r_source and (int(operand, 0) > 32767 or int(operand, 0) < -32768):
                     # e.g. lhu	$2,49344($2)
                     res.extend(
                         [

@@ -2569,6 +2569,8 @@ segments:
       # Phase 5FA: conditional offset-0x14 pointer helper.
       - [0x621C4, c, func_800719C4]
       - [0x621E4, asm]
+      - [0x62284, c, func_80071A84]
+      - [0x62B08, asm]
       - [0x62B34, c, func_80072334]
       - [0x62BA0, asm]
       # This is qsort: func_800723A4(void *b, unsigned int n, int size, int (*cmp)()) with func_800724F4
@@ -3028,7 +3030,7 @@ segments:
       # lw/addiu/store/addiu order (not load/store interleaved) is emitted.
       # era -O2 -G0, LINK_EXACT.
       - [0x6D680, c, func_8007CE80]
-      - [0x6D6AC, asm]
+      - [0x6D6AC, c, func_8007CEAC]
       - [0x6D854, c, func_8007D054]
       - [0x6D874, c, func_8007D074]
       # One-shot init guarded by D_8009B3EC. Two jal macro splits. Return value of func_800726E4 assigne

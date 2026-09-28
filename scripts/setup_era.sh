@@ -23,10 +23,11 @@ MASPSX_REPO="https://github.com/mkst/maspsx"
 mkdir -p "$ERA"
 
 # fetch_gcc <version>: install tools/era/gcc-<version>-psx from the same
-# old-gcc release (idempotent; skipped when cc1+cpp are already executable).
+# old-gcc release (idempotent; skipped when cc1 is already executable).
+# Optional second arg: release asset basename when it is not gcc-<version>-psx.
 fetch_gcc() {
-    local ver="$1" dir="$ERA/gcc-$1-psx" url="$GCC_RELEASE/gcc-$1-psx.tar.gz" tmp
-    if [[ -x "$dir/cc1" && -x "$dir/cpp" ]]; then
+    local ver="$1" dir="$ERA/gcc-$1-psx" url="$GCC_RELEASE/${2:-gcc-$1-psx}.tar.gz" tmp
+    if [[ -x "$dir/cc1" ]]; then
         echo "OK  era gcc present: $dir"
         return 0
     fi
@@ -41,6 +42,7 @@ fetch_gcc() {
 }
 
 fetch_gcc 2.7.2   # default era cc1 (Psy-Q ccpsx fingerprint)
+fetch_gcc 2.7.2-cdk gcc-2.7.2-cdk  # per-leaf ERA_CC1_VER=2.7.2-cdk (func_80071A84, libc printf)
 fetch_gcc 2.8.1   # per-leaf ERA_CC1_VER=2.8.1 (fills the delay slots 2.7.2 leaves to a nop)
 
 # Repo-tracked files under tools/era/maspsx (un-ignored via .gitignore
@@ -112,6 +114,8 @@ MASPSX_TRACKED=(
     "tests/test_branch_steal_target_insn.py"
     "tests/test_fill_jump_preceding_move.py"
     "tests/test_load_delay_nop_before_any_label.py"
+    "tests/test_numeric_load_aspsx.py"
+    "tests/test_cdk_split_dispatch.py"
 )
 
 if [[ -f "$ERA/maspsx/maspsx.py" ]]; then
