@@ -114,7 +114,7 @@ segments:
       - [0x4888, c, func_80193870]
       - [0x49CC, c, func_801939B4]
       - [0x4B74, c, func_80193B5C]
-      - [0x4CD0, asm]
+      - [0x4CD0, c, func_80193CB8]
       - [0x4F48, c, func_80193F30]
       - [0x5140, c, func_80194128]
       - [0x529C, c, func_80194284]

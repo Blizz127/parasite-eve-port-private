@@ -993,7 +993,8 @@ segments:
       # read `*s | 2` BEFORE the D_8009D1A0 RMW; &D_800B0CD8 kept in a register by the zero-code asm bar
       - [0x2FAFC, c, func_8003F2FC]
       - [0x2FBC4, c, func_8003F3C4]
-      - [0x2FF58, asm]
+      - [0x2FF58, c, func_8003F758]
+      - [0x2FF98, c, func_8003F798]
       # Save-block serializer: memcpy fields to the D_800A0ED0 cursor (mirror of func_8003FBD8).
       - [0x30000, c, func_8003F800]
       # Save-block deserializer: memcpy fields from the D_800A0ED0 cursor (builtin block moves).
@@ -2264,7 +2265,8 @@ segments:
       # D_800B1624 +0x1C base, stride 52, four short restores
       - [0x565CC, c, func_80065DCC]
       - [0x56648, c, func_80065E48]
-      - [0x569A4, asm]
+      - [0x569A4, c, func_800661A4]
+      - [0x569CC, c, func_800661CC]
       # D_800BCF88 gate + viewport publish; hoisting (s & ~0xF) into a local kills the duplicated and
       - [0x569EC, c, func_800661EC]
       - [0x56A68, c, func_80066268]
@@ -2925,6 +2927,13 @@ segments:
       # 2.8.1 + expand_div + patch 16 (no reuse nop after the expanded div's mflo). size 0x104.
       - [0x68664, c, func_80077E64]
       - [0x68768, asm]
+      - [0x68B44, c, func_80078344]
+      - [0x68B94, c, func_80078394]
+      - [0x68BE4, c, func_800783E4]
+      - [0x68C6C, c, func_8007846C]
+      - [0x68CF4, c, func_800784F4]
+      - [0x68D54, c, func_80078554]
+      - [0x68DD0, asm]
       - [0x68DD4, c, func_800785D4]
       - [0x68EE0, asm]
       - [0x68EE4, c, func_800786E4]
@@ -2953,6 +2962,18 @@ segments:
       - [0x697E4, c, func_80078FE4]
       - [0x69804, c, func_80079004]
       - [0x6981C, asm]
+      - [0x69834, c, func_80079034]
+      - [0x6985C, c, func_8007905C]
+      - [0x69884, c, func_80079084]
+      - [0x698C0, c, func_800790C0]
+      - [0x698E4, c, func_800790E4]
+      - [0x6990C, c, func_8007910C]
+      - [0x69934, c, func_80079134]
+      - [0x69954, c, func_80079154]
+      - [0x69978, c, func_80079178]
+      - [0x699D0, c, func_800791D0]
+      - [0x69A28, c, func_80079228]
+      - [0x69A40, asm]
       - [0x69A44, c, func_80079244]
       - [0x69A70, asm]
       - [0x69A74, c, func_80079274]
@@ -4589,7 +4610,9 @@ segments:
       - [0xBEE88, c, func_800CE688]
       - [0xBEF8C, c, func_800CE78C]
       - [0xBF070, c, func_800CE870]
-      - [0xBF0F0, asm]
+      - [0xBF0F0, c, func_800CE8F0]
+      - [0xBF1D4, c, func_800CE9D4]
+      - [0xBF2E8, c, func_800CEAE8]
       # Phase 5ED: mid-BEC9C hole — sb+ret0 func_800D4850.
       - [0xBF38C, c, func_800CEB8C]
       # two 2-iteration func_80077A64 loops; `for (i=0, p=&SYM; ...)` comma-init orders the prologue sav
