@@ -16,7 +16,7 @@ objective evidence: a byte-matched C path, a numeric comparison against the
 matched code and disc data, or an emulator/video diff. Anything not checked is
 marked **untested**.
 
-Last updated: 2026-09-28. **Open divergences: 21.**
+Last updated: 2026-09-28. **Open divergences: 24.**
 
 ## Structural (whole classes of code)
 
@@ -53,6 +53,9 @@ Last updated: 2026-09-28. **Open divergences: 21.**
 | 19 | Frame pacing paces one host frame per emulated VBlank at 59.94 Hz | `host_window.c` | Believed faithful (240 Hz sequencer tick measured retail-exact); window-side timing **untested** on the owner's PC beyond his playtest |
 | 20 | Second Eve battle: the music's vocal/choir layer is missing (instrumental plays) | owner report on r2 | Under investigation (audio sweep): check against the retail video and the matched sound-driver C |
 | 21 | On death there is no Game Over screen: the game resets to the intro logo, and the music is left in a bad state | owner report on r2 | Open: the game-over path (script / overlay / state transition) is missing or stubbed |
+| 22 | Battle tick `func_800299CC` is not a port of the matched unit: hand cuts drop `func_8003495C` (flag 0x300), the `D_8009D23C` script commands (`func_8006F6D4` ×2) and `func_80033430` | shadow audit vs `src/func_800299CC.c` | Switching to the matched C (port3) |
+| 23 | Battle mode 3 cut drops item-0x12 consume (`func_8005409C`), the rec+0x56/+0x66 countdowns and the per-enemy walk | shadow audit + day1 vs `src/func_800299CC.c:305-323` | Switching to the matched C |
+| 24 | `func_80024A3C` (Aya's action step) phases 4/6 deferred: effect teardown/spawn and Aya's reposition/facing/SFX 0x4B6 missing | shadow audit | Switching to the matched C |
 
 ## Fixed (kept for the record)
 
