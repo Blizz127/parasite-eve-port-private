@@ -22,7 +22,8 @@
       "func_80197594"
     ],
     "era_o2_g0_narrow_shifted_reg_load": [
-      "func_8019A21C"
+      "func_8019A21C",
+      "func_801944F0"
     ]
   },
   "local_profiles": {

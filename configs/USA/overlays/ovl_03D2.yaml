@@ -60,7 +60,7 @@ segments:
       - [0x2DD8, c, func_80191DC8]
       - [0x2FC8, c, func_80191FB8]
       - [0x3304, c, func_801922F4]
-      - [0x3508, asm]
+      - [0x3508, c, func_801924F8]
       - [0x3944, c, func_80192934]
       - [0x3C58, c, func_80192C48]
       - [0x3CAC, c, func_80192C9C]

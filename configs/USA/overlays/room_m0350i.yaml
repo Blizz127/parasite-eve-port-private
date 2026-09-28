@@ -99,6 +99,8 @@ segments:
       - [0x4A98, asm]
       - [0x4BE4, c, func_80193BCC]
       - [0x4D84, asm]
+      - [0x5508, c, func_801944F0]
+      - [0x566C, asm]
       - [0x5D14, c, func_80194CFC]
       - [0x5F1C, asm]
       - [0x607C, c, func_80195064]

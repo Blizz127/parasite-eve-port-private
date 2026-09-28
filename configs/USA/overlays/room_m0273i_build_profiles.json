@@ -20,7 +20,8 @@
       "func_8019A5D4"
     ],
     "era_o2_g0_narrow_shifted_reg_load": [
-      "func_8019A290"
+      "func_8019A290",
+      "func_80194B5C"
     ],
     "room_m0273i_dispatch_8018F1CC": [
       "func_80192E64"

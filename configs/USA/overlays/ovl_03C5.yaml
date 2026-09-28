@@ -53,7 +53,7 @@ segments:
       - [0x7D4, c, func_801214D4]
       - [0x9C4, c, func_801216C4]
       - [0xD00, c, func_80121A00]
-      - [0xF04, asm]
+      - [0xF04, c, func_80121C04]
       - [0x1340, c, func_80122040]
       - [0x1654, c, func_80122354]
       - [0x16A8, c, func_801223A8]
