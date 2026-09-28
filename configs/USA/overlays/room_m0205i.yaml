@@ -88,6 +88,7 @@ segments:
       - [0x34E8, c, func_801924D0]
       - [0x3504, c, func_801924EC]
       - [0x350C, asm]
+      - [0x3904, c, func_801928EC]
       - [0x3C2C, c, func_80192C14]
       - [0x3C50, bin]
   - [0x28800]

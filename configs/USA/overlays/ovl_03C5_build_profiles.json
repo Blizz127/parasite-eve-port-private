@@ -6,6 +6,9 @@
   "assignments": {
     "ovl_03C5_three_word_symbol_store": [
       "func_80121004"
+    ],
+    "era_o2_g0_no_schedule_insns": [
+      "func_801214D4"
     ]
   },
   "local_profiles": {

@@ -38,7 +38,7 @@ segments:
       - [0x114, c, func_8018F0FC]
       - [0x1A0, c, func_8018F188]
       - [0x200, c, func_8018F1E8]
-      - [0x208, asm]
+      - [0x208, c, func_8018F1F0]
       - [0x44C, c, func_8018F434]
       - [0x454, c, func_8018F43C]
       - [0x560, c, func_8018F548]

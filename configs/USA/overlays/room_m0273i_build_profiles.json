@@ -18,6 +18,9 @@
     ],
     "era_o2_g0_no_schedule_insns": [
       "func_8019A5D4"
+    ],
+    "era_o2_g0_narrow_shifted_reg_load": [
+      "func_8019A290"
     ]
   },
   "local_profiles": {
@@ -63,6 +66,16 @@
       "environment": {
         "MASPSX_THREE_WORD_SYMBOL_STORE": "1",
         "MASPSX_DISPATCH_FOLD": "jtbl_8018F164"
+      }
+    },
+    "era_o2_g0_narrow_shifted_reg_load": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0"
+      ],
+      "environment": {
+        "MASPSX_NARROW_SHIFTED_REG_LOAD": "1"
       }
     }
   }
