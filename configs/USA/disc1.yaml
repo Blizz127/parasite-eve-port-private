@@ -2278,7 +2278,7 @@ segments:
       - [0x574E8, asm]
       - [0x57760, c, func_80066F60]
       - [0x579C8, c, func_800671C8]
-      - [0x57A94, asm]
+      - [0x57A94, c, func_80067294]
       - [0x57E78, c, func_80067678]
       - [0x57ECC, c, func_800676CC]
       - [0x57F30, c, func_80067730]
