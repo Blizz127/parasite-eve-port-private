@@ -5351,7 +5351,8 @@ class MaspsxProcessor:
                     and op == "sw"
                     and r_source is None
                     and (beq := self._next_line_is_beqz()) is not None
-                    and self._line_after_beq_is_label()
+                    and (self._line_after_beq_is_label()
+                         or os.environ.get("MASPSX_BEQZ_SYM_STORE_DELAY_ANY") == "1")
                 ):
                     res.extend(
                         [

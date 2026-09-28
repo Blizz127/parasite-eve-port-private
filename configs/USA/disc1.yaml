@@ -3020,6 +3020,7 @@ segments:
       - [0x6CD44, c, func_8007C544]
       # Phase 5EF: zero-argument func_8007D074 forwarding wrapper.
       - [0x6CD60, asm]
+      - [0x6CD64, c, func_8007C564]
       # func_8007CE80 — word-copy of a2 elements with the count pre-tested; the
       # body keeps the loaded word in a named local so retail's
       # lw/addiu/store/addiu order (not load/store interleaved) is emitted.

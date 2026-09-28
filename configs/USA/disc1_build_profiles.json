@@ -2511,6 +2511,20 @@
         "MASPSX_BRANCH_STEAL_TARGET_INSN": "any",
         "MASPSX_LOAD_DELAY_NOP_BEFORE_ANY_LABEL": "1"
       }
+    },
+    "era_o2_g0_nosr_c564": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-fno-strength-reduce"
+      ],
+      "environment": {
+        "MASPSX_FILL_CALL_DELAY_SLOT": "1",
+        "MASPSX_BEQZ_SYM_STORE_DELAY": "1",
+        "MASPSX_BEQZ_SYM_STORE_DELAY_ANY": "1",
+        "MASPSX_LOAD_DELAY_NOP_BEFORE_LOOP_LABEL": "1"
+      }
     }
   },
   "assignments": {
@@ -3924,6 +3938,9 @@
     ],
     "era_o2_g0_fill_epilogue_delay_slot_branch_steal_target_insn_any_load_delay_nop_before_any_label": [
       "func_80072F64"
+    ],
+    "era_o2_g0_nosr_c564": [
+      "func_8007C564"
     ]
   }
 }

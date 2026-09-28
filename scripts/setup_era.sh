@@ -61,6 +61,7 @@ MASPSX_TRACKED=(
     "tests/test_load_before_stack_half.py"
     "tests/test_bnez_postdec_from_minus_one.py"
     "tests/test_beqz_sym_store_delay.py"
+    "tests/test_beqz_sym_store_delay_any.py"
     "tests/test_frame48_s5_after_s2.py"
     "tests/test_sink_reg_sw_into_bnez.py"
     "tests/test_three_word_symbol_store.py"
