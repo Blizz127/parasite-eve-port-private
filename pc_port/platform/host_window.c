@@ -8,6 +8,7 @@
 #include "host_framebuffer.h"
 #include "host_frame_pacer.h"
 #include "host_window_scale.h"
+#include "host_pad.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -207,6 +208,7 @@ void HostWindow_SetTitle(const char *title)
 int HostWindow_Poll(void)
 {
     if (!g_dpy) return 0;
+    HostPad_Poll();
     while (XPending(g_dpy)) {
         XEvent ev;
         XNextEvent(g_dpy, &ev);
@@ -285,7 +287,8 @@ int HostWindow_Poll(void)
 
 uint16_t HostWindow_PadRaw(void)
 {
-    return (uint16_t)(~g_sony_held);
+    /* Keyboard and controller both drive the pad at once. */
+    return (uint16_t)(~(g_sony_held | HostPad_Held()));
 }
 
 static int monotonic_ns(uint64_t *out)
@@ -343,4 +346,5 @@ void HostWindow_Close(void)
     if (g_xlib) { dlclose(g_xlib); g_xlib = NULL; }
     g_host_window_open = 0;
     g_sony_held = 0;
+    HostPad_Close();
 }

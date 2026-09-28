@@ -134,6 +134,14 @@ The milestone and counts below describe the earlier merged baseline.
 Window controls: arrows move; Enter/Space/Z/X = Cross; C = Circle;
 V = Triangle; S = Square; Q/E = L1/R1; 1/3 = L2/R2;
 Tab = Select; P = Start; Escape closes the window.
+Linux controllers (`platform/host_pad.c`, kernel joystick API, no extra
+libraries) work alongside the keyboard: A/B/X/Y = Cross/Circle/Square/Triangle,
+LB/RB = L1/R1, LT/RT = L2/R2, Back = Select, Start = Start, D-pad or left stick
+= directions. `/dev/input/js0..7` are rescanned about once a second (hot-plug);
+`PE_JOYSTICK=/dev/input/jsN` pins one device, `PE_JOYSTICK=off` disables them,
+`PE_PAD_SWAP_XY=1` swaps Square/Triangle, `PE_PAD_DEBUG=1` logs raw events.
+Tested by `pe-host-pad-tests` (CTest `host-pad-input`). The owner preview
+package is built by `pc_port/package_preview.sh` (no game data inside).
 Resizing or maximizing scales the full game image to fit while keeping its
 original 4:3 aspect ratio; unused space has black borders.
 F6 toggles normal speed (60000/1001 Hz) and uncapped fast-forward; the window
