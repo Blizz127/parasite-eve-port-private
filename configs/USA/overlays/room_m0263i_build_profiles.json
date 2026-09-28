@@ -15,6 +15,14 @@
     ],
     "room_m0263i_dispatch_8018F164": [
       "func_801915C0"
+    ],
+    "era_o2_g0_expand_div": [
+      "func_8018F654",
+      "func_80190394",
+      "func_80190D90",
+      "func_80191124",
+      "func_801918A8",
+      "func_80191D2C"
     ]
   },
   "local_profiles": {

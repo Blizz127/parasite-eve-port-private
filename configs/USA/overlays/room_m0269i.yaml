@@ -39,7 +39,7 @@ segments:
       - [0x150, c, func_8018F138]
       - [0x178, c, func_8018F160]
       - [0x1A4, c, func_8018F18C]
-      - [0x350, asm]
+      - [0x350, c, func_8018F338]
       - [0x5EC, c, func_8018F5D4]
       - [0x6D4, c, func_8018F6BC]
       - [0x810, c, func_8018F7F8]

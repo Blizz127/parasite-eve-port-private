@@ -17,7 +17,13 @@
       "func_801915A4"
     ],
     "era_o2_g0_expand_div": [
-      "func_80192678"
+      "func_80192678",
+      "func_8018F638",
+      "func_80190378",
+      "func_80190D74",
+      "func_80191108",
+      "func_8019188C",
+      "func_80191D10"
     ]
   },
   "local_profiles": {

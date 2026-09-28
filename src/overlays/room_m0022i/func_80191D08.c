@@ -1,4 +1,5 @@
 /* vendor-derived: khasinski/parasite-eve-decomp@3067919e7b82f0334b873117eef07e7157f4ed69 src/overlays/room_m022/func_80191D08.c — attribution khasinski (Chris Hasinski) */
+/* inline GTE/asm: this function uses the vendor's inline PSY-Q GTE (COP2) asm macros — count separately from plain C. */
 /* Imported under the owner's explicit authorization (2026-09-28, via Devbox Coordinator, vendor lane).
  * Upstream tree kept verbatim in vendor/khasinski-parasite-eve-decomp/ (see its PROVENANCE.md).
  * This file is that vendor TU run through the era cpp with the vendor CPP flags

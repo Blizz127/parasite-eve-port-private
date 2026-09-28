@@ -17,7 +17,13 @@
       "func_80192AB8"
     ],
     "era_o2_g0_expand_div": [
-      "func_80193B8C"
+      "func_80193B8C",
+      "func_80190B4C",
+      "func_8019188C",
+      "func_80192288",
+      "func_8019261C",
+      "func_80192DA0",
+      "func_80193224"
     ],
     "era_o2_g0_narrow_shifted_word_load": [
       "func_801946D0"

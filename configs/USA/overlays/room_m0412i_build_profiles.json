@@ -18,6 +18,13 @@
     ],
     "era_o2_g0_narrow_shifted_word_load": [
       "func_80194680"
+    ],
+    "era_o2_g0_expand_div": [
+      "func_80190B54",
+      "func_80191894",
+      "func_80192290",
+      "func_80192624",
+      "func_8019322C"
     ]
   },
   "local_profiles": {
