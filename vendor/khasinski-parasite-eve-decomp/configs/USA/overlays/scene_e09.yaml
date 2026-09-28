@@ -1,0 +1,133 @@
+name: scene_e09.bin
+sha1: 5bba719fc9e394d1df4d1e1de54646d150b84687
+options:
+  basename: scene_e09
+  target_path: original/USA/overlays/scene_e09.bin
+  base_path: ../../..
+  platform: psx
+  compiler: GCC
+  asm_path: asm/USA/overlays/scene_e09
+  src_path: src/overlays/scene_e09
+  build_path: build/USA/overlays/scene_e09
+  ld_script_path: linkers/USA/overlays/scene_e09.ld
+  undefined_funcs_auto_path: linkers/USA/overlays/undefined_funcs_auto.scene_e09.txt
+  symbol_addrs_path: configs/USA/overlays/sym.scene_e09.txt
+  undefined_syms_auto_path: linkers/USA/overlays/undefined_syms_auto.scene_e09.txt
+  find_file_boundaries: True
+  disassemble_all: True
+  asm_function_macro: glabel
+  asm_jtbl_label_macro: jlabel
+  asm_data_macro: dlabel
+  generate_asm_macros_files: False
+  section_order: [".rodata", ".text", ".data", ".sdata", ".sbss", ".bss"]
+  subalign: 4
+  string_encoding: ASCII
+  data_string_encoding: ASCII
+  rodata_string_guesser_level: 2
+  data_string_guesser_level: 2
+segments:
+  - name: scene_e09
+    type: code
+    start: 0x0
+    # Section 3 is loaded at g_LoadedSceneAssetBlock, including its header.
+    vram: 0x8018EFE8
+    align: 4
+    subalign: 4
+    bss_size: 0x0
+    subsegments:
+      - start: 0
+        type: rodatabin
+        name: scene_e09_header
+        dir: scene_e09
+      - [0x24, .rodata, RoomLib_HandlerDArgs]
+      - [0xA4, .rodata, RoomLib_HandlerEArgs]
+      - [0x128, rodata, RoomLib_HandlerEArgsPad]
+      - [0x12C, .rodata, RoomLib_HandlerBArgs]
+      - [0x194, .rodata, RoomLib_HandlerCArgs]
+      - start: 0x1FC
+        type: rodatabin
+        name: scene_e09_header_tail
+        dir: scene_e09
+      - [0x240, c, RoomLib_PlantTable_8018F228]
+      - [0x26C, c, RoomLib_Spawn6_8018F254]
+      - [0x298, c, RoomLib_RegisterTable_8018F280]
+      - [0x2E0, c, RoomLib_RegisterTablesGated_8018F2C8]
+      - [0x3A4, c, RoomLib_CloseTarget_8018F38C]
+      - [0x428, c, func_8018F410]
+      - [0x430, c, func_8018F418]
+      - [0x438, asm, scene_e09_26C_298_2E0_428]
+      - [0x770, c, func_8018F758]
+      - [0x778, c, func_8018F760]
+      - [0x7F8, c, func_8018F7E0]
+      - [0x870, asm, scene_e09_26C_298_2E0_428_770_870]
+      - [0xBA0, c, Scene_UpdateTimedFade_8018FB88]
+      - [0xC44, c, func_8018FC2C]
+      - [0xCBC, asm, func_8018FCA4]
+      - [0xF6C, c, func_8018FF54]
+      - [0xFD0, asm, scene_e09_26C_298_2E0_428_770_FD0]
+      - [0x146C, c, RoomLib_DrawMotion_80190454]
+      - [0x172C, c, RoomLib_UpdateParticleMotion_80190714]
+      - [0x18E0, c, func_801908C8]
+      - [0x1B50, c, func_80190B38]
+      - [0x1BB0, c, func_80190B98]
+      - [0x1C60, c, func_80190C48]
+      - [0x1C68, c, RoomLib_InitB_80190C50]
+      - [0x1D08, c, RoomLib_HandlerDArgs]
+      - [0x1F8C, c, func_80190F74]
+      - [0x1F94, c, RoomLib_StateDispatchVariant2_80190F7C]
+      - [0x201C, c, RoomLib_NotifyArmB_80191004]
+      - [0x20C4, c, RoomLib_HandlerD]
+      - [0x260C, c, RoomLib_FxNotify]
+      - [0x26EC, c, func_801916D4]
+      - [0x292C, c, RoomLib_ResetSignalWithTargetGate]
+      - [0x29C8, c, func_801919B0]
+      - [0x29D0, c, func_801919B8]
+      - [0x29D8, c, RoomLib_InitD_801919C0]
+      - [0x2A54, c, RoomLib_HandlerEArgs]
+      - [0x2CCC, c, func_80191CB4]
+      - [0x2CD4, c, RoomLib_StateDispatchVariant2_80191CBC]
+      - [0x2D5C, c, RoomLib_Notify2ArmB_80191D44]
+      - [0x2E04, c, RoomLib_HandlerE]
+      - [0x3390, c, RoomLib_FxNotify2]
+      - [0x3414, c, RoomLib_ResetAndSignalB_801923FC]
+      - [0x346C, c, func_80192454]
+      - [0x3474, c, func_8019245C]
+      - [0x347C, c, RoomLib_InitC_80192464]
+      - [0x3518, c, RoomLib_HandlerBArgs]
+      - [0x3760, c, func_80192748]
+      - [0x3768, c, RoomLib_InvokeCallbackC_80192750]
+      - [0x3790, c, RoomLib_ArmWindowA_80192778]
+      - [0x3800, c, func_801927E8]
+      - [0x3B8C, c, func_80192B74]
+      - [0x3B94, c, RoomLib_AdvanceArcToTarget_80192B7C]
+      - [0x3F34, c, RoomLib_ResetAndSignal_80192F1C]
+      - [0x3F90, c, func_80192F78]
+      - [0x3F98, c, func_80192F80]
+      - [0x3FA0, c, RoomLib_InitFull_80192F88]
+      - [0x4030, c, RoomLib_HandlerCArgs]
+      - [0x4278, c, func_80193260]
+      - [0x4280, c, RoomLib_InvokeCallbackC_80193268]
+      - [0x42A8, c, RoomLib_ArmWindowB_80193290]
+      - [0x4318, c, RoomLib_HandlerC]
+      - [0x4794, c, func_8019377C]
+      - [0x479C, c, RoomLib_AdvanceArcToTargetY_80193784]
+      - [0x4B24, c, RoomLib_ResetAndSignal_80193B0C]
+      - [0x4B80, c, func_80193B68]
+      - [0x4B88, c, func_80193B70]
+      - [0x4B90, c, RoomLib_InitTimers_80193B78]
+      - [0x4BCC, c, RoomLib_ArgDispatchRearm_80193BB4]
+      - [0x4C64, c, func_80193C4C]
+      - [0x4C6C, c, RoomLib_InvokeCallbackC_80193C54]
+      - [0x4C94, c, RoomLib_RearmOnMatch_80193C7C]
+      - [0x4CC4, c, func_80193CAC]
+      - [0x4DD8, c, RoomLib_MoveActorLocal_80193DC0]
+      - [0x4F58, c, RoomLib_Set4ClearSignal_80193F40]
+      - [0x4F74, c, func_80193F5C]
+      - [0x4F7C, asm, func_80193F64]
+      - [0x593C, c, func_80194924]
+      - [0x5C04, c, func_80194BEC]
+      - [0x5C20, data]
+  - [0x6000]
+# source slice: scanner
+# extract locally with: dd if=disc/extracted/PE.IMG of=original/USA/overlays/scene_e09.bin bs=2048 skip=96033 count=12
+# special-scene set: entry 9 of the table at 0x80094048 (this bin = its section 3); finale (Eve/Melissa) bank

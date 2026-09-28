@@ -1,0 +1,71 @@
+#ifndef PE1_GTE_TYPES_H
+#define PE1_GTE_TYPES_H
+
+#include "common.h"
+
+typedef struct GteMatrix {
+    s16 m[3][3];
+    s32 t[3];
+} GteMatrix;
+
+/* Word transfers to GTE control registers pack successive matrix halfwords.
+ * The fifth word includes the MATRIX alignment halfword, not translation.
+ * Keep this view separate from the signed-halfword arithmetic view above.
+ */
+typedef struct GteMatrixWords {
+    u32 r11_r12;
+    u32 r13_r21;
+    u32 r22_r23;
+    u32 r31_r32;
+    u32 r33_pad;
+    s32 tx, ty, tz;
+} GteMatrixWords;
+
+PE1_STATIC_ASSERT(sizeof(GteMatrixWords) == sizeof(GteMatrix), gte_matrix_words_size);
+PE1_STATIC_ASSERT(PE1_OFFSETOF(GteMatrixWords, r33_pad) == 16,
+                  gte_matrix_words_last_rotation_offset);
+PE1_STATIC_ASSERT(PE1_OFFSETOF(GteMatrixWords, tx) == PE1_OFFSETOF(GteMatrix, t),
+                  gte_matrix_words_translation_offset);
+
+/* Full MATRIX storage with its packed COP2 transfer view. */
+typedef union GteMatrixStorage {
+    GteMatrix matrix;
+    u32 words[8];
+} GteMatrixStorage;
+
+PE1_STATIC_ASSERT(sizeof(GteMatrixStorage) == 32, gte_matrix_storage_size);
+
+typedef struct GteShortVector {
+    s16 x, y, z, pad;
+} GteShortVector;
+
+typedef struct GteVector {
+    s32 x, y, z, pad;
+} GteVector;
+
+GteMatrix *RotMatrixYXZ(GteShortVector *angles, GteMatrix *matrix);
+
+GteShortVector *ApplyMatrixSV(const GteMatrix *matrix,
+                            const GteShortVector *v, GteShortVector *out);
+GteVector *Gte_RotateVec(const GteMatrix *matrix, const GteVector *v,
+                         GteVector *out);
+void LoadAverageShort12(void *first, void *second, int first_scale,
+                        int second_scale, void *output);
+GteMatrix *Gte_ScaleMatrix(GteMatrix *matrix, const GteVector *scale);
+int Gte_Atan2(int y, int x);
+int Gte_ISqrt(int value);
+void Gte_NormalizeVec(GteVector *vector, GteVector *unit);
+
+PE1_STATIC_ASSERT(sizeof(GteMatrix) == 32, gte_matrix_size);
+PE1_STATIC_ASSERT(PE1_OFFSETOF(GteMatrix, t) == 20, gte_matrix_translation_offset);
+PE1_STATIC_ASSERT(sizeof(GteShortVector) == 8, gte_short_vector_size);
+PE1_STATIC_ASSERT(sizeof(GteVector) == 16, gte_vector_size);
+
+typedef struct GteRotation {
+    s16 x;
+    s16 y;
+    s16 z;
+    s16 flags;
+} GteRotation;
+
+#endif

@@ -1,0 +1,34 @@
+#include "common.h"
+#include "include_asm.h"
+
+#define NULL ((void *)0)
+#include "../../../tools/m2c/m2c_macros.h"
+
+void Queue_Init(void);
+void *MenuWidget_FindByModeAndSelectedBase(s32 mode, s32 base);
+s32 Inv_GetPackedListCursor(void);
+void Menu_StepInventoryRoot(s32 arg0, s32 arg1, s32 arg2);
+void Menu_RequestErrorSound(void);
+void Menu_OpenRenameScreen(s32 arg0);
+void *MenuWidget_CreateSimpleNode(s32 mode, s32 arg1, s32 arg2, s32 arg3);
+
+void Menu_DrawContextHelpText(void);
+
+void Menu_OpenSaveLoadEntryPoint(s32 arg0) {
+    Queue_Init();
+    if ((MenuWidget_FindByModeAndSelectedBase(1, 0xD) == NULL) && (MenuWidget_FindByModeAndSelectedBase(1, 0x17) == NULL)) {
+        if (arg0 != 0) {
+            if (Inv_GetPackedListCursor() != 0) {
+                Menu_StepInventoryRoot(0, -2, -1);
+                goto ensure_context_help;
+            }
+            Menu_RequestErrorSound();
+            return;
+        }
+        Menu_OpenRenameScreen(-1);
+ensure_context_help:
+        if (MenuWidget_FindByModeAndSelectedBase(1, 0x13) == NULL) {
+            M2C_FIELD(MenuWidget_CreateSimpleNode(0x13, 0, 0, 0), void **, 0x30) = Menu_DrawContextHelpText;
+        }
+    }
+}

@@ -1,0 +1,17 @@
+RoomLib_Spawn6_8018F028 = 0x8018F028; // type:func
+FieldEng_GetSlot = 0x800C22F8;
+FieldEng_Spawn6 = 0x800C2AF0;
+RoomLib_CloseTarget_8018F128 = 0x8018F128; // type:func
+FieldEng_GetStatus = 0x800C6CE0;
+RoomLib_RegisterTable_8018F054 = 0x8018F054; // type:func
+FieldEng_Register = 0x800C2414;
+RoomLib_TableA_8018F054 = 0x80190004;
+D_80190040 = 0x80190040;
+func_8018F1BC = 0x8018F1BC; // type:func
+func_8018F300 = 0x8018F300; // type:func
+D_80190088 = 0x80190088;
+D_8019008C = 0x8019008C;
+D_80190090 = 0x80190090;
+D_80190098 = 0x80190098;
+D_8019009C = 0x8019009C;
+D_801900A0 = 0x801900A0;

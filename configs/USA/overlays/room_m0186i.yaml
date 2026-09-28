@@ -53,7 +53,7 @@ segments:
       - [0xF48, c, func_8018FF30]
       - [0xFD4, c, func_8018FFBC]
       - [0x1058, c, func_80190040]
-      - [0x1060, asm]
+      - [0x1060, c, func_80190048]
       - [0x122C, c, func_80190214]
       - [0x1234, c, func_8019021C]
       - [0x126C, c, func_80190254]

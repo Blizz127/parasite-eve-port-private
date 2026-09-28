@@ -126,3 +126,7 @@ Disc-backed native oracles read a local path file
 This repository does not contain game images, copyrighted assets, extracted
 game files, or proprietary SDK files. Users must provide their own legally
 obtained copy of the game. See [`docs/legal.md`](docs/legal.md).
+
+## Credits
+
+Parts of this repository are vendor-derived from **[khasinski/parasite-eve-decomp](https://github.com/khasinski/parasite-eve-decomp)** by khasinski (Chris Hasinski) and contributors — a matching decompilation of the same `SLUS_006.62` binary. That upstream tree is vendored unmodified under `vendor/khasinski-parasite-eve-decomp/` (see its `PROVENANCE.md`; upstream has no open-source license selected, its `LICENSE.md` is kept verbatim), and every function adapted from it carries a `vendor-derived:` header naming the upstream commit and path. Imported functions are only accepted after passing this repo's own byte-exact rebuild gates.

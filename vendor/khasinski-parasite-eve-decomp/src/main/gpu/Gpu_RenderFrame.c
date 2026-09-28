@@ -1,0 +1,95 @@
+#include "pe1/psyq_gpu.h"
+/* CC1_FLAGS: -G8 */
+/* MASPSX_FLAGS: -G8 */
+
+
+#include "include_asm.h"
+void DrawSync(int arg0);
+void Menu_DrawSaveBg(void);
+void VSync(int arg0);
+int Seq_GetElapsed(void);
+void SetDispMask(int arg0);
+void Render_InitEntityPool(int arg0);
+int Gpu_CheckDrawStatus(void);
+void PutDrawEnv(void *arg0);
+void Gpu_PutDrawEnvLinked(int arg0, void *arg1);
+
+extern int g_GameState[];
+extern int g_ActiveDrawSlot;
+extern char g_RenderDispEnvArray[];
+extern char g_RenderDrawEnvArray[];
+
+#define D_800B0CD8_WORD (g_GameState[0])
+
+static inline char *DispAddress(int index) {
+    return g_RenderDispEnvArray + index * 20;
+}
+
+static inline char *DrawAddress(int index) {
+    return g_RenderDrawEnvArray + index * 92;
+}
+
+void Gpu_RenderFrame(void) {
+    int idx;
+    int state;
+    int status;
+    int *state_ptr;
+
+    DrawSync(0);
+    Menu_DrawSaveBg();
+
+    if (D_800B0CD8_WORD & 0x200) {
+        VSync(4);
+        if ((short)Seq_GetElapsed() >= 3) {
+            SetDispMask(1);
+        }
+    } else {
+        VSync(2);
+    }
+
+    Render_InitEntityPool(1);
+
+    idx = g_ActiveDrawSlot;
+    PutDispEnv((DISPENV *)DispAddress(idx));
+
+    status = Gpu_CheckDrawStatus();
+    if ((status << 24) != 0) {
+        goto draw_direct;
+    }
+
+    state_ptr = g_GameState;
+    state = *state_ptr;
+    if ((state & 0x200) == 0) {
+        goto draw_buffer;
+    }
+
+draw_direct:
+    idx = g_ActiveDrawSlot;
+    PutDrawEnv(DrawAddress(idx));
+    goto done;
+
+draw_buffer:
+    {
+        int idx_b;
+        register int tmp asm("$2");
+        int arg0;
+        int arg1;
+        char *base;
+
+        idx_b = g_ActiveDrawSlot;
+        tmp = idx_b << 2;
+        asm volatile("" : "=r"(state_ptr) : "0"(state_ptr));
+        tmp = (int)state_ptr + tmp;
+        arg1 = (idx_b << 1) + idx_b;
+        arg1 <<= 3;
+        arg1 -= idx_b;
+        arg1 <<= 2;
+        arg0 = *(int *)(tmp + 0x160);
+        base = g_RenderDrawEnvArray;
+        arg1 += (int)base;
+        Gpu_PutDrawEnvLinked(arg0 + 0x3FFC, (void *)arg1);
+    }
+
+done:
+    g_ActiveDrawSlot = g_ActiveDrawSlot < 1U;
+}

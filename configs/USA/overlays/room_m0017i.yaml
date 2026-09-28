@@ -36,6 +36,7 @@ segments:
       - [0x1BC, c, func_8018F1A4]
       - [0x1C4, c, func_8018F1AC]
       - [0x1D4, c, func_8018F1BC]
-      - [0x1DC, asm]
+      - [0x1DC, c, func_8018F1C4]
+      - [0x210, asm]
       - [0xB5C, bin]
   - [0x21800]

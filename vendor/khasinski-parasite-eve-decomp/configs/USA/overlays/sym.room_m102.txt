@@ -1,0 +1,12 @@
+RoomMdl_Reset_8018EFFC = 0x8018EFFC; // type:func
+RoomMdl_Kill_8018F1AC = 0x8018F1AC; // type:func
+RoomEnt_Setup5_8018F1C4 = 0x8018F1C4; // type:func
+RoomMdl_Tick_8018F0F0 = 0x8018F0F0; // type:func
+// provide: RoomFx_ModelBind = 0x8018F1C4;
+RoomFx_ModelUpdate = 0x8018F1F8;
+RoomFx_ModelDraw = 0x8018F580;
+Render_TransformVertices = 0x8003A088;
+Render_TransformMorphVertices = 0x8003AC90;
+g_GeomVramPacketDst = 0x800BCFA4;
+RoomMdl_Select_8018F020 = 0x8018F020; // type:func
+g_FieldActorListHead = 0x8009D20C;

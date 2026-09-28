@@ -1,0 +1,86 @@
+name: fx_common.bin
+sha1: 64e5b2c2b9dea7c6729c25a10295064d281ac296
+options:
+  basename: fx_common
+  target_path: original/USA/overlays/fx_common.bin
+  base_path: ../../..
+  platform: psx
+  compiler: GCC
+  asm_path: asm/USA/overlays/fx_common
+  src_path: src/overlays/fx_common
+  build_path: build/USA/overlays/fx_common
+  ld_script_path: linkers/USA/overlays/fx_common.ld
+  undefined_funcs_auto_path: linkers/USA/overlays/undefined_funcs_auto.fx_common.txt
+  symbol_addrs_path: configs/USA/overlays/sym.fx_common.txt
+  undefined_syms_auto_path: linkers/USA/overlays/undefined_syms_auto.fx_common.txt
+  find_file_boundaries: True
+  disassemble_all: True
+  asm_function_macro: glabel
+  asm_jtbl_label_macro: jlabel
+  asm_data_macro: dlabel
+  generate_asm_macros_files: False
+  section_order: [".rodata", ".text", ".data", ".sdata", ".sbss", ".bss"]
+  subalign: 4
+  string_encoding: ASCII
+  data_string_encoding: ASCII
+  rodata_string_guesser_level: 2
+  data_string_guesser_level: 2
+segments:
+  - name: fx_common
+    type: code
+    start: 0x0
+    vram: 0x8018EFF0
+    align: 4
+    subalign: 4
+    bss_size: 0x0
+    subsegments:
+      - [0x0, asm, fx_common]
+      - [0x1004, c, FxCommon_CheckBounds]
+      - [0x1264, c, FxCommon_CheckBoundsWithMargin]
+      - [0x14C0, c, FxCommon_CheckFourBoundsWithMargin]
+      - [0x19A8, c, func_80190998]
+      - [0x1AFC, c, FxCommon_AllocateNode]
+      - [0x1B88, c, FxCommon_AllocateTypedNode]
+      - [0x1C2C, c, FxCommon_AllocateConfiguredNode]
+      - [0x1D18, c, FxCommon_DestroyNode]
+      - [0x1D4C, c, FxCommon_ApplyNodeTransform]
+      - [0x1E14, asm, fx_common_1D4C_1E14]
+      - [0x2590, c, FxCommon_InitNodeTransform]
+      - [0x25EC, c, FxCommon_InsertFreeIndex]
+      - [0x2688, c, FxCommon_RemoveIndex]
+      - [0x2750, c, FxCommon_ResetSelection]
+      - [0x2764, c, FxCommon_SelectRecord]
+      - [0x27CC, c, FxCommon_InsertNode]
+      - [0x2844, c, FxCommon_RemoveNode]
+      - [0x2864, asm, fx_common_2864]
+      - [0x2CA4, c, func_80191C94]
+      - [0x2DF8, c, FxCommon_ConfigureDisplayRange]
+      - [0x2E40, c, FxCommon_RunRenderOperation]
+      - [0x2F0C, c, FxCommon_ApplyRenderVector]
+      - [0x2FF8, c, FxCommon_SetMode1]
+      - [0x301C, c, FxCommon_SetMode30]
+      - [0x3040, asm, fx_common_3040]
+      - [0x3750, c, func_80192740]
+      - [0x3810, asm, fx_common_3810]
+      - [0x48F8, c, FxCommon_InitializeMotionVectors]
+      - [0x49C0, c, FxCommon_SetMotionTargets]
+      - [0x4AC0, c, FxCommon_AdvanceMotionVectors]
+      - [0x4B6C, asm, fx_common_4B6C]
+      - [0x5118, c, FxCommon_AdjustIntensity]
+      - [0x51B4, c, FxCommon_DrawIntensityQuad]
+      - [0x530C, asm, fx_common_51B4_530C]
+      - [0x68E4, c, FxCommon_UpdateResource]
+      - [0x69A4, c, FxCommon_InitMotionDeltas]
+      - [0x6BD8, c, func_80195BC8]
+      - [0x6D4C, c, func_80195D3C]
+      - [0x6E5C, c, func_80195E4C]
+      - [0x6F7C, asm, fx_common_6F7C]
+      - [0xA5AC, c, FxCommon_GetOffsetEntryValue]
+      - [0xA5CC, asm, fx_common_A5CC]
+      - [0xCD88, c, func_8019BD78]
+      - [0xCF60, c, FxCommon_PrepareBuffer]
+      - [0xCF9C, c, FxCommon_LinkBuffer]
+      - [0xCFD4, data, D_8019BFC4]
+  - [0xD000]
+# source slice: scanner
+# extract locally with: dd if=disc/extracted/PE.IMG of=original/USA/overlays/fx_common.bin bs=2048 skip=1792 count=26

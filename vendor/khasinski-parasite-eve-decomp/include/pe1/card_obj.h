@@ -1,0 +1,78 @@
+#ifndef PE1_CARD_OBJ_H
+#define PE1_CARD_OBJ_H
+
+#include "common.h"
+
+/* PADCMD.OBJ capability response tables addressed by CardObj field_04/08.
+ * The protocol meaning of each capability byte is not yet named. */
+typedef struct PadCapabilityRecord {
+    u8 bytes[4];
+    u8 high_bit;
+} PadCapabilityRecord;
+typedef struct PadDataRecord {
+    u8 length;
+    u8 reserved[3];
+    u8 *data;
+} PadDataRecord;
+PE1_STATIC_ASSERT(sizeof(PadCapabilityRecord) == 5, pad_capability_record_size);
+PE1_STATIC_ASSERT(PE1_OFFSETOF(PadCapabilityRecord, high_bit) == 4,
+                  pad_capability_high_bit_offset);
+PE1_STATIC_ASSERT(sizeof(PadDataRecord) == 8, pad_data_record_size);
+PE1_STATIC_ASSERT(PE1_OFFSETOF(PadDataRecord, data) == 4, pad_data_record_pointer);
+
+/* LIBPAD per-port command object (legacy CardObj_* names). field_46 is unsigned char: stored as 1
+ * by BeginCommand4D and compared ==0xFF (lbu) by IsTransferActive. */
+typedef struct CardObj {
+    unsigned char *field_00;           /* 0x00 */
+    unsigned char *field_04;           /* 0x04 */
+    unsigned char *field_08;           /* 0x08 */
+    unsigned char *field_0c;           /* 0x0C */
+    struct CardObj *field_10;          /* 0x10 */
+    void (*fn_14)(void *);            /* 0x14 */
+    int (*fn_18)(struct CardObj *);            /* 0x18 */
+    unsigned char pad_1C[0x04];
+    int field_20;                     /* 0x20 */
+    unsigned char pad_24[0x04];
+    unsigned char *payload_28;         /* 0x28 */
+    unsigned char *payload_2c;         /* 0x2C */
+    unsigned char *output_30;          /* 0x30 */
+    unsigned char payload_28_len;      /* 0x34 */
+    unsigned char payload_2c_len;      /* 0x35 */
+    unsigned char command;             /* 0x36 */
+    unsigned char saved_command;       /* 0x37 */
+    unsigned char pad_38[0x04];
+    unsigned char *response_3c;        /* 0x3C */
+    unsigned char *field_40;           /* 0x40 */
+    unsigned char response_index;     /* 0x44: received-byte cursor */
+    unsigned char payload_index;       /* 0x45 */
+    unsigned char field_46;           /* 0x46 */
+    unsigned char field_47;           /* 0x47 */
+    unsigned char field_48;           /* 0x48 */
+    unsigned char field_49;           /* 0x49 */
+    unsigned char field_4a;           /* 0x4A */
+    unsigned char pad_4B[0x01];
+    int field_4c;                     /* 0x4C */
+    unsigned char pad_50[0x01];
+    unsigned char field_51;           /* 0x51 */
+    unsigned char field_52;           /* 0x52 */
+    unsigned char field_53;           /* 0x53 */
+    unsigned char pad_54[0x03];
+    unsigned char field_57[0x06];      /* 0x57 */
+    unsigned char field_5d[0x06];      /* 0x5D */
+    unsigned char pad_63[0x80];
+    unsigned char field_e3;           /* 0xE3 */
+    unsigned char field_e4;           /* 0xE4 */
+    unsigned char pad_e5[0x01];
+    unsigned short field_e6;          /* 0xE6 */
+    unsigned char field_e8;           /* 0xE8 */
+    unsigned char field_e9;           /* 0xE9 */
+    unsigned char field_ea;           /* 0xEA */
+    unsigned char pad_eb[0x01];
+    int field_ec;                     /* 0xEC */
+} CardObj;
+
+PE1_STATIC_ASSERT(PE1_OFFSETOF(CardObj, response_index) == 0x44, card_response_index);
+PE1_STATIC_ASSERT(PE1_OFFSETOF(CardObj, payload_index) == 0x45, card_payload_index);
+PE1_STATIC_ASSERT(sizeof(CardObj) == 0xF0, card_obj_size);
+
+#endif /* PE1_CARD_OBJ_H */

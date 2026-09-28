@@ -1,0 +1,280 @@
+# parasite-pc — Parasite Eve (PS1, SLUS-006.62) matching decompilation.
+
+VERSION    := USA
+BASENAME   := main
+TARGET_SHA := 452fb033f2eaa4b18aa20a5bca60b8125af3a37b
+
+ROOT       := $(abspath .)
+PY         ?= $(if $(wildcard $(ROOT)/.venv/bin/python),$(ROOT)/.venv/bin/python,python3)
+SPLAT_CFG  := configs/$(VERSION)/$(BASENAME).yaml
+
+BUILD      := build/$(VERSION)
+ASM_DIR    := asm/$(VERSION)/$(BASENAME)
+SRC_DIR    := src/$(BASENAME)
+LD_SCRIPT  := linkers/$(VERSION)/$(BASENAME).ld
+TARGET_BIN := assets/$(VERSION)/$(BASENAME).exe
+PE_IMG     := disc/extracted/PE.IMG
+OVERLAY    ?= fx_field
+OVERLAY_CONFIG_DIR ?= configs/$(VERSION)/overlays
+OVERLAY_CONFIGS = $(wildcard $(OVERLAY_CONFIG_DIR)/*.yaml)
+OVERLAY_NAMES = $(basename $(notdir $(OVERLAY_CONFIGS)))
+OVERLAY_CFG = $(OVERLAY_CONFIG_DIR)/$(OVERLAY).yaml
+OVERLAY_ORIG_DIR := original/$(VERSION)/overlays
+OVERLAY_ORIG := $(OVERLAY_ORIG_DIR)/$(OVERLAY).bin
+OVERLAY_ASM_DIR := asm/$(VERSION)/overlays/$(OVERLAY)
+OVERLAY_BUILD := $(BUILD)/overlays/$(OVERLAY)
+OVERLAY_LD := linkers/$(VERSION)/overlays/$(OVERLAY).ld
+OVERLAY_UNDEFINED_FUNCS := linkers/$(VERSION)/overlays/undefined_funcs_auto.$(OVERLAY).txt
+OVERLAY_UNDEFINED_SYMS := linkers/$(VERSION)/overlays/undefined_syms_auto.$(OVERLAY).txt
+OVERLAY_EXTRA_UNDEFINEDS := linkers/$(VERSION)/overlays/undefined_extra.$(OVERLAY).txt
+OVERLAY_OUT := $(OVERLAY_BUILD)/$(OVERLAY).bin
+
+ELF        := $(BUILD)/$(BASENAME).elf
+OUT_BIN    := $(BUILD)/$(BASENAME).exe
+
+# CD image build (Disc 1): repack the original disc contents with our exe.
+MKPSXISO   := tools/mkpsxiso-bin/mkpsxiso
+DISC_XML   := disc/disc1.xml
+DISC_DATA  := disc/extracted
+ISO_STAGE  := $(BUILD)/iso
+ISO_BIN    := $(BUILD)/parasite-eve-$(VERSION)-disc1.bin
+ISO_CUE    := $(BUILD)/parasite-eve-$(VERSION)-disc1.cue
+
+CC_WRAPPER := tools/scripts/cc.sh
+AS         := mipsel-none-elf-as
+LD         := mipsel-none-elf-ld
+OVERLAY_VMA_OVERLAP := boot_display menu_memcard scene_e11 scene_e12 scene_e13 scene_e14
+NM         := mipsel-none-elf-nm
+OBJCOPY    := mipsel-none-elf-objcopy
+
+ASM_SRCS := $(shell find $(ASM_DIR) -name '*.s' -not -path '*/matchings/*' -not -path '*/nonmatchings/*' 2>/dev/null)
+C_SRCS   := $(shell find $(SRC_DIR) -name '*.c' 2>/dev/null)
+
+ASM_OBJS := $(ASM_SRCS:%.s=$(BUILD)/%.s.o)
+C_OBJS   := $(C_SRCS:%=$(BUILD)/%.o)
+
+OBJS := $(ASM_OBJS) $(C_OBJS)
+
+# Header dependencies are emitted by the stock preprocessor through cc.sh.
+# Without these, editing a shared ABI header can leave stale objects behind
+# and make an incremental `make check` falsely pass.
+C_DEPS := $(C_OBJS:.o=.o.d)
+-include $(C_DEPS)
+
+.PHONY: expected objdiff-config progress-audit report report-audit all build check check-sources source-policy-check ci verify verify-clean clean diff distclean overlay-build overlay-build-all overlay-check overlay-check-all overlay-clean overlay-extract overlay-permuter-scratch overlay-split permute progress debt debt-check debt-baseline organization-check organization-baseline test drop-pins drop-barriers drop-aliases split split-if-needed tools
+
+all: verify
+
+split:
+	rm -rf $(ASM_DIR) $(LD_SCRIPT) $(UNDEFINED_SYMS) $(UNDEFINED_FUNCS) $(ADDR_ALIASES)
+	@$(PY) -m splat split $(SPLAT_CFG)
+	@find $(ASM_DIR) -name '*.data.s' -o -name '*.rodata.s' | xargs $(PY) tools/scripts/collapse_zero_data.py
+	@grep -rl 'INCLUDE_ASM(' src/main --include='*.c' 2>/dev/null | xargs touch 2>/dev/null || true
+
+split-if-needed:
+	@if [ ! -f "$(LD_SCRIPT)" ] || [ ! -f "$(ASM_DIR)/header.s" ] || \
+	    [ "$(SPLAT_CFG)" -nt "$(LD_SCRIPT)" ]; then \
+	    $(MAKE) split; \
+	fi
+
+build: split-if-needed
+	@$(MAKE) --no-print-directory $(OUT_BIN)
+
+# Assemble split MIPS asm with maspsx-aware path (no preprocessing needed —
+# splat output already uses macro.inc and is GNU-as compatible).
+$(BUILD)/asm/%.s.o: asm/%.s
+	@mkdir -p $(dir $@)
+	$(AS) -EL -G0 -mips4 -32 -no-pad-sections -Iinclude -I$(ASM_DIR) -o $@ $<
+
+# Compile C with PSYQ GCC 2.7.2 → maspsx → GNU as.
+$(BUILD)/src/%.c.o: src/%.c | $(BUILD)
+	@mkdir -p $(dir $@)
+	$(CC_WRAPPER) $< $@
+
+$(BUILD):
+	@mkdir -p $@
+
+# Link to ELF using splat-generated linker script.
+UNDEFINED_SYMS := linkers/$(VERSION)/undefined_syms_auto.$(BASENAME).txt
+UNDEFINED_FUNCS := linkers/$(VERSION)/undefined_funcs_auto.$(BASENAME).txt
+UNDEFINED_MANUAL := linkers/$(VERSION)/undefined_syms_manual.txt
+ADDR_ALIASES := linkers/$(VERSION)/undefined_addr_aliases.$(BASENAME).txt
+
+# Link only the absolute addresses that no object actually defines. Feeding
+# splat's complete auto files to ld would override real definitions forever.
+$(ADDR_ALIASES): $(OBJS) $(UNDEFINED_MANUAL) $(UNDEFINED_SYMS) $(UNDEFINED_FUNCS) tools/scripts/gen_undefined_addr_aliases.py
+	@$(PY) tools/scripts/gen_undefined_addr_aliases.py --nm $(NM) --output $@ \
+	      --source $(UNDEFINED_SYMS) --source $(UNDEFINED_FUNCS) \
+	      --manual $(UNDEFINED_MANUAL) $(OBJS)
+
+$(ELF): $(OBJS) $(LD_SCRIPT) $(UNDEFINED_MANUAL) $(ADDR_ALIASES)
+	$(LD) -EL -T $(LD_SCRIPT) -T $(UNDEFINED_MANUAL) -T $(ADDR_ALIASES) \
+	      -Map $(BUILD)/$(BASENAME).map -o $@
+
+# Extract PSX executable from ELF.
+$(OUT_BIN): $(ELF)
+	$(OBJCOPY) -O binary $< $@
+
+check: build
+	@echo "$(TARGET_SHA)  $(OUT_BIN)" | shasum -c -
+
+# Fresh-clone guard: every committed `c` subsegment must have a tracked source.
+check-sources:
+	@$(PY) tools/scripts/check_c_subseg_sources.py
+
+source-policy-check:
+	@$(PY) tools/scripts/check_source_policy.py
+
+# Source-only checks suitable for a fresh public clone without retail assets or
+# proprietary compiler binaries. Keep this target aligned with GitHub Actions.
+ci: check-sources source-policy-check debt-check organization-check test
+
+# Canonical acceptance target when the local retail image/toolchain is present.
+verify: ci check
+
+# Use before merging structural, toolchain, manifest, or shared-header changes.
+verify-clean:
+	@$(MAKE) --no-print-directory clean
+	@$(MAKE) --no-print-directory verify
+
+test:
+	@$(PY) -m unittest discover -s tools/tests -p 'test_*.py'
+
+diff:
+	@./tools/asm-differ/diff.py --help >/dev/null 2>&1 || (echo "asm-differ deps missing; run: .venv/bin/pip install -r tools/asm-differ/requirements.txt" && exit 1)
+	@./tools/asm-differ/diff.py -mwo $(FUNC)
+
+permute:
+	@$(PY) tools/decomp-permuter/permuter.py $(FUNC)
+
+progress:
+	@$(PY) tools/scripts/progress_report.py
+
+# Crutch-debt tracker: count pins/barriers/aliases/gotos still to remove.
+debt:
+	@$(PY) tools/scripts/crutch_debt.py --write
+
+debt-check:
+	@$(PY) tools/scripts/crutch_debt.py --check
+
+debt-baseline:
+	@$(PY) tools/scripts/crutch_debt.py --update-baseline
+
+organization-check:
+	@$(PY) tools/scripts/organization_debt.py --check
+
+organization-baseline:
+	@$(PY) tools/scripts/organization_debt.py --update-baseline
+
+# Verified crutch removal (byte-identical only; run per file/dir): make drop-pins FILE='src/main/gpu/*.c'
+drop-pins:
+	@$(PY) tools/scripts/try_drop_pins.py $(FILE)
+drop-barriers:
+	@$(PY) tools/scripts/try_drop_barriers.py $(FILE)
+drop-aliases:
+	@$(PY) tools/scripts/try_drop_externs.py $(FILE)
+
+# Disassemble the retail binaries into objdiff's target objects. This is a
+# fresh second split against an empty source tree - never a copy of our own
+# build, which would compare the build against itself and prove nothing.
+# Needs `make build` for the main map and `make overlay-build-all` for the
+# overlay maps; gen_expected says which modules are missing.
+expected:
+	@$(PY) tools/scripts/gen_expected.py
+
+objdiff-config:
+	@$(PY) tools/scripts/objdiff_config.py
+
+progress-audit: expected objdiff-config
+	@$(PY) tools/scripts/audit_progress.py
+
+OBJDIFF ?= tools/objdiff/objdiff-cli
+
+# The report decomp.dev ingests: every function in every shipped binary,
+# each compared against its retail disassembly.
+report: progress-audit
+	@$(OBJDIFF) report generate -p . -o $(BUILD)/report.json
+	@$(PY) tools/scripts/audit_report.py
+	@echo "wrote $(BUILD)/report.json"
+
+report-audit:
+	@$(PY) tools/scripts/audit_report.py
+
+# Build every configured overlay; OVERLAY_JOBS bounds the parallel makes.
+# Each overlay logs to build/USA/overlay-build.<name>.log and a failure
+# replays its tail - a parallel build that hides why it failed costs a CI
+# round trip per bug.
+OVERLAY_JOBS ?= 4
+overlay-build-all: | $(BUILD)
+	@test -n "$(OVERLAY_NAMES)" || { echo "no configured overlays in configs/$(VERSION)/overlays"; exit 1; }
+	@$(PY) tools/scripts/parallel_overlay_make.py --jobs $(OVERLAY_JOBS) \
+	    --target overlay-build $(OVERLAY_NAMES)
+
+overlay-permuter-scratch:
+	@$(PY) tools/scripts/make_overlay_permuter_scratch.py \
+	    $(if $(FUNC),--func $(FUNC),) \
+	    $(if $(RANK),--rank $(RANK),) \
+	    $(if $(C_RANK),--c-rank $(C_RANK),)
+
+overlay-extract:
+	@if [ -f "$(OVERLAY_ORIG)" ]; then echo "have $(OVERLAY_ORIG)"; exit 0; fi; \
+	test -f $(OVERLAY_CFG) || { echo "missing overlay config: $(OVERLAY_CFG)"; exit 1; }; \
+	$(PY) tools/scripts/extract_overlay_config_target.py "$(OVERLAY_CFG)" --pe-img "$(PE_IMG)"
+
+overlay-split: overlay-extract
+	@test -f $(OVERLAY_CFG) || { echo "missing overlay config: $(OVERLAY_CFG)"; exit 1; }
+	@$(PY) -m splat split $(OVERLAY_CFG)
+	@find $(OVERLAY_ASM_DIR) \( -name '*.data.s' -o -name '*.rodata.s' -o -path '*/data/*.s' \) \
+	    | xargs $(PY) tools/scripts/collapse_zero_data.py
+
+overlay-build: overlay-split
+	@find $(OVERLAY_ASM_DIR) \( -path '*/matchings/*' -o -path '*/nonmatchings/*' \) -prune -o -name '*.s' -print | while read asm; do \
+	    obj="$(OVERLAY_BUILD)/$$asm.o"; \
+	    mkdir -p "$$(dirname "$$obj")"; \
+	    $(AS) -EL -G0 -mips4 -32 -no-pad-sections -Iinclude -I$(OVERLAY_ASM_DIR) \
+	        -o "$$obj" "$$asm" || exit $$?; \
+	done
+	@if [ -d src/overlays/$(OVERLAY) ]; then \
+	    find src/overlays/$(OVERLAY) -name '*.c' -print | while read src; do \
+	        obj="$(OVERLAY_BUILD)/$$src.o"; \
+	        mkdir -p "$$(dirname "$$obj")"; \
+	        $(CC_WRAPPER) "$$src" "$$obj" || exit $$?; \
+	    done; \
+	fi
+	@$(PY) tools/scripts/overlay_extra_undefineds.py $(OVERLAY_BUILD) \
+	    --out $(OVERLAY_EXTRA_UNDEFINEDS) \
+	    --existing $(OVERLAY_UNDEFINED_FUNCS) \
+	    --existing $(OVERLAY_UNDEFINED_SYMS) \
+	    --symbols $(OVERLAY_CONFIG_DIR)/sym.$(OVERLAY).txt \
+	    --symbols configs/$(VERSION)/sym.$(BASENAME).txt
+	# Copied functions retain their original link VMAs, which can overlap other sections.
+	$(LD) $(if $(filter $(OVERLAY),$(OVERLAY_VMA_OVERLAP)),--no-check-sections) -EL -T $(OVERLAY_LD) -T $(OVERLAY_UNDEFINED_FUNCS) -T $(OVERLAY_UNDEFINED_SYMS) -T $(OVERLAY_EXTRA_UNDEFINEDS) \
+	    -Map $(OVERLAY_BUILD)/$(OVERLAY).map -o $(OVERLAY_BUILD)/$(OVERLAY).elf
+	$(OBJCOPY) -O binary $(OVERLAY_BUILD)/$(OVERLAY).elf $(OVERLAY_OUT)
+
+overlay-check: overlay-build
+	@EXPECTED=$$(shasum $(OVERLAY_ORIG) | cut -d' ' -f1); \
+	ACTUAL=$$(shasum $(OVERLAY_OUT) | cut -d' ' -f1); \
+	if [ "$$EXPECTED" = "$$ACTUAL" ]; then \
+	    echo "$(OVERLAY): OK ($$ACTUAL)"; \
+	else \
+	    echo "$(OVERLAY): SHA mismatch"; \
+	    echo "expected $$EXPECTED  $(OVERLAY_ORIG)"; \
+	    echo "actual   $$ACTUAL  $(OVERLAY_OUT)"; \
+	    exit 1; \
+	fi
+
+overlay-check-all:
+	@test -n "$(OVERLAY_NAMES)" || { echo "no configured overlays in configs/$(VERSION)/overlays"; exit 1; }
+	@$(PY) tools/scripts/check_overlay_hashes.py
+
+overlay-clean:
+	rm -rf $(OVERLAY_ORIG_DIR) asm/$(VERSION)/overlays linkers/$(VERSION)/overlays $(BUILD)/overlays
+
+clean:
+	rm -rf $(BUILD)
+
+distclean: clean
+	rm -rf $(ASM_DIR) $(LD_SCRIPT) linkers/$(VERSION)/undefined_*.txt
+
+-include local.mk

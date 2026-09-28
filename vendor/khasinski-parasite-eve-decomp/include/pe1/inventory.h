@@ -1,0 +1,114 @@
+#ifndef PE1_INVENTORY_H
+#define PE1_INVENTORY_H
+
+#include "common.h"
+
+enum ItemDataFlags {
+    ITEM_DATA_FLAG_GENERIC_DESCRIPTION = 0x10,
+    ITEM_DATA_FLAG_DISABLED = 0x40
+};
+
+enum ItemKind {
+    ITEM_KIND_ARMOR = 9
+};
+
+/* Common 0x20-byte item-data record returned by Inv_LookupActiveListData.
+ * Equipment, consumables and key items reuse the tail differently. The
+ * weapon/armor ("E-Reg") variant is confirmed by the Deconstruction Cheats
+ * Wiki: the record sits 4 bytes before the register base (g_InvItemSlotArray
+ * = 0x800C0EAC, so itemId lands on E-Reg "value" 0x800C0EB0). itemId values
+ * are the ItemId enum; tailData mods are ItemMod codes (see item_ids.h).
+ */
+typedef struct ItemDataRecord {
+/* 0x00 */ u8  pad_00[4];
+/* 0x04 */ u8  itemId;       /* ItemId type code (E-Reg value) */
+/* 0x05 */ u8  flags;
+/* 0x06 */ u8  kind;
+/* 0x07 */ u8  baseStats[3]; /* Attack/Range/Bullets (weapon) or Defense/P.Energy/Critical (armor) */
+/* 0x0A */ u16 ammo;         /* loaded rounds; 0 for melee */
+/* 0x0C */ u16 reserveAmmo;
+/* 0x0E */ s16 bonusStats[3];/* the three "+N" bonuses, same axes as baseStats */
+/* 0x14 */ u8  tailCount;    /* equipment: modification-slot count (max 0x0A); else use count */
+/* 0x15 */ u8  tailData[0x0B];/* equipment: up to 10 ItemMod codes */
+} ItemDataRecord;
+
+/* Historical name retained while older consumers are migrated. */
+typedef ItemDataRecord InvItemSlot;
+
+extern ItemDataRecord g_InvCompareSlotLeft;
+extern ItemDataRecord g_InvCompareSlotRight;
+extern ItemDataRecord *D_8009D070, *D_8009D074;
+extern u16 g_InvCategoryItemTable[];
+extern ItemDataRecord D_800A1A00;
+extern ItemDataRecord g_InvItemSlotArray[128];
+
+/* Historical name: this operation returns a status, not an item pointer. */
+int Inv_GetSlotItemData(int index);
+/* Historical name: allocate a copied equipment record and insert its ID. */
+ItemDataRecord *Inv_FindSlotByIndex(int id);
+int Inv_WriteSlotById(ItemDataRecord *item);
+void Inv_StepScrollDisplay(void);
+int Inv_DrawSlotItemIcon(void);
+int Inv_RebuildWithBonusSlots(int minSecond, int minThird);
+int Inv_TransferToStorage(void);
+void Inv_InitNewGameInventory(void);
+void Inv_SetAyaSlotCount(int count);
+void Inv_MergeStorageToSlot(void);
+void Inv_RebuildSelectionBitset(void);
+int Inv_CheckSlotUsable(int id);
+int Inv_CanAddActiveListItemToAya(int index);
+void Inv_TransferItemAlt(void);
+void Inv_ClearDisplaySlots(void);
+int Inv_StepScrollDisplay2(int special);
+int Inv_SetupSlotDisplay(int mask);
+int Inv_PickRandomItem(int unused);
+u8 *Inv_GetItemEffectData(int item, int mode);
+extern u8 D_800A1B50[];
+void Inv_RollRandomItemType(s16 *type, s16 *amount);
+int Inv_IsSlotSelectable(int index);
+int Inv_IsSlotEquipped(int index);
+int Inv_GetWayneListItemByIndex(int index);
+int Inv_TransferItemAlt2(int kindMask);
+void Inv_SortSlotsByPriority(void);
+void Inv_SetSelectionBit(int index);
+void Inv_InitSlotDisplay(int *list, int *index);
+int Inv_BuildCompatibleWeaponBitset(int sourceIndex);
+void Inv_BuildDisplayFromList(int leftStorage, int leftIndex, int rightStorage, int rightIndex);
+int Inv_RebuildWithSlotLimit(int fromMode, int fromIndex, int toMode, int toIndex);
+int Inv_TestSelectionBit(int index);
+int Inv_IsAyaInventorySlotReserved(int index);
+int Inv_GetActiveSlotCount(int *requiredReserve);
+void Inv_TransferItemBetweenLists(unsigned selection, int modifier, int flags, int cost);
+void Inv_BuildEquipSlotDisplay(int index);
+int Inv_RemoveActiveListItem(int index);
+void Inv_RebuildSelectableMask(void);
+int Inv_GetSlotHighlightState(int spell, int available);
+int Inv_GetActiveListItemType(int index);
+void Item_SetDisabledFlag(int itemId, int enabled);
+int Inv_FindIndexByData(void *needle);
+void Inv_BuildFilteredPackedList(int mask);
+ItemDataRecord *Inv_LookupActiveListData(int index);
+ItemDataRecord *Item_LookupBaseData(unsigned int index);
+void Inv_ClearEquipFlagForKind(ItemDataRecord *record);
+
+PE1_STATIC_ASSERT(sizeof(ItemDataRecord) == 0x20, item_data_record_size);
+PE1_STATIC_ASSERT(PE1_OFFSETOF(ItemDataRecord, itemId) == 0x04,
+                  item_data_record_id_offset);
+PE1_STATIC_ASSERT(PE1_OFFSETOF(ItemDataRecord, flags) == 0x05,
+                  item_data_record_flags_offset);
+PE1_STATIC_ASSERT(PE1_OFFSETOF(ItemDataRecord, kind) == 0x06,
+                  item_data_record_kind_offset);
+PE1_STATIC_ASSERT(PE1_OFFSETOF(ItemDataRecord, ammo) == 0x0A,
+                  item_data_record_ammo_offset);
+PE1_STATIC_ASSERT(PE1_OFFSETOF(ItemDataRecord, bonusStats) == 0x0E,
+                  item_data_record_bonus_stats_offset);
+PE1_STATIC_ASSERT(PE1_OFFSETOF(ItemDataRecord, tailCount) == 0x14,
+                  item_data_record_tail_offset);
+
+int Inv_CountByCategory(int category);
+int WayneStorage_CountItemType(int category);
+
+void Inv_ClearSelectionBitset(void);
+int Inv_IsActiveListOverrideSelected(void);
+
+#endif /* PE1_INVENTORY_H */

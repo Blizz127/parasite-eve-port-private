@@ -61,6 +61,7 @@ segments:
       - [0x2180, c, func_80191168]
       - [0x21A4, c, func_8019118C]
       - [0x22E4, asm]
+      - [0x2BF8, c, func_80191BE0]
       - [0x2EEC, c, func_80191ED4]
       - [0x2F90, bin]
   - [0x27000]

@@ -1,0 +1,196 @@
+name: room_m318.bin
+sha1: 3deebe65a4bb7eb5d1a9ececd8296a47ea7b9e4b
+options:
+  basename: room_m318
+  target_path: original/USA/overlays/room_m318.bin
+  base_path: ../../..
+  platform: psx
+  compiler: GCC
+  asm_path: asm/USA/overlays/room_m318
+  src_path: src/overlays/room_m318
+  build_path: build/USA/overlays/room_m318
+  ld_script_path: linkers/USA/overlays/room_m318.ld
+  undefined_funcs_auto_path: linkers/USA/overlays/undefined_funcs_auto.room_m318.txt
+  symbol_addrs_path: configs/USA/overlays/sym.room_m318.txt
+  undefined_syms_auto_path: linkers/USA/overlays/undefined_syms_auto.room_m318.txt
+  find_file_boundaries: True
+  disassemble_all: True
+  asm_function_macro: glabel
+  asm_jtbl_label_macro: jlabel
+  asm_data_macro: dlabel
+  generate_asm_macros_files: False
+  section_order: [".rodata", ".text", ".data", ".sdata", ".sbss", ".bss"]
+  subalign: 4
+  string_encoding: ASCII
+  data_string_encoding: ASCII
+  rodata_string_guesser_level: 2
+  data_string_guesser_level: 2
+segments:
+  - name: room_m318
+    type: code
+    start: 0x0
+    vram: 0x8018EFE8
+    align: 4
+    subalign: 4
+    bss_size: 0x0
+    subsegments:
+      - [0x0, rodata, room_m318]
+      - [0xC, .rodata, RoomLib_HandlerDArgs_8018F2EC]
+      - [0x8C, .rodata, RoomLib_HandlerEArgs_80190038]
+      - [0x110, rodata, RoomLib_HandlerEArgsPad_80190038]
+      - [0x114, .rodata, RoomLib_HandlerBArgs_80190AFC]
+      - [0x17C, .rodata, RoomLib_HandlerCArgs_80191614]
+      - [0x1E4, rodata, RoomLib_HandlerCArgsData_80191614]
+      - [0x25C, c, func_8018F244]
+      - [0x264, c, RoomLib_InitB_8018F24C]
+      - [0x304, c, RoomLib_HandlerDArgs_8018F2EC]
+      - [0x588, c, func_8018F570]
+      - [0x590, c, func_8018F578]
+      - [0x618, c, RoomLib_NotifyArmB_8018F600]
+      - [0x6C0, c, RoomLib_HandlerD]
+      - [0xC08, c, RoomLib_FxNotify]
+      - [0xCE8, c, RoomLib_RotateMotion_8018FCD0]
+      - [0xF28, c, func_8018FF10]
+      - [0xFC4, c, func_8018FFAC]
+      - [0xFCC, c, func_8018FFB4]
+      - [0xFD4, c, RoomLib_InitD_8018FFBC]
+      - [0x1050, c, RoomLib_HandlerEArgs_80190038]
+      - [0x12C8, c, func_801902B0]
+      - [0x12D0, c, func_801902B8]
+      - [0x1358, c, RoomLib_Notify2ArmB_80190340]
+      - [0x1400, c, RoomLib_HandlerE]
+      - [0x198C, c, RoomLib_SteerToward_80190974]
+      - [0x1A10, c, RoomLib_ResetAndSignalB_801909F8]
+      - [0x1A68, c, func_80190A50]
+      - [0x1A70, c, func_80190A58]
+      - [0x1A78, c, RoomLib_InitC_80190A60]
+      - [0x1B14, c, RoomLib_HandlerBArgs_80190AFC]
+      - [0x1D5C, c, func_80190D44]
+      - [0x1D64, c, RoomLib_InvokeCallbackC_80190D4C]
+      - [0x1D8C, c, RoomLib_ArmWindowA_80190D74]
+      - [0x1DFC, c, RoomLib_HandlerB]
+      - [0x2188, c, func_80191170]
+      - [0x2190, c, func_80191178]
+      - [0x2530, c, RoomLib_ResetAndSignal_80191518]
+      - [0x258C, c, func_80191574]
+      - [0x2594, c, func_8019157C]
+      - [0x259C, c, RoomLib_InitFull_80191584]
+      - [0x262C, c, RoomLib_HandlerCArgs_80191614]
+      - [0x2874, c, func_8019185C]
+      - [0x287C, c, RoomLib_InvokeCallbackC_80191864]
+      - [0x28A4, c, RoomLib_ArmWindowB_8019188C]
+      - [0x2914, c, RoomLib_HandlerC]
+      - [0x2D90, c, func_80191D78]
+      - [0x2D98, c, func_80191D80]
+      - [0x3120, c, RoomLib_ResetAndSignal_80192108]
+      - [0x317C, c, func_80192164]
+      - [0x3184, c, func_8019216C]
+      - [0x318C, c, RoomLib_InitTimers_80192174]
+      - [0x31C8, c, func_801921B0]
+      - [0x3260, c, func_80192248]
+      - [0x3268, c, RoomLib_InvokeCallbackC_80192250]
+      - [0x3290, c, RoomLib_RearmOnMatch_80192278]
+      - [0x32C0, c, RoomLib_HandlerA]
+      - [0x33D4, c, RoomLib_MoveActorLocal_801923BC]
+      - [0x3554, c, RoomLib_Set4ClearSignal_8019253C]
+      - [0x3570, c, func_80192558]
+      - [0x3578, c, func_80192560]
+      - [0x3638, c, func_80192620]
+      - [0x3730, asm, func_80192718]
+      - [0x3A94, asm, func_80192A7C]
+      - [0x3DB8, c, RoomEffect_FallingPaletteSprite]
+      - [0x3EEC, asm, func_80192ED4]
+      - [0x4284, asm, func_8019326C]
+      - [0x4650, asm, func_80193638]
+      - [0x49C4, c, RoomEffect_DriftingPaletteSprite]
+      - [0x4B78, c, RoomEffect_SparkEmitter]
+      - [0x4DA0, c, func_80193D88]
+      - [0x4FDC, c, RoomEffect_ExpandingPaletteSprite]
+      - [0x517C, asm, func_80194164]
+      - [0x5500, asm, func_801944E8]
+      - [0x5AC4, asm, func_80194AAC]
+      - [0x61A8, asm, func_80195190]
+      - [0x65FC, asm, func_801955E4]
+      - [0x691C, asm, func_80195904]
+      - [0x6D38, asm, func_80195D20]
+      - [0x7484, asm, func_8019646C]
+      - [0x7838, asm, func_80196820]
+      - [0x7C60, c, RoomEffect_DriftingPalettePulse]
+      - [0x7E64, asm, func_80196E4C]
+      - [0x8630, asm, func_80197618]
+      - [0x8CD4, asm, func_80197CBC]
+      - [0x9280, asm, func_80198268]
+      - [0x9910, asm, func_801988F8]
+      - [0xA230, c, func_80199218]
+      - [0xA24C, c, func_80199234]
+      - [0xA268, c, func_80199250]
+      - [0xA2AC, c, RoomLib_SetArg1_80199294]
+      - [0xA2BC, c, func_801992A4]
+      - [0xA394, c, RoomLib_SetArg1_8019937C]
+      - [0xA3A4, c, func_8019938C]
+      - [0xA3B4, data, D_8019939C]
+      - [0xA3EC, data, D_801993D4]
+      - [0xA45C, data, D_80199444]
+      - [0xA47C, data, D_80199464]
+      - [0xA4A4, data, D_8019948C]
+      - [0xA4D4, data, D_801994BC]
+      - [0xA504, data, D_801994EC]
+      - [0xA53C, data, D_80199524]
+      - [0xA560, data, D_80199548]
+      - [0xA598, data, D_80199580]
+      - [0xA5D0, data, D_801995B8]
+      - [0xA5D4, data, D_801995BC]
+      - [0xA5F4, data, D_801995DC]
+      - [0xA614, data, D_801995FC]
+      - [0xA63C, data, D_80199624]
+      - [0xA674, data, D_8019965C]
+      - [0xA68C, data, D_80199674]
+      - [0xA6B4, data, D_8019969C]
+      - [0xA6EC, data, D_801996D4]
+      - [0xA704, data, D_801996EC]
+      - [0xA724, data, D_8019970C]
+      - [0xA75C, data, D_80199744]
+      - [0xA788, data, D_80199770]
+      - [0xA7B0, data, D_80199798]
+      - [0xA7D8, data, D_801997C0]
+      - [0xA810, data, D_801997F8]
+      - [0xA824, data, D_8019980C]
+      - [0xA85C, data, D_80199844]
+      - [0xA880, data, D_80199868]
+      - [0xA8A8, data, D_80199890]
+      - [0xA8D0, data, D_801998B8]
+      - [0xA908, data, D_801998F0]
+      - [0xA90C, data, D_801998F4]
+      - [0xA910, data, D_801998F8]
+      - [0xA914, data, D_801998FC]
+      - [0xA918, data, D_80199900]
+      - [0xA91C, data, D_80199904]
+      - [0xA920, data, D_80199908]
+      - [0xA924, data, D_8019990C]
+      - [0xA928, data, D_80199910]
+      - [0xA92C, data, D_80199914]
+      - [0xA930, data, D_80199918]
+      - [0xA934, data, D_8019991C]
+      - [0xA938, data, D_80199920]
+      - [0xA93C, data, D_80199924]
+      - [0xA940, data, D_80199928]
+      - [0xA944, data, RoomSlotA_80199294]
+      - [0xA948, data, D_80199930]
+      - [0xA94C, data, D_80199934]
+      - [0xA950, data, RoomSlotA_8019937C]
+      - [0xA954, data, D_8019993C]
+      - [0xA958, data, D_80199940]
+      - start: 0xA95C
+        type: databin
+        name: D_80199944
+        dir: room_m318
+      - [0x311F8, data, D_801C01E0]
+      - start: 0x31210
+        type: databin
+        name: D_801C01F8
+        dir: room_m318
+  - [0x5C800]
+# room: m318, section3 sector 77178, scanner delta 0
+# source slice: room-section3
+# extract locally with: dd if=disc/extracted/PE.IMG of=original/USA/overlays/room_m318.bin bs=2048 skip=77178 count=185
+# text-bank: Final day / EX: Chrysler Building floors

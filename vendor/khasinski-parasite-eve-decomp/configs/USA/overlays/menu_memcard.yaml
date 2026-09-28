@@ -1,0 +1,296 @@
+name: menu_memcard.bin
+sha1: e9adf978d2984be64397ec48b4da7b3e83f07aa8
+options:
+  basename: menu_memcard
+  target_path: original/USA/overlays/menu_memcard.bin
+  base_path: ../../..
+  platform: psx
+  compiler: GCC
+  asm_path: asm/USA/overlays/menu_memcard
+  src_path: src/overlays/menu_memcard
+  build_path: build/USA/overlays/menu_memcard
+  ld_script_path: linkers/USA/overlays/menu_memcard.ld
+  symbol_addrs_path: configs/USA/overlays/sym.menu_memcard.txt
+  undefined_funcs_auto_path: linkers/USA/overlays/undefined_funcs_auto.menu_memcard.txt
+  undefined_syms_auto_path: linkers/USA/overlays/undefined_syms_auto.menu_memcard.txt
+  find_file_boundaries: True
+  disassemble_all: True
+  asm_function_macro: glabel
+  asm_jtbl_label_macro: jlabel
+  asm_data_macro: dlabel
+  generate_asm_macros_files: False
+  section_order: [".rodata", ".text", ".data", ".sdata", ".sbss", ".bss"]
+  subalign: 4
+  string_encoding: ASCII
+  data_string_encoding: ASCII
+  rodata_string_guesser_level: 2
+  data_string_guesser_level: 2
+segments:
+  - name: menu_memcard
+    type: code
+    start: 0x0
+    vram: 0x80120D44
+    align: 4
+    subalign: 4
+    bss_size: 0x0
+    subsegments:
+      # generated from static prologue hints; verify with runtime trace and SHA check
+      - [0x0, asm, menu_memcard_header]
+      - [0x304, asm, func_menu_memcard_000304]
+      - [0x570, asm, func_menu_memcard_000570]
+      - [0x7DC, asm, func_menu_memcard_0007DC]
+      - [0x9C4, asm, func_menu_memcard_0009C4]
+      - [0xD00, c, Memcard_ResetDisplayState_80121A44]
+      - [0xF04, asm, func_menu_memcard_000F04]
+      - [0x1348, asm, func_menu_memcard_001348]
+      - [0x1654, c, func_80122398]
+      - [0x16A8, c, func_801223EC]
+      - [0x16F4, asm, menu_memcard_data_0016F4]
+      - [0x2060, asm, func_menu_memcard_002060]
+      - [0x244C, asm, func_menu_memcard_00244C]
+      - [0x2D9C, asm, func_menu_memcard_002D9C]
+      - [0x33D0, asm, func_menu_memcard_0033D0]
+      - [0x3D68, asm, func_menu_memcard_003D68]
+      - [0x4180, asm, func_menu_memcard_004180]
+      - [0x4870, asm, func_menu_memcard_004870]
+      - [0x4E98, asm, func_menu_memcard_004E98]
+  - [0x53A8]
+  # Pulse-image jumps retain the original copied callback link address.
+  - name: menu_memcard_pulse_linkbase
+    type: code
+    start: 0x53A8
+    vram: 0x801F0BA0
+    align: 4
+    subalign: 4
+    bss_size: 0x0
+    subsegments:
+      - [0x53A8, c, Memcard_PulseImage]
+  - [0x5538]
+  - name: menu_memcard_link_effect_linkbase
+    type: code
+    start: 0x5538
+    vram: 0x801F0D30
+    align: 4
+    subalign: 4
+    bss_size: 0x0
+    subsegments:
+      - [0x5538, c, Memcard_LinkEffect]
+  - [0x5878]
+  - name: menu_memcard_cosine_linkbase
+    type: code
+    start: 0x5878
+    vram: 0x801F1070
+    align: 4
+    subalign: 4
+    bss_size: 0x0
+    subsegments:
+      - [0x5878, c, Memcard_CosineImage]
+  - [0x5A04]
+  - name: menu_memcard_trail_linkbase
+    type: code
+    start: 0x5A04
+    vram: 0x801F11FC
+    align: 4
+    subalign: 4
+    bss_size: 0x0
+    subsegments:
+      - [0x5A04, c, Memcard_TrailEffect]
+  - [0x5DE4]
+  - name: menu_memcard_sine_rotate_linkbase
+    type: code
+    start: 0x5DE4
+    vram: 0x801F15DC
+    align: 4
+    subalign: 4
+    bss_size: 0x0
+    subsegments:
+      - [0x5DE4, c, Memcard_SineRotatingImage]
+  - [0x5F98]
+  - name: menu_memcard_effect_callbacks_tail
+    type: code
+    start: 0x5F98
+    vram: 0x80126CDC
+    align: 4
+    subalign: 4
+    bss_size: 0x0
+    subsegments:
+      - [0x5F98, asm, func_menu_memcard_005F98]
+      - [0x6B04, c, func_80127848]
+      - [0x6C78, asm, func_menu_memcard_006C78]
+  - [0x7000]
+  - name: menu_memcard_blend_image_linkbase
+    type: code
+    start: 0x7000
+    vram: 0x8018F7F0
+    align: 4
+    subalign: 4
+    bss_size: 0x0
+    subsegments:
+      - [0x7000, c, Memcard_BlendImage]
+  - [0x7168]
+  - name: menu_memcard_blend_rotated_linkbase
+    type: code
+    start: 0x7168
+    vram: 0x8018F958
+    align: 4
+    subalign: 4
+    bss_size: 0x0
+    subsegments:
+      - [0x7168, c, Memcard_BlendRotatedImage]
+  - [0x73D0]
+  # This allocator retains local jumps from its original link address.
+  - name: menu_memcard_image_node_linkbase
+    type: code
+    start: 0x73D0
+    vram: 0x8018FBC0
+    align: 4
+    subalign: 4
+    bss_size: 0x0
+    subsegments:
+      - [0x73D0, c, Memcard_CreateImageNode]
+  - [0x7514]
+  - name: menu_memcard_fixed_image_linkbase
+    type: code
+    start: 0x7514
+    vram: 0x8018FD04
+    align: 4
+    subalign: 4
+    bss_size: 0x0
+    subsegments:
+      - [0x7514, c, Memcard_CreateFixedImageNode]
+  - [0x762C]
+  - name: menu_memcard_image_group_linkbase
+    type: code
+    start: 0x762C
+    vram: 0x8018FE1C
+    align: 4
+    subalign: 4
+    bss_size: 0x0
+    subsegments:
+      - [0x762C, c, Memcard_CreateImageGroup]
+  - [0x7874]
+  - name: menu_memcard_image_node_late
+    type: code
+    start: 0x7874
+    vram: 0x801285B8
+    align: 4
+    subalign: 4
+    bss_size: 0x0
+    subsegments:
+      - [0x7874, asm, func_menu_memcard_007874]
+      - [0x7E70, asm, func_menu_memcard_007E70]
+      - [0x81C4, asm, func_menu_memcard_0081C4]
+  - [0x9108]
+  - name: menu_memcard_video_display_linkbase
+    type: code
+    start: 0x9108
+    vram: 0x801918F8
+    align: 4
+    subalign: 4
+    bss_size: 0x0
+    subsegments:
+      - [0x9108, c, Memcard_SetVideoDisplay]
+  - [0x9374]
+  - name: menu_memcard_video_frame_linkbase
+    type: code
+    start: 0x9374
+    vram: 0x80191B64
+    align: 4
+    subalign: 4
+    bss_size: 0x0
+    subsegments:
+      - [0x9374, c, Memcard_UpdateVideoFrame]
+  - [0x95D8]
+  - name: menu_memcard_video_upload_linkbase
+    type: code
+    start: 0x95D8
+    vram: 0x80191DC8
+    align: 4
+    subalign: 4
+    bss_size: 0x0
+    subsegments:
+      - [0x95D8, c, Memcard_UploadVideoSlice]
+  - [0x97C8]
+  - name: menu_memcard_video_init_linkbase
+    type: code
+    start: 0x97C8
+    vram: 0x80191FB8
+    align: 4
+    subalign: 4
+    bss_size: 0x0
+    subsegments:
+      - [0x97C8, c, Memcard_InitVideoBuffers]
+  - [0x9B04]
+  - name: menu_memcard_video_after_init
+    type: code
+    start: 0x9B04
+    vram: 0x8012A848
+    align: 4
+    subalign: 4
+    bss_size: 0x0
+    subsegments:
+      - [0x9B04, c, func_8012A848]
+      - [0x9D08, asm, func_menu_memcard_009D08]
+      - [0xA144, asm, func_menu_memcard_00A144]
+      - [0xA458, c, func_8012B19C]
+  - [0xA4AC]
+  # This copied handler retained its original 0x80192CE0 link address.
+  - name: menu_memcard_copied_handler
+    type: code
+    start: 0xA4AC
+    vram: 0x80192CE0
+    align: 4
+    subalign: 4
+    bss_size: 0x0
+    subsegments:
+      - [0xA4AC, c, Memcard_UpdateEventFlag_8012B1F0]
+  - [0xA4F8]
+  - name: menu_memcard_play_video_linkbase
+    type: code
+    start: 0xA4F8
+    vram: 0x80192CE8
+    align: 4
+    subalign: 4
+    bss_size: 0x0
+    subsegments:
+      - [0xA4F8, c, Memcard_PlayVideo]
+  - [0xA7A8]
+  - name: menu_memcard_fade_before_counter
+    type: code
+    start: 0xA7A8
+    vram: 0x8012B4EC
+    align: 4
+    subalign: 4
+    bss_size: 0x0
+    subsegments:
+      - [0xA7A8, c, Memcard_InitFadeForNode]
+  - [0xA7F8]
+  # The retail jump to the shared epilogue retained this earlier link address.
+  - name: menu_memcard_fade_linkbase
+    type: code
+    start: 0xA7F8
+    vram: 0x80192F9C
+    align: 4
+    subalign: 4
+    bss_size: 0x0
+    subsegments:
+      - [0xA7F8, c, Memcard_UpdateFadeCounter_8012B53C]
+  - [0xA894]
+  - name: menu_memcard_fade_late
+    type: code
+    start: 0xA894
+    vram: 0x8012B5D8
+    align: 4
+    subalign: 4
+    bss_size: 0x0
+    subsegments:
+      - [0xA894, c, Memcard_AdvanceFade]
+      - [0xA8E8, c, Memcard_UpdateFadeDisplay]
+      - [0xA97C, c, Memcard_DecreaseFade]
+      - [0xA9AC, c, func_8012B6F0]
+      - [0xA9CC, c, func_8012B710]
+      - [0xAA10, c, func_8012B754]
+      - [0xAA64, asm, menu_memcard_data]
+  - [0xB000]
+# source slice: scanner
+# extract locally with: dd if=disc/extracted/PE.IMG of=original/USA/overlays/menu_memcard.bin bs=2048 skip=965 count=22

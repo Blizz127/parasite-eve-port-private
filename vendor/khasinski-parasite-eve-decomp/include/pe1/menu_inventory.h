@@ -1,0 +1,72 @@
+#ifndef PE1_MENU_INVENTORY_H
+#define PE1_MENU_INVENTORY_H
+
+#include "pe1/menu_widget.h"
+
+void BoundsCheck_AssertStub(int code);
+void MenuWidget_InitPool(void);
+void Inventory_OpenAyaItemList(unsigned int mode);
+
+MenuWidgetNode *MenuWidget_GetChild(MenuWidgetNode *node, int index);
+MenuWidgetNode *MenuWidget_FindByModeAndSelectedBase(int mode,
+                                                     int selectedBase);
+void MenuWidget_SetCurrentNode(MenuWidgetNode *node);
+void MenuWidget_RestoreSavedCurrentNode(void);
+void MenuWidget_DestroyNode(MenuWidgetNode *node);
+void MenuWidget_DestroyNodeRecursive(MenuWidgetNode *node);
+void func_80064A54(MenuWidgetNode *node);
+void MenuWidget_NavScrollTo(int selectedBase);
+int Menu_InventoryNavigate(MenuWidgetNode *current, MenuWidgetNode *node,
+                           u32 flags);
+void Menu_CreateBonusPointAllocationView(void);
+void Menu_PlayCancelSound(void);
+void Menu_SetSwapReturnFlag(void);
+void Menu_PlayMoveSound(void);
+
+extern int D_8009CF18, D_8009CFB0;
+int MenuWidget_GridCellIndex(MenuWidgetNode *node);
+MenuWidgetNode *MenuWidget_GetCurrentNode(void);
+void Menu_OpenItemUsePanelAtIndex(int index);
+void Menu_OpenSkillSelectionView(void);
+void Menu_StepInventoryRoot(int mode, int index, int arg);
+void Menu_CreateNotificationDialog(int message, int arg);
+void MenuInput_SetPollingPaused(int paused);
+void Menu_OnEquipConfirm(int unused, int confirmed);
+
+int Menu_ClampRange(int value);
+void Menu_SaveBgInitFade(void);
+
+int Menu_InitBonusPointScreen(int command, int value, int other, int *unused);
+void Menu_CreateContextHelpPanel(void);
+void Menu_ComputeGammaLut(int initial, int threshold);
+void Menu_SaveBgStartFadeOut(void);
+void Menu_SetMemCardConfirmPending(void);
+void Menu_InitBonusPointAllocState(int gainedPoints);
+
+void Menu_CopyPromptCodes(u8 *source);
+void Menu_SetActionSubmenuSelection(int value);
+void MenuWidget_SetColumnLayoutMode(int mode);
+
+extern int g_MenuItemUseMode;
+void MenuWidget_ClampScroll(MenuWidgetNode *node);
+void MenuWidget_OffsetPosition(MenuWidgetNode *node, int dx, int dy);
+void MenuWidget_ClearCursorY(MenuWidgetNode *node);
+void Menu_OpenBonusPointSpendDialog(MenuWidgetNode *node, int stat);
+void Menu_PlayConfirmSound(void);
+void func_800490B0(void);
+int Menu_StatSlotInputHandler(MenuWidgetNode *node, unsigned int flags);
+int Menu_StepListNavigate(MenuWidgetListNavigation *node, unsigned int flags);
+
+int Menu_CheckItemAffordable(int actionId);
+int Menu_GetBattleEquipMode(void);
+extern int D_8009CF3C; /* Restricts selected parasite actions when nonzero. */
+/* Incomplete arrays retain the retail full-address HP accesses with -G8. */
+extern u16 D_800C0E08[]; /* Current HP. */
+extern u16 D_800C0E06[]; /* Maximum HP. */
+
+int Menu_StepNameEntry(MenuWidgetNode *parent, unsigned int flags);
+void Menu_PlayErrorSound(void);
+extern u8 *D_8009CF54;
+extern int D_8009D004;
+
+#endif

@@ -1,0 +1,11 @@
+#include "common.h"
+extern char D_80192BE8;
+
+void **func_800C22F8(void);
+
+s32 func_8018F03C(void) {
+    void **slot = func_800C22F8();
+
+    *slot = &D_80192BE8;
+    return 0;
+}

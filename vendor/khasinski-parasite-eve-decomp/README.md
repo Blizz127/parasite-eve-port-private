@@ -1,0 +1,186 @@
+# parasite-eve-decomp
+
+Work-in-progress matching decompilation of the North American PlayStation
+release of Parasite Eve, target `SLUS-006.62`.
+
+This repository is source-only. It does not contain disc images, extracted game
+assets, FMV, memory cards, Sony PSYQ SDK files, compiler binaries, or generated
+split output. Contributors must provide their own legally obtained copy of the
+game and local toolchains.
+
+## Target
+
+| Field | Value |
+|---|---|
+| Game | Parasite Eve, USA Disc 1 |
+| Executable | `SLUS_006.62` |
+| Target path | `assets/USA/main.exe` |
+| SHA-1 | `452fb033f2eaa4b18aa20a5bca60b8125af3a37b` |
+| Entry PC | `0x80072534` |
+| Text VRAM | `0x80010000..0x801FE000` |
+
+## Progress
+
+![functions](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fkhasinski%2Fparasite-eve-decomp%2Fmain%2Fdocs%2Fbadges%2Ffunctions.json)
+![code](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fkhasinski%2Fparasite-eve-decomp%2Fmain%2Fdocs%2Fbadges%2Fcode.json)
+![debt](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fkhasinski%2Fparasite-eve-decomp%2Fmain%2Fdocs%2Fbadges%2Fdebt.json)
+
+Progress is measured by objdiff against a disassembly of the retail binaries,
+the same `report.json` CI publishes for decomp.dev. Regenerate locally with
+`make report` and render the badges and per-category table with `make
+progress`. This README intentionally avoids hardcoded numbers.
+CI regenerates the badges after auditing the report and rejects stale committed
+values. Run `make report`, `make progress`, and `make debt` before committing
+changes that affect progress or debt; include `docs/badges/` in that commit.
+
+The badges measure **verified semantic C**, not merely matching bytes. A unit
+is eligible only when its complete executable or overlay matches the retail
+SHA-1. Generated split assembly, original BIOS/SDK assembly, inline CPU
+instruction implementations, and data stored in `.text` receive no semantic-C
+credit. Register pins and empty compiler barriers remain eligible but are
+reported separately as crutch debt. Function counts remain a secondary,
+partly source-dependent estimate: the target generator borrows symbol names
+and sizes from verified C objects so objdiff can pair them. The audit checks
+that the two sides are consistent, but it does not turn those boundaries into
+independent evidence about the original translation units. Code bytes and the
+full linked SHA-1 are the stronger measures.
+
+Binary matching is only one quality level. See
+[docs/SOURCE_QUALITY.md](docs/SOURCE_QUALITY.md) for the semantic, crutch-free,
+header-integrated, typed, and organized review levels.
+
+For normal acceptance run `make verify`; it combines the source-policy gates,
+tests, build, and retail checksum. Structural, manifest, toolchain, and shared
+header changes require `make verify-clean`. See [CONTRIBUTING.md](CONTRIBUTING.md)
+for the working contract.
+
+The matching policy is conservative: promoted decompilation work must match
+through the stock compiler pipeline. Register pins and empty asm barriers are
+allowed source-level constraints, but are tracked as debt, kept to a minimum,
+and removed after matching whenever the stock compiler still produces the
+retail bytes. Inline instructions are limited to named, central macros for
+documented GTE/COP2 operations or functions proven to have originated in
+assembly. Whole-function asm bodies are not decompilation results. Compiler or
+MASPSX modifications, post-build rewrites, and build hacks are forbidden. See
+[docs/ASM_AND_GTE_POLICY.md](docs/ASM_AND_GTE_POLICY.md).
+
+## Layout
+
+- `configs/USA/` - splat config, symbols, relocs, checksum.
+- `src/main/` - decompiled C translation units for the main executable.
+- `candidates/` - tracked, non-matching or superseded C experiments; never
+  compiled into release binaries and never counted as decompiled source.
+- `include/` - project headers.
+- `tools/scripts/` - project-specific build and analysis helpers.
+- `docs/` - progress table and maintained documentation.
+
+Source placement and translation-unit changes follow
+[docs/CODE_ORGANIZATION.md](docs/CODE_ORGANIZATION.md). New declarations belong
+in subsystem headers rather than directly in C files; CI prevents the existing
+migration debt from increasing. CI also enforces a one-to-one mapping between
+manifest C entries and files under `src/`; unfinished candidates belong under
+`candidates/`.
+
+Generated directories such as `asm/`, `linkers/`, `build/`, `assets/`, and
+`disc/` are intentionally ignored, along with local working notes.
+
+## Toolchain
+
+Linking and assembling use standard GNU binutils: `mipsel-none-elf-as`,
+`mipsel-none-elf-ld`, and `mipsel-none-elf-objcopy` on `PATH`.
+
+Compiling matching C uses a native PSX GCC 2.7.2 `cc1` from
+[decompals/old-gcc](https://github.com/decompals/old-gcc), plus a
+PSYQ-compatible preprocessor and
+[maspsx](https://github.com/mkst/maspsx) reproducing ASPSX assembler behavior.
+The supported compiler path is the native toolchain below. Default local paths:
+
+```text
+sdk/psyq-4.0/PSX/INCLUDE/
+tools/psyq-gcc-2.7.2/cpp
+tools/old-gcc/cc1
+tools/maspsx/maspsx.py
+```
+
+Overridable with environment variables:
+
+```sh
+export PE_CPP=/path/to/gcc-2.7.2/cpp
+export PE_CC1=/path/to/stock/native/old-gcc/cc1-or-wrapper
+```
+
+Install the local compiler pieces with:
+
+```sh
+tools/scripts/setup_stock_cc1.sh
+tools/scripts/setup_maspsx.sh
+```
+
+Current matching note: `-G8` is part of the expected PSX small-data profile.
+The final build must use the unmodified stock compiler and the unmodified,
+pinned upstream maspsx checkout. Local patches, diagnostic compiler builds,
+postpasses, and MASPSX flags absent from that revision are forbidden. The
+upstream flags `--use-comm-section` and `--expand-div` remain available where
+required by the original compiler output. A function that cannot match with
+stock maspsx stays undecompiled until its C source is corrected; extending the
+assembler wrapper is not an acceptable matching technique.
+
+## Quick Start
+
+```sh
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+
+mkdir -p assets/USA
+cp /path/to/your/SLUS_006.62 assets/USA/main.exe
+
+make split
+make build
+make check
+```
+
+`make split` regenerates `asm/` and `linkers/` from the user-supplied
+executable, `make build` compiles and links `build/USA/main.exe`, and
+`make check` verifies its SHA-1 against retail. Useful extras:
+
+```sh
+make diff FUNC=SomeFunction
+make permute FUNC=SomeFunction
+make progress          # badges + per-category table from build/USA/report.json
+```
+
+## decomp.dev report
+
+CI publishes an [objdiff](https://github.com/encounter/objdiff) report for
+[decomp.dev](https://decomp.dev/khasinski/parasite-eve-decomp) on every push to
+`main`. Local commits and pushes to other branches do not update that page.
+The published `SLUS_006.62_report` artifact and the README badges come from
+the same audited build. It covers the main
+executable and all configured overlays, with PsyQ code in a separate category.
+The target side is a fresh disassembly of the retail binaries, never a snapshot
+of our own build. Generated assembly remains visible as unmatched work;
+text-resident data is typed as data rather than guessed functions. Report
+generation fails if any shipped module is absent or fails its retail SHA-1.
+
+To reproduce it locally:
+
+```sh
+tools/scripts/setup_objdiff.sh              # pinned objdiff-cli
+make build                                  # base: main executable
+make overlay-build-all                      # base: all overlays
+make report                                 # fresh retail target + audited report
+```
+
+`make report` regenerates the target objects directly from the retail binaries,
+rebuilds `objdiff.json`, verifies every configured module SHA-1, and runs the
+progress-input audit before invoking objdiff. A final report audit rejects the
+artifact if any code byte or function outside `semantic_c` receives credit.
+
+`objdiff.json` is generated, not committed; run `make objdiff-config` before
+pointing the objdiff GUI at the repository.
+
+## License
+
+See [LICENSE.md](LICENSE.md). Game code and data remain the property of their
+respective owners; this repository contains only clean-room reimplementation
+source.

@@ -1,0 +1,97 @@
+#include "common.h"
+#include "pe1/menu_widget.h"
+/* CC1_FLAGS: -G8 */
+/* MASPSX_FLAGS: -G8 */
+
+#define NULL ((void *)0)
+#include "../../../tools/m2c/m2c_macros.h"
+void *MenuWidget_FindByModeAndSelectedBase();
+M2C_UNK MenuWidget_OffsetPosition();
+M2C_UNK MenuWidget_SetCurrentNode();
+M2C_UNK Menu_PlayConfirmSound();
+M2C_UNK Menu_PlayErrorSound();
+s32 Inv_GetActiveListItemType();
+s32 Inv_GetPackedListCount();
+M2C_UNK Inv_BuildFilteredPackedList();
+M2C_UNK Inv_BuildFilteredPackedListExcluding();
+s32 Inv_RestoreSelection();
+void *MenuWidget_CreateSimpleNode();
+void *MenuWidget_CreateNode();
+M2C_UNK func_80064B74();
+M2C_UNK MenuWidget_ClearColumnLayout();
+extern s32 g_MenuEquipMode;
+extern s32 g_InvItemUsableFlag;
+extern s32 g_MenuLayoutLocked;
+extern M2C_UNK Menu_StepEquipConfirm[];
+#define Menu_StepEquipConfirm (Menu_StepEquipConfirm[0])
+extern M2C_UNK Menu_DrawEquipSelectionList[];
+#define Menu_DrawEquipSelectionList (Menu_DrawEquipSelectionList[0])
+
+void Menu_StepSkillList(s32 arg0, s32 arg1) {
+    M2C_UNK var_a0_2;
+    s32 saved_arg0 = arg0;
+    s32 saved_arg1 = arg1;
+    s32 temp_v0;
+    s32 temp_shift;
+    void *temp_s0;
+    register void *temp_v0_2 asm("$17");
+    register void *temp_v0_3 asm("$17");
+
+    if (g_MenuLayoutLocked != 0) {
+        temp_v0 = Inv_RestoreSelection(0);
+        if ((Inv_GetActiveListItemType(temp_v0) != 0) && (Inv_GetActiveListItemType(temp_v0) < 6)) {
+            Inv_BuildFilteredPackedListExcluding(0x3E, temp_v0);
+        } else {
+            s32 mask;
+            temp_shift = Inv_GetActiveListItemType(temp_v0);
+            {
+                register s32 one asm("$3") = 1;
+                asm volatile("" : "=r"(one) : "0"(one));
+                mask = one << temp_shift;
+            }
+            Inv_BuildFilteredPackedListExcluding(mask, temp_v0);
+        }
+        temp_v0_2 = MenuWidget_FindByModeAndSelectedBase(1, 0x2F);
+        MenuWidget_OffsetPosition(temp_v0_2, 0xB4 - M2C_FIELD(temp_v0_2, s32 *, 0x18), 0xA4 - M2C_FIELD(temp_v0_2, s32 *, 0x1C));
+    } else {
+        var_a0_2 = 0x200;
+        if (g_InvItemUsableFlag != 0) {
+            var_a0_2 = 0x1FE;
+        }
+        Inv_BuildFilteredPackedList(var_a0_2);
+    }
+    if ((g_MenuEquipMode != 0) || (Inv_GetPackedListCount() != 0)) {
+        temp_v0_3 = MenuWidget_CreateSimpleNode(7, saved_arg0, 0, 0);
+        temp_s0 = MenuWidget_CreateNode(7, temp_v0_3, temp_v0_3);
+        M2C_FIELD(temp_v0_3, M2C_UNK **, 0x2C) = &Menu_StepEquipConfirm;
+        {
+            s32 temp_v1 = g_MenuLayoutLocked;
+            M2C_FIELD(temp_s0, M2C_UNK **, 0x30) = &Menu_DrawEquipSelectionList;
+            if (temp_v1 != 0) {
+                MenuWidget_ClearColumnLayout(temp_s0);
+            }
+        }
+        if (g_InvItemUsableFlag == 0) {
+            func_80064B74(temp_s0, 0x13);
+        }
+        if (saved_arg1 == 0) {
+            M2C_FIELD(temp_s0, s32 *, 0x44) = -1;
+        } else {
+            M2C_FIELD(temp_s0, s32 *, 0x44) = 0;
+        }
+        if (M2C_FIELD(temp_s0, s32 *, 0x48) < 0) {
+            M2C_FIELD(temp_s0, s32 *, 0x48) = 0;
+        }
+        if (M2C_FIELD(temp_s0, s32 *, 0x44) >= 0) {
+            MenuWidget_SetCurrentNode(temp_s0);
+        }
+        Draw_SetPrimCallback(temp_s0, Inv_GetPackedListCount());
+        if (g_MenuEquipMode != 0) {
+            M2C_FIELD(temp_s0, s32 *, 0x44) = -1;
+            MenuWidget_OffsetPosition(temp_v0_3, 0, 0x14);
+        }
+        Menu_PlayConfirmSound();
+        return;
+    }
+    Menu_PlayErrorSound();
+}
