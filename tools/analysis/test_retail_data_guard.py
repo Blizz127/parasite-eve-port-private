@@ -166,6 +166,15 @@ class GuardTest(unittest.TestCase):
         self.assertTrue(g.scan_bytes("docs/a/voice.wav", b"RIFF" + bytes(40), ref_for(), set()))
         self.assertFalse(g.scan_bytes("pc_port/assets/icon.png", png, ref_for(), set()))
 
+    def test_av_and_reference_cache_rejected_anywhere(self):
+        for path in ("pc_port/assets/intro.webm", "tools/x/clip.MKV", "a.mp4", "sfx/hit.wav",
+                     "m/voice.opus", "m/bgm.ogg", "m/bgm.flac", "build/reference/day1/notes.txt"):
+            hits = g.scan_bytes(path, b"x" * 64, ref_for(), set())
+            self.assertEqual([h[4] for h in hits], ["data"], path)
+        self.assertFalse(g.scan_bytes("a.mp4", b"x", ref_for(), {"a.mp4"}))       # allowlisted
+        self.assertFalse(g.scan_bytes("build/references.md", b"notes", ref_for(), set()))
+        self.assertFalse(g.scan_bytes("pc_port/ui/logo.png", b"\x89PNG" + bytes(8), ref_for(), set()))
+
     def test_allow_file_addr_lines(self):
         with tempfile.TemporaryDirectory() as d:
             f = Path(d) / "allow.txt"
@@ -188,6 +197,81 @@ class GuardTest(unittest.TestCase):
         t = ",".join(f"0x{w:08X}u" for w in words(0x800, 8))
         hits = g.scan_bytes("x.h", t.encode(), r, set())
         self.assertTrue(hits and "signature known_table" in hits[0][3])
+
+
+SCRIPT = [
+    "Quartermaster, the zeppelin we could not moor beside the lighthouse ever.",
+    "Your umbrella was lent to a juggler in the orchard tonight.",
+    "Yes", "No", "New Game",
+    "Brittle yet fragrant marmalade for the tugboat crew.",
+]
+
+
+def encode_script(line: str) -> bytes:
+    """Synthetic text in the retail glyph encoding (letters = ASCII - 0x31)."""
+    out = bytearray()
+    for ch in line:
+        if ch.isalpha():
+            out.append(ord(ch) - 0x31)
+        else:
+            out.append({" ": 0x0F, "!": 0x2B, "'": 0x2E, ".": 0x2F, ",": 0x4A}[ch])
+    return bytes(out)
+
+
+def fake_peimg() -> bytes:
+    rng = random.Random(77)
+    blob = bytearray(rng.getrandbits(8) for _ in range(0x8000))
+    at = 0x100
+    for line in SCRIPT:
+        e = encode_script(line)
+        blob[at:at + len(e)] = e
+        blob[at + len(e)] = 0xFF
+        at += len(e) + 0x40
+    return bytes(blob)
+
+
+class TextTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.ref = g.Reference()
+        cls.ref.text.load_disc(fake_peimg(), None)
+
+    def hits(self, text, ref=None):
+        return [h for h in g.scan_bytes("docs/x.md", text.encode(), ref or self.ref, set())
+                if h[4] == "text"]
+
+    def test_decoder_finds_script(self):
+        self.assertIn("your umbrella was lent", self.ref.text.grams)
+
+    def test_quoted_dialogue_hits(self):
+        h = self.hits('Aya reads:\n> "YOUR UMBRELLA   was lent to a\n> juggler" (msg 0x21)\n')
+        self.assertEqual(len(h), 1)
+        self.assertEqual(h[0][0], 2)
+        self.assertEqual(h[0][4], "text")
+
+    def test_json_escaped_dialogue_hits(self):
+        self.assertTrue(self.hits('{"t": "Your umbrella was\\n lent to a juggler"}'))
+
+    def test_snake_case_item_text_hits(self):
+        self.assertTrue(self.hits("#define ITEM_BRITTLE_YET_FRAGRANT_MARMALADE_FOR_THE 7"))
+
+    def test_generic_labels_and_phrases_ignored(self):
+        self.assertFalse(self.hits("Menu: Yes / No / New Game / Continue"))
+        # 4 retail words but only one content word (generic English)
+        self.assertFalse(self.hits('assert ok, "the zeppelin we could not land"'))
+        self.assertFalse(self.hits("your umbrella was"))          # 3 words
+
+    def test_signature_fallback(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "sig.txt"
+            n = g.retail_text.write_signatures(fake_peimg(), p)
+            self.assertTrue(n > 0)
+            self.assertNotIn("umbrella", p.read_text())             # hashes only
+            r = g.Reference()
+            r.text.load_signatures(p)
+            self.assertTrue(self.hits("Your umbrella was lent to a juggler in the orchard.", r))
+            self.assertFalse(self.hits("Your umbrella was lent.", r))   # < 5-gram
+            self.assertFalse(self.hits("Yes No New Game", r))
 
 
 class StripTest(unittest.TestCase):

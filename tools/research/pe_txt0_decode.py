@@ -10,6 +10,9 @@ explicitly non-production diagnostic that uses a host 5x7 font.
 
 Example:
   python3 tools/research/pe_txt0_decode.py "$PE_DISC1_BIN" --message 0x21
+
+Decoded text goes to stdout, or with --png to a file under build/ only
+(git-ignored); never paste it into tracked files.
 """
 
 from __future__ import annotations
@@ -648,6 +651,12 @@ def main() -> int:
     parser.add_argument("--png", type=Path, default=None, help="non-production diagnostic PNG")
     parser.add_argument("--scene", default="m0004i", help="package used for provenance offsets")
     args = parser.parse_args()
+    # Decoded game text never goes into the tracked tree (owner decision
+    # 2026-09-28): file output is confined to the git-ignored build/.
+    if args.png is not None:
+        build = (Path(__file__).resolve().parents[2] / "build").resolve()
+        if build not in args.png.resolve().parents:
+            parser.error(f"--png must be under {build} (decoded game text stays out of git)")
 
     exe, pe_img = load_retail(args.disc)
     print(f"disc_sha256={DISC1_SHA256}")

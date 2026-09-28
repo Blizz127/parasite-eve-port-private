@@ -19,6 +19,12 @@ What is scanned (tracked files, or the staged index with --staged):
     and byte-swapped (``objdump -s`` memory-order columns); and contiguous hex
     byte strings of >= 32 bytes, optionally ``' '``/``':'``-separated per byte
     (``retail: 0000828c2400...``, CSV ``raw_hex`` columns, ``FF FE 14 1F ..``);
+  * decoded game script text (guard v6, tools/analysis/retail_text.py): a
+    quoted run of retail dialogue / item text (>= 4 words, >= 20 normalized
+    characters, >= 2 content words), matched against the script text decoded
+    from the user's PE.IMG, or offline against retail_text_signatures.txt;
+  * any tracked file under ``build/reference/`` and any audio/video file
+    (.webm .mkv .mp4 .wav .opus .ogg .flac) anywhere, unless allowlisted;
   * media files (images/audio/video) under ``docs/``: game frames and sounds
     are retail data too; only paths in the allowlist may be committed;
   * the raw bytes of every binary (non-UTF-8) file.
@@ -41,6 +47,7 @@ Exit status: 0 clean, 1 hits, 2 usage/config error.
   retail_data_guard.py --staged              scan the staged index (pre-commit)
   retail_data_guard.py FILE...               scan specific files (working tree)
   retail_data_guard.py --write-signatures    regenerate the signature file (disc)
+  retail_data_guard.py --write-text-signatures  regenerate the text signatures (disc)
   retail_data_guard.py --no-disc             signatures only (CI behaviour)
 """
 
@@ -62,8 +69,10 @@ SIG_FILE = ROOT / "tools/analysis/retail_data_signatures.txt"
 ALLOW_FILE = ROOT / "tools/analysis/retail_data_guard_allow.txt"
 BASELINE_FILE = ROOT / "tools/analysis/retail_data_guard_baseline.txt"
 CACHE_DIR = Path(os.environ.get("PE_DISC_CACHE_DIR") or ROOT / "build/disc-cache")
-GUARD_VERSION = 5
+GUARD_VERSION = 7
 sys.path.insert(0, str(ROOT / "tools/extract"))
+sys.path.insert(0, str(ROOT / "tools/analysis"))
+import retail_text  # noqa: E402
 
 WIN = 32                # bytes per compared window
 MIN_DISTINCT = 10       # distinct byte values required in a window
@@ -157,6 +166,7 @@ class Reference:
         self.sigs: dict[int, set[str]] = {}
         self.sigs2: dict[int, set[str]] = {}
         self.sig_labels: dict[str, str] = {}
+        self.text = retail_text.TextReference()
 
     def add_blob(self, label: str, data: bytes, stride: int, vbase: int = 0,
                  tier2: bool = False):
@@ -253,7 +263,7 @@ class Reference:
 
     @property
     def empty(self) -> bool:
-        return not self.index and not self.sigs and not self.index2
+        return not self.index and not self.sigs and not self.index2 and self.text.empty
 
 
 def exe_windows_for_signatures(exe: bytes):
@@ -423,17 +433,34 @@ def _collect_runs(buf: bytes, pos: list[int], width: int, ref: Reference, out: l
     return res
 
 
+# audio/video containers are rejected anywhere in the tree (retail captures)
+AV_SUFFIXES = {".webm", ".mkv", ".mp4", ".wav", ".opus", ".ogg", ".flac"}
+REFERENCE_DIR = "build/reference/"   # the owner's retail reference video cache
+
+
 def is_docs_media(path: str) -> bool:
     """Image/audio/video under docs/: game frames and sounds are retail data."""
     return path.startswith("docs/") and Path(path).suffix.lower() in MEDIA_SUFFIXES
+
+
+def forbidden_path(path: str) -> str | None:
+    """Why a tracked path is rejected outright (media / reference cache)."""
+    if path.startswith(REFERENCE_DIR):
+        return "file under build/reference/ (retail reference video cache)"
+    if Path(path).suffix.lower() in AV_SUFFIXES:
+        return "audio/video file (not allowlisted)"
+    if is_docs_media(path):
+        return "media file under docs/ (not allowlisted)"
+    return None
 
 
 def scan_bytes(path: str, data: bytes, ref: Reference, allow: set[str]):
     """Return [(from_line, to_line, nbytes, match, class)]."""
     if path in allow:
         return []
-    if is_docs_media(path):
-        return [("file", "file", len(data), "media file under docs/ (not allowlisted)", "data")]
+    why = forbidden_path(path)
+    if why:
+        return [("file", "file", len(data), why, "data")]
     if Path(path).suffix.lower() in SKIP_SUFFIXES:
         return []
     try:
@@ -449,6 +476,9 @@ def scan_bytes(path: str, data: bytes, ref: Reference, allow: set[str]):
             raw.extend(_collect_runs(buf, pos, width, ref, []))
     else:
         raw.extend(_collect_runs(data, list(range(len(data))), 1, ref, []))
+    texthits = []
+    if is_text:
+        texthits = [(a, b, n, w, "text") for a, b, n, w in retail_text.scan_text(data, ref.text)]
     # merge runs found by several encodings/strides over the same text span
     raw.sort()
     merged = []
@@ -462,7 +492,7 @@ def scan_bytes(path: str, data: bytes, ref: Reference, allow: set[str]):
             continue
         merged.append([a, b, nb, where, cls])
     if is_text:
-        return [(line_of(data, a), line_of(data, b), nb, w, c) for a, b, nb, w, c in merged]
+        return [(line_of(data, a), line_of(data, b), nb, w, c) for a, b, nb, w, c in merged] + texthits
     return [(f"byte 0x{a:X}", f"byte 0x{b:X}", nb, w, c) for a, b, nb, w, c in merged]
 
 
@@ -583,6 +613,8 @@ def main(argv=None) -> int:
     ap.add_argument("--exe", help="retail SLUS_006.62 (default: disc cache)")
     ap.add_argument("--peimg", help="retail PE.IMG (default: disc cache)")
     ap.add_argument("--write-signatures", action="store_true")
+    ap.add_argument("--write-text-signatures", action="store_true",
+                    help="regenerate retail_text_signatures.txt (needs PE.IMG)")
     ap.add_argument("--json", help="write hits as JSON here")
     ap.add_argument("--write-baseline", action="store_true",
                     help="record current hits as known debt (lead decision only)")
@@ -592,6 +624,13 @@ def main(argv=None) -> int:
     args = ap.parse_args(argv)
 
     exe, peimg = load_disc_blobs(args)
+    if args.write_text_signatures:
+        if peimg is None:
+            eprint("[guard] --write-text-signatures needs PE.IMG (run tools/extract/disc_cache.py populate)")
+            return 2
+        n = retail_text.write_signatures(peimg.read_bytes())
+        print(f"[guard] wrote {n} text signatures to {retail_text.TEXT_SIG_FILE.relative_to(ROOT)}")
+        return 0
     if args.write_signatures:
         if exe is None:
             eprint("[guard] --write-signatures needs the disc (run tools/extract/disc_cache.py populate)")
@@ -613,8 +652,13 @@ def main(argv=None) -> int:
             r.load_signatures(SIG_FILE)
             if exe is not None:
                 r.add_blob("SLUS_006.62", exe[EXE_HDR:], 4, EXE_VRAM, tier2=True)
-            if peimg is not None:
-                r.add_blob("PE.IMG", peimg.read_bytes(), PEIMG_STRIDE)
+            pdata = peimg.read_bytes() if peimg is not None else None
+            if pdata is not None:
+                r.add_blob("PE.IMG", pdata, PEIMG_STRIDE)
+            r.text.load_disc(pdata, peimg.parent if peimg is not None else None)
+            del pdata
+            if r.text.empty:
+                r.text.load_signatures()
             _ref.append(r)
         return _ref[0]
 
@@ -623,6 +667,9 @@ def main(argv=None) -> int:
     baseline = load_baseline()
     mode_key = hashlib.sha1(json.dumps([GUARD_VERSION, WIN, MIN_DISTINCT, PEIMG_STRIDE,
                                         SIG_FILE.read_bytes().hex() if SIG_FILE.exists() else "",
+                                        hashlib.sha1(retail_text.TEXT_SIG_FILE.read_bytes()).hexdigest()
+                                        if retail_text.TEXT_SIG_FILE.exists() else "",
+                                        retail_text.TEXT_VERSION,
                                         hashlib.sha1(exe).hexdigest() if exe else "",
                                         bool(peimg)]).encode()).hexdigest()
     cache_path = CACHE_DIR / f"guard-{mode_key[:16]}.json"
@@ -671,11 +718,12 @@ def main(argv=None) -> int:
         eprint(f"[guard] note: {len(debt)} baseline file(s) still carry {sum(debt.values())} "
                f"retail bytes (known debt in {BASELINE_FILE.relative_to(ROOT)}; shrink it)")
     report = [r for r in report if not (r["file"] in debt and r["file"] not in grown)]
-    fails = [r for r in report if r["class"] == "data" or args.strict]
+    fails = [r for r in report if r["class"] != "address-table" or args.strict]
     infos = [r for r in report if r not in fails]
     for r in fails[:300]:
         loc = f"{r['file']}:{r['from']}" + (f"-{r['to']}" if r["to"] != r["from"] else "")
-        print(f"RETAIL-DATA {loc}: {r['bytes']} bytes match {r['match']}")
+        unit = "chars" if r["class"] == "text" else "bytes"
+        print(f"RETAIL-DATA {loc}: {r['bytes']} {unit} match {r['match']}")
     if len(fails) > 300:
         print(f"... {len(fails) - 300} more (see --json)")
     if args.json:

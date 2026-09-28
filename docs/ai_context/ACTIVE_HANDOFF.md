@@ -10393,7 +10393,7 @@ full decompilation through97BA0 rather than substituting an initialization
 prefix. 9234C frame loop remains separate unresolved work.
 
 Run41 still live on DAY1-32 (GDB102220/exec9160). Two ordinary Return taps
-advanced the young-girl dialogue (screensgirl-next.png: "That girl...!")
+advanced the young-girl dialogue (screensgirl-next.png: her next line)
 and reachedg74=56 at133500, tokenA80010C8, Aya(67,0,125),control8,HP21/45.
 A240ms Up tap moved her toZ180 at138040. RGB continues showing prior
 backstage backdrop (room-current.png/room-moved.png); this may be a scene

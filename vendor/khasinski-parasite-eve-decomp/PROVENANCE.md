@@ -70,7 +70,8 @@ This repository commits no bytes from the retail disc (CLAUDE.md hard rule 3;
 `tools/analysis/retail_data_guard.py`). Three upstream files embedded retail
 data tables as C initializers. Only those initializers were removed; each was
 replaced by an `extern` declaration and a `headclean 2026-09-28` comment
-saying that the bytes come from the split of the user's own disc. The rest of
+saying that the bytes come from the split of the user's own disc. Two more
+files quoted decoded game text, which was removed or paraphrased. The rest of
 each file is unchanged.
 
 | File | Removed initializer | Retail location |
@@ -78,6 +79,9 @@ each file is unchanged.
 | `src/main/psyq/libcd/bios.c` | `g_CdCommandAckOnly`, `g_CdCommandClearsReady`, `g_CdCommandUpdatesStatus`, `g_CdCommandParamCount` (`u32[32]` each), `g_CdBiosHardwareState` (`.data` pointer block) | EXE `0x8009B07C`..`0x8009B27C`, `0x8009B294` |
 | `src/main/psyq/libgte/St_DmaHandlerTemplates.c` | `St_DmaCompleteCallback[6]`, `St_DmaPatchedCallback[6]` (the mnemonics stay as a comment) | EXE `0x8007A1E0`, `0x8007A1F8` |
 | `src/overlays/fx_field/fx_field_data.c` | `D_8018FC80[]`, `D_8018FCEC`, `D_8018FCF0`, `D_8018FCF4[]` | fx_field overlay `.text` data in PE.IMG |
+
+| `include/pe1/item_ids.h` | the 235 per-item description comments (in-game item text); the `ItemMod` enumerators renamed `MOD_TYPE_<code>` because their upstream names spelled out the in-game mod descriptions | script text (owner decision 2026-09-28: no decoded game text in tracked files) |
+| `include/pe1/text.h` | one quoted on-screen line, replaced by a description | script text |
 
 These files are not compiled by this repository's build. Imported functions
 in `src/` are unaffected.
