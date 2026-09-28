@@ -32,9 +32,11 @@ segments:
     vram: 0x8018EFE8
     subsegments:
       - [0x0, bin]
+      # 0xC-0x6C: func_8018F0D0 switch jump table (pool for MASPSX_DISPATCH_FOLD).
+      - [0xC, rodata]
       - [0x6C, c, func_8018F054]
       - [0x74, c, func_8018F05C]
-      - [0xE8, asm]
+      - [0xE8, c, func_8018F0D0]
       - [0x260, c, func_8018F248]
       - [0x268, c, func_8018F250]
       - [0x2D4, c, func_8018F2BC]

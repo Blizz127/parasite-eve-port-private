@@ -49,6 +49,8 @@ segments:
       - [0x0, bin]
       - [0x60, c, func_801ED858]
       - [0x44C, asm]
+      - [0xD9C, c, func_801EE594]
+      - [0x13D0, asm]
       - [0x33A8, c, func_801F0BA0]
       - [0x3538, asm]
       - [0x3878, c, func_801F1070]
