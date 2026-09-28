@@ -15,6 +15,9 @@
     ],
     "ovl_0457_dispatch_801235BC": [
       "func_80125094"
+    ],
+    "ovl_0457_dispatch_8012359C_expand_div": [
+      "func_8012403C"
     ]
   },
   "local_profiles": {
@@ -60,6 +63,18 @@
       "environment": {
         "MASPSX_THREE_WORD_SYMBOL_STORE": "1",
         "MASPSX_DISPATCH_FOLD": "jtbl_801235BC"
+      }
+    },
+    "ovl_0457_dispatch_8012359C_expand_div": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0"
+      ],
+      "environment": {
+        "MASPSX_THREE_WORD_SYMBOL_STORE": "1",
+        "MASPSX_DISPATCH_FOLD": "jtbl_8012359C",
+        "MASPSX_EXPAND_DIV": "1"
       }
     }
   }

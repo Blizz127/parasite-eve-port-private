@@ -90,6 +90,8 @@ segments:
       - [0x3520, asm]
       - [0x37BC, c, func_801927A4]
       - [0x38EC, asm]
+      - [0x8234, c, func_8019721C]
+      - [0x837C, asm]
       - [0xAB24, c, func_80199B0C]
       - [0xABAC, c, func_80199B94]
       - [0xACBC, c, func_80199CA4]

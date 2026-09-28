@@ -133,5 +133,6 @@ segments:
       - [0x5E2C, c, func_80194E14]
       - [0x5E48, c, func_80194E30]
       - [0x5E50, asm]
+      - [0x5FE8, c, func_80194FD0]
       - [0x632C, bin]
   - [0x46800]

@@ -5,7 +5,8 @@
   "default_profile": "era_o2_g0",
   "assignments": {
     "era_o2_g0_no_cse_skip_blocks": [
-      "func_8018F2F4"
+      "func_8018F2F4",
+      "func_80190660"
     ],
     "era_o2_g0_no_schedule_insns": [
       "func_80191DC8"

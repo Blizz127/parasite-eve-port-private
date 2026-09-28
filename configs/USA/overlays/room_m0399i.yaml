@@ -110,5 +110,6 @@ segments:
       - [0x4CD8, c, func_80193CC0]
       - [0x4CF4, c, func_80193CDC]
       - [0x4CFC, asm]
+      - [0x4E94, c, func_80193E7C]
       - [0x51D8, bin]
   - [0x33800]
