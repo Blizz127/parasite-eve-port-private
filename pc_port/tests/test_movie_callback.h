@@ -1,7 +1,7 @@
 #include "retail_movie_callback_cases.h"
 static void test_DAY2_movie_callback(void)
 {
-    TEST("DAY2_movie_callback");
+    TEST_RETAIL_DISC1("DAY2_movie_callback"); TEST_RETAIL_FIXUPS(RETAILFIX_dispenv);
     for (unsigned k=0;k<sizeof(MOVCB_cases)/sizeof(MOVCB_cases[0]);k++) {
         unsigned width=MOVCB_cases[k].wide?24u:16u;
         unsigned bank=MOVCB_cases[k].bank;

@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Pre-commit: refuse commits that add retail disc bytes/tables.
+#
+# Enable once per clone:   git config core.hooksPath .githooks
+#
+# Scans only the staged blobs.  With the user's disc cache present
+# (tools/extract/disc_cache.py populate) it compares against the real EXE and
+# PE.IMG; otherwise it uses the committed one-way signatures.  Bypass only
+# with the lead's say-so: git commit --no-verify.
+set -euo pipefail
+ROOT="$(git rev-parse --show-toplevel)"
+exec python3 "$ROOT/tools/analysis/retail_data_guard.py" --staged

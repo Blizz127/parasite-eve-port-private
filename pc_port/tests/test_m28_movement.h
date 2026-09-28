@@ -1,7 +1,7 @@
 #include "retail_m28_movement_cases.h"
 static void test_DAY1_m28_movement(void)
 {
-    TEST("DAY1_m28_movement");
+    TEST_RETAIL_DISC1("DAY1_m28_movement"); TEST_RETAIL_FIXUPS(RETAILFIX_m28_movement);
     for(unsigned k=0;k<sizeof(m28_movement_cases)/sizeof(m28_movement_cases[0]);k++) {
         ResetTestState();
         for(unsigned i=0;i<sizeof(m28_movement_common)/sizeof(m28_movement_common[0]);i++)

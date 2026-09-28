@@ -3,7 +3,7 @@
 static void test_NAM9_retail_name_frame(void)
 {
     unsigned k,i;
-    TEST("NAM9_retail_name_frame");
+    TEST_RETAIL_DISC1("NAM9_retail_name_frame"); TEST_RETAIL_FIXUPS(RETAILFIX_name_frame);
     for (k=0;k<sizeof(NAM9_name_frame_cases)/sizeof(NAM9_name_frame_cases[0]);k++) {
         const uint32_t *a=NAM9_name_frame_cases[k].args;
         uint64_t hash;uint32_t result=0u;

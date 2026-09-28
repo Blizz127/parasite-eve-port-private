@@ -5,6 +5,7 @@
 #include "pe_timer1.h"
 #include "pe_rcnt2.h"
 #include "pe_sio0.h"
+#include "pe_spu_dma.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -96,6 +97,75 @@ static uint32_t canon(pe_addr_t a)
     return a;
 }
 
+/* SPU register file 0x1F801C00..0x1F801DFF (pe_spu_dma.h
+ * PE_SpuRegister_{Load,Store}U16 -- the same authority the translated SPU
+ * code and the audio lane's interpreter use).  Halfword registers; a 32-bit
+ * access is two halfwords, low first. */
+#define SPU_BASE 0x1F801C00u
+#define SPU_SIZE 0x200u
+static int is_spu(uint32_t a, size_t size)
+{
+    return a >= SPU_BASE && a - SPU_BASE < SPU_SIZE &&
+           size <= SPU_SIZE - (a - SPU_BASE);
+}
+static uint8_t g_spu_shadow[SPU_SIZE];
+static uint8_t g_spu_snapshot[SPU_SIZE];
+static int g_spu_shadow_live;
+/* KON/KOFF (0x188..0x18F) trigger on every write, including a repeat of the
+ * value last written, so their shadow slots refresh as 0 (a zero write is a
+ * no-op on hardware) and any non-zero pointer write is committed. */
+static int spu_trigger_reg(uint32_t off) { return off >= 0x188u && off < 0x190u; }
+
+static void spu_commit(void)
+{
+    if (!g_spu_shadow_live)
+        return;
+    g_spu_shadow_live = 0;
+    for (uint32_t off = 0; off < SPU_SIZE; off += 2u) {
+        uint16_t now = (uint16_t)(g_spu_shadow[off] | (g_spu_shadow[off + 1u] << 8));
+        uint16_t was = (uint16_t)(g_spu_snapshot[off] | (g_spu_snapshot[off + 1u] << 8));
+        if (now != was)
+            PE_SpuRegister_StoreU16(off, now);
+    }
+}
+
+static void spu_refresh(void)
+{
+    for (uint32_t off = 0; off < SPU_SIZE; off += 2u) {
+        uint16_t v = spu_trigger_reg(off) ? 0u : PE_SpuRegister_LoadU16(off);
+        g_spu_shadow[off] = (uint8_t)v;
+        g_spu_shadow[off + 1u] = (uint8_t)(v >> 8);
+    }
+    memcpy(g_spu_snapshot, g_spu_shadow, sizeof(g_spu_shadow));
+    g_spu_shadow_live = 1;
+}
+
+static uint32_t spu_load(uint32_t a, size_t size)
+{
+    uint32_t off = a - SPU_BASE;
+    if (size == 2 && !(off & 1u))
+        return PE_SpuRegister_LoadU16(off);
+    if (size == 4 && !(off & 3u))
+        return PE_SpuRegister_LoadU16(off) | ((uint32_t)PE_SpuRegister_LoadU16(off + 2u) << 16);
+    if (size == 1) {
+        uint16_t h = PE_SpuRegister_LoadU16(off & ~1u);
+        return (off & 1u) ? (uint32_t)(h >> 8) : (uint32_t)(h & 0xFFu);
+    }
+    return 0xFFFFFFFFu;   /* unaligned: caller aborts */
+}
+
+static int spu_store(uint32_t a, size_t size, uint32_t v)
+{
+    uint32_t off = a - SPU_BASE;
+    if (size == 2 && !(off & 1u)) { PE_SpuRegister_StoreU16(off, (uint16_t)v); return 1; }
+    if (size == 4 && !(off & 3u)) {
+        PE_SpuRegister_StoreU16(off, (uint16_t)v);
+        PE_SpuRegister_StoreU16(off + 2u, (uint16_t)(v >> 16));
+        return 1;
+    }
+    return 0;   /* byte / unaligned SPU writes are not modelled */
+}
+
 static void mmio_fatal(const char *what, pe_addr_t a, size_t size)
 {
     fprintf(stderr, "FATAL: MMIO %s: address 0x%08X size %zu is not a "
@@ -116,12 +186,17 @@ static const PeMmioReg *find_reg(uint32_t a, size_t size)
 
 int PE_MMIO_IsModelled(pe_addr_t address, size_t size)
 {
-    return find_reg(canon(address), size) != NULL;
+    uint32_t a = canon(address);
+    if (is_spu(a, size))
+        return (size == 2 && !(a & 1u)) || (size == 4 && !(a & 3u)) || size == 1;
+    return find_reg(a, size) != NULL;
 }
 
 int PE_MMIO_InShadowBlock(pe_addr_t address, size_t size)
 {
     uint32_t a = canon(address);
+    if (is_spu(a, size))
+        return 1;
     for (size_t i = 0; i < PE_MMIO_NBLOCKS; i++)
         if (a >= g_blocks[i].base && a - g_blocks[i].base < g_blocks[i].size &&
             size <= g_blocks[i].size - (a - g_blocks[i].base))
@@ -131,6 +206,14 @@ int PE_MMIO_InShadowBlock(pe_addr_t address, size_t size)
 
 uint32_t PE_MMIO_Load(pe_addr_t address, size_t size)
 {
+    if (is_spu(canon(address), size)) {
+        uint32_t v;
+        PE_MMIO_Commit();
+        v = spu_load(canon(address), size);
+        if (v == 0xFFFFFFFFu && size != 4)
+            mmio_fatal("load (unaligned SPU)", address, size);
+        return v;
+    }
     const PeMmioReg *r = find_reg(canon(address), size);
     if (!r || !r->read)
         mmio_fatal("load", address, size);
@@ -141,6 +224,12 @@ uint32_t PE_MMIO_Load(pe_addr_t address, size_t size)
 
 void PE_MMIO_Store(pe_addr_t address, size_t size, uint32_t value)
 {
+    if (is_spu(canon(address), size)) {
+        PE_MMIO_Commit();
+        if (!spu_store(canon(address), size, value))
+            mmio_fatal("store (byte/unaligned SPU)", address, size);
+        return;
+    }
     const PeMmioReg *r = find_reg(canon(address), size);
     if (!r || !r->write)
         mmio_fatal("store", address, size);
@@ -175,6 +264,7 @@ static void shadow_put(uint8_t *buf, uint32_t a, uint32_t w, uint32_t v)
 
 void PE_MMIO_Commit(void)
 {
+    spu_commit();
     if (!g_shadow_live)
         return;
     g_shadow_live = 0;
@@ -212,12 +302,17 @@ void *PE_MMIO_Translate(pe_addr_t address, size_t size)
     if (!PE_MMIO_InShadowBlock(address, size))
         mmio_fatal("translate", address, size);
     PE_MMIO_Commit();
+    if (is_spu(a, size)) {
+        spu_refresh();
+        return &g_spu_shadow[a - SPU_BASE];
+    }
     refresh();
     return &g_shadow[a - SHADOW_BASE];
 }
 
 void PE_MMIO_Reset(void)
 {
+    g_spu_shadow_live = 0;
     g_shadow_live = 0;
     memset(g_shadow, 0xDE, sizeof(g_shadow));
     memcpy(g_snapshot, g_shadow, sizeof(g_shadow));

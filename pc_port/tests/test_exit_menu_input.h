@@ -1,7 +1,7 @@
 #include "retail_exit_menu_input_cases.h"
 static void test_DAY1_exit_menu_input(void)
 {
-    TEST("DAY1_exit_menu_input");
+    TEST_RETAIL_DISC1("DAY1_exit_menu_input"); TEST_RETAIL_FIXUPS(RETAILFIX_exit_menu_input);
     for(unsigned n=0;n<328;n++) {
         ResetTestState();
         for(unsigned i=0;i<sizeof(DAY1_exit_input_common)/sizeof(DAY1_exit_input_common[0]);i++)

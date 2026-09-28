@@ -4,7 +4,7 @@ static pe_addr_t DAY1_hit_draw_address(uint32_t offset)
 static void test_DAY1_hit_draw(void)
 {
     unsigned k,i,j;
-    TEST("DAY1_hit_draw");
+    TEST_RETAIL_DISC1("DAY1_hit_draw"); TEST_RETAIL_FIXUPS(RETAILFIX_hit_draw);
     for (k=0;k<sizeof(DAY1_hit_draw_cases)/sizeof(DAY1_hit_draw_cases[0]);k++) {
         const uint32_t *a=DAY1_hit_draw_cases[k].args;
         uint64_t hash=UINT64_C(14695981039346656037);

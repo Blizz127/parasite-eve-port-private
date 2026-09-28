@@ -93,6 +93,10 @@ int PE_M0023I_Main(int32_t mode,pe_addr_t data)
 /* F710 borrows six bytes from the original caller stack before CE8F0
  * overwrites them. Keep that input/output explicit: it is shared between
  * successive callbacks, not an actor position or an initialized local. */
+/* 1 = keep the unresolved caller-stack read as an explicit boundary that
+ * stops the port (pre-Day-1 behaviour; tests use it).  0 = Day-1 shim. */
+int g_pe_strict_effect_stack = 0;
+
 int PE_M0023I_Flash(int32_t mode,pe_addr_t data,int16_t retained_position[3])
 {
     int16_t local[3];uint8_t ring_color[3],fan_color[3];
@@ -114,9 +118,21 @@ int PE_M0023I_Flash(int32_t mode,pe_addr_t data,int16_t retained_position[3])
     } else if(mode==2) {
         int state=lh(data+4u),timer=lh(data+2u);int32_t scale=0,brightness=0;
         if(state==0) {
-            if(!retained_position) {
+            if(!retained_position && g_pe_strict_effect_stack) {
                 Bootstrap_ReturnVoid("PE_M0023I_Flash","original F710 caller stack position is unresolved");
                 PE_Port_RequestStop(PE_PORT_STOP_UNRESOLVED_BOUNDARY);return 0;
+            }
+            if(!retained_position) {
+                /* DAY1 SHIM (docs/ai_context/DAY1_FIDELITY_GAPS.md,
+                 * "M0023I F710 flash ring position"): the borrowed caller
+                 * stack bytes are not modelled on this call path.  Retail
+                 * leaves F710's own last write there (the joint position
+                 * stored at the end of every mode-2 call below), so use the
+                 * current joint position instead of stopping the game. */
+                static int16_t fallback[3];static int warned;
+                if(!warned){warned=1;fprintf(stderr,"[DAY1_SHIM] PE_M0023I_Flash: F710 caller-stack ring position unresolved; using owner joint position\n");}
+                PE_ActorJointPositionCE8F0(owner(),(uint32_t)(int32_t)lh(data),local,fallback);
+                retained_position=fallback;
             }
             PE_EffectRingD0728(retained_position,600,800,32,0,timer,timer,ring_color,0,
                 func_80077CF4(timer*128)/32,1);

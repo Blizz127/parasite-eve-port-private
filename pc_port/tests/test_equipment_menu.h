@@ -3,7 +3,7 @@
 static void test_INV21_retail_equipment_menu(void)
 {
     unsigned k,i,failures=0;
-    TEST("INV21_retail_equipment_menu");
+    TEST_RETAIL_DISC1("INV21_retail_equipment_menu"); TEST_RETAIL_FIXUPS(RETAILFIX_equipment_menu);
     for (k=0;k<sizeof(INV21_equipment_menu_cases)/sizeof(INV21_equipment_menu_cases[0]);k++) {
         const uint32_t *args=INV21_equipment_menu_cases[k].args;
         uint32_t a=args[0],result=0u;

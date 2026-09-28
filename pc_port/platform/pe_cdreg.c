@@ -1,5 +1,6 @@
 /* ── pe_cdreg: minimal CD-controller register shadow ──────────────── */
 
+#include "pe_spu.h"
 #include "pe_cdreg.h"
 
 #include "pe_guest_ram.h"
@@ -44,6 +45,13 @@ static int CdOutputDmaBusy(void)
     return 0;
 }
 static uint8_t CdDeviceStatus(void) { return 2u|(g_device.reading?0x20u:0u); }
+static uint8_t g_audio_pending[4],g_audio_active[4];
+static uint8_t g_xa_filter[2];   /* audio lane: Setfilter file/channel */
+static void CdAudioTap(void)
+{
+    PE_Spu_CdSector(g_sector,(uint8_t)g_device.mode,g_device.muted!=0,
+                    g_xa_filter[0],g_xa_filter[1],g_audio_active);
+}
 static uint32_t CdSectorCycles(void) { return (g_device.mode&0x80u)?225792u:451584u; }
 static void CdClearData(void)
 {
@@ -146,6 +154,7 @@ void PE_CdReg_ServiceDevice(uint32_t elapsed_cycles)
                 else if(g_command==11u) g_device.muted=1u;
                 else if(g_command==12u) g_device.muted=0u;
                 else if(g_command==14u) g_device.mode=g_command_parameter;
+                else if(g_command==13u) {g_xa_filter[0]=g_command_parameters[0];g_xa_filter[1]=g_command_parameters[1];}
                 else if(g_command==15u) {response[1]=g_device.mode;size=5u;}
                 else if(g_command==19u) {response[1]=response[2]=1u;size=3u;}
             }
@@ -179,6 +188,7 @@ void PE_CdReg_ServiceDevice(uint32_t elapsed_cycles)
                         if(!PE_Disc_ReadRawSector(g_device_disc,g_device.next_lba,g_sector)) {
                             CdDeviceBoundary("CD_device_sector_read",g_device.next_lba);return;
                         }
+                        CdAudioTap();   /* audio lane: XA-ADPCM -> SPU CD input */
                         g_device.next_lba++;g_device.sectors++;g_sector_pending=1;g_read_cycles=CdSectorCycles();
                         {
                             uint8_t status=CdDeviceStatus();
@@ -194,6 +204,7 @@ void PE_CdReg_ServiceDevice(uint32_t elapsed_cycles)
             if(!PE_Disc_ReadRawSector(g_device_disc,g_device.next_lba,g_sector)) {
                 CdDeviceBoundary("CD_device_sector_read",g_device.next_lba);return;
             }
+            CdAudioTap();   /* audio lane: XA-ADPCM -> SPU CD input */
             g_device.next_lba++;g_device.sectors++;g_sector_pending=1;g_read_cycles=CdSectorCycles();
             uint8_t status=CdDeviceStatus();
             if(!PE_CdReg_PushResponse(1u,&status,1u)) {CdDeviceBoundary("CD_device_response_queue",1u);return;}
@@ -205,8 +216,6 @@ void PE_CdReg_ServiceDevice(uint32_t elapsed_cycles)
     PE_CdReg_ServiceDMA3();
     if(g_response_tag&g_response_mask) PE_IRQ_AssertSources(4u);
 }
-
-static uint8_t g_audio_pending[4],g_audio_active[4];
 
 void PE_CdReg_GetAudioVolumes(uint8_t out[4])
 {

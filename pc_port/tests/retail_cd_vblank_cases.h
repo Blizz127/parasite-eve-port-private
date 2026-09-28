@@ -1,6 +1,7 @@
+#pragma once
 /* Original VBlank -> reset/issue graphs; VSync(-1) returns0 from provider. */
 static const uint32_t CDVB_ranges[][2]={{0x9AFB4u,40u},{0x9B294u,4u},{0x9B554u,340u},{0xA3478u,12u},{0x130000u,8u}};
-static const uint32_t CDVB_params[]={0u,0u,3u,0u,0u,0u,0u,0u,0u,0u,0u,0u,0u,2u,1u,0u,0u,0u,1u,0u,1u,0u,0u,0u,0u,0u,0u,0u,0u,0u,0u,0u};
+static uint32_t CDVB_params[]={0u,0u,0u,0u,0u,0u,0u,0u,0u,0u,0u,0u,0u,0u,0u,0u,0u,0u,0u,0u,0u,0u,0u,0u,0u,0u,0u,0u,0u,0u,0u,0u};
 static const uint32_t CDVB_clear[]={0u,0u,0u,1u,1u,1u,1u,0u,0u,0u,0u,0u,0u,0u,0u,0u,0u,0u,0u,0u,0u,1u,1u,0u,0u,0u,0u,1u,0u,0u,0u,0u};
 static const struct { uint32_t lane,state,phase,pending,flag,cb,boundary; uint64_t hash; } CDVB_cases[]={
 {1u,11u,21u,4294967295u,0u,0u,0u,UINT64_C(0xA95393CBDF6AF205)},
@@ -3363,4 +3364,11 @@ static const struct { uint32_t lane,state,phase,pending,flag,cb,boundary; uint64
 {3u,17u,24u,2u,1u,2u,0u,UINT64_C(0x15BBBBB97DFCA573)},
 {3u,17u,24u,2u,1u,3u,0u,UINT64_C(0xC7E70405AAAF9786)},
 {3u,17u,24u,2u,1u,4u,0u,UINT64_C(0xC7E70405AAAF9786)},
+};
+
+/* Retail bytes stripped by tools/analysis/strip_retail_seeds.py: these
+ * regions are zero here and restored at test time from the user's disc
+ * (test_retail_fixups.h / pe_disc_cache.h).  Never commit them. */
+static const PE_TestRetailFixup RETAILFIX_cd_vblank[]={
+    {PE_RF_BYTES,CDVB_params,0u,128u,PE_RF_EXE,0x8B9FCu},
 };

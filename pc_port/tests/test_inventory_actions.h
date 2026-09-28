@@ -3,7 +3,7 @@
 static void test_INV7_retail_inventory_actions(void)
 {
     unsigned k,i;
-    TEST("INV7_retail_inventory_actions");
+    TEST_RETAIL_DISC1("INV7_retail_inventory_actions"); TEST_RETAIL_FIXUPS(RETAILFIX_inventory_actions);
     for (k=0;k<sizeof(INV7_inventory_actions_cases)/sizeof(INV7_inventory_actions_cases[0]);k++) {
         const uint32_t *args=INV7_inventory_actions_cases[k].args;
         uint32_t a=args[0],result=0u;

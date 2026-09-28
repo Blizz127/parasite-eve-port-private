@@ -1,7 +1,7 @@
 #include "retail_card_driver_cases.h"
 static void test_DAY1_card_driver(void)
 {
-    TEST("DAY1_card_driver");
+    TEST_RETAIL_DISC1("DAY1_card_driver"); TEST_RETAIL_FIXUPS(RETAILFIX_card_driver);
     for(unsigned n=0;n<112;n++) {
         ResetTestState();
         for(unsigned i=0;i<sizeof(DAY1_card_driver_common)/sizeof(DAY1_card_driver_common[0]);i++)

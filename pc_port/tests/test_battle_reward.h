@@ -18,7 +18,7 @@ static void reward_seed_resources(void)
 
 static void test_REWARD_original_entries(void)
 {
-    TEST("REWARD_original_entries");
+    TEST_RETAIL_DISC1("REWARD_original_entries"); TEST_RETAIL_FIXUPS(RETAILFIX_battle_reward);
     for (unsigned k=0;k<sizeof(REWARD_cases)/sizeof(REWARD_cases[0]);k++) {
         const uint32_t *args=REWARD_cases[k].args;
         uint32_t a=args[0],b=args[1],c=args[2],result=0u;

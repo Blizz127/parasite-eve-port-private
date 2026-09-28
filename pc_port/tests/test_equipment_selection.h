@@ -3,7 +3,7 @@
 static void test_INV22_retail_equipment_selection(void)
 {
     unsigned k,i,failures=0;
-    TEST("INV22_retail_equipment_selection");
+    TEST_RETAIL_DISC1("INV22_retail_equipment_selection"); TEST_RETAIL_FIXUPS(RETAILFIX_equipment_selection);
     for (k=0;k<sizeof(INV22_equipment_selection_cases)/sizeof(INV22_equipment_selection_cases[0]);k++) {
         const uint32_t *args=INV22_equipment_selection_cases[k].args;
         uint32_t a=args[0],result=0u;

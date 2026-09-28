@@ -10,6 +10,8 @@
  * Steam Input / Steam Deck / Legion Go):
  *   A=Cross  B=Circle  X=Square  Y=Triangle  LB/RB=L1/R1  LT/RT=L2/R2
  *   Back/View=Select  Start/Menu=Start  D-pad + left stick = directions
+ *   Port hotkeys (not PSX buttons): R3 (right stick click) = fast-forward
+ *   while held; L3 (left stick click) = toggle fast-forward (like F6)
  *
  * Environment:
  *   PE_JOYSTICK=/dev/input/jsN   use only this device (default: js0..js7)
@@ -36,6 +38,10 @@
 #define HOST_PAD_CROSS    0x4000u
 #define HOST_PAD_SQUARE   0x8000u
 
+/* Host hotkeys from stick clicks (never reach the game's pad word). */
+#define HOST_PAD_HOTKEY_FF_HOLD   0x01u  /* R3 held */
+#define HOST_PAD_HOTKEY_FF_TOGGLE 0x02u  /* L3 held (toggle on press) */
+
 /* Left-stick deadzone and trigger threshold (js range is -32767..32767). */
 #define HOST_PAD_STICK_DEADZONE   12000
 #define HOST_PAD_TRIGGER_THRESHOLD 0   /* triggers rest at -32767 */
@@ -47,6 +53,7 @@ typedef struct {
     uint16_t buttons;        /* held PSX bits from buttons */
     int16_t  axis[64];       /* last value per js axis index */
     int      trigger_seen[64]; /* trigger axis moved/initialised */
+    uint8_t  hotkeys;        /* held HOST_PAD_HOTKEY_* bits */
 } HostPadDevice;
 
 /* Fill the fallback (xpad) index layout. */
@@ -55,11 +62,15 @@ void     HostPad_DeviceDefaults(HostPadDevice *dev);
 void     HostPad_DeviceEvent(HostPadDevice *dev, uint8_t type, uint8_t number, int16_t value);
 /* Held PSX bits (active-high) for one device. */
 uint16_t HostPad_DeviceHeld(const HostPadDevice *dev);
+/* Held HOST_PAD_HOTKEY_* bits for one device. */
+uint8_t  HostPad_DeviceHotkeys(const HostPadDevice *dev);
 
 /* Poll all devices (non-blocking, hot-plug rescan). Safe to call every frame. */
 void     HostPad_Poll(void);
 /* Held PSX bits (active-high) OR-ed over all connected controllers. */
 uint16_t HostPad_Held(void);
+/* Held HOST_PAD_HOTKEY_* bits OR-ed over all connected controllers. */
+uint8_t  HostPad_Hotkeys(void);
 /* Close all devices. */
 void     HostPad_Close(void);
 

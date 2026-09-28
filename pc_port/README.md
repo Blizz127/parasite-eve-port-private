@@ -124,8 +124,24 @@ match232 original-executable cases. Ordinary weapon/armor selection,
 cancellation and confirmation now match215 additional original cases and are
 wired into the main menu. The INV22 visible replay completed the fight,
 then equipped Club 1 and restored M84F, exercised the armor page, and
-returned to normal movement. Status/config/upgrade pages remain unfinished. Audio command processing prevents queue corruption;
-full music sequencing and audible SPU synthesis remain unported.
+returned to normal movement. Status/config/upgrade pages remain unfinished. Audio is audible (audio lane, 2026-09-28): `platform/pe_spu.c` is a
+native SPU (24 ADPCM voices, ADSR, sweeps, noise, pitch modulation, reverb,
+CD/XA input), `platform/pe_audio_driver.c` runs the retail AKAO tick
+`func_8008DB7C` from guest RAM in a small R3000A interpreter at the retail
+240 Hz RCNT2 rate, and `platform/host_audio.c` outputs 44.1 kHz stereo via a
+runtime-`dlopen`ed `libpulse-simple.so.0` (PipeWire/PulseAudio; silent if
+missing). `PE_AUDIO=0` disables it; `PE_AUDIO_WAV=out.wav` dumps the mix
+(headless too); `PE_AUDIO_DEVICE=1` forces the sound device in headless runs;
+`PE_AUDIO_KON_LOG=path` writes a key-on timeline; `PE_AUDIO_DEBUG=1` prints
+SPU state every 10 s; `PE_AUDIO_LATENCY_MS` (default 100: 60 % device buffer,
+40 % queue) sets the output latency. The device feed is steered by an adaptive
+resampler (at most ±0.5 %) so the 60 Hz emulated audio clock, the 59.94 Hz
+pacer and the device crystal never starve or overfill it; starves fade out and
+back in. Voices use the psx-spx 4-point gaussian table, XA uses the CD
+decoder's 7-phase zigzag FIR behind a 133 ms jitter buffer, and reverb I/O uses
+the 39-tap half-band FIR (audio2 lane). Evidence and gaps:
+`../docs/evidence/pe-native-audio/REPORT.md`,
+`../docs/ai_context/DAY1_FIDELITY_GAPS.md` §3.
 See
 `../docs/ai_context/ACTIVE_HANDOFF.md` for current status
 and `../docs/evidence/pe-aya-visible-dialogue/REPORT.md` for screenshots.
@@ -144,8 +160,14 @@ Tested by `pe-host-pad-tests` (CTest `host-pad-input`). The owner preview
 package is built by `pc_port/package_preview.sh` (no game data inside).
 Resizing or maximizing scales the full game image to fit while keeping its
 original 4:3 aspect ratio; unused space has black borders.
-F6 toggles normal speed (60000/1001 Hz) and uncapped fast-forward; the window
-title shows the active mode. Normal is the default. Frame waits use a monotonic
+Pacing is per emulated VBlank (`PE_AudioDriver_SetVBlankPacer`): one VBlank
+= 1/59.94 s of wall time, so the game's 30 fps loop (2 VBlanks per present),
+its `VSync(n)` waits and the 240 Hz music clock all run at retail speed; a
+present only polls input. (Pacing per present had run gameplay and music at
+2x.) F6 toggles normal speed (60000/1001 Hz) and uncapped fast-forward; on a
+controller L3 (left stick click) toggles it and R3 (right stick click)
+fast-forwards while held. The window title shows the active mode, and the sound
+device is muted with a fade while fast-forwarding (the WAV dump is not). Normal is the default. Frame waits use a monotonic
 clock and poll input; long pauses discard the timing backlog.
 
 **Metrics authority:** the merged tree generates and cross-checks current

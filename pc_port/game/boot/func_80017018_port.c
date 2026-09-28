@@ -39,6 +39,7 @@
  * 801A074C op 5D never resumed, so Aya's poll of m19 never ended).
  * Not M2.
  */
+#include "pe_disc.h"
 #include <stdio.h>
 #include "psx_compat.h"
 #include "pe_port_compat.h"
@@ -716,6 +717,8 @@ static int pe_attachment_command(pe_addr_t fn, pe_addr_t args)
     return 1;
 }
 
+extern int func_80014E30(pe_addr_t a0);
+
 static int pe_17018_dispatch_body(pe_addr_t fn, pe_addr_t args)
 {
     if (fn == 0x80018300u) return func_80018300(args);
@@ -839,6 +842,13 @@ static int pe_17018_dispatch_body(pe_addr_t fn, pe_addr_t args)
             Stub_Record("func_80014E30_skip_movie", "HOST_ADAPTED");
             return 1;
         }
+        /* fmv lane: the matched-decomp func_80014E30 (absent_lo_batch3)
+         * loads the movie overlay and runs 1216C4/121C04/1223A8; the
+         * stream is served by pe_str_feed when the CD device is off.
+         * Without a disc / PE.IMG base the overlay read can never
+         * complete (retail would spin), so that stays a named cut. */
+        if (PE_Disc_GetActive() != NULL && PE_LoadU32(0x800B0DD8u) != 0u)
+            return func_80014E30(args);
         Bootstrap_ReturnVoid("func_80014E30", "func_80017018");
         PE_StoreU32(GA_D_8009CE00, PE_LoadU32(GA_D_8009CE00) - 12u);
         PE_Port_RequestStop(PE_PORT_STOP_UNRESOLVED_BOUNDARY);

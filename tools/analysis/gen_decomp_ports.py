@@ -287,7 +287,7 @@ def canonical_protos() -> dict[str, int]:
         if not root.is_dir():
             continue
         for path in root.rglob("*.h"):
-            if "build" in path.parts:
+            if "build" in path.relative_to(REPO_ROOT).parts:
                 continue
             text = path.read_text(encoding="utf-8", errors="replace")
             for m in PROTO_RE.finditer(strip_comments(text)):
@@ -313,7 +313,7 @@ def canonical_signatures() -> dict[str, dict]:
         if not root.is_dir():
             continue
         for path in sorted(root.rglob("*.h")):
-            if "build" in path.parts:
+            if "build" in path.relative_to(REPO_ROOT).parts:
                 continue
             text = strip_comments(path.read_text(encoding="utf-8", errors="replace"))
             for m in SIG_RE.finditer(text):
@@ -491,7 +491,7 @@ def pc_port_definitions() -> dict[str, set[str]]:
     """func_* symbol -> set of pc_port source files that define it."""
     defined: dict[str, set[str]] = {}
     for path in (REPO_ROOT / "pc_port").rglob("*.c"):
-        if "build" in path.parts:
+        if "build" in path.relative_to(REPO_ROOT).parts:
             continue
         # Overlay TUs (gen_overlay_ports.py) define `<ovl>__func_X` through a
         # rename macro; their textual `func_X(...) {` is not a plain symbol.
@@ -530,7 +530,7 @@ def inline_shims() -> dict[str, dict]:
         if not root.is_dir():
             continue
         for path in sorted(root.rglob("*.h")):
-            if "build" in path.parts:
+            if "build" in path.relative_to(REPO_ROOT).parts:
                 continue
             text = strip_comments(path.read_text(encoding="utf-8", errors="replace"))
             for m in INLINE_SHIM_RE.finditer(text):

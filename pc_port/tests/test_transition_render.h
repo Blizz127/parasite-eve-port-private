@@ -1,7 +1,7 @@
 #include "retail_transition_render_cases.h"
 static void test_DAY1_transition_render(void)
 {
-    TEST("DAY1_transition_render");
+    TEST_RETAIL_DISC1("DAY1_transition_render"); TEST_RETAIL_FIXUPS(RETAILFIX_transition_view);
     for(unsigned k=0;k<sizeof(DAY1_transition_render_cases)/sizeof(DAY1_transition_render_cases[0]);k++) {
         ResetTestState();memset(&g_pe_gte,0,sizeof(g_pe_gte));
         for(unsigned j=0;j<sizeof(DAY1_view_tables);j++)PE_StoreU8(0x80095F00u+j,DAY1_view_tables[j]);

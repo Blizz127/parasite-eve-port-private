@@ -3,7 +3,7 @@
 static void test_INV16_retail_pe_cost(void)
 {
     unsigned k,i;
-    TEST("INV16_retail_pe_cost");
+    TEST_RETAIL_DISC1("INV16_retail_pe_cost"); TEST_RETAIL_FIXUPS(RETAILFIX_pe_cost);
     for (k=0;k<sizeof(INV16_pe_cost_cases)/sizeof(INV16_pe_cost_cases[0]);k++) {
         const uint32_t *args=INV16_pe_cost_cases[k].args;
         uint32_t a=args[0],result=0u;

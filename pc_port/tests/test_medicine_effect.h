@@ -39,7 +39,7 @@ static uint64_t INV15_medicine_effect_hash(void)
 static void test_INV15_retail_medicine_effect(void)
 {
     unsigned k,i;
-    TEST("INV15_retail_medicine_effect");
+    TEST_RETAIL_DISC1("INV15_retail_medicine_effect"); TEST_RETAIL_FIXUPS(RETAILFIX_medicine_effect);
     for (k=0;k<sizeof(INV15_medicine_effect_cases)/sizeof(INV15_medicine_effect_cases[0]);k++) {
         const uint32_t *a=INV15_medicine_effect_cases[k].args;
         uint32_t result=0;uint64_t hash;

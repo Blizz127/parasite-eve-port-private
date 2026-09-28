@@ -1,0 +1,60 @@
+# retail_data_guard known debt: <allowed retail bytes>	<tracked file>
+# Files listed here predate the 2026-09-28 "run off the disc" decision and
+# still carry retail bytes.  The guard lets them keep (never grow) that
+# amount; every other file must be clean.  Shrink this list: move the bytes
+# to runtime disc reads and delete the line.  Regenerate only by lead
+# decision: retail_data_guard.py --write-baseline (needs the disc).
+32	docs/evidence/pe-btl147-theater-eve-path/scan.json
+32	docs/evidence/pe-pst0-persist-provenance/REPORT.md
+756	pc_port/tools/b23_oracle.py
+588	pc_port/tools/b25_oracle.py
+320	pc_port/tools/b29_oracle.py
+64	pc_port/tools/b30_oracle.py
+124	pc_port/tools/b31_oracle.py
+144	pc_port/tools/b32_oracle.py
+84	pc_port/tools/b35_oracle.py
+308	pc_port/tools/b39_oracle.py
+168	pc_port/tools/b40_oracle.py
+480	pc_port/tools/b41_oracle.py
+560	pc_port/tools/b42_oracle.py
+800	pc_port/tools/b43_oracle.py
+924	pc_port/tools/b44_oracle.py
+232	pc_port/tools/b46_oracle.py
+32	pc_port/tools/b47_oracle.py
+392	pc_port/tools/b48_oracle.py
+1564	pc_port/tools/b50_oracle.py
+444	pc_port/tools/b52_oracle.py
+740	pc_port/tools/b53c_oracle.py
+624	pc_port/tools/b53e_oracle.py
+80	pc_port/tools/b53f_oracle.py
+112	pc_port/tools/b53g_oracle.py
+112	pc_port/tools/b53h_oracle.py
+840	pc_port/tools/b53i_b1_oracle.py
+584	pc_port/tools/b53i_b2_oracle.py
+1564	pc_port/tools/b54a_6ad40_suffix_oracle.py
+240	pc_port/tools/b54c_6ad40_material_table_oracle.py
+116	pc_port/tools/b54c_718d0_oracle.py
+40	pc_port/tools/b54j_30894_audit_oracle.py
+32	pc_port/tools/b54kc_30894_l6_oracle.py
+108	pc_port/tools/b54ke_30894_l8_oracle.py
+220	pc_port/tools/b54kf_30894_l9_oracle.py
+308	pc_port/tools/b54kg_30894_l10_oracle.py
+280	pc_port/tools/b54kh_30894_l11_oracle.py
+172	pc_port/tools/b54ki_30894_complete_oracle.py
+32	pc_port/tools/b54kj_6ad40_f0_wait_oracle.py
+152	pc_port/tools/b54kk_6ad40_e0_group_oracle.py
+180	pc_port/tools/b54kl_6ad40_3126_wait_oracle.py
+32	pc_port/tools/b54kv_textured_rectangle_oracle.py
+76	pc_port/tools/pe_b558_cd_controller_oracle.py
+52	pc_port/tools/pe_battle_data_precovery_oracle.py
+408	pc_port/tools/pe_btl2_144fc_oracle.py
+428	pc_port/tools/pe_btl3_29810_tail_oracle.py
+136	pc_port/tools/pe_btl3_command_table_oracle.py
+128	pc_port/tools/pe_btl4_command_table_oracle.py
+288	pc_port/tools/pe_btl5_overlay_wait_oracle.py
+52	pc_port/tools/pe_btl66_1a4ac_oracle.py
+156	pc_port/tools/pe_btl6_14544_oracle.py
+36	pc_port/tools/pe_mv1a_870f0_oracle.py
+168	vendor/khasinski-parasite-eve-decomp/src/main/psyq/libcd/bios.c
+52	vendor/khasinski-parasite-eve-decomp/src/main/psyq/libgte/St_DmaHandlerTemplates.c
+748	vendor/khasinski-parasite-eve-decomp/src/overlays/fx_field/fx_field_data.c

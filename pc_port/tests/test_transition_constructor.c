@@ -2,6 +2,7 @@
 #include "pe_port_compat.h"
 #include "game_port.h"
 #include <stdio.h>
+#include "test_retail_fixups.h"
 #include "retail_transition_constructor_cases.h"
 #include "retail_transition_constructor_faults.h"
 #include "retail_transition_path_cases.h"
@@ -52,7 +53,13 @@ static void fixture(void)
 }
 int main(void)
 {
+    char why[320];
     PE_RamInit();
+    /* The libgte ratan table seed comes from the user's disc (retail bytes
+     * are never committed); exit 77 = ctest SKIP when no disc is configured. */
+    if(PE_TestRetail_Apply(RETAILFIX_transition_path,sizeof(RETAILFIX_transition_path)/sizeof(RETAILFIX_transition_path[0]),why,sizeof(why))!=0){
+        printf("SKIP: %s\n",why);PE_RamDestroy();return 77;
+    }
     for(current=0;current<sizeof(DAY1_constructor_cases)/sizeof(DAY1_constructor_cases[0]);current++){
         fixture();func_80196498();
         if(calls!=DAY1_constructor_cases[current].calls || trace!=DAY1_constructor_cases[current].trace || state()!=DAY1_constructor_cases[current].state || PE_Port_ShouldStop()){

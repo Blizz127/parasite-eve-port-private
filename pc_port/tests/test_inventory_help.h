@@ -3,7 +3,7 @@
 static void test_INV5_retail_inventory_help(void)
 {
     unsigned k,i;
-    TEST("INV5_retail_inventory_help");
+    TEST_RETAIL_DISC1("INV5_retail_inventory_help"); TEST_RETAIL_FIXUPS(RETAILFIX_inventory_help);
     for (k=0;k<sizeof(INV5_inventory_help_cases)/sizeof(INV5_inventory_help_cases[0]);k++) {
         uint32_t a=INV5_inventory_help_cases[k].args[0],result=0u;
         uint64_t hash;

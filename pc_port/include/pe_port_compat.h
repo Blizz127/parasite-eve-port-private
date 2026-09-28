@@ -1078,6 +1078,7 @@ int PE_M0023I_Main(int32_t mode, pe_addr_t data);
 int PE_M0023I_Particle(int32_t mode, pe_addr_t data);
 int PE_M0023I_Beam(int32_t mode, pe_addr_t data);
 int PE_M0023I_Flash(int32_t mode, pe_addr_t data, int16_t retained_position[3]);
+extern int g_pe_strict_effect_stack;   /* m0023i_effect_port.c: 1 = unresolved F710 stack read stops the port */
 void PE_EffectStackBegin(void);
 void PE_EffectStackEnd(void);
 void PE_EffectStackInvalidate(void);

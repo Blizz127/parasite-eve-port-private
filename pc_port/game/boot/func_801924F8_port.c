@@ -13,6 +13,11 @@
 #include "pe_sdk.h"
 #include "host_framebuffer.h"
 
+#include <stdio.h>
+#include <stdlib.h>
+
+#define FMV_DBG(...) do { if (getenv("PE_FMV_DEBUG")) fprintf(stderr, "[FMV] " __VA_ARGS__); } while (0)
+
 int func_801924F8(int index)
 {
     uint16_t record_index = (uint16_t)index;
@@ -52,11 +57,12 @@ int func_801924F8(int index)
             status = func_80081414(0x801D0DC4u, filename);
     } while (status == 0 || status == -1);
 
+    FMV_DBG("924F8 file found %s stop=%d\n", filename, PE_Port_ShouldStop());
     PE_StoreU32(0x801D0DDCu, PE_LoadU32(0x801D0DC4u));
     record = PE_LoadU32(0x801D11ACu);
     movie_x = PE_LoadU16(record + 10u);
     movie_y = PE_LoadU16(record + 12u);
-    display_buffer = PE_LoadU32(0x800ACDDCu);
+    display_buffer = PE_LoadU32(0x8009CDDCu);
 
     PE_StoreU8(0x801D148Au, (uint8_t)display_buffer);
     PE_StoreU32(0x801D1464u, PE_LoadU32(0x801D0DE8u));
@@ -78,8 +84,10 @@ int func_801924F8(int index)
     PE_StoreU8(0x801D1494u, 0u);
 
     func_8010BE3C(0);
-    if (PE_Port_ShouldStop())
+    if (PE_Port_ShouldStop()) {
+        FMV_DBG("924F8 stop after BE3C\n");
         return 0;
+    }
 
     func_8010C0D8(0x80191DC8u);
 
@@ -90,6 +98,7 @@ int func_801924F8(int index)
                   -1, 0u, 0u);
 
 cdready_wait:
+    FMV_DBG("924F8 cdready_wait stop=%d\n", PE_Port_ShouldStop());
     do {
         while (func_8007F72C() != 1) {
         }
@@ -107,6 +116,7 @@ cdready_wait:
     if (status == 0)
         goto cdready_wait; /* B0-exhaustion: re-poll. */
     /* B8: v0 = [146C]; a1 = film id; mode = 3. */
+    FMV_DBG("924F8 ReadS ok\n");
     func_800870F0(PE_LoadU8(0x800B0DBEu));
     if (PE_Port_ShouldStop())
         return 0;
@@ -116,6 +126,7 @@ cdready_wait:
     if (PE_Port_ShouldStop())
         return 0;
 e0_poll:
+    FMV_DBG("924F8 e0_poll\n");
     /* E0: poll the streaming slot table; s0 = 2000 tries.  Retail fills
      * slots via DMA-completion IRQs (7C214): CEAC enables DMA3 IRQ only
      * when the sector is the last chunk of a frame (B89F4), so a promote
@@ -157,26 +168,28 @@ e0_poll:
             break;
         }
     }
-    /* Give-up path: copy D0DC4 to D0DDC, CD-ready waits, re-issue Setloc
-     * (loc word D0DDC, s2 = READY_FROM_CALLER -1) + ReadN(480), reset s0.
-     * The beqz delay (li s0,2000) runs on both outcomes, so s0 is always
-     * 2000 here: status 0 reaches the 9289C wait, nonzero reaches E0. */
+    /* Give-up path (0x80192878): copy D0DC4 to D0DDC, then CD-ready waits
+     * against $s2 == 1 (set at 0x801927CC), re-issue Setloc(D0DDC) +
+     * ReadS(480).  beqz → back to the 0x8019289C wait; nonzero → E0 with
+     * s0 = 2000. */
+    FMV_DBG("924F8 give-up path\n");
+    PE_StoreU32(0x801D0DDCu, PE_LoadU32(0x801D0DC4u));
     for (;;) {
-        PE_StoreU32(0x801D0DDCu, PE_LoadU32(0x801D0DC4u));
-        while (func_8007F72C() != -1) {
+        while (func_8007F72C() != 1) {
+            if (PE_Port_ShouldStop())
+                return 0;
         }
-        while (func_8007F778() != 0) {
-        }
+        if (func_8007F778() != 0)
+            continue;
         func_80080D5C(2, 0x801D0DDCu, 0u);
         status = func_80081314(0x801D0DDCu, 480u);
         if (PE_Port_ShouldStop())
             return 0;
-        if (status == 0)
-            break;
-        goto e0_poll;
+        if (status != 0)
+            goto e0_poll;
     }
-    goto cdready_wait;
 got_frame:
+    FMV_DBG("924F8 got_frame s1=%d\n", s1);
     /* 80192814..80192930: authenticated got_frame tail (ov133 carve).
      * Order is load-bearing: a2 from [D0DF8], bump B0DBC into $v1, XOR
      * toggle [146C] then index s3+bank*4 for a1, store the bumped

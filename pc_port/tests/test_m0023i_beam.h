@@ -49,7 +49,7 @@ static uint64_t DAY1_beam_hash(void)
 static void test_DAY1_retail_m0023i_beam(void)
 {
     unsigned k,i;
-    TEST("DAY1_retail_m0023i_beam");
+    TEST_RETAIL_DISC1("DAY1_retail_m0023i_beam"); TEST_RETAIL_FIXUPS(RETAILFIX_m0023i_beam);
     for (k=0;k<sizeof(DAY1_beam_cases)/sizeof(DAY1_beam_cases[0]);k++) {
         const uint32_t *a=DAY1_beam_cases[k].args;
         uint32_t result=0;uint64_t hash;

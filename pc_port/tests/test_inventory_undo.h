@@ -3,7 +3,7 @@
 static void test_INV12_retail_inventory_undo(void)
 {
     unsigned k,i;
-    TEST("INV12_retail_inventory_undo");
+    TEST_RETAIL_DISC1("INV12_retail_inventory_undo"); TEST_RETAIL_FIXUPS(RETAILFIX_inventory_undo);
     for (k=0;k<sizeof(INV12_inventory_undo_cases)/sizeof(INV12_inventory_undo_cases[0]);k++) {
         const uint32_t *args=INV12_inventory_undo_cases[k].args;
         uint32_t a=args[0],result=0u;

@@ -3,7 +3,7 @@
 static void test_NAM6_retail_menu_window(void)
 {
     unsigned k,i;
-    TEST("NAM6_retail_menu_window");
+    TEST_RETAIL_DISC1("NAM6_retail_menu_window"); TEST_RETAIL_FIXUPS(RETAILFIX_menu_window);
     for (k=0;k<sizeof(NAM6_menu_window_cases)/sizeof(NAM6_menu_window_cases[0]);k++) {
         const uint32_t *a=NAM6_menu_window_cases[k].args;
         uint64_t hash;

@@ -1,7 +1,7 @@
 #include "retail_attachment_vm_cases.h"
 static void test_DAY1_attachment_vm(void)
 {
-    TEST("DAY1_attachment_vm");
+    TEST_RETAIL_DISC1("DAY1_attachment_vm"); TEST_RETAIL_FIXUPS(RETAILFIX_attachment_vm);
     for (unsigned k=0;k<sizeof(ATT_cases)/sizeof(ATT_cases[0]);k++) {
         uint64_t hash;
         ResetTestState();

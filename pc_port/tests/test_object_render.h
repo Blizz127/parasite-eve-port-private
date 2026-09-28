@@ -5,7 +5,7 @@ static uint32_t object_render_random(uint32_t *seed)
 }
 static void test_DAY1_object_render(void)
 {
-    TEST("DAY1_object_render");
+    TEST_RETAIL_DISC1("DAY1_object_render"); TEST_RETAIL_FIXUPS(RETAILFIX_transition_view);
     static const unsigned strides[2][8]={{28,36,36,48,64,72,60,76},{28,36,36,48,40,48,48,60}},vertices[2][8]={{4,4,12,16,40,40,36,44},{4,4,12,16,16,16,24,28}};
     static const uint32_t ranges[][2]={{0x1F800000,1024},{0x80140000,0x1800},{0x80145000,0x1000},{0x80146000,0x5000},{0x8014B000,16},{0x8019C9C0,4},{0x801EA5E0,4}};
     for(unsigned k=0;k<sizeof(DAY1_object_render_cases)/sizeof(DAY1_object_render_cases[0]);k++) {

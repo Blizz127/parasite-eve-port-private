@@ -31,6 +31,7 @@
  * pointer is retained or written to guest state.
  */
 #include "pe_spu_dma.h"
+#include "pe_spu.h"
 #include "psx_compat.h"
 #include "pe_sdk.h"
 
@@ -75,6 +76,7 @@ void PE_SpuDma_Reset(void)
     memset(g_spu_registers, 0, sizeof(g_spu_registers));
     memset(&g_dma, 0, sizeof(g_dma));
     g_order = 0;
+    PE_Spu_Reset();                          /* audio lane (pe_spu.h) */
 }
 
 int PE_SpuDma_InstallIrq(pe_addr_t handler)
@@ -209,7 +211,11 @@ uint8_t PE_SpuRam_LoadU8(uint32_t address)
 
 uint16_t PE_SpuRegister_LoadU16(uint32_t offset)
 {
+    uint16_t live;
     if ((offset & 1u) || offset >= 0x200u) abort();
+    /* Audio lane: hardware-live registers (ENDX, envelope level) when the
+     * synthesizer is active (pe_spu.h); plain storage otherwise. */
+    if (PE_Spu_OnRegisterRead(offset, &live)) return live;
     return g_spu_registers[offset / 2u];
 }
 
@@ -217,4 +223,10 @@ void PE_SpuRegister_StoreU16(uint32_t offset, uint16_t value)
 {
     if ((offset & 1u) || offset >= 0x200u) abort();
     g_spu_registers[offset / 2u] = value;
+    PE_Spu_OnRegisterWrite(offset, value);   /* audio lane (pe_spu.h) */
+}
+
+uint8_t *PE_SpuRam_Data(void)
+{
+    return g_spu_ram;
 }

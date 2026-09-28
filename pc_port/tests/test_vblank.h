@@ -11,7 +11,7 @@ static void test_vblank_callback(void)
 }
 static void test_DAY1_vblank(void)
 {
-    TEST("DAY1_vblank");
+    TEST_RETAIL_DISC1("DAY1_vblank"); TEST_RETAIL_FIXUPS(RETAILFIX_vblank);
     static const uint32_t ranges[][2]={{0x70DCC,0x84},{0x9568C,36},{0xA76A0,48},{0x9D1A0,4},{0xB0DB8,8}};
     for(unsigned n=0;n<512;n++) {
         ResetTestState();PE_Callback_Init();

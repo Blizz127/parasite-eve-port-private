@@ -52,7 +52,7 @@ static uint64_t DAY1_pump_hash(void)
 
 static void test_DAY1_retail_m0023i_pump(void)
 {
-    TEST("DAY1_retail_m0023i_pump");
+    TEST_RETAIL_DISC1("DAY1_retail_m0023i_pump"); TEST_RETAIL_FIXUPS(RETAILFIX_m0023i_pump);
     for(unsigned k=0;k<sizeof(DAY1_pump_cases)/sizeof(DAY1_pump_cases[0]);k++) {
         unsigned i,j;
         if(!DAY1_pump_cases[k].frame) {
@@ -91,7 +91,16 @@ static void test_DAY1_retail_m0023i_pump(void)
     for(unsigned i=0;i<sizeof(DAY1_pump_common)/sizeof(DAY1_pump_common[0]);i++)
         PE_StoreU32(DAY1_pump_address(DAY1_pump_common[i][0]),DAY1_pump_common[i][1]);
     D_8009D1A0=0x84u;(void)func_800D401C(1);
+    g_pe_strict_effect_stack=1;
     (void)func_80069594();
-    ASSERT(PE_Port_ShouldStop(),"a fresh effect pump must not inherit unknown stack Z from a prior RAM generation");
+    g_pe_strict_effect_stack=0;
+    ASSERT(PE_Port_ShouldStop(),"strict mode: a fresh effect pump must not inherit unknown stack Z from a prior RAM generation");
+    /* Day-1 shim (DAY1_FIDELITY_GAPS.md): same history keeps running. */
+    ResetTestState();
+    for(unsigned i=0;i<sizeof(DAY1_pump_common)/sizeof(DAY1_pump_common[0]);i++)
+        PE_StoreU32(DAY1_pump_address(DAY1_pump_common[i][0]),DAY1_pump_common[i][1]);
+    D_8009D1A0=0x84u;(void)func_800D401C(1);
+    (void)func_80069594();
+    ASSERT(!PE_Port_ShouldStop(),"Day-1 shim: a fresh effect pump keeps the port running");
     ResetTestState();PASS();
 }

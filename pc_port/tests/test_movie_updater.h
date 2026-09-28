@@ -114,7 +114,7 @@ static void test_DAY2_movie_updater(void)
     PeMdecState mdec;
     unsigned end,bank,k;
 
-    TEST("DAY2_movie_updater");
+    TEST_RETAIL_DISC1("DAY2_movie_updater"); TEST_RETAIL_FIXUPS(RETAILFIX_dispenv); TEST_RETAIL_FIXUPS(RETAILFIX_cd_device_tables);
     /* Early return: B0DBA < 2 returns 0 with no calls and no mutation. */
     for(unsigned active=0u;active<2u;active++) for(end=0u;end<3u;end++) {
         ResetTestState();HostFB_Init();PE_GPU_Init();
@@ -210,9 +210,9 @@ static void test_DAY2_movie_updater(void)
         FxFree(&fx);
     }
     /* Abort helper 22354: decrement, sound stop, MDEC unregister,
-     * stream teardown, then Pause. Device disabled stops at the
-     * recorded CD_command_wait boundary (stage 155: Pause needs the
-     * enabled device); the pre-Pause effects are checked. */
+     * stream teardown, then Pause. Device disabled: the HOST_ADAPTED
+     * Pause arm (fmv lane, pe_str_feed) completes without a controller
+     * round trip; the pre-Pause effects are checked. */
     ResetTestState();HostFB_Init();PE_GPU_Init();
     PE_StoreU8(0x800B0DBAu,2u);
     PE_StoreU32(0x8009D2C0u,0u);                  /* D2C0 bit 1 clear */
@@ -222,8 +222,7 @@ static void test_DAY2_movie_updater(void)
     PE_StoreU32(0x8009B288u,0x1F801803u);
     MOVUPD_SeedTeardown();
     func_80122354();
-    ASSERT(PE_Port_ShouldStop() && g_stub_order_count>=1u &&
-        strcmp(g_stub_order_log[0],"CD_command_wait")==0,"abort Pause stop");
+    ASSERT(!PE_Port_ShouldStop(),"abort host Pause completes");
     ASSERT(PE_LoadU8(0x800B0DBAu)==1u,"abort active decrement");
     ASSERT(PE_LoadU8(0x8009D1CAu)==0u && PE_LoadU8(0x8009D1C8u)==0u &&
         PE_LoadU8(0x8009D1CBu)==0u && PE_LoadU8(0x8009D1C9u)==0u,

@@ -104,7 +104,23 @@ void HostFB_PresentDispEnv(pe_addr_t env)
     /* Blank scanlines outside this frame's display range. Keeping the
      * old framebuffer there leaks pixels when a scene narrows the range. */
     memset(fb, 0, sizeof(fb));
-    if (fb_mask) {
+    if (fb_mask && PE_LoadU8(env + 17u)) {
+        /* DISPENV.isrgb24 (MDEC movies): VRAM holds packed R,G,B bytes;
+         * disp.w may be given in 16-bit VRAM units (480 for 320 px). */
+        uint32_t pw = dw > (uint32_t)PE_PORT_FB_WIDTH ? dw * 2u / 3u : dw;
+        if (pw > (uint32_t)PE_PORT_FB_WIDTH) pw = (uint32_t)PE_PORT_FB_WIDTH;
+        for (row = 0u; row < dh && top + row < (uint32_t)PE_PORT_FB_HEIGHT; row++) {
+            for (col = 0u; col < pw; col++) {
+                uint8_t *dst = fb + ((size_t)(top + row) * PE_PORT_FB_WIDTH + col) * 3u;
+                for (uint32_t c = 0u; c < 3u; c++) {
+                    uint32_t byte = col * 3u + c;
+                    uint16_t word = 0u;
+                    (void)PE_GPU_ReadVRAM((dx + byte / 2u) & 1023u, (dy + row) & 511u, &word);
+                    dst[c] = (uint8_t)((byte & 1u) ? word >> 8 : word);
+                }
+            }
+        }
+    } else if (fb_mask) {
         if (dw > (uint32_t)PE_PORT_FB_WIDTH)  dw = (uint32_t)PE_PORT_FB_WIDTH;
         for (row = 0u; row < dh && top + row < (uint32_t)PE_PORT_FB_HEIGHT; row++) {
             for (col = 0u; col < dw; col++) {

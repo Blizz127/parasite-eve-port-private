@@ -16,6 +16,8 @@
 #include "psx_compat.h"
 #include "game_port.h"
 #include "pe_sdk.h"
+#include "pe_cdreg.h"
+#include "pe_str_feed.h"
 
 /* func_800824C8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800824C8_port.c (src/func_800824C8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
@@ -36,6 +38,19 @@ int func_80081314(pe_addr_t location, uint32_t mode)
         PE_StoreU32(0x800A8020u, (mode & 0x20u) != 0u ? 0u : 1u);
         (void)func_800824F0(0x8007C214u);
         old_b8ab4 = func_800824C8(0x800813E8u);
+        if (!PE_CdReg_DeviceEnabled() && PE_StrFeed_Probe(location)) {
+            /* HOST_ADAPTED (fmv lane): with the CD register device
+             * disabled nothing would ever drain the four SetMode/Setloc/
+             * ReadS packets 7F0C8 queues (D_800A3608 += 4), which blocks
+             * every later func_8006E6D4 read.  Hand the stream to the host
+             * feeder and return a fresh command sequence instead. */
+            uint32_t seq = PE_LoadU32(0x8009B53Cu) + 1u;
+            if (seq == 0u)
+                seq = 1u;
+            PE_StoreU32(0x8009B53Cu, seq);
+            PE_StrFeed_Open(location, mode);
+            return (int)seq;
+        }
         status = func_8007F0C8(mode & 0xFFu, location, 0x1Bu, 0u,
                                (pe_addr_t)0xFFFFFFFFu);
         if (status == 0) {

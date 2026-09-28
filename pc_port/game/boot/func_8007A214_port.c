@@ -11,6 +11,7 @@
  */
 
 #include "psx_compat.h"
+#include "pe_str_feed.h"
 
 #define GA_RECORD_BASE       0x800C0DC8u
 #define GA_RECORD_COUNT      0x800C20C4u
@@ -146,8 +147,14 @@ void func_8007C394(uint32_t sector)
  */
 int func_8007C484(pe_addr_t dst_a, pe_addr_t dst_b)
 {
-    uint32_t base = PE_LoadU32(GA_RECORD_BASE);
-    pe_addr_t slot = (pe_addr_t)(base +
+    uint32_t base;
+    pe_addr_t slot;
+
+    /* HOST_ADAPTED producer (device-disabled production runs). */
+    if (PE_StrFeed_Active())
+        PE_StrFeed_Pump();
+    base = PE_LoadU32(GA_RECORD_BASE);
+    slot = (pe_addr_t)(base +
                                  (PE_LoadU32(GA_ACTIVE_INDEX)
                                   << RECORD_SHIFT));
 

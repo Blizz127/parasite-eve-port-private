@@ -64,7 +64,7 @@ void func_80191DC8(void)
             uint32_t wide = PE_LoadU8(0x800B0DBBu) ^ 1u;
             PE_StoreU8(0x800B0DBBu, (uint8_t)wide);
             PE_StoreU16(0x801D1490u, wide ? 24u : 16u);
-            func_801918F8((int8_t)(PE_LoadU32(0x800ACDDCu) ^ 1u),
+            func_801918F8((int8_t)(PE_LoadU32(0x8009CDDCu) ^ 1u),
                           (int8_t)wide);
             if (PE_Port_ShouldStop())
                 return;

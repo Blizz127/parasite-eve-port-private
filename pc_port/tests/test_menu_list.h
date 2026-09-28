@@ -3,7 +3,7 @@
 static void test_NAM7_retail_menu_list(void)
 {
     unsigned k,i;
-    TEST("NAM7_retail_menu_list");
+    TEST_RETAIL_DISC1("NAM7_retail_menu_list"); TEST_RETAIL_FIXUPS(RETAILFIX_menu_list);
     for (k=0;k<sizeof(NAM7_menu_list_cases)/sizeof(NAM7_menu_list_cases[0]);k++) {
         const uint32_t *a=NAM7_menu_list_cases[k].args;
         uint64_t hash;

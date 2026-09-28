@@ -211,7 +211,7 @@ def parse_ports() -> tuple[dict[str, list[str]], dict[str, str], dict[str, bool]
     any_real: dict[str, bool] = {}
     paths = sorted(REPO_ROOT.glob(PORT_GLOB)) + sorted(REPO_ROOT.glob(PORT_HEADER_GLOB))
     for path in paths:
-        if "build" in path.parts:
+        if "build" in path.relative_to(REPO_ROOT).parts:
             continue
         # Overlay TUs define `<ovl>__func_X` through a rename macro; they are
         # counted by --overlays, never as plain EXE definitions.
@@ -299,7 +299,7 @@ def overlay_report() -> dict:
     definitions, _prov, stub_only = parse_ports()
     ns_defs: dict[str, bool] = {}
     for path in sorted(REPO_ROOT.glob(PORT_GLOB)):
-        if "build" in path.parts or "decomp_ovl" in path.parts:
+        if "build" in path.relative_to(REPO_ROOT).parts or "decomp_ovl" in path.parts:
             continue
         text = path.read_text(encoding="utf-8", errors="replace")
         for m in re.finditer(r"^[A-Za-z_][\w \t\*]*?\b(\w+__func_[0-9A-Fa-f]{8})\s*\(",

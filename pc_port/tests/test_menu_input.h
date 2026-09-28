@@ -3,7 +3,7 @@
 static void test_NAM4_retail_menu_input(void)
 {
     unsigned k,i;
-    TEST("NAM4_retail_menu_input");
+    TEST_RETAIL_DISC1("NAM4_retail_menu_input"); TEST_RETAIL_FIXUPS(RETAILFIX_menu_input);
     for (k=0;k<sizeof(NAM4_menu_input_cases)/sizeof(NAM4_menu_input_cases[0]);k++) {
         const uint32_t *a=NAM4_menu_input_cases[k].args;
         uint32_t result=0;

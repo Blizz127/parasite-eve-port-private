@@ -1,7 +1,7 @@
 #include "retail_transition_view_cases.h"
 static void test_DAY1_transition_view(void)
 {
-    TEST("DAY1_transition_view");
+    TEST_RETAIL_DISC1("DAY1_transition_view"); TEST_RETAIL_FIXUPS(RETAILFIX_transition_view);
     static const uint32_t ranges[][2]={{0x140000,256},{0x19BFC4,8},{0x19C330,12},{0x19C810,12},{0x19CC30,32},{0x19CDF0,32}};
     for(unsigned k=0;k<sizeof(DAY1_view_cases)/sizeof(DAY1_view_cases[0]);k++) {
         ResetTestState();

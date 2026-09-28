@@ -1,7 +1,7 @@
 #include "retail_transition_bounds_cases.h"
 static void test_DAY1_transition_bounds(void)
 {
-    TEST("DAY1_transition_bounds");
+    TEST_RETAIL_DISC1("DAY1_transition_bounds"); TEST_RETAIL_FIXUPS(RETAILFIX_transition_bounds);
     static const uint32_t ranges[][2]={{0x963DC,0x290},{0x140000,128},{0x19BFD0,32},{0x19CA90,0x190},{0x19CDF0,32}};
     for(unsigned k=0;k<sizeof(DAY1_bounds_cases)/sizeof(DAY1_bounds_cases[0]);k++) {
         ResetTestState();memset(&g_pe_gte,0,sizeof(g_pe_gte));

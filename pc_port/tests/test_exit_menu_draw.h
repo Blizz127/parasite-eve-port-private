@@ -1,7 +1,7 @@
 #include "retail_exit_menu_draw_cases.h"
 static void test_DAY1_exit_menu_draw(void)
 {
-    TEST("DAY1_exit_menu_draw");
+    TEST_RETAIL_DISC1("DAY1_exit_menu_draw"); TEST_RETAIL_FIXUPS(RETAILFIX_exit_menu_draw);
     for(unsigned n=0;n<sizeof(DAY1_exit_draw_predicates)/sizeof(DAY1_exit_draw_predicates[0]);n++) {
         ResetTestState();uint32_t index=DAY1_exit_draw_predicates[n][0];
         PE_StoreU8(0x800A0ED4u+index*0x418u,DAY1_exit_draw_predicates[n][1]);

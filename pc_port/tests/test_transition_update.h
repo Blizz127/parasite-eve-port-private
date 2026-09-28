@@ -1,7 +1,7 @@
 #include "retail_transition_update_cases.h"
 static void test_DAY1_transition_update(void)
 {
-    TEST("DAY1_transition_update");
+    TEST_RETAIL_DISC1("DAY1_transition_update"); TEST_RETAIL_FIXUPS(RETAILFIX_transition_path);
     const uint16_t subtitle_tail[]={0x1234,0xCDEF,0x89AB,0xEFA8};
     for(unsigned k=0;k<sizeof(DAY1_update_cases)/sizeof(DAY1_update_cases[0]);k++) {
         DAY1_camera_fixture(DAY1_update_cases[k].seed,0);

@@ -5,6 +5,9 @@
  * Direct-clear shortcut requires explicit --direct-clear-test flag.
  */
 
+#include "host_audio.h"
+#include "pe_audio_driver.h"
+#include "pe_spu.h"
 #include "pe_guestcode.h"
 #include "psx_compat.h"
 #include "host_framebuffer.h"
@@ -16,6 +19,7 @@
 #include "pe_sdk.h"
 #include "pe_disc.h"
 #include "pe_guest_image.h"
+#include "pe_disc_check.h"
 #include "pe_route_pad.h"
 #include "pe_port_compat.h"
 #include "pe_guest_ram.h"
@@ -99,6 +103,7 @@ static struct { int frame; uint16_t mask; } g_pad_sequence[4096];
 static unsigned g_pad_sequence_count;
 #include "route_rehearsal_pads.h"
 #include "route_reward_sewer_pilot.h"
+#include "route_ammo_trace.h"
 
 /* m0004i module-4 type-4 task PC: the documented executed-route frontier
  * (same FRONTIER_PC the harness pins).  Matched on the task PC rather than
@@ -186,6 +191,35 @@ static void RoutePadLoadSequence(void)
     }
 }
 
+static struct { int frame; uint16_t mask; } g_script_pad[256];
+static unsigned g_script_pad_count;
+
+static void ScriptPadLoad(const char *s)
+{
+    g_script_pad_count = 0;
+    while (s && *s && g_script_pad_count < 256u) {
+        char *end;
+        unsigned long frame = strtoul(s, &end, 10), mask;
+        if (end == s || *end != ':') break;
+        s = end + 1;
+        mask = strtoul(s, &end, 16);
+        if (end == s) break;
+        g_script_pad[g_script_pad_count].frame = (int)frame;
+        g_script_pad[g_script_pad_count++].mask = (uint16_t)mask;
+        s = *end == ',' ? end + 1 : end;
+    }
+}
+
+static uint16_t ScriptPadSource(void)
+{
+    int presented = 0;
+    uint16_t mask = 0xFFFFu;
+    HostFB_GetState(NULL, NULL, &presented, NULL);
+    for (unsigned i = 0; i < g_script_pad_count && presented >= g_script_pad[i].frame; i++)
+        mask = g_script_pad[i].mask;
+    return mask;
+}
+
 static int      g_handed_over;
 static int      g_hand_over_announced;
 
@@ -224,20 +258,60 @@ static int RouteHandOverReady(void)
     return 1;
 }
 
+/* Event-anchored pad clock.  The recorded pads (kDay1RoutePads, the exact
+ * battle windows, the pulse gating) were captured on one build's timing.  Port
+ * changes can move a battle start by a few frames (9dd1bd1c: func_800144FC
+ * retail TU made every battle entry 2-3 frames earlier), and a replayed fight
+ * then desyncs and is lost.  So the replay runs on a route clock
+ * rf = g_frame - offset, re-anchored at every battle start: when D1A0&0x2
+ * rises in room T, offset = g_frame - (the next recorded start for T).
+ * Anchors were recorded on b04c438e (build/lanes/day1/anchors-good.log).
+ * PE_ROUTE_NO_ANCHOR=1 restores absolute frames. */
+static const struct { uint32_t token; int frame; } kRouteBattleAnchors[] = {
+#include "route_battle_anchors.h"
+};
+static int g_pad_offset;
+static int RoutePadClock(void)
+{
+    static int init = -1;
+    static uint32_t last_b;
+    static unsigned used;          /* bitmask of consumed anchors */
+    uint32_t b;
+    if (init < 0) init = !getenv("PE_ROUTE_NO_ANCHOR");
+    b = PE_LoadU32(0x8009D1A0u) & 0x2u;
+    if (init && b && !last_b) {
+        uint32_t tok = (uint32_t)D_8009D280;
+        for (unsigned i = 0; i < sizeof(kRouteBattleAnchors)/sizeof(kRouteBattleAnchors[0]) && i < 32u; i++) {
+            if (!(used & (1u << i)) && kRouteBattleAnchors[i].token == tok &&
+                abs(g_frame - kRouteBattleAnchors[i].frame - g_pad_offset) < 600) {
+                used |= 1u << i;
+                g_pad_offset = g_frame - kRouteBattleAnchors[i].frame;
+                fprintf(stderr, "[ROUTE] anchor battle token=%08X recorded=%d actual=%d offset=%d\n",
+                        (unsigned)tok, kRouteBattleAnchors[i].frame, g_frame, g_pad_offset);
+                break;
+            }
+        }
+    }
+    last_b = b;
+    return g_frame - g_pad_offset;
+}
+
 static uint16_t RoutePadSource(void)
 {
     uint16_t mask;
+    int rf;
 
     g_route_frame = g_frame;
     if (RouteHandOverReady()) return HostWindow_PadRaw();
-    mask=PeRoutePad_Mask(&g_route_pad,g_frame);
-    for (unsigned i=0;i<g_pad_sequence_count && g_frame>=g_pad_sequence[i].frame;i++)
+    rf = RoutePadClock();
+    mask=PeRoutePad_Mask(&g_route_pad,rf);
+    for (unsigned i=0;i<g_pad_sequence_count && rf>=g_pad_sequence[i].frame;i++)
         mask=g_pad_sequence[i].mask;
-    if (!(g_frame>=g_exact_pad_begin && g_frame<g_exact_pad_end) &&
-        !(g_frame>=g_sewer_pad_begin && g_frame<g_sewer_pad_end) &&
-        !(g_frame>=g_second_sewer_pad_begin && g_frame<g_second_sewer_pad_end) &&
-        !(g_frame>=g_supply_pad_begin && g_frame<g_supply_pad_end) &&
-        (g_frame<g_pulse_end || g_frame>=g_pulse_resume) && (g_frame%g_route_pad.period)==3)
+    if (!(rf>=g_exact_pad_begin && rf<g_exact_pad_end) &&
+        !(rf>=g_sewer_pad_begin && rf<g_sewer_pad_end) &&
+        !(rf>=g_second_sewer_pad_begin && rf<g_second_sewer_pad_end) &&
+        !(rf>=g_supply_pad_begin && rf<g_supply_pad_end) &&
+        (rf<g_pulse_end || rf>=g_pulse_resume) && (rf%g_route_pad.period)==3)
         mask&=g_route_pad.pulse;
     mask=RouteRewardSewerPilot(mask);
     if (getenv("PE_ROUTE_DEBUG") && (g_frame % 500) == 0)
@@ -245,6 +319,19 @@ static uint16_t RoutePadSource(void)
                 g_frame, (unsigned)D_8009D280,
                 (unsigned)PE_LoadU32(0x800A7918u), (unsigned)PE_LoadU32(0x8009D26Cu),
                 (unsigned)mask);
+    if (getenv("PE_ROUTE_POS_TRACE")) {
+        static uint16_t last_mask = 0; static int last_f = -1000;
+        if (mask != last_mask || g_frame - last_f >= 60) {
+            pe_addr_t aya = PE_LoadU32(0x8009D254u);
+            fprintf(stderr, "POS %d rf=%d token=%08X mode=%u d1a0=%X pad=%04X aya=%d,%d focus=%08X\n",
+                    g_frame, rf, (unsigned)D_8009D280, PE_LoadU32(0x8009D28Cu),
+                    PE_LoadU32(0x8009D1A0u), (unsigned)mask,
+                    aya ? (int32_t)PE_LoadU32(aya + 40u) >> 16 : 0,
+                    aya ? (int32_t)PE_LoadU32(aya + 48u) >> 16 : 0,
+                    (unsigned)PE_LoadU32(0x8009D15Cu));
+            last_mask = mask; last_f = g_frame;
+        }
+    }
     RoutePadAutoQuitIfDone();
     return mask;
 }
@@ -258,6 +345,16 @@ static void PresentHook_BlitWindow(void)
     if (g_opts.route_pad) {
         g_frame++;
         RecordSewerVictory();
+        RouteAmmoTrace();
+        {
+            static uint32_t last_tok = 0xFFFFFFFFu, last_story = 0xFFFFFFFFu;
+            uint32_t tok = (uint32_t)D_8009D280, st = PE_LoadU32(0x800A7918u);
+            if (tok != last_tok || st != last_story) {
+                fprintf(stderr, "[ROUTE] change frame=%d token=%08X story=%08X\n",
+                        g_frame, (unsigned)tok, (unsigned)st);
+                last_tok = tok; last_story = st;
+            }
+        }
         if ((g_frame % 500) == 0)
             fprintf(stderr, "[ROUTE] frame=%d token=%08X story=%08X victories=%u\n",
                     g_frame, (unsigned)D_8009D280,
@@ -585,7 +682,55 @@ static void UpdateTitle(const char *phase, const char *func) {
 }
 
 /* ── main ───────────────────────────────────────────────────────────── */
+static void AudioStatsAtExit(void)
+{
+    PeAudioDriverStats d;
+    PeSpuStats sp;
+    PE_AudioDriver_GetStats(&d);
+    PE_Spu_GetStats(&sp);
+    fprintf(stderr, "[AUDIO] summary: vblanks=%llu ticks=%llu skipped=%llu "
+            "faults=%llu insns=%llu | KON=%llu KOFF=%llu regwrites=%llu "
+            "fifo=%llu frames=%llu\n",
+            (unsigned long long)d.vblanks, (unsigned long long)d.ticks,
+            (unsigned long long)d.skipped_ticks, (unsigned long long)d.faults,
+            (unsigned long long)d.instructions,
+            (unsigned long long)sp.kon_events, (unsigned long long)sp.koff_events,
+            (unsigned long long)sp.register_writes,
+            (unsigned long long)sp.fifo_bytes,
+            (unsigned long long)sp.rendered_frames);
+    PE_Spu_DebugSummary(stderr);
+}
+
+#if !defined(_WIN32)
+#include <execinfo.h>
+#include <signal.h>
+#include <unistd.h>
+/* Debug aid (fmv lane): PE_WATCHDOG_SEC=N dumps a backtrace every N s so a
+ * spinning guest loop can be located with addr2line (no debugger here). */
+static unsigned g_watchdog_sec;
+static void WatchdogHandler(int sig)
+{
+    void *frames[48];
+    int n = backtrace(frames, 48);
+    (void)sig;
+    (void)!write(2, "[WATCHDOG] backtrace\n", 21);
+    backtrace_symbols_fd(frames, n, 2);
+    alarm(g_watchdog_sec);
+}
+static void WatchdogArm(void)
+{
+    const char *w = getenv("PE_WATCHDOG_SEC");
+    if (!w || !(g_watchdog_sec = (unsigned)atoi(w))) return;
+    signal(SIGALRM, WatchdogHandler);
+    signal(SIGABRT, WatchdogHandler);
+    alarm(g_watchdog_sec);
+}
+#else
+static void WatchdogArm(void) {}
+#endif
+
 int main(int argc, char **argv) {
+    WatchdogArm();
     ParseArgs(argc, argv); TraceInit();
     g_bootstrap_disc = g_opts.bootstrap_disc;
     g_strict_stubs   = g_opts.strict_stubs;
@@ -616,16 +761,29 @@ int main(int argc, char **argv) {
         }
         PE_Disc_SetActive(disc);
         {
+            /* First-run disc check (pe_disc_check.h): SYSTEM.CNF boot serial
+             * + boot-EXE SHA-1 against the known-disc table.  The game boots
+             * from Disc 1; Disc 2 is recognised and rejected with a clear
+             * message until disc swapping lands. */
+            PE_DiscIdentity id;
+            char why[384];
             char vol[40];
-            int kind = PE_Disc_BootKind(disc);
+            if (PE_DiscCheck_Identify(disc, 1u, &id, why, sizeof(why)) != 0) {
+                fprintf(stderr, "[DISC] %s: %s\n", g_opts.disc_image, why);
+                fprintf(stderr, "[DISC] The game reads everything from your own disc image: "
+                                "pass the Parasite Eve (USA) Disc 1 .bin (BIN/CUE dump).\n");
+                TraceClose();
+                PE_Disc_Close(disc);
+                PE_RamDestroy();
+                return 1;
+            }
             if (!PE_Disc_VolumeId(disc, vol, sizeof(vol)))
                 vol[0] = '\0';
             fprintf(stderr,
-                    "[DISC] opened '%s' (%u user sectors, boot=%s, vol='%s')\n",
-                    g_opts.disc_image, PE_Disc_UserSectorCount(disc),
-                    kind == 1 ? "SLUS_006.62" :
-                    kind == 2 ? "SLUS_006.68" : "unknown",
-                    vol);
+                    "[DISC] opened '%s' (%u user sectors, vol='%s'): Parasite Eve %s "
+                    "Disc %d (%s), EXE sha1 %s verified\n",
+                    g_opts.disc_image, PE_Disc_UserSectorCount(disc), vol,
+                    id.known->region, id.known->disc, id.known->serial, id.exe_sha1);
         }
 
         /* Phase 6E-B2: load the retail boot executable into guest RAM —
@@ -697,6 +855,15 @@ int main(int argc, char **argv) {
         }
     }
 
+    /* Autopilot-only aids (M34 HP lock etc.) are test-harness only: they may
+     * be armed solely by --route-pad.  A normal start must never see them. */
+    if (!g_opts.route_pad) {
+        if (g_route_m34_shim || g_route_battle_shim) {
+            fprintf(stderr, "[ROUTE_SHIM] FATAL: route aid armed without --route-pad\n");
+            abort();
+        }
+        fprintf(stderr, "[ROUTE_SHIM] disabled (normal start: no --route-pad)\n");
+    }
     if (g_opts.route_pad) {
         /* Interactive Day-1 autopilot: same four-stage table + switch frames
          * the route harness proves (shared pe_route_pad.h).  A route-pad run
@@ -709,6 +876,11 @@ int main(int argc, char **argv) {
         g_sewer_victories = 0;
         g_sewer_enemy_peak[0]=g_sewer_enemy_peak[1]=g_sewer_enemy_peak[2]=0;
         RoutePadLoadSequence();
+        g_route_m34_shim = !getenv("PE_ROUTE_M34_NO_SHIM");
+        g_route_battle_shim = !getenv("PE_ROUTE_BATTLE_NO_SHIM");
+        if (g_route_m34_shim)
+            fprintf(stderr, "[ROUTE_SHIM] M34 HP lock + simple tail controller enabled "
+                            "(PE_ROUTE_M34_NO_SHIM=1 disables; see DAY1_FIDELITY_GAPS.md)\n");
         PE_Port_SetSkipMovie(1);
         PE_Port_SetSkipOpeningMenu(1);
         PE_Port_SetPadSource(RoutePadSource);
@@ -720,6 +892,35 @@ int main(int argc, char **argv) {
                 "[ROUTE] --route-pad: full Day-1/Day-2 pad sequence (%u pairs) "
                 "+ sewer/M34 pilot + skip-movie + skip-opening-menu\n",
                 g_pad_sequence_count);
+    }
+
+    /* fmv lane: PE_PAD_SCRIPT="present:mask,..." (active-low raw masks,
+     * e.g. FFF7 Start, DFFF Circle) drives a headless non-route run by
+     * host present count, so title/movie/menu paths can be verified
+     * without --route-pad (which forces --skip-movie). */
+    if (!g_opts.route_pad && getenv("PE_PAD_SCRIPT")) {
+        ScriptPadLoad(getenv("PE_PAD_SCRIPT"));
+        PE_Port_SetPadSource(ScriptPadSource);
+        fprintf(stderr, "[PAD] PE_PAD_SCRIPT: %u scripted pad changes\n",
+                g_script_pad_count);
+    }
+
+    /* Audio lane: native SPU + retail AKAO driver tick + host output.
+     * PE_AUDIO=0 keeps the historical silent command-only behavior.  The
+     * sound device opens with a window (or PE_AUDIO_DEVICE=1); the WAV dump
+     * (PE_AUDIO_WAV) works headless. */
+    {
+        const char *pa = getenv("PE_AUDIO");
+        const char *pd = getenv("PE_AUDIO_DEVICE");
+        if (!(pa && pa[0] == '0')) {
+            int dev = pd ? pd[0] != '0' : use_window;
+            (void)HostAudio_Open(dev);
+            PE_AudioDriver_SetSink(HostAudio_Submit);
+            PE_AudioDriver_Enable(1);
+            atexit(AudioStatsAtExit);
+            fprintf(stderr, "[AUDIO] native SPU + AKAO driver enabled "
+                    "(device=%d, PE_AUDIO=0 disables)\n", HostAudio_DeviceOpen());
+        }
     }
 
     if (g_opts.direct_clear_test) {

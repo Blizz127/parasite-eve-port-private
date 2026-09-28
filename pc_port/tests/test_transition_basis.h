@@ -1,7 +1,7 @@
 #include "retail_transition_basis_cases.h"
 static void test_DAY1_transition_basis(void)
 {
-    TEST("DAY1_transition_basis");
+    TEST_RETAIL_DISC1("DAY1_transition_basis"); TEST_RETAIL_FIXUPS(RETAILFIX_transition_basis);
     for(unsigned k=0;k<sizeof(DAY1_basis_cases)/sizeof(DAY1_basis_cases[0]);k++) {
         ResetTestState();
         for(unsigned i=0;i<sizeof(DAY1_basis_table);i++)PE_StoreU8(0x800961D0u+i,DAY1_basis_table[i]);

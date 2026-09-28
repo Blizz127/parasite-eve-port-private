@@ -3,7 +3,7 @@
 static void test_ATK34_retail_pistol_effect(void)
 {
     unsigned k,i,j;
-    TEST("ATK34_retail_pistol_effect");
+    TEST_RETAIL_DISC1("ATK34_retail_pistol_effect"); TEST_RETAIL_FIXUPS(RETAILFIX_pistol_effect);
     for (k=0;k<sizeof(ATK34_pistol_cases)/sizeof(ATK34_pistol_cases[0]);k++) {
         const uint32_t *a=ATK34_pistol_cases[k].args;
         uint64_t hash=UINT64_C(14695981039346656037);

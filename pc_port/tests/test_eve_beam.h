@@ -43,7 +43,7 @@ static uint64_t ATK29_beam_hash(void)
 static void test_ATK29_retail_eve_beam(void)
 {
     unsigned k,i;
-    TEST("ATK29_retail_eve_beam");
+    TEST_RETAIL_DISC1("ATK29_retail_eve_beam"); TEST_RETAIL_FIXUPS(RETAILFIX_eve_beam);
     for (k=0;k<sizeof(ATK29_beam_cases)/sizeof(ATK29_beam_cases[0]);k++) {
         const uint32_t *a=ATK29_beam_cases[k].args;
         uint32_t result=0;uint64_t hash;

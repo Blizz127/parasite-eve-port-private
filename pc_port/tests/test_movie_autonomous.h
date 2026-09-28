@@ -49,10 +49,10 @@ static void MOVAU_WriteVideoSector(uint8_t *img, uint32_t lba,
 /* Seed record 0's search prefix/name (leading '\' required by 81414). */
 static void MOVAU_SeedPath(const char *prefix, const char *file)
 {
-    pe_addr_t p=0x80122FF0u;
-    strcpy(PE_Translate(p,24u),prefix);
-    PE_StoreU32(0x80120FF4u,p);
-    PE_StoreU32(0x80120FFCu,p);
+    /* Retail 121C04 passes the prefix strings' own addresses (addiu a1,
+     * 0x80120FF4 / 0x80120FFC), so the bytes live there, not a pointer. */
+    strcpy(PE_Translate(0x80120FF4u,8u),prefix);
+    strcpy(PE_Translate(0x80120FFCu,8u),prefix);
     strcpy(PE_Translate(0x80130130u,16u),file);
 }
 
@@ -97,7 +97,7 @@ static void MOVAU_SeedRegisterPointers(void)
 static void test_DAY2_movie_autonomous(void)
 {
     DiscFixture fx={0};
-    TEST("DAY2_movie_autonomous");
+    TEST_RETAIL_DISC1("DAY2_movie_autonomous"); TEST_RETAIL_FIXUPS(RETAILFIX_dispenv); TEST_RETAIL_FIXUPS(RETAILFIX_cd_device_tables);
     /* ── Synthetic fixture: deterministic chain proof. ───────────────── */
     ResetTestState();
     HostFB_Init();PE_GPU_Init();func_80073C94();B54KR_SeedGpuStatic();

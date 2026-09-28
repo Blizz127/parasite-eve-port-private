@@ -3,7 +3,7 @@
 static void test_DAY1_m28_projectile(void)
 {
     unsigned k,i,j;
-    TEST("DAY1_m28_projectile");
+    TEST_RETAIL_DISC1("DAY1_m28_projectile"); TEST_RETAIL_FIXUPS(RETAILFIX_m28_projectile);
     for (k=0;k<sizeof(DAY1_m28_projectile_cases)/sizeof(DAY1_m28_projectile_cases[0]);k++) {
         const uint32_t *a=DAY1_m28_projectile_cases[k].args;
         uint32_t result=0;uint64_t hash;

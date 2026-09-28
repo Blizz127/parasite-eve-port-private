@@ -8,6 +8,7 @@
  * native adaptation.
  */
 
+#include "pe_str_feed.h"
 #include "game_port.h"
 #include "pe_gpu.h"
 #include "pe_irq.h"
@@ -36,6 +37,7 @@ static int g_port_skip_movie = 0;
 static int g_port_skip_opening_menu = 0;
 static int g_port_card_testevent_host_return = 0;
 static int g_port_movie_continue_budget = -1;
+static int g_port_title_loop_budget = -1;
 static PEPortPadSource g_port_pad_source = NULL;
 
 void PE_Port_SetSkipMovie(int enabled)
@@ -65,6 +67,21 @@ int PE_Port_ConsumeMovieContinue(void)
     if (g_port_movie_continue_budget == 0)
         return 0;
     g_port_movie_continue_budget--;
+    return 1;
+}
+
+void PE_Port_SetTitleLoopBudget(int continues)
+{
+    g_port_title_loop_budget = continues;
+}
+
+int PE_Port_ConsumeTitleLoop(void)
+{
+    if (g_port_title_loop_budget < 0)
+        return 1;
+    if (g_port_title_loop_budget == 0)
+        return 0;
+    g_port_title_loop_budget--;
     return 1;
 }
 
@@ -112,6 +129,8 @@ void PE_Port_RunControlReset(void)
     g_port_skip_opening_menu = 0;
     g_port_card_testevent_host_return = 0;
     g_port_movie_continue_budget = -1;
+    g_port_title_loop_budget = -1;
+    PE_StrFeed_Reset();
     g_port_pad_source = NULL;
     g_port_stop_requested = 0;
     g_port_main_iterations = 0;

@@ -3,11 +3,13 @@
 static void test_INV4_retail_inventory_commit(void)
 {
     unsigned k,i;
-    TEST("INV4_retail_inventory_commit");
+    TEST_RETAIL_DISC1("INV4_retail_inventory_commit"); TEST_RETAIL_FIXUPS(RETAILFIX_inventory_commit);
     for (k=0;k<sizeof(INV4_inventory_commit_cases)/sizeof(INV4_inventory_commit_cases[0]);k++) {
         const uint32_t *a=INV4_inventory_commit_cases[k].args;
         uint64_t hash;
         ResetTestState();
+        /* func_800209F0 reads its weapon tables from the disc-loaded EXE. */
+        ASSERT(PE_TestRetail_LoadExeRange(0x800106A4u, 0x39u) == 0, "EXE 0x800106A4 table");
         for (i=0;i<sizeof(INV4_inventory_commit_common)/sizeof(INV4_inventory_commit_common[0]);i++)
             PE_StoreU32(0x80000000u+INV4_inventory_commit_common[i][0],INV4_inventory_commit_common[i][1]);
         for (i=INV4_inventory_commit_cases[k].first;i<INV4_inventory_commit_cases[k].end;i++)

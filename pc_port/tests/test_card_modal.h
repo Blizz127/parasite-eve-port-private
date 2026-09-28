@@ -1,7 +1,7 @@
 #include "retail_card_modal_cases.h"
 static void test_DAY1_card_modal(void)
 {
-    TEST("DAY1_card_modal");
+    TEST_RETAIL_DISC1("DAY1_card_modal"); TEST_RETAIL_FIXUPS(RETAILFIX_card_modal);
     for(unsigned n=0;n<112;n++) {
         ResetTestState();
         for(unsigned i=0;i<sizeof(DAY1_card_modal_common)/sizeof(DAY1_card_modal_common[0]);i++)

@@ -3,7 +3,7 @@
 static void test_DAY1_retail_inventory_sort(void)
 {
     unsigned k,i,failures=0;
-    TEST("DAY1_retail_inventory_sort");
+    TEST_RETAIL_DISC1("DAY1_retail_inventory_sort"); TEST_RETAIL_FIXUPS(RETAILFIX_inventory_sort);
     for (k=0;k<sizeof(DAY1_inventory_sort_cases)/sizeof(DAY1_inventory_sort_cases[0]);k++) {
         const uint32_t *args=DAY1_inventory_sort_cases[k].args;
         uint32_t a=args[0],result=0u;

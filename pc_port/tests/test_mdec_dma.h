@@ -1,7 +1,7 @@
 #include "retail_mdec_io_cases.h"
 static void test_DAY2_mdec_dma(void)
 {
-    TEST("DAY2_mdec_dma");
+    TEST_RETAIL_DISC1("DAY2_mdec_dma"); TEST_RETAIL_FIXUPS(RETAILFIX_dispenv); TEST_RETAIL_FIXUPS(RETAILFIX_mdec_pixel_tables);
     PeMdecState state;
     for(unsigned k=0;k<sizeof(MDECIO_input)/sizeof(MDECIO_input[0]);k++) {
         ResetTestState();PE_StoreU32(0x80140000u,MDECIO_input[k].command);

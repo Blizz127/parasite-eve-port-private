@@ -19,9 +19,10 @@
 static void MOVPLY_SeedRecord(unsigned id,unsigned wide)
 {
     pe_addr_t record=0x80122438u+id*20u;
-    PE_StoreU8(0x80122FF0u,'\\');PE_StoreU8(0x80122FF1u,0u);   /* prefix "\\" */
-    PE_StoreU32(0x80120FF4u,0x80122FF0u);
-    PE_StoreU32(0x80120FFCu,0x80122FF0u);
+    /* Retail 121C04 strcats the prefix strings AT 0x80120FF4/0x80120FFC
+     * (addiu a1), not through a pointer stored there. */
+    PE_StoreU8(0x80120FF4u,'\\');PE_StoreU8(0x80120FF5u,0u);   /* prefix "\\" */
+    PE_StoreU8(0x80120FFCu,'\\');PE_StoreU8(0x80120FFDu,0u);
     strcpy(PE_Translate(0x80130130u,16u),"PE.IMG;1");
     PE_StoreU32(0x80122438u+id*20u,0x80130130u);   /* record[0] is the name */
     PE_StoreU8(record+4u,(uint8_t)wide);
@@ -57,7 +58,7 @@ static void test_DAY2_movie_player(void)
     PeMdecState mdec;
     unsigned wide,k;
 
-    TEST("DAY2_movie_player");
+    TEST_RETAIL_DISC1("DAY2_movie_player"); TEST_RETAIL_FIXUPS(RETAILFIX_dispenv); TEST_RETAIL_FIXUPS(RETAILFIX_cd_device_tables);
     /* Early returns: halfword id >= 0x2F returns 0 without touching B0DBF. */
     for(k=0u;k<4u;k++) {
         unsigned id=k==0u?0x2Fu:k==1u?0x30u:k==2u?0x8000012Fu:0xFFFFu;

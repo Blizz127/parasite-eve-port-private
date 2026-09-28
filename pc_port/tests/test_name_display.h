@@ -3,7 +3,7 @@
 static void test_NAM8_retail_name_display(void)
 {
     unsigned k,i;
-    TEST("NAM8_retail_name_display");
+    TEST_RETAIL_DISC1("NAM8_retail_name_display"); TEST_RETAIL_FIXUPS(RETAILFIX_name_display);
     for (k=0;k<sizeof(NAM8_name_display_cases)/sizeof(NAM8_name_display_cases[0]);k++) {
         const uint32_t *a=NAM8_name_display_cases[k].args;
         uint64_t hash;uint32_t result=0u;

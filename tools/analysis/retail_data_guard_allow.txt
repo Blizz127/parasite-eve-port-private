@@ -1,0 +1,13 @@
+# retail_data_guard allowlist: tracked files that may legitimately contain
+# byte runs equal to the retail disc.  One path per line; keep the reason.
+#
+# Matched decompilation C (CLAUDE.md hard rule 1: verified against the retail
+# binary by the checksum/rebuild harness).  A matching function's initialized
+# local tables compile to the same .rodata bytes by construction.
+src/func_80022394.c
+src/func_80024250.c
+
+# SPU hardware 4-point gaussian table, transcribed from psx-spx (public hardware
+# documentation, not game data). The 40-byte hit is the low-entropy -1/0/1 head
+# of the table colliding with bytes in PE.IMG.
+pc_port/platform/pe_spu_gauss.inc

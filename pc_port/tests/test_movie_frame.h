@@ -1,7 +1,7 @@
 #include "retail_movie_frame_cases.h"
 static void test_DAY2_movie_frame(void)
 {
-    TEST("DAY2_movie_frame");
+    TEST_RETAIL_DISC1("DAY2_movie_frame"); TEST_RETAIL_FIXUPS(RETAILFIX_dispenv);
     for (unsigned k=0;k<sizeof(MOVFRAME_display)/sizeof(MOVFRAME_display[0]);k++) {
         ResetTestState();
         for (unsigned j=0;j<sizeof(MOVFRAME_display_ranges)/sizeof(MOVFRAME_display_ranges[0]);j++)

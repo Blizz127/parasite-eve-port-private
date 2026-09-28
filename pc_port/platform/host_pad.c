@@ -27,6 +27,8 @@
 #define EV_BTN_TR2      0x139
 #define EV_BTN_SELECT   0x13a
 #define EV_BTN_START    0x13b
+#define EV_BTN_THUMBL   0x13d
+#define EV_BTN_THUMBR   0x13e
 #define EV_BTN_DPAD_UP    0x220
 #define EV_BTN_DPAD_DOWN  0x221
 #define EV_BTN_DPAD_LEFT  0x222
@@ -77,7 +79,8 @@ void HostPad_DeviceDefaults(HostPadDevice *dev)
      * axes LX LY LT RX RY RT HatX HatY. */
     static const uint16_t btn[] = {EV_BTN_A, EV_BTN_B, EV_BTN_X, EV_BTN_Y,
                                    EV_BTN_TL, EV_BTN_TR, EV_BTN_SELECT,
-                                   EV_BTN_START, 0x13c, 0x13d, 0x13e};
+                                   EV_BTN_START, 0x13c, EV_BTN_THUMBL,
+                                   EV_BTN_THUMBR};
     static const uint8_t ax[] = {EV_ABS_X, EV_ABS_Y, EV_ABS_Z, 0x03, 0x04,
                                  EV_ABS_RZ, EV_ABS_HAT0X, EV_ABS_HAT0Y};
     memset(dev, 0, sizeof(*dev));
@@ -90,7 +93,15 @@ void HostPad_DeviceEvent(HostPadDevice *dev, uint8_t type, uint8_t number, int16
 {
     type &= (uint8_t)~JS_EVENT_INIT;
     if (type == JS_EVENT_BUTTON) {
-        uint16_t bit = button_bit(dev->btn_code[number]);
+        uint16_t code = dev->btn_code[number];
+        uint8_t hk = code == EV_BTN_THUMBR ? HOST_PAD_HOTKEY_FF_HOLD :
+                     code == EV_BTN_THUMBL ? HOST_PAD_HOTKEY_FF_TOGGLE : 0u;
+        uint16_t bit = button_bit(code);
+        if (hk) {
+            if (value) dev->hotkeys |= hk;
+            else       dev->hotkeys &= (uint8_t)~hk;
+            return;
+        }
         if (!bit) return;
         if (value) dev->buttons |= bit;
         else       dev->buttons &= (uint16_t)~bit;
@@ -134,6 +145,11 @@ uint16_t HostPad_DeviceHeld(const HostPadDevice *dev)
         }
     }
     return held;
+}
+
+uint8_t HostPad_DeviceHotkeys(const HostPadDevice *dev)
+{
+    return dev->hotkeys;
 }
 
 /* ── Device management ─────────────────────────────────────────────── */
@@ -271,6 +287,14 @@ uint16_t HostPad_Held(void)
     for (int i = 0; i < HOST_PAD_MAX_DEVICES; i++)
         if (g_slots[i].fd >= 0) held |= HostPad_DeviceHeld(&g_slots[i].dev);
     return held;
+}
+
+uint8_t HostPad_Hotkeys(void)
+{
+    uint8_t hk = 0;
+    for (int i = 0; i < HOST_PAD_MAX_DEVICES; i++)
+        if (g_slots[i].fd >= 0) hk |= HostPad_DeviceHotkeys(&g_slots[i].dev);
+    return hk;
 }
 
 void HostPad_Close(void)

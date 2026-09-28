@@ -39,7 +39,7 @@ static uint64_t ATK26_flare_hash(void)
 static void test_ATK26_retail_eve_flare(void)
 {
     unsigned k,i;
-    TEST("ATK26_retail_eve_flare");
+    TEST_RETAIL_DISC1("ATK26_retail_eve_flare"); TEST_RETAIL_FIXUPS(RETAILFIX_eve_flare);
     for (k=0;k<sizeof(ATK26_flare_cases)/sizeof(ATK26_flare_cases[0]);k++) {
         const uint32_t *a=ATK26_flare_cases[k].args;
         uint32_t result=0;uint64_t hash;

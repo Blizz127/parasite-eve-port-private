@@ -40,6 +40,173 @@ static uint16_t RoutePilotAimPadT(int dx, int dz)
     return mask;
 }
 
+/* ---- DAY1 route shim: simple M34 weak-point controller -----------------
+ * Opt-in (port_main sets g_route_m34_shim for --route-pad unless
+ * PE_ROUTE_M34_NO_SHIM=1; the harness leaves it 0). Logged as a fidelity gap
+ * in docs/ai_context/DAY1_FIDELITY_GAPS.md ("Route shim: M34 HP lock").
+ * The ONLY guest write is Aya's current HP (record+12) := max (record+28)
+ * while token==M0034I, so the autopilot need not out-kite the head. Damage,
+ * targeting, the room script's HP<=1,000,000 poll, outro and the M0359I
+ * transfer all run unmodified. Movement uses a pad->world map learned online
+ * from Aya's displacement (the arena camera is rotated), seeded from the
+ * 0x800BD000/4 matrix. */
+static int g_route_m34_shim;
+static int g_m34s_vx[4], g_m34s_vz[4], g_m34s_init;   /* Up,Right,Down,Left */
+static const uint16_t kM34sPad[4]={0xFFEFu,0xFFDFu,0xFFBFu,0xFF7Fu};
+
+static uint16_t RouteM34ShimMove(int ax, int az, int wx, int wz, int stop2)
+{
+    static int last_dir=-1, hold=0, px, pz;
+    int c=(int16_t)PE_LoadU16(0x800BD000u),sn=(int16_t)PE_LoadU16(0x800BD004u);
+    int best=-1; long long bd=0;
+    if (!g_m34s_init) {
+        if (!c && !sn) c=4096;
+        /* w = M p with M=[[c,-sn],[sn,c]] (transposed-aim convention). */
+        g_m34s_vx[0]=-sn; g_m34s_vz[0]=c;     /* Up    p=(0,1)  */
+        g_m34s_vx[1]=c;   g_m34s_vz[1]=sn;    /* Right p=(1,0)  */
+        g_m34s_vx[2]=sn;  g_m34s_vz[2]=-c;    /* Down  p=(0,-1) */
+        g_m34s_vx[3]=-c;  g_m34s_vz[3]=-sn;   /* Left  p=(-1,0) */
+        for (int i=0;i<4;i++) {
+            int n=abs(g_m34s_vx[i])+abs(g_m34s_vz[i]); if(!n)n=1;
+            g_m34s_vx[i]=g_m34s_vx[i]*1000/n; g_m34s_vz[i]=g_m34s_vz[i]*1000/n;
+        }
+        g_m34s_init=1;
+        fprintf(stderr,"M34_SHIM_MAP_SEED c=%d sn=%d U=(%d,%d) R=(%d,%d) D=(%d,%d) L=(%d,%d)\n",
+                c,sn,g_m34s_vx[0],g_m34s_vz[0],g_m34s_vx[1],g_m34s_vz[1],
+                g_m34s_vx[2],g_m34s_vz[2],g_m34s_vx[3],g_m34s_vz[3]);
+    }
+    /* Learn: after 12 frames of the same single direction, the net
+     * displacement over the last window is that pad's world direction. */
+    if (last_dir>=0 && hold>=12) {
+        int dx=ax-px,dz=az-pz,n=abs(dx)+abs(dz);
+        if (n>=40) {
+            int nx=dx*1000/n,nz=dz*1000/n;
+            if ((long long)nx*g_m34s_vx[last_dir]+(long long)nz*g_m34s_vz[last_dir]<0)
+                fprintf(stderr,"M34_SHIM_MAP_FLIP %d dir=%d old=(%d,%d) new=(%d,%d)\n",
+                        g_frame,last_dir,g_m34s_vx[last_dir],g_m34s_vz[last_dir],nx,nz);
+            g_m34s_vx[last_dir]=(g_m34s_vx[last_dir]+nx*3)/4;
+            g_m34s_vz[last_dir]=(g_m34s_vz[last_dir]+nz*3)/4;
+        }
+        hold=0; px=ax; pz=az;
+    }
+    if ((long long)wx*wx+(long long)wz*wz<=stop2) { last_dir=-1; hold=0; return 0xFFFFu; }
+    for (int i=0;i<4;i++) {
+        long long d=(long long)wx*g_m34s_vx[i]+(long long)wz*g_m34s_vz[i];
+        if (best<0 || d>bd) { bd=d; best=i; }
+    }
+    if (best!=last_dir) { last_dir=best; hold=0; px=ax; pz=az; }
+    else hold++;
+    return kM34sPad[best];
+}
+
+static uint16_t RouteM34Shim(void)
+{
+    static int broken_logged, last_log;
+    pe_addr_t aya=PE_LoadU32(0x8009D254u),rec=PE_LoadU32(0x8009D278u);
+    unsigned mode=PE_LoadU32(0x8009D28Cu);
+    pe_addr_t tail=0,head=0; unsigned tail_idx=0xFFu, count=PE_LoadU8(0x8009D2B0u);
+    int ax=0,az=0,tx=0,tz=0,tailhp=0,headhp=0,t2=0;
+    uint16_t mask=0xFFFFu;
+    if (rec) {
+        unsigned mx=PE_LoadU16(rec+28u);
+        if (mx && PE_LoadU16(rec+12u)<mx) PE_StoreU16(rec+12u,(uint16_t)mx);
+    }
+    if (!aya || !rec) return 0xFFFFu;
+    ax=(int32_t)PE_LoadU32(aya+40u)>>16; az=(int32_t)PE_LoadU32(aya+48u)>>16;
+    for (unsigned i=0;i<45;i++) {
+        pe_addr_t p=PE_LoadU32(0x8009E000u+i*12u);
+        if (!p) break;
+        if (p==aya || !PE_RangeIsRam(p,640u) || !PE_RangeIsRam(PE_LoadU32(p),24u)) continue;
+        if (PE_LoadU8(p+12u)==4u) { tail=p; tail_idx=i; tailhp=(int32_t)PE_LoadU32(PE_LoadU32(p)+16u); }
+        else if (PE_LoadU8(p+12u)==3u) { head=p; headhp=(int32_t)PE_LoadU32(PE_LoadU32(p)+16u); }
+    }
+    if (tail) {
+        tx=(int32_t)PE_LoadU32(tail+40u)>>16; tz=(int32_t)PE_LoadU32(tail+48u)>>16;
+        t2=(tx-ax)*(tx-ax)+(tz-az)*(tz-az);
+    }
+    if (tail && tailhp>0 && tailhp<=1000000 && !broken_logged) {
+        broken_logged=1;
+        fprintf(stderr,"M34_TAIL_BROKEN %d tailhp=%d headhp=%d t2=%d (shim)\n",g_frame,tailhp,headhp,t2);
+    }
+    if (g_frame-last_log>=60) {
+        last_log=g_frame;
+        fprintf(stderr,"M34_SHIM %d mode=%u pos=%d,%d tail=%d,%d t2=%d tailhp=%d headhp=%d hp=%u/%u atb=%u loaded=%u ammo=%u sel=%u tidx=%u cnt=%u\n",
+                g_frame,mode,ax,az,tx,tz,t2,tailhp,headhp,PE_LoadU16(rec+12u),PE_LoadU16(rec+28u),
+                PE_LoadU16(rec+16u),
+                PE_LoadU32(rec+104u)?(PE_LoadU32(PE_LoadU32(rec+104u)+12u)&0x3FFu):0u,
+                PE_LoadU16(0x800A1E6Eu),PE_LoadU8(0x8009CE44u),tail_idx,count);
+    }
+    (void)head;
+    if (mode==1u) {
+        /* ATB target menu: select the type-4 tail, then commit. */
+        unsigned sel=PE_LoadU8(0x8009CE44u);
+        if (tail_idx!=0xFFu && sel!=tail_idx) {
+            if (g_frame%8==3) mask=tail_idx>sel?0xFFBFu:0xFFEFu;
+        } else if (g_frame%8==3) mask=0xBFFFu;
+        return mask;
+    }
+    if (mode!=0u) {
+        /* Outro / dialogue / transfer: slow Cross to advance text. */
+        if (g_frame%32==3) mask=0xBFFFu;
+        return mask;
+    }
+    if (tail && tailhp>1000000) {
+        int stop2=500000; /* ~707 world units: well inside the 1071 band */
+        mask=RouteM34ShimMove(ax,az,tx-ax,tz-az,stop2);
+        if (t2<=900000 && g_frame%8==3) mask&=0xBFFFu; /* attack / reload */
+    } else if (g_frame%32==3) mask=0xBFFFu;
+    return mask;
+}
+
+/* ---- DAY1 route shim: generic battle aid (harness-only) ------------------
+ * For battles whose recorded pads drift with port changes (first: the M0023I
+ * rehearsal Eve fight, token A80021C8). HP lock as for M34, then: keep
+ * 600..950 world units from the nearest living enemy, Cross when the ATB is
+ * full (opens targeting), and in mode 1 Cross on the default target. The
+ * room's own HP-threshold script ends the fight. */
+static int g_route_battle_shim;
+static uint16_t RouteBattleShim(void)
+{
+    static int last_log; static uint32_t last_tok;
+    pe_addr_t aya=PE_LoadU32(0x8009D254u),rec=PE_LoadU32(0x8009D278u);
+    unsigned mode=PE_LoadU32(0x8009D28Cu);
+    pe_addr_t best=0; long long bd=0; int ax,az,ex=0,ez=0,ehp=0;
+    uint16_t mask=0xFFFFu;
+    if ((uint32_t)GA_TOKEN!=last_tok) { last_tok=(uint32_t)GA_TOKEN; g_m34s_init=0; }
+    if (rec) {
+        unsigned mx=PE_LoadU16(rec+28u);
+        if (mx && PE_LoadU16(rec+12u)<mx) PE_StoreU16(rec+12u,(uint16_t)mx);
+    }
+    if (!aya || !rec) return 0xFFFFu;
+    ax=(int32_t)PE_LoadU32(aya+40u)>>16; az=(int32_t)PE_LoadU32(aya+48u)>>16;
+    for (unsigned i=0;i<45;i++) {
+        pe_addr_t p=PE_LoadU32(0x8009E000u+i*12u);
+        int x,z; long long d;
+        if (!p) break;
+        if (p==aya || !PE_RangeIsRam(p,640u) || !PE_RangeIsRam(PE_LoadU32(p),24u) ||
+            (int32_t)PE_LoadU32(PE_LoadU32(p)+16u)<=0) continue;
+        x=(int32_t)PE_LoadU32(p+40u)>>16; z=(int32_t)PE_LoadU32(p+48u)>>16;
+        d=(long long)(x-ax)*(x-ax)+(long long)(z-az)*(z-az);
+        if (!best || d<bd) { best=p; bd=d; ex=x; ez=z; ehp=(int32_t)PE_LoadU32(PE_LoadU32(p)+16u); }
+    }
+    if (g_frame-last_log>=60) {
+        last_log=g_frame;
+        fprintf(stderr,"BATTLE_SHIM %d token=%08X mode=%u pos=%d,%d enemy=%d,%d d2=%lld ehp=%d type=%u hp=%u/%u atb=%u\n",
+                g_frame,(unsigned)GA_TOKEN,mode,ax,az,ex,ez,bd,ehp,best?PE_LoadU8(best+12u):0u,
+                PE_LoadU16(rec+12u),PE_LoadU16(rec+28u),PE_LoadU16(rec+16u));
+    }
+    if (mode==1u) { if (g_frame%8==3) mask=0xBFFFu; return mask; }
+    if (mode!=0u) { if (g_frame%32==3) mask=0xBFFFu; return mask; }
+    if (best) {
+        int wx=ex-ax,wz=ez-az;
+        if (bd>360000) mask=RouteM34ShimMove(ax,az,wx,wz,0);
+        else if (bd<90000) mask=RouteM34ShimMove(ax,az,-wx,-wz,0);
+        else mask=0xFFFFu;
+        if (g_frame%8==3) mask&=0xBFFFu;
+    }
+    return mask;
+}
+
 static uint16_t RoutePilotItemHealMask(int heal_start)
 {
     /* Oracle cadence (SUPPLY_MENU pads 61000..61152): Triangle 2f, idle ~28f,
@@ -158,6 +325,9 @@ static uint16_t RouteRewardSewerPilot(uint16_t mask)
     /* M34 must own the pad from room entry, not only after the battle flag.
      * The recorded supply suffix is Cross/idle, so leaving it in control
      * parks Aya on the alligator's charge line. */
+    if (m34 && g_route_m34_shim) return RouteM34Shim();
+    if (g_route_battle_shim && GA_TOKEN==0xA80021C8u && (PE_LoadU32(0x8009D1A0u)&2u))
+        return RouteBattleShim();
     if ((GA_TOKEN==0xA80023C8u || GA_TOKEN==0xA8002448u || GA_TOKEN==0xA8003148u || m34) &&
         (m34 || (PE_LoadU32(0x8009D1A0u)&2u))) {
         pe_addr_t aya=PE_LoadU32(0x8009D254u),rec=PE_LoadU32(0x8009D278u);

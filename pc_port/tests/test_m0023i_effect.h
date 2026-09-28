@@ -43,7 +43,7 @@ static uint64_t DAY1_effect_hash(void)
 static void test_DAY1_retail_m0023i_effect(void)
 {
     unsigned k,i;
-    TEST("DAY1_retail_m0023i_effect");
+    TEST_RETAIL_DISC1("DAY1_retail_m0023i_effect"); TEST_RETAIL_FIXUPS(RETAILFIX_m0023i_effect);
     for (k=0;k<sizeof(DAY1_effect_cases)/sizeof(DAY1_effect_cases[0]);k++) {
         const uint32_t *a=DAY1_effect_cases[k].args;
         uint32_t result=0;uint64_t hash;

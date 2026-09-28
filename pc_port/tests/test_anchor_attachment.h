@@ -1,7 +1,7 @@
 #include "retail_anchor_attachment_cases.h"
 static void test_DAY1_anchor_attachment(void)
 {
-    TEST("DAY1_anchor_attachment");
+    TEST_RETAIL_DISC1("DAY1_anchor_attachment"); TEST_RETAIL_FIXUPS(RETAILFIX_anchor_attachment);
     for (unsigned k=0;k<sizeof(ANC_cases)/sizeof(ANC_cases[0]);k++) {
         uint64_t hash;
         ResetTestState();

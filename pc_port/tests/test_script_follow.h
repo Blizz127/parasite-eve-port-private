@@ -1,7 +1,7 @@
 #include "retail_script_follow_cases.h"
 static void test_DAY1_script_follow(void)
 {
-    TEST("DAY1_script_follow");
+    TEST_RETAIL_DISC1("DAY1_script_follow"); TEST_RETAIL_FIXUPS(RETAILFIX_script_follow);
     for(unsigned k=0;k<sizeof(DAY1_follow_cases)/sizeof(DAY1_follow_cases[0]);k++) {
         if(!DAY1_follow_cases[k].frame) {
             ResetTestState();

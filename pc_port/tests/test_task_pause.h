@@ -2,7 +2,7 @@
 
 static void test_DAY1_task_pause(void)
 {
-    TEST("DAY1_task_pause");
+    TEST_RETAIL_DISC1("DAY1_task_pause"); TEST_RETAIL_FIXUPS(RETAILFIX_task_pause);
     for (unsigned k=0;k<sizeof(task_pause_cases)/sizeof(task_pause_cases[0]);k++) {
         ResetTestState();
         for (unsigned i=0;i<sizeof(task_pause_common)/sizeof(task_pause_common[0]);i++)

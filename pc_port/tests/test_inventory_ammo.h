@@ -3,7 +3,7 @@
 static void test_INV9_retail_inventory_ammo(void)
 {
     unsigned k,i;
-    TEST("INV9_retail_inventory_ammo");
+    TEST_RETAIL_DISC1("INV9_retail_inventory_ammo"); TEST_RETAIL_FIXUPS(RETAILFIX_inventory_ammo);
     for (k=0;k<sizeof(INV9_inventory_ammo_cases)/sizeof(INV9_inventory_ammo_cases[0]);k++) {
         const uint32_t *args=INV9_inventory_ammo_cases[k].args;
         uint32_t a=args[0],result=0u;

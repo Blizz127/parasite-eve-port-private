@@ -3,7 +3,7 @@
 static void test_SEW14_m0013i_effect(void)
 {
     unsigned k,i,j;
-    TEST("SEW14_m0013i_effect");
+    TEST_RETAIL_DISC1("SEW14_m0013i_effect"); TEST_RETAIL_FIXUPS(RETAILFIX_m0013i_effect);
     for (k=0;k<sizeof(SEW14_cases)/sizeof(SEW14_cases[0]);k++) {
         const uint32_t *a=SEW14_cases[k].args;
         uint32_t result=0;uint64_t hash;

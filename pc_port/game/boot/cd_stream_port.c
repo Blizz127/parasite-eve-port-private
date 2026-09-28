@@ -4,6 +4,7 @@
  * Enabled-device physical FIFO/DMA3 paths are connected; unsupported
  * device states and unknown callbacks remain explicit stops.
  */
+#include "pe_str_feed.h"
 #include "psx_compat.h"
 #include "pe_sdk.h"
 #include "pe_gpu.h"
@@ -820,6 +821,7 @@ void func_8007C13C(void)
  * the original bank/request registers within the critical section. */
 void func_8007A2A4(void)
 {
+    PE_StrFeed_Close(); /* HOST_ADAPTED feeder teardown (pe_str_feed.h) */
     (void)func_80072714();
     if(PE_LoadU32(0x8009AFD8u)==1u) {
         (void)func_800824F0(0u);
@@ -907,6 +909,14 @@ int func_8007F418(uint32_t sequence,pe_addr_t response)
  * SDK worker advances the enabled device clock and dispatches real IRQs. */
 int func_80080DC4(int command,pe_addr_t param,pe_addr_t response)
 {
+    /* HOST_ADAPTED (fmv lane): with the CD device disabled the only
+     * streaming reader is pe_str_feed; CdlPause(9)/CdlStop(8) end it and
+     * complete immediately (no controller response bytes are read by the
+     * movie callers). */
+    if(!PE_CdReg_DeviceEnabled() && (((uint32_t)command&255u)==9u || ((uint32_t)command&255u)==8u)) {
+        PE_StrFeed_Close();
+        return 1;
+    }
     uint32_t sequence=func_8007EE84((uint32_t)command&255u,param,0u,0u);
     if(!sequence || PE_Port_ShouldStop()) return 0;
     for(unsigned polls=0;;polls++) {

@@ -13,6 +13,11 @@
 #include "game_port.h"
 #include "pe_sdk.h"
 
+#include <stdio.h>
+#include <stdlib.h>
+
+#define FMV_DBG(...) do { if (getenv("PE_FMV_DEBUG")) fprintf(stderr, "[FMV] " __VA_ARGS__); } while (0)
+
 #define GA_READ_DEST       0x8001160Cu
 #define GA_ARENA           0x80011610u
 #define GA_READ_TABLE      0x8009315Eu
@@ -21,6 +26,18 @@
 #define GA_RECORD_BASE     0x801D0E04u
 
 extern int PE_func_80191FB8_Values(int count, const pe_addr_t *sources);
+
+/* HOST_ADAPTED: retail libpad fills the BIOS pad buffer from the VSync
+ * interrupt; the port fills it from the host pad source right before the
+ * guest's func_8003EB04 read (same contract as func_8003F3C4's field
+ * tick), so title/movie loops see window or scripted input. */
+static void HostPadFill(void)
+{
+    if (PE_Port_HasPadSource()) {
+        PE_StoreU16(0x800BE9A0u, 0x4100u);
+        PE_StoreU16(0x800BE9A2u, PE_Port_ReadPadRaw());
+    }
+}
 
 static void ClearMovieArenas(void)
 {
@@ -50,6 +67,7 @@ int func_80192CE8(int index)
     (void)func_80074A44(1); /* ResetGraph light path */
 
 retry_issue:
+    FMV_DBG("92CE8 issue index=%d\n", index);
     start = PE_LoadU16(GA_READ_TABLE);
     end = PE_LoadU16(GA_READ_TABLE + 2u);
     do {
@@ -67,6 +85,7 @@ retry_issue:
             goto retry_issue;
     }
 
+    FMV_DBG("92CE8 read done\n");
     (void)func_80072714();
     func_800726C4();
     func_80072724();
@@ -78,7 +97,9 @@ retry_issue:
     if (PE_Port_ShouldStop())
         return -1;
 
+    FMV_DBG("92CE8 91FB8 done stream=%08X\n", stream);
     (void)func_801924F8((int16_t)index);
+    FMV_DBG("92CE8 924F8 done BA=%u BC=%d\n", PE_LoadU8(0x800B0DBAu), (int16_t)PE_LoadU16(0x800B0DBCu));
     if (PE_Port_ShouldStop())
         return -1;
 
@@ -99,11 +120,13 @@ retry_issue:
                 return -1;
             }
 
+            HostPadFill();
             func_8003EB04();
             if (PE_Port_ShouldStop())
                 return -1;
 
             step = func_80192934();
+            FMV_DBG("92CE8 step=%d BA=%u BC=%d\n", step, PE_LoadU8(0x800B0DBAu), (int16_t)PE_LoadU16(0x800B0DBCu));
             if (PE_Port_ShouldStop())
                 return -1;
 

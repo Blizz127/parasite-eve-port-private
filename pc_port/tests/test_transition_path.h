@@ -1,7 +1,7 @@
 #include "retail_transition_path_cases.h"
 static void test_DAY1_transition_path(void)
 {
-    TEST("DAY1_transition_path");
+    TEST_RETAIL_DISC1("DAY1_transition_path"); TEST_RETAIL_FIXUPS(RETAILFIX_transition_path);
     const uint32_t ranges[][2]={{0x140000u,512},{0x150000u,32},{0x19BFCCu,4}};
     for(unsigned k=0;k<sizeof(DAY1_path_cases)/sizeof(DAY1_path_cases[0]);k++){
         ResetTestState();

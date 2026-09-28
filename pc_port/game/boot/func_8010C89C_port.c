@@ -208,7 +208,9 @@ main_loop:                      /* CA7C */
         t0 += a3t;
         t1 = PE_LoadU32(t0);
         t3 = 0u;                /* CACC */
-        /* CAD4 delay (at = t1 & 0xFF) already equals at: t1 kept */
+        /* CAD4: the b-delay recomputes at from the NEW long-table t1
+         * (the CA94 value was from the zero first-table entry). */
+        at = (int32_t)(t1 & 0xFFu);
     } else {
         t3 = PE_LoadU32(t0 + 4u);   /* CAD8 */
     }

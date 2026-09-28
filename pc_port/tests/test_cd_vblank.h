@@ -1,7 +1,7 @@
 #include "retail_cd_vblank_cases.h"
 static void test_DAY2_cd_vblank(void)
 {
-    TEST("DAY2_cd_vblank");
+    TEST_RETAIL_DISC1("DAY2_cd_vblank"); TEST_RETAIL_FIXUPS(RETAILFIX_cd_vblank);
     for(unsigned k=0;k<sizeof(CDVB_cases)/sizeof(CDVB_cases[0]);k++) {
         ResetTestState();HostFB_Init();PE_GPU_Init();B558_PlantPointers();PE_Callback_Init();
         for(unsigned j=0;j<5;j++) for(unsigned i=0;i<CDVB_ranges[j][1];i++) PE_StoreU8(0x80000000u+CDVB_ranges[j][0]+i,0u);

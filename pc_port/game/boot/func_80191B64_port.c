@@ -13,8 +13,8 @@
  * Delay-slot notes: the BB0 beqz delay decrements s0 on every pass
  * (zero breaks to BD0, nonzero retries to the DB0 return-0); the
  * bnez delay re-sets a0 = sp+16 for retries; the C84 store is
- * skipped by the second bnez
- * (only the first condition latches [DBD]); D00 stores h=480 on
+ * skipped only when w < the record end frame (second bnez), so both
+ * w < last and w >= end latch [DBD]; D00 stores h=480 on
  * both rect arms (w = [B0DBB] ? 480 : 320); the D38 signed path
  * keeps full 32-bit wrap so the low half matches the srl chain.
  * Fixed-point: ((int64)a0 * 0x92492493 >> 32) + a0, then >> 3
@@ -86,16 +86,18 @@ int func_80191B64(pe_addr_t state)
         uint32_t w = PE_LoadU32(slot + 8u);
         uint32_t lim = (uint32_t)(int32_t)(int16_t)PE_LoadU16(
             0x801D11B0u);
+        /* 0x80191C58..C88: frame went backwards (w < last) OR reached
+         * the movie record's end frame (w >= rec+8) latches [DBD]=1;
+         * only w < end skips the C84 store (bnez at 0x80191C7C). */
         if (w < lim) {
-            v0 = 1;
             PE_StoreU8(0x801D0DBDu, 1u);
         } else {
             uint32_t rec = PE_LoadU32(0x801D11ACu);
             uint32_t rh = (uint32_t)(int32_t)(int16_t)PE_LoadU16(
                 rec + 8u);
-            v0 = (w < rh) ? 1 : 0;
+            if (w >= rh)
+                PE_StoreU8(0x801D0DBDu, 1u);
         }
-        (void)v0;
     }
     /* C8C record publish. */
     {

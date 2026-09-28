@@ -5,7 +5,7 @@
 static void test_P7_retail_hand_adapters(void)
 {
     unsigned k, i, bad = 0u;
-    TEST("P7_retail_hand_adapters");
+    TEST_RETAIL_DISC1("P7_retail_hand_adapters"); TEST_RETAIL_FIXUPS(RETAILFIX_port7);
     for (k = 0; k < sizeof(P7_cases) / sizeof(P7_cases[0]); k++) {
         const uint32_t *a = P7_cases[k].args;
         uint32_t result = 0;

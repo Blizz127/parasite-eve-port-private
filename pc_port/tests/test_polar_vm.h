@@ -1,7 +1,7 @@
 #include "retail_polar_vm_cases.h"
 static void test_DAY1_polar_vm(void)
 {
-    TEST("DAY1_polar_vm");
+    TEST_RETAIL_DISC1("DAY1_polar_vm"); TEST_RETAIL_FIXUPS(RETAILFIX_polar_vm);
     for(unsigned k=0;k<sizeof(polar_vm_cases)/sizeof(polar_vm_cases[0]);k++) {
         ResetTestState();
         for(unsigned i=0;i<sizeof(polar_vm_common)/sizeof(polar_vm_common[0]);i++)

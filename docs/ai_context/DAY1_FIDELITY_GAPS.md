@@ -14,58 +14,74 @@ funcs / `65774` words (`tools/analysis/route_coverage.py --no-history`).
 
 ## Ranked Day-1 blockers
 
-### 1. Opening FMV — HOST_ADAPTED skip is still the only working New-Game path
+### 1. Opening FMV — plays on New Game without `--skip-movie` (fmv lane, 2026-09-28)
+
+Evidence: `docs/evidence/fmv-playback/REPORT.md`. Headless, real Disc 1, no
+skip flags: boot → logos → `FMV1/FMV001.STR;1` (LBA 189742) all **2077**
+frames in **8318** VBlanks (15 fps; retail `func_80070E54` `VSync(4)`), with
+**2597** XA-ADPCM sectors mixed through the audio lane's SPU CD input → title
+"Press Start Button" → Start → "New Game / Tutorial" → New Game → field
+opcode `0x35` plays `FMV000.STR` (SQUARE logo, 150 frames) → opening
+Carnegie Hall scene. Start during FMV001 skips it (retail 60-frame wait).
+`--skip-movie` stays for the `--route-pad` autopilot.
 
 | Item | Status |
 | --- | --- |
-| File identity | **Strong native evidence for `FMV1/FMV001.STR;1` at LBA 189742** (movie index 1 / `func_80192CE8(1)`); acceptance contract still labels critical-path opcode/file mapping `RESEARCH_REQUIRED` (`PE_DAY1_ACCEPTANCE_CONTRACT.md:182`) — do not treat as closed for acceptance |
-| Harness / default run | **Partial:** `OPEN1` proves New Game enters real FMV without `skip-movie` (budgeted). Connected route harness still forces `PE_Port_SetSkipMovie(1)`. |
-| `got_frame` / C89C | **PASS on real FMV001:** live C89C→7C394→EC. |
-| `92CE8` media loop | **Partial:** continue-frame live; default unlimited; B54KY/OPEN1 budget=1 → `func_80192CE8_media_loop`. FMV001 ≈2077 frames. |
-| Title join after FMV | **Partial:** pad-seeded body runs `90064`+`8F468`+merge+present; frontier **`0x801911C0`** (loop continue). Canary without pad still `0x801911F8`. |
-| Real playback on connected route | **Not yet.** Full STR + title + drop route skip-movie still open |
+| Stream delivery | **HOST_ADAPTED producer** `pc_port/platform/pe_str_feed.{c,h}`: production runs never enable the modeled CD register device, so the retail IRQ-driven stream assembly (7C13C→7C564→DMA3→7C214) is replaced by a host feeder that reads raw sectors at the 2× rate (2.5 sectors / VBlank, credited from **all** VBlanks), writes STR chunk headers/data into the `StSetRing` records exactly where `func_8007C484`/`func_8007C394` read them, and advances VBlanks only while the guest waits on the stream. Everything downstream (91B64/924F8/92934, DecDCTvlc, MDEC, 91DC8 slices, display) is the guest player |
+| Frame pacing / present | While a stream is open the feeder pays one host present per VBlank (the window pacer is one present = 1/60 s), so picture and XA audio run at real time. Approximation: the drive read-ahead is capped at ~2 s; ring-full stalls the drive instead of dropping sectors |
+| ReadS / Pause with device off | `func_80081314` no longer queues the four SetMode/Setloc/ReadS packets that nothing drains (they blocked every later `func_8006E6D4` read); `func_80080DC4` Pause/Stop closes the feeder and completes without controller response bytes |
+| XA audio | Audio sectors go to `PE_Spu_CdSector` at their drive-time position. Drive ATV volume matrix is not modeled with the device off → straight stereo 0x80 (retail power-on/CdMix default); SPU CD volume 0x1B0/0x1B2 unwritten (see §3) |
+| MDEC | DecDCTvlc pads past the last macroblock; a new decode command now drops the stale tail (hardware leaves it in the FIFO) |
+| 24-bit display | `HostFB_PresentDispEnv` decodes `DISPENV.isrgb24` (packed RGB, disp.w in VRAM units) |
+| Title | `func_801909B4` full retail loop: attract timeout (1000 frames → replay FMV001), menu dispatch (0xA0 NEW GAME → 1; card screen via `func_8005C498`; 0xB4 w/o card / ≥0xB5 → 3), teardown + env restore. Title objects: `func_8018F468` retranslated (dirty-rect union, TIM background restore, all node callbacks), `func_80192FE8` (y/alpha were swapped), new `title_menu_callbacks_port.c` (8018F958/8018FD04/8018FE1C/80192F98/80193084/801930D8/8019316C/801931BC/80193200). Host pad fill before the title/movie `func_8003EB04` reads (retail libpad fills at VSync) |
+| Port bugs fixed from overlay bytes | `func_8010C89C` long-code `at` reload (0x8010CAD4 delay slot); `func_80191B64` end-frame latch (DBD also when `w >= record+8`); `func_801924F8` give-up wait compares `$s2=1`; `D_800ACDDC` → `D_8009CDDC` (924F8/92934/91DC8/909B4); `func_80121C04` "\\FMV1" prefix is an address |
+| Title audio | **Verified, no gap:** retail title overlay 0x03D2 has no AKAO/SEQ start. Its only sound calls are the menu SFX helpers `func_800525EC` (0x44C) / `func_8005267C` (0x44E) → `func_8006DF50`, plus `func_800870F0` (movie CD volume); the caller `func_8001220C` → `func_8006E834` → `func_801909B4` starts none. A retail-byte scan (overlay `jal` list; the three `jalr` sites are the title-node +0xC/+0x10/+0x14 slots, all overlay-internal; 141 EXE callees walked 3 levels from the disc EXE) finds no call to the music-start entries 0x8006CDA4/0x8006D2B8/0x8006D60C/0x80086FF8/0x80015DAC. So the title after FMV001 is silent apart from menu SFX in retail too, and those SFX play in the port (WAV `build/lanes/fmv/skip/after.wav`, 27.6–28.1 s) |
+| Not claimed | No hardware pixel/audio golden; drive seek/spin-up time and retry timing are not modeled; CD-DA not decoded |
 
-**Code that must change for real playback:**
+### 2. In-route movies (FMV000/FMV003 etc.) — field opcode `0x35` plays
 
-1. ~~Deliver a complete last-chunk frame into `func_801924F8` E0~~ **done**
-2. ~~`func_80192CE8` past `80192E08` into the media loop~~ **done**
-3. ~~Translate `func_80192934` + `3EB04` + DMA1 `80191DC8`~~ **done**
-4. ~~Production media loop (until `B0DBA==0`)~~ **done** (host budget for tests)
-5. ~~`func_801909B4` enters `92CE8` without skip-movie~~ **done** (`OPEN1` PASS)
-6. ~~Title present `8018F2F4` + freelist + `8018FBC0`~~ **done** (frontier
-   `0x801911C0` title main loop)
-7. Finish full FMV001 (no continue budget) on New Game; translate title
-   main loop (repeat `801911C0` until Circle/timeout, then New Game); remove route harness
-   `PE_Port_SetSkipMovie(1)` only when that path stays stop-free.
-8. Field path `func_80121C04` / `func_80122040` without skip + XA decode.
-
-**Exact next concrete edit:** Translate the title main-loop body past
-`0x801911C0`, or run opening STR with unlimited continue budget through
-`B0DBA==0` on the New-Game path.
-### 2. In-route movies (FMV003 etc.) — proven identity; playback still skipped
-
-| Layer | Proven? | Evidence |
-| --- | --- | --- |
-| FMV003 identity | **Yes** | ISO `FMV1/FMV003.STR;1` via field opcode `0x35 3` on `m0372i` (`PE_DAY1_ACCEPTANCE_CONTRACT.md:187`) |
-| Autonomous stream (first assembled slice) | **Yes (FMV001 fixture + disc)** | `docs/evidence/fmv-autonomous-stream/REPORT.md` — ReadS `0x1E0` served; `HostFB_StreamTick`; `B0DBA=4` / slice bytes match disc |
-| Multi-frame updater | **Partial** | `DAY2_MOVIE_UPDATER.md` — `func_80122040` ported; retry/Setloc / cycle-accurate waits incomplete |
-| MDEC complete frames | **Partial** | `DAY2_MOVIE_COMPLETE_FRAMES.md` — FMV001 frames 1–3 RLE/MDEC DMA checked; **no hardware pixel golden** |
-| XA audio interleaved with STR | **No** | Explicit non-claim in `fmv-autonomous-stream/REPORT.md:136-139` |
-| Connected-route FMV003 | **Skipped** | `func_80017018_port.c:1310-1321` — `PE_Port_SkipMovie()` → `func_80014E30_skip_movie`; else unresolved boundary |
-
-Field movie without skip: port/finish `func_80014E30` (106 words, still `asm`) and stop returning early under skip.
-
----
+`func_80017018` opcode `0x35` (fn `0x80014E30`) now runs the matched-decomp
+`func_80014E30` (movie overlay load + `1216C4`/`121C04`/`1223A8`) when not
+skipping; the stream is served by the same feeder. Verified on New Game
+(`FMV000.STR`, 150 frames, `docs/evidence/fmv-playback/REPORT.md`).
+`--route-pad` still forces `--skip-movie` (its pad schedule is keyed to
+present counts; movies would shift it), so FMV003 on `m0372i` is exercised only
+in a player run. Remaining: FMV003 not yet driven headless end-to-end (needs a
+player-route pad script past the sewers).
 
 ### 3. Sound / music / SPU / XA on Day-1 path
 
-| Area | Implemented | Stubbed / incomplete | Evidence |
-| --- | --- | --- | --- |
+**Audible since 2026-09-28 (audio lane).** Evidence:
+`docs/evidence/pe-native-audio/REPORT.md`. The music/SFX you hear comes from
+the retail sound driver itself: `pc_port/platform/pe_audio_driver.c` runs the
+retail machine code of `func_8008DB7C` (AKAO tick: sequencer, voice updates,
+command queue `func_8008CA84`, SPU flush) out of guest RAM in a small R3000A
+integer interpreter, 4 ticks per emulated VBlank (retail RCNT2
+`SetRCnt(0xF2000002, 0x44E8, 0x1000)` = 240 Hz). `pe_spu.c` synthesizes the
+SPU; `host_audio.c` outputs through a `dlopen`ed `libpulse-simple.so.0`.
+Headless route runs: 0 interpreter faults over 128k ticks, ~2 M ADPCM blocks
+decoded with 0 invalid headers, output byte-identical between runs, route log
+identical with `PE_AUDIO=0`.
+
+| Area | Implemented | Approximation / gap |
+| --- | --- | --- |
+| AKAO sequencer + SFX | Retail `func_8008DB7C` interpreted; gated by the retail event registration + critical sections (`PE_Event_AudioTimerArmed`) | Ticks run in bursts at VBlank boundaries (sample output between ticks keeps even 240 Hz spacing in emulated time). `func_8008E23C`'s CPU-load bookkeeping (`D_8009CDE4`) is not updated. Interpreter: no load-delay slots, no overflow traps, COP2 = fault (none hit). `func_8008E8D0` (sequencer step) stays unmatched asm; it runs as retail code, not as a C port |
+| ADPCM voices | 24 voices, 5 filters, shift 13–15→9, loop start/end/repeat, ENDX, KON/KOFF, repeat-address ignore-after-KON rule, noise (NON), pitch modulation (PMON) | 4-point gaussian interpolation from the psx-spx table (audio2 lane; was linear) |
+| Envelopes / volume | psx-spx ADSR rate formula (exp ×4 above 0x6000, exp decrease scaling), voice/main volume sweeps via the same stepper | Sweep "phase" bit treated as sign only |
+| Main volume / SPUCNT | Honors written values | The port collapses SpuInit (`func_8007D1D4`), so main volume 0x180/0x182 is never written → treated as **0x3FFF** (libsnd `SsSetMVol(127,127)`); SPUCNT mute bit only honored once bit 15 has been written |
+| Reverb | psx-spx algorithm at 22.05 kHz, work area in SPU RAM, EON input, 0x184/0x186 output | Input/output resampled through the psx-spx 39-tap half-band FIR (audio2; was a 2-sample average + hold). Exact per-stage rounding/saturation positions unknown |
+| CD / XA input | XA-ADPCM tap on every drive sector (`pe_cdreg.c` → `PE_Spu_CdSector`): mode 0x40, form-2 audio, Setfilter file/channel, 37.8/18.9 kHz, mono/stereo, 4/8-bit, drive volume matrix | psx-spx 7-phase zigzag FIR resampler (audio2; was linear); 18.9 kHz fed twice into the 37.8 kHz path (approximation). 133 ms jitter buffer with fades because the port's feed delivers XA in bursts (real drive: steady). CD volume 0x1B0/0x1B2 unwritten (collapsed SpuInit/SsSetSerialVol) → full volume. **Exercised on FMV playback** (fmv lane): 2597 XA sectors over FMV001 via `pe_str_feed`; `--route-pad` still forces skip-movie, so 0 XA sectors are played there; Day-1 BGM is SPU-sequenced (AKAO), XA is FMV audio. CD-DA `Play` not decoded (not seen on the Day-1 path) |
+| SPU extras | Manual FIFO writes (0x1A8) | SPU IRQ (0x1A4), capture buffers, SPU→RAM DMA reads not modelled |
+| Wall-clock pacing | Per emulated VBlank at 59.94 Hz via `PE_AudioDriver_SetVBlankPacer` (audio2, 2026-09-28). Before, the window paced per present; the game presents every 2 VBlanks, so gameplay, AKAO tempo (≈480 ticks/s) and sample production (2x → overflow static) ran at 2x | Slow host frames discard backlog (music slows, never speeds); a scene presenting without VBlanks falls back to per-present pacing after 100 ms |
+| Host output | PulseAudio/PipeWire via `dlopen` (no link dep), writer thread, 100 ms default (`PE_AUDIO_LATENCY_MS`), never blocks; adaptive ±0.5 % resampler on the device feed; fast-forward mutes with fades (audio2); WAV dump (unresampled, never muted) | Device opens only with a window (or `PE_AUDIO_DEVICE=1`). Faster-than-real-time headless overflows are dropped with a crossfade; genuine starves fade out/in. Windows build: WAV only |
+| Spatial sound `func_8006DE80` | Native port helpers | Still **asm** matching leaf (fan-in 15) |
+
+--- | --- | --- | --- |
 | Event BGM handles `0xC8`/`0xC9` (seq 26/27) | Command IDs proven on Day-1 rooms | Full audible score sequencing | `PE_DAY1_ACCEPTANCE_CONTRACT.md:223-238` |
 | Audio command queue / EA dispatch | Control/data graphs | Not audible synthesis | `DAY2_AUDIO_DISPATCH.md`; `pc_port/README.md:127-128` |
 | SPU mode / DMA / registers | Register + DMA event model | Synthesis collapsed | `DAY2_SPU_MODE_*.md`; `pc_port/platform/pe_stream.c:12-36` |
 | Ambient reload after sewer battle | Loader transitions | Provider internals / audible | `DAY1_SEWER_FADES.md:53-72` |
-| XA / CD-DA decode + mix | Read modes accepted | **Undecoded** | `fmv-autonomous-stream/REPORT.md`; `DAY2_CD_SECTOR_DEVICE.md` |
+| XA decode + mix | FMV XA through `pe_str_feed` → `PE_Spu_CdSector` (fmv lane) | CD-DA undecoded | `fmv-playback/REPORT.md` |
 | Spatial sound `func_8006DE80` | Native port helpers | Still **asm** matching leaf (fan-in 15) | `route_coverage.py` top list |
 
 ---
@@ -142,3 +158,47 @@ Also still **unnamed `asm`** and load-bearing for movies despite lower/merged fa
 | Movie player / ticks | `pc_port/game/boot/movie_overlay_port.c`, `pc_port/platform/host_framebuffer.c` (`HostFB_StreamTick`) |
 | Route harness | `pc_port/tests/test_route_boot_day2.c` |
 | Day-1 exit proof | `docs/ai_context/DAY1_DAY2_TRANSITIONS.md` |
+
+---
+
+## Route shims (autopilot only — "Day 1 playable ASAP", 2026-09-28, lane day1)
+
+These are **driver** shims in the `--route-pad` autopilot, not changes to game
+code. A human player with a real pad is unaffected.
+
+### Route shim: M34 HP lock + simple tail controller
+
+| Field | Value |
+| --- | --- |
+| What | While token `A8003248` (M0034I), `RouteM34Shim()` writes Aya's current HP (`*(0x8009D278)+12`) := max HP (`+28`) every pad poll, and replaces the 52-run kiting pilot with: learned pad→world map, walk to ≤707u of the type-4 tail, Cross (attack/reload) when `t2≤900k`, mode 1 selects the tail then Cross. |
+| Why | 52 supply runs (09-15..09-18) never broke the tail: every run died to the head while positioning. Survival heuristics were the blocker, not port code. The shim lets the route continue so later Day-1 rooms can be tested. |
+| What still runs unmodified | Damage (`func_80028574`), hit gate (`func_80021278`), ATB/targeting, the room script's `HP ≤ 1,000,000` poll, outro and the M0359I transfer. |
+| Files | `pc_port/tests/route_reward_sewer_pilot.h` (`g_route_m34_shim`, `RouteM34Shim`), `pc_port/src/port_main.c` (enables it for `--route-pad`). |
+| How to restore | Run with `PE_ROUTE_M34_NO_SHIM=1`: the old supply pilot then owns M34, with no RAM writes. The test harness never sets the flag. |
+
+### Route shim: M0023I battle aid
+
+| Field | Value |
+| --- | --- |
+| What | `RouteBattleShim()`: during the M0023I rehearsal battle (token `A80021C8`, `D1A0&2`), Aya's HP is locked to max, the aid keeps 300..600u from the nearest enemy, presses Cross every 8f and, in mode 1, Crosses the default target. |
+| Why | The replayed pads for this fight drifted with port changes: the 09-22 binary wins it, while the 09-28 02:18 build resets to New Game. |
+| Restore | `PE_ROUTE_BATTLE_NO_SHIM=1` (replayed pads). The route counts as green only once a run in which Eve's flash (`PE_M0023I_Flash`) fires passes. |
+
+---
+
+## Port shims (game code, lane port, 2026-09-28)
+
+These change what the native port does for **every** player, not just the
+autopilot. Each keeps a strict switch so tests still see the retail boundary.
+
+### Port shim: M0023I F710 flash ring position
+
+| Field | Value |
+| --- | --- |
+| What | Eve's flash effect callback `0x8018F710` (`PE_M0023I_Flash`, `pc_port/game/boot/m0023i_effect_port.c`) draws its state-0 ring at six bytes it borrows from the original caller's stack. The port models those bytes only on the known effect-stack paths (`func_800D413C_port.c` `effect_stack`). On any other path the port used to record a boundary and **stop the game** (`stop_reason=unresolved-boundary` at frame ~43860 in the first Eve fight). Now it uses the owner's current joint position (`PE_ActorJointPositionCE8F0`, the same value F710 writes back into that slot at the end of every mode-2 call) and logs `[DAY1_SHIM] PE_M0023I_Flash ...` once. |
+| Accuracy cost | Only the ring's position on the first flash frame can differ from retail, which is whatever stale stack bytes the caller left there. Gameplay state is unaffected (the ring is draw-only). |
+| Restore | `g_pe_strict_effect_stack = 1` restores the explicit boundary + stop. `test_DAY1_retail_m0023i_flash` checks both modes. |
+
+### Not a port bug: first Eve fight route reset (09-22 pass → 09-28 fail)
+
+Bisect (`build/lanes/port/NOTES.md`, "port3"): b04c438e passes `--until eve1_victory`; 9dd1bd1c and later fail. The cause is the retail-matching generated TU for `func_800144FC` (field-VM battle-entry state machine). It replaced the approximate hand port (`func_800144FC_state*_cut` in `func_80029810_port.c`). Every battle now starts 2–3 frames earlier (d1a0 `|=0x80`/`|=2` and mode 7→0: M0002I 10252→10250, M0011I 18903→18900, M0023I 42934→42931). Room entry frames and field RNG call counts are unchanged. The replayed exact pads `[42713,45041)` were recorded on the old timing. Shifting them by −3 frames does not reproduce the fight because Eve's AI state also differs. The fix therefore belongs in the route (battle aid above), not in reverting the retail TU.

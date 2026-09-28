@@ -171,6 +171,10 @@ int  PE_Event_DeliverSpuDma(void);
 int  PE_Event_ConsumeSpuDma(int handle);
 /* Host scheduling of the command-RAM portion of the audio timer. */
 void PE_Event_ServiceAudioCommands(void);
+/* Audio lane: 1 when the retail RCNT2 audio event (func_8008E23C) is
+ * registered+enabled and no critical section is held — the gate under which
+ * the native audio driver (pe_audio_driver.h) runs func_8008DB7C. */
+int PE_Event_AudioTimerArmed(void);
 void func_8008CA84(void);
 
 /* ── libgpu (pc_port/platform/pe_libgpu.c) ──────────────────────────── */

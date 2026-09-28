@@ -1,7 +1,7 @@
 #include "retail_card_operation_frame_cases.h"
 static void test_DAY1_card_operation_frame(void)
 {
-    TEST("DAY1_card_operation_frame");
+    TEST_RETAIL_DISC1("DAY1_card_operation_frame"); TEST_RETAIL_FIXUPS(RETAILFIX_card_operation_frame);
     for(unsigned n=0;n<1280;n++) {
         ResetTestState();
         for(unsigned i=0;i<sizeof(DAY1_card_operation_frame_common)/sizeof(DAY1_card_operation_frame_common[0]);i++)

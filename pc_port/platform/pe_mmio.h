@@ -19,6 +19,12 @@
  *   0x1F801124  RCNT2 mode  16  pe_rcnt2  read (clears reached) / write
  *   0x1F801128  RCNT2 target16  pe_rcnt2  read / write
  *   (RCNT0 0x1F801100..0x1F80110B, RCNT1 target: NOT modelled -> abort.)
+ *   0x1F801C00..0x1F801DFF  SPU registers (pe_spu_dma.h PE_SpuRegister_*):
+ *               halfword / aligned word / byte read, halfword / aligned word
+ *               write.  Its own host-pointer shadow block: every changed
+ *               halfword is committed in address order; KON/KOFF
+ *               (0x1F801D88..0x1F801D8F) refresh as 0 so a repeated key-on
+ *               mask is still written.
  * Register semantics: https://psx-spx.consoledev.net/timers/ and
  * /interrupts/ and /dmachannels/.  KSEG0/KSEG1 aliases (0x9F80xxxx,
  * 0xBF80xxxx) resolve to the same registers.

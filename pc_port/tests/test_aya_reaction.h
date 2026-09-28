@@ -38,7 +38,7 @@ static uint64_t ATK35_reaction_hash(void)
 static void test_ATK35_retail_aya_reaction(void)
 {
     unsigned k,i;
-    TEST("ATK35_retail_aya_reaction");
+    TEST_RETAIL_DISC1("ATK35_retail_aya_reaction"); TEST_RETAIL_FIXUPS(RETAILFIX_aya_reaction);
     for (k=0;k<sizeof(ATK35_reaction_cases)/sizeof(ATK35_reaction_cases[0]);k++) {
         const uint32_t *a=ATK35_reaction_cases[k].args;
         uint32_t result=0;uint64_t hash;

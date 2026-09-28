@@ -17,6 +17,9 @@
 #   3. configure — cmake -S pc_port -B <build dir>
 #   4. build     — cmake --build <build dir>
 #   5. test      — ./<build dir>/pe-native-tests
+#   guard        — tools/analysis/retail_data_guard.py: no retail disc bytes in
+#                  tracked files (runs after stage 2; uses the user's disc via
+#                  the git-ignored disc cache when present, else signatures)
 #
 # Idempotent: re-running regenerates in place, reuses the CMake cache and
 # rebuilds only what changed.  Nothing git-tracked is written; the only outputs
@@ -27,6 +30,7 @@
 #   scripts/build_pc_port.sh --clean         # remove the build dir first
 #   scripts/build_pc_port.sh --no-tests      # stop after the build
 #   scripts/build_pc_port.sh --build-dir DIR # default: pc_port/build
+#   scripts/build_pc_port.sh --no-guard      # skip the retail-data guard
 #
 # Environment:
 #   CMAKE   — path to a cmake binary (otherwise resolved from PATH, then from
@@ -44,11 +48,13 @@ fi
 BUILD_DIR="$ROOT/pc_port/build"
 RUN_TESTS=1
 CLEAN=0
+RUN_GUARD=1
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --clean)      CLEAN=1; shift ;;
         --no-tests)   RUN_TESTS=0; shift ;;
+        --no-guard)   RUN_GUARD=0; shift ;;
         --build-dir)  BUILD_DIR="$2"; shift 2 ;;
         -h|--help)    sed -n '2,32p' "${BASH_SOURCE[0]}"; exit 0 ;;
         *) echo "ERROR: unknown argument '$1' (see --help)." >&2; exit 1 ;;
@@ -164,6 +170,16 @@ ERROR: generated port TUs still drift from src/ after 3 generate+verify passes.
        which is a real bug in tools/analysis/gen_decomp_ports.py.
 EOF
     exit 1
+fi
+
+# ── guard: no retail bytes in tracked files ─────────────────────────────
+# Owner decision 2026-09-28: everything from the game is read from the user's
+# disc at runtime; nothing retail-derived is committed.  Results are cached per
+# blob under build/disc-cache/, so only changed files are rescanned.
+if [[ "$RUN_GUARD" -eq 1 ]]; then
+    echo
+    echo "-- retail-data guard (tracked files)"
+    python3 "$ROOT/tools/analysis/retail_data_guard.py"
 fi
 
 # ── 3. configure ─────────────────────────────────────────────────────────

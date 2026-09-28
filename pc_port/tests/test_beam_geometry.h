@@ -6,7 +6,7 @@ static pe_addr_t ATK27_beam_address(uint32_t offset)
 static void test_ATK27_retail_beam_geometry(void)
 {
     unsigned k,i,j;
-    TEST("ATK27_retail_beam_geometry");
+    TEST_RETAIL_DISC1("ATK27_retail_beam_geometry"); TEST_RETAIL_FIXUPS(RETAILFIX_beam_geometry);
     for (k=0;k<sizeof(ATK27_beam_cases)/sizeof(ATK27_beam_cases[0]);k++) {
         const uint32_t *a=ATK27_beam_cases[k].args;
         uint32_t result=0;uint64_t hash=UINT64_C(14695981039346656037);

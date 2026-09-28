@@ -3,7 +3,7 @@
 static void test_INV8_retail_inventory_dialogs(void)
 {
     unsigned k,i;
-    TEST("INV8_retail_inventory_dialogs");
+    TEST_RETAIL_DISC1("INV8_retail_inventory_dialogs"); TEST_RETAIL_FIXUPS(RETAILFIX_inventory_dialogs);
     for (k=0;k<sizeof(INV8_inventory_dialogs_cases)/sizeof(INV8_inventory_dialogs_cases[0]);k++) {
         const uint32_t *args=INV8_inventory_dialogs_cases[k].args;
         uint32_t a=args[0],result=0u;

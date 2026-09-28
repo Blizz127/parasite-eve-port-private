@@ -16,7 +16,7 @@ static unsigned CdSectorReply(uint8_t *response,unsigned count)
 }
 static void test_DAY2_cd_sector_device(void)
 {
-    TEST("DAY2_cd_sector_device");
+    TEST_RETAIL_DISC1("DAY2_cd_sector_device"); TEST_RETAIL_FIXUPS(RETAILFIX_cd_device_tables);
     DiscFixture fx={0};uint8_t response[5],raw[2352];
     ResetTestState();ASSERT(FxBuild(&fx,0),"sector fixture");PE_Disc_SetActive(fx.disc);
     /* Full raw contents, including the header and ECC tail, must survive. */

@@ -27,7 +27,7 @@ int func_80192934(void)
         return 0;
 
     if (PE_LoadU8(0x801D0DC0u) == 2u) {
-        func_801918F8((int8_t)(PE_LoadU32(0x800ACDDCu) ^ 1u),
+        func_801918F8((int8_t)(PE_LoadU32(0x8009CDDCu) ^ 1u),
                       (int8_t)PE_LoadU8(0x800B0DBBu));
         if (PE_Port_ShouldStop())
             return 0;

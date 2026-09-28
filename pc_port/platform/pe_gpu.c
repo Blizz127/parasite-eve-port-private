@@ -9,6 +9,7 @@
  * counter.  Hardware progress occurs only through explicit API calls.
  */
 #include "pe_gpu.h"
+#include "pe_audio_driver.h"
 #include "pe_timer1.h"
 
 #include <stddef.h>
@@ -1392,6 +1393,7 @@ int PE_GPU_SetVBlank(int level,PeIrqGeneration generation)
 void PE_GPU_VBlankStep(void)
 {
     g_gpu.state.vsync_count++;
+    PE_AudioDriver_VBlank();   /* audio lane: 240 Hz driver + SPU output */
 }
 
 void PE_GPU_GetState(PeGpuState *out)

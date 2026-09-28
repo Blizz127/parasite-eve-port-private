@@ -2,7 +2,7 @@
 
 static void test_VICTORY_original_entries(void)
 {
-    TEST("VICTORY_original_entries");
+    TEST_RETAIL_DISC1("VICTORY_original_entries"); TEST_RETAIL_FIXUPS(RETAILFIX_battle_victory);
     for (unsigned k=0;k<sizeof(VICTORY_cases)/sizeof(VICTORY_cases[0]);k++) {
         const uint32_t *args=VICTORY_cases[k].args;
         uint32_t a=args[0],b=args[1],c=args[2],d=args[3],result=0u;

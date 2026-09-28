@@ -1,7 +1,7 @@
 #include "retail_card_confirmation_cases.h"
 static void test_DAY1_card_confirmation(void)
 {
-    TEST("DAY1_card_confirmation");
+    TEST_RETAIL_DISC1("DAY1_card_confirmation"); TEST_RETAIL_FIXUPS(RETAILFIX_card_confirmation);
     for(unsigned n=0;n<128;n++) {
         ResetTestState();
         for(unsigned i=0;i<sizeof(DAY1_card_confirm_common)/sizeof(DAY1_card_confirm_common[0]);i++)

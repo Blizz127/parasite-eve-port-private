@@ -1,7 +1,7 @@
 #include "retail_movie_init_cases.h"
 static void test_DAY2_movie_init(void)
 {
-    TEST("DAY2_movie_init");
+    TEST_RETAIL_DISC1("DAY2_movie_init"); TEST_RETAIL_FIXUPS(RETAILFIX_dispenv);
     for (unsigned k=0;k<sizeof(MOVINIT_cases)/sizeof(MOVINIT_cases[0]);k++) {
         PeGpuState gpu;
         uint64_t hash;

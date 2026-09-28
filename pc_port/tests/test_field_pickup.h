@@ -3,7 +3,7 @@
 static void test_SEW17_field_pickup(void)
 {
     unsigned k,i;
-    TEST("SEW17_field_pickup");
+    TEST_RETAIL_DISC1("SEW17_field_pickup"); TEST_RETAIL_FIXUPS(RETAILFIX_field_pickup);
     for (k=0;k<sizeof(SEW17_cases)/sizeof(SEW17_cases[0]);k++) {
         const uint32_t *args=SEW17_cases[k].args;
         uint32_t a=args[0],result=0u;

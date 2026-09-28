@@ -1,7 +1,7 @@
 #include "retail_card_cleanup_cases.h"
 static void test_DAY1_card_cleanup(void)
 {
-    TEST("DAY1_card_cleanup");
+    TEST_RETAIL_DISC1("DAY1_card_cleanup"); TEST_RETAIL_FIXUPS(RETAILFIX_card_cleanup);
     for(unsigned n=0;n<256;n++) {
         ResetTestState();
         for(unsigned i=0;i<sizeof(DAY1_card_cleanup_common)/sizeof(DAY1_card_cleanup_common[0]);i++)

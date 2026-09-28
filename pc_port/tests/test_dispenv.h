@@ -8,7 +8,7 @@ static void DAY1_SeedDisplayDispatch(void)
 }
 static void test_DAY1_dispenv(void)
 {
-    TEST("DAY1_dispenv");
+    TEST_RETAIL_DISC1("DAY1_dispenv"); TEST_RETAIL_FIXUPS(RETAILFIX_dispenv);
     static const int widths[]={-32768,-1,0,280,281,352,353,400,401,560,561,32767};
     static const int values[]={-32768,-1000,-1,0,1,2,255,256,257,288,289,32767};
     static const uint32_t ranges[][2]={{0x150000,20},{0x957B8,20},{0xA3348,256}};

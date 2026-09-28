@@ -3,7 +3,7 @@
 static void test_INV17_retail_gameover_fade(void)
 {
     unsigned k,i;
-    TEST("INV17_retail_gameover_fade");
+    TEST_RETAIL_DISC1("INV17_retail_gameover_fade"); TEST_RETAIL_FIXUPS(RETAILFIX_gameover_fade);
     for (k=0;k<sizeof(INV17_gameover_fade_cases)/sizeof(INV17_gameover_fade_cases[0]);k++) {
         const uint32_t *args=INV17_gameover_fade_cases[k].args;
         uint32_t result=0u;

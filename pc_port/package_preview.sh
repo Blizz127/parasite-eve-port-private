@@ -69,7 +69,7 @@ if [[ "$DISC" == *.cue || "$DISC" == *.CUE ]]; then
     [[ -n "$bin" ]] && DISC="$(dirname "$DISC")/$bin"
 fi
 [[ -n "$DISC" && -f "$DISC" ]] || { echo "ERROR: disc image not found: ${DISC:-$1}" >&2; exit 1; }
-size="$(stat -c%s "$DISC")"
+size="$(stat -L -c%s "$DISC")"   # -L: the image may be a symlink
 if (( size % 2352 != 0 )); then
     echo "ERROR: $DISC is not a raw 2352-byte/sector BIN (size $size)." >&2
     echo "       Use the .bin from a BIN/CUE dump of Disc 1 (not .iso/.chd)." >&2
@@ -81,7 +81,9 @@ if [[ -z "${DISPLAY:-}" ]]; then
     exit 1
 fi
 cd "$HERE"
-exec "$HERE/bin/parasite-eve-port" --windowed --skip-movie --scale 3 \
+SKIP=()
+[[ "${PE_SKIP_MOVIE:-__DEFAULT_SKIP__}" == 1 ]] && SKIP=(--skip-movie)
+exec "$HERE/bin/parasite-eve-port" --windowed "${SKIP[@]}" --scale 3 \
     --window-title "Parasite Eve - Day 1 preview" \
     --disc-image "$DISC" "$@"
 LAUNCHER
@@ -122,7 +124,8 @@ L1 / R1                  Q / E                    LB / RB
 L2 / R2                  1 / 3                    LT / RT
 Select                   Tab                      Back / View
 Start                    P                        Start / Menu
-Fast-forward toggle      F6                       -
+Fast-forward toggle      F6                       L3 (click left stick)
+Fast-forward while held  -                        R3 (click right stick)
 Quit                     Esc                      -
 
 Keyboard and controller work at the same time. Controllers are read
@@ -130,6 +133,10 @@ through the Linux joystick interface (/dev/input/js*) and may be plugged in
 or removed while the game runs; up to four are merged. This covers Xbox
 pads, Steam Deck / Legion Go built-in controls and anything Steam Input or
 Handheld Daemon (HHD) presents as an Xbox controller.
+
+Fast-forward runs the game uncapped and mutes the sound (it fades out and
+back in, so there is no chipmunk audio or static); the window title shows
+the active speed.
 
 Controller environment variables:
   PE_JOYSTICK=/dev/input/js1   use only this device (default: js0..js7)
@@ -144,22 +151,28 @@ expose a virtual one instead — either works.
 
 KNOWN LIMITS
 ------------
-* Day 1 is playable up to the M34 sewer boss. The boss fight and every
-  room after it are NOT finished; expect a hang or wrong behaviour there.
-* Opening logo/movie and title screen are skipped (see above).
-* No audio: sound and music are not in this build.
-* Saving: no guarantees. This build writes no save files to disk, so
-  nothing persists after you quit; do not rely on in-game saves.
-* Crashes and graphical glitches are expected in places. Useful bug
-  reports: the terminal output plus the room you were in.
+__LIMITS__
 
 RUNTIME REQUIREMENTS
 --------------------
 64-bit Linux with glibc and libX11.so.6 (loaded at runtime; present on
-Bazzite / SteamOS / any desktop distro). No other libraries needed.
+Bazzite / SteamOS / any desktop distro). Sound uses libpulse-simple.so.0
+(PipeWire's pulse compatibility provides it; the game is silent without
+it). No other libraries needed. PE_AUDIO_LATENCY_MS=150 raises the audio
+buffer (default 100 ms) if sound crackles on a busy system.
 README
 chmod 0644 "$STAGE/README-PREVIEW.txt"
 
+VARIANT="${PE_PREVIEW_VARIANT:-current}"
+LIMITS_FILE="${PE_PREVIEW_LIMITS:-}"
+if [[ -n "$LIMITS_FILE" ]]; then LIMITS="$(cat "$LIMITS_FILE")"; else LIMITS="* See build-info.json for the source commit."; fi
+DEFAULT_SKIP="${PE_PREVIEW_DEFAULT_SKIP:-0}"
+python3 - "$STAGE" "$LIMITS" "$DEFAULT_SKIP" <<'PY'
+import sys, pathlib
+stage, limits, skip = sys.argv[1:]
+r = pathlib.Path(stage, "README-PREVIEW.txt"); r.write_text(r.read_text().replace("__LIMITS__", limits))
+l = pathlib.Path(stage, "parasite-eve-preview"); l.write_text(l.read_text().replace("__DEFAULT_SKIP__", skip))
+PY
 BIN_SHA="$(sha256sum "$STAGE/bin/parasite-eve-port" | cut -d' ' -f1)"
 LAUNCHER_SHA="$(sha256sum "$STAGE/parasite-eve-preview" | cut -d' ' -f1)"
 BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"

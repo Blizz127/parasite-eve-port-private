@@ -29,14 +29,19 @@ set(PLATFORM_SRCS
     platform/pe_irq_delivery.c
     platform/pe_gte.c
     platform/pe_mdec.c
+    platform/pe_str_feed.c
     platform/pe_libetc.c
     platform/pe_libgpu.c
     platform/pe_libsnd.c
     platform/pe_spu_dma.c
+    platform/pe_spu.c
+    platform/pe_audio_driver.c
     platform/pe_libcard.c
     platform/pe_cdreg.c
     platform/pe_libcd.c
     platform/pe_disc.c
+    platform/pe_disc_check.c
+    platform/pe_disc_cache.c
     platform/pe_save.c
     platform/pe_stream.c
     platform/pe_stream_commands.c
@@ -361,6 +366,7 @@ set(GAME_SRCS
     game/boot/func_80190660_port.c
     game/boot/func_8018F2F4_port.c
     game/boot/func_8018F468_port.c
+    game/boot/title_menu_callbacks_port.c
     game/boot/func_8018FBC0_port.c
     game/boot/func_80190064_port.c
     game/boot/func_801909B4_port.c
@@ -463,6 +469,7 @@ set(PE_GUESTCODE_REGISTRY ${CMAKE_SOURCE_DIR}/game/decomp_ovl/_dispatch/zz_dispa
 add_executable(parasite-eve-port
     src/port_main.c
     ${HOST_WINDOW_SRC}
+    platform/host_audio.c
     ${PE_GUESTCODE_REGISTRY}
 )
 target_link_libraries(parasite-eve-port PRIVATE pe_field_runtime)
@@ -470,6 +477,9 @@ target_include_directories(parasite-eve-port PRIVATE ${CMAKE_SOURCE_DIR}/tests)
 if(NOT WIN32)
     # POSIX X11 backend resolves dlopen/dlsym from libdl.
     target_link_libraries(parasite-eve-port PRIVATE dl)
+    # host_audio.c writer thread (glibc provides it; no new external library).
+    find_package(Threads REQUIRED)
+    target_link_libraries(parasite-eve-port PRIVATE Threads::Threads)
 endif()
 
 target_compile_definitions(parasite-eve-port PRIVATE
@@ -587,6 +597,7 @@ if(BUILD_TESTS)
             target_link_options(pe-transition-constructor-tests PRIVATE -fsanitize=address,undefined -static-libasan -static-libubsan)
         endif()
         add_test(NAME transition-constructor-control-flow COMMAND pe-transition-constructor-tests)
+        set_tests_properties(transition-constructor-control-flow PROPERTIES SKIP_RETURN_CODE 77)
         set_tests_properties(transition-constructor-control-flow PROPERTIES TIMEOUT 30)
 
         add_executable(pe-transition-init-tests tests/test_transition_init.c)
@@ -658,6 +669,22 @@ if(BUILD_TESTS)
 
     add_test(NAME native-tests COMMAND pe-native-tests)
     add_test(NAME field-runtime-link COMMAND pe-field-runtime-link-test)
+    # Retail-data guard (owner decision 2026-09-28: nothing from the game is
+    # committed; tests read it from the user's disc).  The guard scans the
+    # tracked tree; with the git-ignored disc cache it compares against the
+    # real EXE/PE.IMG, otherwise against committed one-way signatures.
+    find_package(Python3 COMPONENTS Interpreter QUIET)
+    if(Python3_Interpreter_FOUND)
+        get_filename_component(PE_REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/.." ABSOLUTE)
+        add_test(NAME retail-data-guard-selftest
+                 COMMAND ${Python3_EXECUTABLE} ${PE_REPO_ROOT}/tools/analysis/test_retail_data_guard.py)
+        add_test(NAME disc-cache-selftest
+                 COMMAND ${Python3_EXECUTABLE} ${PE_REPO_ROOT}/tools/extract/test_disc_cache.py)
+        add_test(NAME retail-data-guard
+                 COMMAND ${Python3_EXECUTABLE} ${PE_REPO_ROOT}/tools/analysis/retail_data_guard.py --quiet-baseline
+                 WORKING_DIRECTORY ${PE_REPO_ROOT})
+        set_tests_properties(retail-data-guard PROPERTIES TIMEOUT 1200)
+    endif()
     set_tests_properties(native-tests field-runtime-link PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..
     )

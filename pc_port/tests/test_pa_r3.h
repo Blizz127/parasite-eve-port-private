@@ -123,7 +123,7 @@ static void test_PA_r3_80016910(void)
  * pending title (0x2000 -> D_800914AC rows of 20) and re-arms 0x4B - 1. */
 static void test_PA_r3_8003495C(void)
 {
-    TEST("PA_r3_8003495C_title_banner");
+    TEST_RETAIL_DISC1("PA_r3_8003495C_title_banner"); TEST_RETAIL_FIXUPS(RETAILFIX_menu_text);
     ResetTestState();
     for (unsigned i = 0; i < sizeof(NAM5_menu_text_common) / sizeof(NAM5_menu_text_common[0]); i++)
         PE_StoreU32(0x80000000u + NAM5_menu_text_common[i][0], NAM5_menu_text_common[i][1]);

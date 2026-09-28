@@ -3,7 +3,7 @@
 static void test_NAM5_retail_menu_text(void)
 {
     unsigned k,i;
-    TEST("NAM5_retail_menu_text");
+    TEST_RETAIL_DISC1("NAM5_retail_menu_text"); TEST_RETAIL_FIXUPS(RETAILFIX_menu_text);
     for (k=0;k<sizeof(NAM5_menu_text_cases)/sizeof(NAM5_menu_text_cases[0]);k++) {
         const uint32_t *a=NAM5_menu_text_cases[k].args;
         uint32_t result=0;

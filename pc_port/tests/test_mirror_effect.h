@@ -1,7 +1,7 @@
 #include "retail_mirror_effect_cases.h"
 static void test_SEW15_mirror_effect(void)
 {
-    TEST("SEW15_mirror_effect");
+    TEST_RETAIL_DISC1("SEW15_mirror_effect"); TEST_RETAIL_FIXUPS(RETAILFIX_mirror_effect);
     for(unsigned k=0;k<sizeof(SEW15_cases)/sizeof(SEW15_cases[0]);k++) {
         const uint32_t *a=SEW15_cases[k].args;uint32_t result=0;uint64_t hash=UINT64_C(1469598103934665603);
         ResetTestState();

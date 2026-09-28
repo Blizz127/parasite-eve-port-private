@@ -51,7 +51,7 @@ static void CdStreamWriteVideoSector(uint8_t *img,uint32_t lba,uint32_t chunk,
 }
 static void test_DAY2_cd_device(void)
 {
-    TEST("DAY2_cd_device");
+    TEST_RETAIL_DISC1("DAY2_cd_device"); TEST_RETAIL_FIXUPS(RETAILFIX_cd_device_tables);
     for(unsigned k=0;k<sizeof(CDNOTIFY_cases)/sizeof(CDNOTIFY_cases[0]);k++) {
         ResetTestState();PE_StoreU32(0x800B8AB8u,CDNOTIFY_cases[k].target);
         func_8007F960(CDNOTIFY_cases[k].status,CDNOTIFY_cases[k].response);

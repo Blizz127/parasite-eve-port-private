@@ -1,7 +1,7 @@
 #include "retail_m32_movement_cases.h"
 static void test_DAY1_m32_movement(void)
 {
-    TEST("DAY1_m32_movement");
+    TEST_RETAIL_DISC1("DAY1_m32_movement"); TEST_RETAIL_FIXUPS(RETAILFIX_m32_movement);
     for(unsigned k=0;k<sizeof(m32_movement_cases)/sizeof(m32_movement_cases[0]);k++) {
         ResetTestState();
         for(unsigned i=0;i<sizeof(m32_movement_common)/sizeof(m32_movement_common[0]);i++)

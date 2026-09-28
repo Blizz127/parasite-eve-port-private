@@ -64,6 +64,29 @@ static void test_decoder(void)
     CHECK(HostPad_DeviceHeld(&d) == HOST_PAD_UP);
 }
 
+static void test_hotkeys(void)
+{
+    /* xpad: button 9 = LS click (L3), 10 = RS click (R3).  They are port
+     * hotkeys (fast-forward toggle / hold), never PSX pad bits. */
+    HostPadDevice d;
+    HostPad_DeviceDefaults(&d);
+    CHECK(HostPad_DeviceHotkeys(&d) == 0);
+    HostPad_DeviceEvent(&d, JS_EVENT_BUTTON, 10, 1);
+    CHECK(HostPad_DeviceHotkeys(&d) == HOST_PAD_HOTKEY_FF_HOLD);
+    CHECK(HostPad_DeviceHeld(&d) == 0);
+    HostPad_DeviceEvent(&d, JS_EVENT_BUTTON, 9, 1);
+    CHECK(HostPad_DeviceHotkeys(&d) == (HOST_PAD_HOTKEY_FF_HOLD | HOST_PAD_HOTKEY_FF_TOGGLE));
+    HostPad_DeviceEvent(&d, JS_EVENT_BUTTON, 10, 0);
+    CHECK(HostPad_DeviceHotkeys(&d) == HOST_PAD_HOTKEY_FF_TOGGLE);
+    HostPad_DeviceEvent(&d, JS_EVENT_BUTTON, 9, 0);
+    CHECK(HostPad_DeviceHotkeys(&d) == 0);
+    CHECK(HostPad_DeviceHeld(&d) == 0);
+    /* Code-mapped (JSIOCGBTNMAP) BTN_THUMBR at another index. */
+    d.btn_code[13] = 0x13e;
+    HostPad_DeviceEvent(&d, JS_EVENT_BUTTON, 13, 1);
+    CHECK(HostPad_DeviceHotkeys(&d) == HOST_PAD_HOTKEY_FF_HOLD);
+}
+
 static void send(int fd, uint8_t type, uint8_t number, int16_t value)
 {
     struct js_event e = {0, value, type, number};
@@ -111,6 +134,7 @@ static void test_fifo_device(void)
 int main(void)
 {
     test_decoder();
+    test_hotkeys();
     test_fifo_device();
     if (g_fail) return 1;
     printf("host-pad tests: OK\n");

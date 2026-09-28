@@ -2,7 +2,7 @@
 static void test_DAY2_controller_join(void)
 {
     PE_Disc *disc;char err[256]={0};uint8_t *seed;
-    TEST_RETAIL_DISC1("DAY2_controller_join");
+    TEST_RETAIL_DISC1("DAY2_controller_join"); TEST_RETAIL_FIXUPS(RETAILFIX_controller_join);
     ResetTestState();disc=BTL6_OpenDisc1(err,sizeof(err));ASSERT(disc!=NULL,err);
     ASSERT(PE_GuestImage_LoadExe(disc,err,sizeof(err))==0,err);PE_Disc_Close(disc);
     seed=malloc(PE_RAM_SIZE);ASSERT(seed!=NULL,"controller join seed");memcpy(seed,PE_TranslateConst(PE_RAM_BASE,PE_RAM_SIZE),PE_RAM_SIZE);

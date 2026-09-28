@@ -3,7 +3,7 @@
 static void test_INV18_retail_pe_apply(void)
 {
     unsigned k,i;
-    TEST("INV18_retail_pe_apply");
+    TEST_RETAIL_DISC1("INV18_retail_pe_apply"); TEST_RETAIL_FIXUPS(RETAILFIX_pe_apply);
     for (k=0;k<sizeof(INV18_pe_apply_cases)/sizeof(INV18_pe_apply_cases[0]);k++) {
         const uint32_t *args=INV18_pe_apply_cases[k].args;
         uint32_t a=args[0],result=0u;

@@ -1,7 +1,7 @@
 #include "retail_model_fade_cases.h"
 static void test_DAY1_model_fade(void)
 {
-    TEST("DAY1_model_fade");
+    TEST_RETAIL_DISC1("DAY1_model_fade"); TEST_RETAIL_FIXUPS(RETAILFIX_model_fade);
     for (unsigned k=0;k<sizeof(model_fade_cases)/sizeof(model_fade_cases[0]);k++) {
         const uint32_t *a=model_fade_cases[k].args;
         uint32_t result=0;

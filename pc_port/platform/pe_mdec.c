@@ -124,7 +124,17 @@ static int MdecBeginCommand(uint32_t command,pe_addr_t source)
     unsigned required_tables=((command>>27u)&3u)<2u?5u:7u;
     if((g_tables&required_tables)!=required_tables) return MdecBoundary("MDEC_missing_tables",g_tables);
     if(!PE_RangeIsRam(source,words*4u)) return MdecBoundary("MDEC_input_range",source);
-    if(g_input_pos<g_input_count || g_pixel_pos<g_pixel_count) return MdecBoundary("MDEC_decode_busy",g_input_pos);
+    /* A new decode command while the previous one still holds input:
+     * libpress pads the VLC output with DC-only blocks past the last
+     * macroblock the game reads out.  With no output DMA in flight the
+     * tail can never be observed, so drop it (hardware leaves it in the
+     * FIFO until the next command word is parsed).  The command is only
+     * parsed here, lazily at DMA0 service, so an already-queued DMA1
+     * request belongs to the new command. */
+    if(g_input_pos<g_input_count || g_pixel_pos<g_pixel_count) {
+        g_input_pos=g_input_count;g_pixel_pos=g_pixel_count;
+        g_mdec.stale_input_discards++;
+    }
     g_decode_command=command;g_input_count=words*2u;g_input_pos=0;g_pixel_pos=g_pixel_count=0;g_macroblocks=0;g_decode_valid=1;
     for(unsigned i=0;i<g_input_count;i++) g_input[i]=PE_LoadU16(source+i*2u);
     return 1;

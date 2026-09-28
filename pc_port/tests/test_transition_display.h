@@ -1,7 +1,7 @@
 #include "retail_transition_display_cases.h"
 static void test_DAY1_transition_display(void)
 {
-    TEST("DAY1_transition_display");
+    TEST_RETAIL_DISC1("DAY1_transition_display"); TEST_RETAIL_FIXUPS(RETAILFIX_dispenv);
     for (unsigned k=0;k<sizeof(DAY1_display_cases)/sizeof(DAY1_display_cases[0]);k++) {
         unsigned step=DAY1_display_cases[k].step;
         uint64_t hash;
@@ -53,7 +53,7 @@ static void test_DAY1_transition_display(void)
 static void test_DAY1_transition_display_boundary(void)
 {
     int mask;
-    TEST("DAY1_transition_display_boundary");
+    TEST_RETAIL_DISC1("DAY1_transition_display_boundary"); TEST_RETAIL_FIXUPS(RETAILFIX_dispenv);
     ResetTestState();HostFB_Init();PE_GPU_Init();B54KR_SeedGpuStatic();
     PE_StoreU32(0x800B0E38u,0x80140000u);PE_StoreU32(0x800B0E3Cu,0x80145000u);
     PE_StoreU32(0x800B0E4Cu,0x80100000u);PE_StoreU32(0x8019C9C0u,0xDEADBEEFu);

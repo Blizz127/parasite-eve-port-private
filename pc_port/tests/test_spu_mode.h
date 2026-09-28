@@ -1,7 +1,7 @@
 #include "retail_spu_mode_cases.h"
 static void test_DAY2_spu_mode(void)
 {
-    TEST("DAY2_spu_mode");
+    TEST_RETAIL_DISC1("DAY2_spu_mode"); TEST_RETAIL_FIXUPS(RETAILFIX_spu_mode);
     for(unsigned k=0;k<sizeof(SM_cases)/sizeof(SM_cases[0]);k++) {
         for(unsigned physical=0;physical<2;physical++) {
         ResetTestState();func_8007D15C();

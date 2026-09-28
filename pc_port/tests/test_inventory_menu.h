@@ -3,7 +3,7 @@
 static void test_INV2_retail_inventory_menu(void)
 {
     unsigned k,i;
-    TEST("INV2_retail_inventory_menu");
+    TEST_RETAIL_DISC1("INV2_retail_inventory_menu"); TEST_RETAIL_FIXUPS(RETAILFIX_inventory_menu);
     for (k=0;k<sizeof(INV2_inventory_menu_cases)/sizeof(INV2_inventory_menu_cases[0]);k++) {
         uint64_t hash;uint32_t result=0u;
         ResetTestState();

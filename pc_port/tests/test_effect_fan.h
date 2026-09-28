@@ -35,7 +35,7 @@ static uint64_t DAY1_fan_hash(void)
 static void test_DAY1_retail_effect_fan(void)
 {
     unsigned k,i;
-    TEST("DAY1_retail_effect_fan");
+    TEST_RETAIL_DISC1("DAY1_retail_effect_fan"); TEST_RETAIL_FIXUPS(RETAILFIX_effect_fan);
     for (k=0;k<sizeof(DAY1_fan_cases)/sizeof(DAY1_fan_cases[0]);k++) {
         const uint32_t *a=DAY1_fan_cases[k].args;
         uint32_t result=0;uint64_t hash;

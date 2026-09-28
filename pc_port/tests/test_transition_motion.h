@@ -20,7 +20,7 @@ static void DAY1_motion_fixture(unsigned seed,unsigned alias,uint32_t time,unsig
 }
 static void test_DAY1_transition_motion(void)
 {
-    TEST("DAY1_transition_motion");
+    TEST_RETAIL_DISC1("DAY1_transition_motion"); TEST_RETAIL_FIXUPS(RETAILFIX_transition_path);
     for(unsigned k=0;k<sizeof(DAY1_motion_cases)/sizeof(DAY1_motion_cases[0]);k++) {
         unsigned kind=DAY1_motion_cases[k].kind,fault=DAY1_motion_cases[k].fault;
         uint32_t id=DAY1_motion_cases[k].id;

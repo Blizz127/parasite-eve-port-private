@@ -9,6 +9,9 @@
 #include "host_frame_pacer.h"
 #include "host_window_scale.h"
 #include "host_pad.h"
+#include "host_audio.h"
+#include "pe_audio_driver.h"
+#include "game_port.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -101,7 +104,15 @@ static int g_close_requested = 0;
 int g_host_window_open = 0;
 static uint16_t g_sony_held = 0;
 static HostFramePacer g_pacer;
-static int g_fast_forward, g_speed_key_held;
+/* Fast-forward: F6 or controller L3 toggles g_fast_forward; controller R3
+ * fast-forwards while held.  g_ff_active is the effective state. */
+static int g_fast_forward, g_speed_key_held, g_ff_active;
+static uint8_t g_pad_hotkeys;
+/* Pacing is per emulated VBlank (see pe_audio_driver.h).  Presents only
+ * poll input, unless a scene presents without advancing VBlanks. */
+static int g_vblank_paced;
+static void pace_vblank(void);
+static uint64_t g_last_vblank_ns;
 static char g_title[512];
 
 static void *xlib_sym(const char *name) {
@@ -168,7 +179,8 @@ int HostWindow_Open(const char *display, int width, int height,
 
     g_win = XCreateSimpleWindow(g_dpy, root, 200, 200, g_win_w, g_win_h,
                                  4, 0xFFFFFF, 0xFFFFFF);
-    g_fast_forward=0;g_speed_key_held=0;
+    g_fast_forward=0;g_speed_key_held=0;g_ff_active=0;g_pad_hotkeys=0;
+    g_vblank_paced=0;g_last_vblank_ns=0;
     HostWindow_SetTitle(title);
     XSelectInput(g_dpy, g_win, ExposureMask | KeyPressMask | (1L<<1) | StructureNotifyMask | FocusChangeMask);
     g_wm_delete = XInternAtom(g_dpy, "WM_DELETE_WINDOW", 0);
@@ -182,6 +194,7 @@ int HostWindow_Open(const char *display, int width, int height,
     g_sony_held = 0;
     memset(&g_pacer,0,sizeof(g_pacer));
     g_host_window_open = 1;
+    PE_AudioDriver_SetVBlankPacer(pace_vblank);
 
     XFlush(g_dpy);
     fprintf(stderr, "[WINDOW] %dx%d (fb %dx%d) on %s title='%s'\n",
@@ -201,14 +214,35 @@ void HostWindow_SetTitle(const char *title)
 {
     char label[560];
     if (title) snprintf(g_title,sizeof(g_title),"%s",title);
-    snprintf(label,sizeof(label),"%s [%s]",g_title,g_fast_forward?"Fast-forward":"Normal speed");
+    snprintf(label,sizeof(label),"%s [%s]",g_title,g_ff_active?"Fast-forward":"Normal speed");
     if (g_dpy && g_win) { XStoreName(g_dpy, g_win, label); XFlush(g_dpy); }
+}
+
+/* Recompute the effective fast-forward state; on a change reset the pacer,
+ * retitle, and mute/unmute the audio device (no chipmunk audio). */
+static void ff_update(const char *why)
+{
+    int eff=g_fast_forward||(g_pad_hotkeys&HOST_PAD_HOTKEY_FF_HOLD)!=0;
+    if (eff==g_ff_active) return;
+    g_ff_active=eff;
+    memset(&g_pacer,0,sizeof(g_pacer));
+    HostWindow_SetTitle(NULL);
+    HostAudio_SetFastForward(eff);
+    fprintf(stderr,"[WINDOW] %s (%s; F6/L3 toggle, hold R3)\n",
+            eff?"Fast-forward, audio muted":"Normal speed: 59.94 Hz",why);
 }
 
 int HostWindow_Poll(void)
 {
     if (!g_dpy) return 0;
     HostPad_Poll();
+    {
+        uint8_t hk=HostPad_Hotkeys();
+        if ((hk&HOST_PAD_HOTKEY_FF_TOGGLE)&&!(g_pad_hotkeys&HOST_PAD_HOTKEY_FF_TOGGLE))
+            g_fast_forward=!g_fast_forward;
+        g_pad_hotkeys=hk;
+        ff_update("controller");
+    }
     while (XPending(g_dpy)) {
         XEvent ev;
         XNextEvent(g_dpy, &ev);
@@ -235,9 +269,7 @@ int HostWindow_Poll(void)
                 }
                 if (ev.type==KeyPress && !g_speed_key_held) {
                     g_fast_forward=!g_fast_forward;
-                    memset(&g_pacer,0,sizeof(g_pacer));
-                    HostWindow_SetTitle(NULL);
-                    fprintf(stderr,"[WINDOW] %s (F6 toggles speed)\n",g_fast_forward?"Fast-forward":"Normal speed: 59.94 Hz");
+                    ff_update("F6");
                 }
                 g_speed_key_held=ev.type==KeyPress;
                 continue;
@@ -299,17 +331,18 @@ static int monotonic_ns(uint64_t *out)
     return 1;
 }
 
-int HostWindow_Pace(void)
+/* Sleep to the next 59.94 Hz deadline, polling input.  Returns 1 on
+ * close or a host clock failure. */
+static int pace_one_frame(void)
 {
     uint64_t now,deadline;
-    if (g_fast_forward) return HostWindow_Poll();
     if (!monotonic_ns(&now)) return 1;
     deadline=HostFramePacer_Deadline(&g_pacer,now);
     for (;;) {
         struct timespec delay;
         uint64_t remaining;
         if (HostWindow_Poll() || !monotonic_ns(&now)) return 1;
-        if (g_fast_forward) return 0;
+        if (g_ff_active) return 0;
         if (now>=deadline) return 0;
         remaining=deadline-now;
         delay.tv_sec=0;
@@ -317,6 +350,37 @@ int HostWindow_Pace(void)
         /* Recheck the absolute deadline after interruptions and oversleep. */
         (void)nanosleep(&delay,NULL);
     }
+}
+
+/* PeVBlankPacer: one emulated VBlank = one 59.94 Hz frame of wall time. */
+static void pace_vblank(void)
+{
+    if (!g_dpy) return;
+    g_vblank_paced=1;
+    if (g_close_requested) return;
+    if (g_ff_active) {
+        /* uncapped, but keep input (and the fast-forward keys) live */
+        static unsigned n;
+        if ((++n & 7u)==0u) (void)HostWindow_Poll();
+        return;
+    }
+    if (pace_one_frame()) PE_Port_RequestStop(PE_PORT_STOP_HOST_QUIT);
+    (void)monotonic_ns(&g_last_vblank_ns);
+}
+
+int HostWindow_Pace(void)
+{
+    if (g_ff_active) return HostWindow_Poll();
+    /* Emulated VBlanks pace the game; a present only polls (catch-up
+     * presents such as pe_str_feed's cost no time).  Safety net: if no
+     * VBlank has paced for 100 ms of wall time, a scene is presenting
+     * without VBlanks and presents are paced one frame each. */
+    if (g_vblank_paced) {
+        uint64_t now;
+        if (monotonic_ns(&now) && now-g_last_vblank_ns<UINT64_C(100000000))
+            return HostWindow_Poll();
+    }
+    return pace_one_frame();
 }
 
 int HostWindow_Run(int milliseconds)
@@ -339,6 +403,7 @@ int HostWindow_Run(int milliseconds)
 
 void HostWindow_Close(void)
 {
+    PE_AudioDriver_SetVBlankPacer(NULL);
     if (g_ximg) XDestroyImage(g_ximg);
     g_imgbuf = NULL; g_ximg = NULL;
     g_gc = 0; g_win = 0;

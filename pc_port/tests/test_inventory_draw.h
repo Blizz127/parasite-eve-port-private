@@ -3,7 +3,7 @@
 static void test_INV3_retail_inventory_draw(void)
 {
     unsigned k,i;
-    TEST("INV3_retail_inventory_draw");
+    TEST_RETAIL_DISC1("INV3_retail_inventory_draw"); TEST_RETAIL_FIXUPS(RETAILFIX_inventory_draw);
     for (k=0;k<sizeof(INV3_inventory_draw_cases)/sizeof(INV3_inventory_draw_cases[0]);k++) {
         const uint32_t *a=INV3_inventory_draw_cases[k].args;
         uint64_t hash;uint32_t result=0u;

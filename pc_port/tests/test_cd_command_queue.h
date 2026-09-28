@@ -1,7 +1,7 @@
 #include "retail_cd_command_queue_cases.h"
 static void test_DAY2_cd_command_queue(void)
 {
-    TEST("DAY2_cd_command_queue");
+    TEST_RETAIL_DISC1("DAY2_cd_command_queue"); TEST_RETAIL_FIXUPS(RETAILFIX_cd_device_tables);
     for(unsigned k=0;k<sizeof(CDQUEUE_issue)/sizeof(CDQUEUE_issue[0]);k++) {
         ResetTestState();
         for(unsigned j=0;j<sizeof(CDQUEUE_issue_ranges)/sizeof(CDQUEUE_issue_ranges[0]);j++)

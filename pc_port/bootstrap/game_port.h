@@ -89,6 +89,13 @@ int  PE_Port_MovieContinueBudget(void);
  * remains it is decremented.  Returns 0 when budget is exhausted. */
 int  PE_Port_ConsumeMovieContinue(void);
 
+/* Host-only budget for func_801909B4's title main loop (0x801911C0).
+ * -1 (default) = retail loop (repeat until Circle confirm / 1000-frame
+ * attract timeout).  N >= 0 allows N further loop-continues before the
+ * func_801909B4_title_main_loop frontier.  RunControlReset restores -1. */
+void PE_Port_SetTitleLoopBudget(int continues);
+int  PE_Port_ConsumeTitleLoop(void);
+
 /* Opt-in demo shortcut for M0010's EF(0) menu after Aya's profile.
  * Preserve existing defaults; the full 16F10/4DCA4 menu is not translated. */
 void PE_Port_SetSkipOpeningMenu(int enabled);

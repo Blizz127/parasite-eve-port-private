@@ -1,3 +1,12 @@
+## UPDATE 2026-09-28: preview checkpoint — eve1 fixed, audio/FMV fixes, runs off the disc
+
+Port checkpoint (lanes port3, audio2, fmv, day1, disc). Evidence: native suite 1584/1584 with a disc, 1347 pass / 237 skip / 0 fail without one (disc lane build); `pc_port/tools/day1_route_regress.sh` → `REGRESS PASS until=eve1_victory frame=44344` (baseline build stops at 43500); `preview_release_check.sh` table in `build/lanes/day1/table-eve1-pcbuild-day1.txt`; `tools/analysis/retail_data_guard.py --quiet-baseline` → OK.
+- port3: `PE_M0023I_Flash` unresolved boundary is now a logged Day-1 shim (`g_pe_strict_effect_stack=1` restores the stop); flash path not yet exercised in a full-route fight (the aid wins first) — proof owed.
+- audio2: static fixed (adaptive resampler + queue in host_audio.c, 133 ms XA jitter buffer, psx-spx zigzag XA FIR, reverb half-band FIR, gaussian voices); L3 toggle / R3 hold fast-forward. Battle-tempo report still open.
+- fmv: no-skip boot plays FMV001 → title → New Game → FMV000 → opening scene; `pe_str_feed` host STR producer; movie skip silences XA within 50 ms (`PE_Spu_CdInputStop`); retail title has no BGM (verified from the overlay code).
+- disc: 81 test headers stripped of retail bytes and restored from the user's disc at test time (`verify_retail_fixups.py` 80/80 + hand-checked cd tables); `pe_disc_check` identifies USA Disc 1/2 by serial + EXE SHA-1; `func_80029810_port.c` reads its tables from guest RAM; guard in build script, ctest, `.githooks/pre-commit` (enable with `git config core.hooksPath .githooks`) and CI.
+- Next: full Day-1 table on the release build, battle tempo, flash proof, then rebuild + redeploy the preview.
+
 ## UPDATE 2026-09-28: batch 17 — 2144 EXE c spans, gate PASS (main + vendor-derived func_80014BA0)
 
 `EXACT_REBUILD_GATE=PASS plan=be6eb4d4a58b109d992ff0701cd6ff9f4bcd4ec2fe0b6cbaacc8801c7ed98ebc yaml=5c951c8272d6377bfe6f0503809f0dc40d4783b308946fc391b2c20861ce093f spans=[2144 c, 147 asm, 2 rodata] sha1_orig=sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=2144` (log `build/tmp/gate-2144.log`). Leaves: **`func_8001220C` (`main`)** — counted as matched C but **flagged inline-asm** (the scratchpad stack handoff around `func_8019234C` has no C spelling; fenced asm block), tracked separately per owner directive; **`func_80014BA0`** — vendor-derived from khasinski/parasite-eve-decomp@3067919e (`Camera_StepAngleFade`), supersedes the exeA PARK (104 mismatches). Remaining matchable EXE: `func_8007CEAC`, `func_80071A84` (knob K-CDKJT) — lane exeJ.

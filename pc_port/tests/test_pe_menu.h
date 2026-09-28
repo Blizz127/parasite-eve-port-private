@@ -3,7 +3,7 @@
 static void test_INV19_retail_pe_menu(void)
 {
     unsigned k,i,failures=0;
-    TEST("INV19_retail_pe_menu");
+    TEST_RETAIL_DISC1("INV19_retail_pe_menu"); TEST_RETAIL_FIXUPS(RETAILFIX_pe_menu);
     for (k=0;k<sizeof(INV19_pe_menu_cases)/sizeof(INV19_pe_menu_cases[0]);k++) {
         const uint32_t *args=INV19_pe_menu_cases[k].args;
         uint32_t a=args[0],result=0u;

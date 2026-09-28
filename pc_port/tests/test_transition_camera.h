@@ -18,7 +18,7 @@ static void DAY1_camera_fixture(unsigned seed,uint32_t variant)
 }
 static void test_DAY1_transition_camera(void)
 {
-    TEST("DAY1_transition_camera");
+    TEST_RETAIL_DISC1("DAY1_transition_camera"); TEST_RETAIL_FIXUPS(RETAILFIX_transition_path);
     static const uint32_t shifts[]={0,1,15,16,31,32,255,0x10001};
     for(unsigned k=0;k<sizeof(DAY1_camera_cases)/sizeof(DAY1_camera_cases[0]);k++){
         unsigned seed=DAY1_camera_cases[k].seed,step=DAY1_camera_cases[k].step;
@@ -35,7 +35,7 @@ static void test_DAY1_transition_camera(void)
 }
 static void test_DAY1_transition_camera_boundary(void)
 {
-    TEST("DAY1_transition_camera_boundary");
+    TEST_RETAIL_DISC1("DAY1_transition_camera_boundary"); TEST_RETAIL_FIXUPS(RETAILFIX_transition_path);
     for(unsigned k=0;k<sizeof(DAY1_camera_faults)/sizeof(DAY1_camera_faults[0]);k++){
         unsigned f=DAY1_camera_faults[k].fn,second=DAY1_camera_faults[k].second;
         DAY1_camera_fixture(0,0);PE_StoreU8(0x8019C040u,3);PE_StoreU8(0x8019C041u,255);PE_StoreU8(0x8019C042u,3);

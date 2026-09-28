@@ -26,6 +26,7 @@
 #include "pe_guestcode.h"
 #include "psx_compat.h"
 #include "pe_sdk.h"
+#include "pe_audio_driver.h"
 #include "pe_spu_dma.h"
 #include "pe_gpu.h"
 #include "pe_mdec.h"
@@ -330,8 +331,22 @@ int PE_Event_ConsumeSpuDma(int handle)
     return 1;
 }
 
+int PE_Event_AudioTimerArmed(void)
+{
+    return g_audio_event_enabled && !g_irq_lock_depth && !PE_Port_ShouldStop();
+}
+
+/* Port lane: PE_AKAO_VERIFY=1 differential check of the native AKAO tick
+ * (game/decomp_hand/akao_tick_port.c).  Weak: link-only tests omit it. */
+extern int PE_AkaoVerify_Tick(void) __attribute__((weak));
+
 void PE_Event_ServiceAudioCommands(void)
 {
+    /* Audio lane: the native audio driver runs the whole retail tick
+     * func_8008DB7C (which calls func_8008CA84 itself) at 240 Hz. */
+    if (PE_AudioDriver_Active()) return;
+    if (PE_AkaoVerify_Tick && g_audio_event_enabled && !g_irq_lock_depth &&
+        !PE_Port_ShouldStop() && PE_AkaoVerify_Tick()) return;
     /* Host adaptation: the frame wait supplies the missing timer service.
      * Preserve registration, EnableEvent, critical-section and producer
      * gates. This is 8DB7C's 8E1F0..8E208 command portion only; its music

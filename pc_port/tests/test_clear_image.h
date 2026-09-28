@@ -28,7 +28,7 @@ static void test_DAY1_clear_image_packets(void)
 
 static void test_DAY1_clear_image_dispatch_pixels(void)
 {
-    TEST("DAY1_clear_image_dispatch_pixels");
+    TEST_RETAIL_DISC1("DAY1_clear_image_dispatch_pixels"); TEST_RETAIL_FIXUPS(RETAILFIX_dispenv);
     for (unsigned queued=0;queued<2;queued++) {
         PeGpuState gpu;
         int returned=0;
@@ -85,7 +85,7 @@ static void test_DAY1_gpu_drawing_status(void)
 static void test_DAY1_clear_image_queue_ownership(void)
 {
     RECT upload={40,50,16,2};
-    TEST("DAY1_clear_image_queue_ownership");
+    TEST_RETAIL_DISC1("DAY1_clear_image_queue_ownership"); TEST_RETAIL_FIXUPS(RETAILFIX_dispenv);
     ResetTestState();HostFB_Init();PE_GPU_Init();B54KR_SeedGpuStatic();
     for (unsigned i=0;i<16;i++) PE_StoreU32(0x80170000u+i*4u,0x7FFF7FFFu);
     ASSERT(func_8007506C(&upload,0x80170000u)==0 && PE_GPU_DMA2Pending(),"DMA seed failed");
@@ -107,7 +107,7 @@ static void test_DAY1_clear_image_queue_ownership(void)
 static void test_DAY1_clear_sdk_lifetime(void)
 {
     RECT rect={0,240,1024,1},upload={40,50,16,2};
-    TEST("DAY1_clear_sdk_lifetime");
+    TEST_RETAIL_DISC1("DAY1_clear_sdk_lifetime"); TEST_RETAIL_FIXUPS(RETAILFIX_dispenv);
     ResetTestState();HostFB_Init();PE_GPU_Init();B54KR_SeedGpuStatic();
     HostFB_ClearImage(0,0,320,240,17,33,65);
     ASSERT(func_80074F44(&rect,255,0,0)==0 && rect.w==1023 && rect.h==1 &&
@@ -133,7 +133,7 @@ static void test_DAY1_clear_sdk_dispatch_boundary(void)
 {
     RECT rect={0,0,320,240};
     const BootstrapArgCall4 *call;
-    TEST("DAY1_clear_sdk_dispatch_boundary");
+    TEST_RETAIL_DISC1("DAY1_clear_sdk_dispatch_boundary"); TEST_RETAIL_FIXUPS(RETAILFIX_dispenv);
     ResetTestState();PE_GPU_Init();B54KR_SeedGpuStatic();
     PE_StoreU32(0x8009570Cu,0xDEADBEEFu);
     ASSERT(func_80074F44(&rect,0x12,0x34,0x56)==0 && PE_Port_ShouldStop(),"dirty dispatch silently accepted");
@@ -147,7 +147,7 @@ static void test_DAY1_clear_sdk_dispatch_boundary(void)
 #include "retail_clear_sdk_cases.h"
 static void test_DAY1_clear_sdk_original_arguments(void)
 {
-    TEST("DAY1_clear_sdk_original_arguments");
+    TEST_RETAIL_DISC1("DAY1_clear_sdk_original_arguments"); TEST_RETAIL_FIXUPS(RETAILFIX_dispenv);
     for (unsigned i=0;i<sizeof(DAY1_clear_sdk_colors)/sizeof(DAY1_clear_sdk_colors[0]);i++) {
         RECT rect={0,240,64,1};
         const uint32_t *c=DAY1_clear_sdk_colors[i];

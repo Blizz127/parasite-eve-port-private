@@ -1,7 +1,7 @@
 #include "retail_formatter_frame_cases.h"
 static void test_DAY1_formatter_frame(void)
 {
-    TEST("DAY1_formatter_frame");
+    TEST_RETAIL_DISC1("DAY1_formatter_frame"); TEST_RETAIL_FIXUPS(RETAILFIX_formatter_frame);
     for(unsigned n=0;n<sizeof(DAY1_formatter_frame_cases)/sizeof(DAY1_formatter_frame_cases[0]);n++) {
         ResetTestState();
         for(unsigned i=0;i<sizeof(DAY1_formatter_frame_common)/sizeof(DAY1_formatter_frame_common[0]);i++)

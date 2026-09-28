@@ -20,6 +20,11 @@ jobs:
         run: python3 tools/build/disc1_plan.py --check --check-status
       - name: Patch hygiene
         run: git diff --check
+      - name: Retail-data guard (no disc bytes committed)
+        run: |
+          python3 tools/analysis/test_retail_data_guard.py
+          python3 tools/extract/test_disc_cache.py
+          python3 tools/analysis/retail_data_guard.py --no-disc
 
   native-progress:
     runs-on: ubuntu-latest

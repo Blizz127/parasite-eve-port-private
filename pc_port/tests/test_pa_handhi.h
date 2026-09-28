@@ -650,7 +650,7 @@ static void test_PA_handhi_texture(void)
 {
     uint16_t px;
     unsigned i;
-    TEST("PA_handhi_texture");
+    TEST_RETAIL_DISC1("PA_handhi_texture"); TEST_RETAIL_FIXUPS(RETAILFIX_dispenv);
     ResetTestState();HostFB_Init();PE_GPU_Init();B54KR_SeedGpuStatic();
 
     /* src/func_80074774.c mode 1: RECT {a3, a4, a5 / 2, a6}; returns

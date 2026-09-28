@@ -53,7 +53,7 @@ static uint64_t DAY1_flash_hash(void)
 static void test_DAY1_retail_m0023i_flash(void)
 {
     unsigned k,i;
-    TEST("DAY1_retail_m0023i_flash");
+    TEST_RETAIL_DISC1("DAY1_retail_m0023i_flash"); TEST_RETAIL_FIXUPS(RETAILFIX_m0023i_flash);
     for (k=0;k<sizeof(DAY1_flash_cases)/sizeof(DAY1_flash_cases[0]);k++) {
         const uint32_t *a=DAY1_flash_cases[k].args;
         uint32_t result=0;uint64_t hash;
@@ -92,9 +92,18 @@ static void test_DAY1_retail_m0023i_flash(void)
     for(i=0;i<sizeof(DAY1_flash_common)/sizeof(DAY1_flash_common[0]);i++)
         PE_StoreU32(DAY1_flash_address(DAY1_flash_common[i][0]),DAY1_flash_common[i][1]);
     PE_StoreU16(0x80150104u,0);PE_StoreU32(0x8009CDD8u,0);
+    g_pe_strict_effect_stack=1;
     (void)PE_EffectCallback(0x8018F710u,2,0x80150100u,0);
-    ASSERT(PE_Port_ShouldStop(),"unknown original caller stack must remain an explicit boundary");
-    ASSERT(PE_LoadU32(0x8009CDD8u)==0,"unknown stack position must not emit invented geometry");
+    g_pe_strict_effect_stack=0;
+    ASSERT(PE_Port_ShouldStop(),"strict mode: unknown original caller stack must remain an explicit boundary");
+    ASSERT(PE_LoadU32(0x8009CDD8u)==0,"strict mode: unknown stack position must not emit invented geometry");
+    /* Day-1 shim (DAY1_FIDELITY_GAPS.md): the same call keeps the game running. */
+    ResetTestState();
+    for(i=0;i<sizeof(DAY1_flash_common)/sizeof(DAY1_flash_common[0]);i++)
+        PE_StoreU32(DAY1_flash_address(DAY1_flash_common[i][0]),DAY1_flash_common[i][1]);
+    PE_StoreU16(0x80150104u,0);PE_StoreU32(0x8009CDD8u,0);
+    (void)PE_EffectCallback(0x8018F710u,2,0x80150100u,0);
+    ASSERT(!PE_Port_ShouldStop(),"Day-1 shim: unresolved F710 stack position must not stop the port");
     ResetTestState();
     PASS();
 }

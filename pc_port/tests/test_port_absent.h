@@ -155,7 +155,7 @@ static void test_PORTABSENT_e9_guest_ptr(void)
  * for (D_8009CFD0, D_8009CFDC). */
 static void test_PORTABSENT_status_panel_buf(void)
 {
-    TEST("PORTABSENT_4A6CC_status_panel_buf");
+    TEST_RETAIL_DISC1("PORTABSENT_4A6CC_status_panel_buf"); TEST_RETAIL_FIXUPS(RETAILFIX_menu_text);
     ResetTestState();
     /* Retail menu-text state (glyph packet arena, pen, font) captured by the
      * NAM5 menu-text cases (test_menu_text.h), so the glyph draws run. */

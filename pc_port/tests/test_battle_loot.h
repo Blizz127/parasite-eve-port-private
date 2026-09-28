@@ -2,7 +2,7 @@
 
 static void test_LOOT_original_entries(void)
 {
-    TEST("LOOT_original_entries");
+    TEST_RETAIL_DISC1("LOOT_original_entries"); TEST_RETAIL_FIXUPS(RETAILFIX_battle_loot);
     for (unsigned k=0;k<sizeof(LOOT_cases)/sizeof(LOOT_cases[0]);k++) {
         const uint32_t *args=LOOT_cases[k].args;
         uint32_t a=args[0],b=args[1],c=args[2],d=args[3],result=0u;

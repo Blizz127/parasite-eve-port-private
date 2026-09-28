@@ -30,7 +30,7 @@ static uint64_t ATK25_charge_hash(void)
 static void test_ATK25_retail_eve_charge(void)
 {
     unsigned k,i;
-    TEST("ATK25_retail_eve_charge");
+    TEST_RETAIL_DISC1("ATK25_retail_eve_charge"); TEST_RETAIL_FIXUPS(RETAILFIX_eve_charge);
     for (k=0;k<sizeof(ATK25_charge_cases)/sizeof(ATK25_charge_cases[0]);k++) {
         const uint32_t *a=ATK25_charge_cases[k].args;
         uint32_t result=0;

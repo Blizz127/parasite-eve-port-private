@@ -3,7 +3,7 @@
 static void test_INV10_retail_inventory_use(void)
 {
     unsigned k,i;
-    TEST("INV10_retail_inventory_use");
+    TEST_RETAIL_DISC1("INV10_retail_inventory_use"); TEST_RETAIL_FIXUPS(RETAILFIX_inventory_use);
     for (k=0;k<sizeof(INV10_inventory_use_cases)/sizeof(INV10_inventory_use_cases[0]);k++) {
         const uint32_t *args=INV10_inventory_use_cases[k].args;
         uint32_t a=args[0],result=0u;

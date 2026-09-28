@@ -1,7 +1,7 @@
 #include "retail_cd_dma_issue_cases.h"
 static void test_DAY2_cd_dma(void)
 {
-    TEST("DAY2_cd_dma");
+    TEST_RETAIL_DISC1("DAY2_cd_dma"); TEST_RETAIL_FIXUPS(RETAILFIX_cd_device_tables);
     for(unsigned k=0;k<sizeof(CDDMA_cases)/sizeof(CDDMA_cases[0]);k++) {
         ResetTestState();
         PE_StoreU32(0x8009B348u,0x80130000u);PE_StoreU32(0x80130000u,CDDMA_cases[k].enable<<16u|0x1234u);

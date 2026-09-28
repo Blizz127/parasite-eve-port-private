@@ -305,7 +305,7 @@ static void test_PV_777C0_immediate_moveimage(void)
     };
     const pe_addr_t rect = 0x80170100u;
     PeGpuState state;
-    TEST("PV_777C0_immediate_moveimage");
+    TEST_RETAIL_DISC1("PV_777C0_immediate_moveimage"); TEST_RETAIL_FIXUPS(RETAILFIX_dispenv);
     ResetTestState();
     B54KR_SeedGpuStatic();
     ASSERT(B54KR_UploadPixels(10u, 20u, 4u, 2u, pixels), "source upload failed");
@@ -340,7 +340,7 @@ static void test_PV_775E8_immediate_loadimage(void)
 {
     const pe_addr_t rect = 0x80170100u;
     uint32_t i;
-    TEST("PV_775E8_immediate_loadimage");
+    TEST_RETAIL_DISC1("PV_775E8_immediate_loadimage"); TEST_RETAIL_FIXUPS(RETAILFIX_dispenv);
     ResetTestState();
     HostFB_Init();
     B54KR_SeedGpuStatic();

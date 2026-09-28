@@ -348,9 +348,10 @@ int func_80121C04(int id)
     func_80121004(1,(int8_t)PE_LoadU8(0x800B0DBBu));
     if(PE_Port_ShouldStop()) return 0;
     name[0]=0;
-    strcat(name,(const char *)PE_TranslateConst(PE_LoadU32(selector<0x15u?
-        0x80120FF4u:0x80120FFCu),0));
-    strcat(name,(const char *)PE_TranslateConst(PE_LoadU32(record),0));
+    /* 0x80121C9C..CB4: a1 = &"\FMV1" / &"\FMV2" (addiu, not a load). */
+    strcat(name,(const char *)PE_TranslateConst(selector<0x15u?
+        0x80120FF4u:0x80120FFCu,8));
+    strcat(name,(const char *)PE_TranslateConst(PE_LoadU32(record),16));
     search=0;
     for(unsigned cycles=0;;) {
         if(func_8007F72C()==1 && func_8007F778()==0) {
