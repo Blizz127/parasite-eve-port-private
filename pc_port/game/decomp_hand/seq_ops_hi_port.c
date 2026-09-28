@@ -22,28 +22,22 @@ static void flags38_or(pe_addr_t a0, uint32_t m) { PE_StoreU32(a0 + 0x38u, PE_Lo
 static void flags38_and(pe_addr_t a0, uint32_t m) { PE_StoreU32(a0 + 0x38u, PE_LoadU32(a0 + 0x38u) & m); }
 
 /* src/func_8008FCB4.c: +0x82 = 0. */
-void func_8008FCB4(pe_addr_t arg0) { PE_StoreU16(arg0 + 0x82u, 0u); }
+/* func_8008FCB4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8008FCB4_port.c (src/func_8008FCB4.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 /* src/func_800904A0.c: +0x84 = 1. */
-void func_800904A0(pe_addr_t arg0) { PE_StoreU16(arg0 + 0x84u, 1u); }
+/* func_800904A0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800904A0_port.c (src/func_800904A0.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 /* src/func_80090A0C.c: +0x38 &= ~0x8. */
-void func_80090A0C(pe_addr_t arg0) { flags38_and(arg0, ~0x8u); }
+/* func_80090A0C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80090A0C_port.c (src/func_80090A0C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 /* src/func_80090C38.c / C4C / C60 / C74: +0x38 bit 4 / bit 5 set / clear. */
-void func_80090C38(pe_addr_t arg0) { flags38_or(arg0, 0x10u); }
-void func_80090C4C(pe_addr_t arg0) { flags38_and(arg0, ~0x10u); }
-void func_80090C60(pe_addr_t arg0) { flags38_or(arg0, 0x20u); }
-void func_80090C74(pe_addr_t arg0) { flags38_and(arg0, ~0x20u); }
+/* func_80090C38: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80090C38_port.c (src/func_80090C38.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
+/* func_80090C4C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80090C4C_port.c (src/func_80090C4C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
+/* func_80090C60: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80090C60_port.c (src/func_80090C60.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
+/* func_80090C74: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80090C74_port.c (src/func_80090C74.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 /* src/func_80090F54.c: +0x38 |= 0x100000. */
-void func_80090F54(pe_addr_t arg0) { flags38_or(arg0, 0x100000u); }
+/* func_80090F54: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80090F54_port.c (src/func_80090F54.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* src/func_8008F868.c / 8008F880.c: +0x7C = (+0x7C +/- 1) & 0xF. */
-void func_8008F868(pe_addr_t arg0)
-{
-    PE_StoreU16(arg0 + 0x7Cu, (uint16_t)((PE_LoadU16(arg0 + 0x7Cu) + 1u) & 0xFu));
-}
-void func_8008F880(pe_addr_t arg0)
-{
-    PE_StoreU16(arg0 + 0x7Cu, (uint16_t)((PE_LoadU16(arg0 + 0x7Cu) - 1u) & 0xFu));
-}
+/* func_8008F868: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8008F868_port.c (src/func_8008F868.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
+/* func_8008F880: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8008F880_port.c (src/func_8008F880.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* src/func_8008F84C.c: +0x7C = next byte. */
 void func_8008F84C(pe_addr_t arg0) { PE_StoreU16(arg0 + 0x7Cu, seq_next(arg0)); }

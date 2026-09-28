@@ -164,11 +164,7 @@ void func_8007D614(void)
 
 /* ── src/func_80080F64.c: if ((a0 & 0xFF) == 2)
  *    func_80081D74(func_80080F98, -1).  Code pointer = retail VMA. */
-void func_80080F64(int a0)
-{
-    if ((a0 & 0xFF) == 2)
-        (void)CD_B_80081D74(0x80080F98u, -1);
-}
+/* func_80080F64: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80080F64_port.c (src/func_80080F64.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* ── src/func_80081110.c: card poll tick over D_8009B6AC[7]
  * (p = &D_8009B6AC[1]): p[0] += p[-1] << 2; p[1]--; a VSync(-1) timeout
@@ -205,57 +201,13 @@ void func_80081110(void)
 /* ── src/func_800819D8.c: search the 0x2C-stride table D_800A3CB4 (0x80
  * entries; a zero key ends it) for key a0 whose name at D_800A3CBC + i*0x2C
  * compares equal (func_80072A54(a1, name) == 0); returns i + 1, else -1. */
-int func_800819D8(int a0, pe_addr_t a1)
-{
-    int i = 0;
-    pe_addr_t q = 0x800A3CBCu;
-    uint32_t off = 0;
-    int v;
-
-    for (;;) {
-        v = ld32(0x800A3CB4u + off);
-        if (v == 0)
-            break;
-        if (v == a0 && CD_B_80072A54(a1, q) == 0)
-            return i + 1;
-        q += 0x2Cu;
-        i++;
-        off += 0x2Cu;
-        if (i >= 0x80)
-            break;
-    }
-    return -1;
-}
+/* func_800819D8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800819D8_port.c (src/func_800819D8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* ── src/func_8008214C.c: over D_8009B6EC[9] (p = &D_8009B6EC[7]): return
  * unless p[0] and p[1]; a0 == 2 -> func_80082204() unless func_8007F778();
  * else func_800824C8(p[-2]), func_800824DC(p[-1]), p[1] = 0, and the
  * callback p[-5] (read before the clear) gets (a0, a1, 0) when non-null. */
-void func_8008214C(unsigned char a0, int a1)
-{
-    const pe_addr_t p = 0x8009B708u;
-    unsigned int k;
-    pe_addr_t f;
-
-    if (ld32(p) == 0)
-        return;
-    if (ld32(p + 4u) == 0)
-        return;
-    k = a0;
-    if (k == 2u) {
-        if (func_8007F778() != 0)
-            return;
-        func_80082204();
-        return;
-    }
-    (void)func_800824C8(PE_LoadU32(p - 8u));
-    (void)func_800824DC(ld32(p - 4u));
-    f = PE_LoadU32(p - 0x14u);
-    PE_StoreU32(p + 4u, 0u);
-    if (f != 0u)
-        (void)cd_icall("D_8009B6F4 (card event callback)", f, 3u,
-                       k, (uint32_t)a1, 0u);
-}
+/* func_8008214C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8008214C_port.c (src/func_8008214C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* ── src/func_80082444.c: a0 == 1 -> read 2 bytes into the stack buf
  * (func_80080AE4(buf, 2)) and compare &buf[1] with D_8001205C over 5 bytes
@@ -327,52 +279,13 @@ int func_8008284C(int a0, int a1, int a2)
  * count >= 0x96 resets record 0 through D_8009B728; count = 0), else
  * D_8009B774 = 1; bit 1 likewise port 1 (D_8009B778, D_800A5AC4, record
  * D_8009B758 + 0xF0).  D_8009B75C = 1; return cur. */
-int func_800829C4(int a0)
-{
-    int cur = (ld32(GA_B778) << 1) | (ld32(GA_B774) == 0);
-
-    if (cur == a0)
-        return cur;
-    PE_StoreU32(GA_B75C, 0u);
-    if (a0 & 1) {
-        PE_StoreU32(GA_B774, 0u);
-        if (ld32(GA_5AC0) >= 0x96)
-            (void)cd_icall("D_8009B728 (card record reset)", PE_LoadU32(GA_B728),
-                           1u, PE_LoadU32(GA_B758), 0u, 0u);
-        PE_StoreU32(GA_5AC0, 0u);
-    } else {
-        PE_StoreU32(GA_B774, 1u);
-    }
-    if (a0 & 2) {
-        PE_StoreU32(GA_B778, 1u);
-        if (ld32(GA_5AC4) >= 0x96)
-            (void)cd_icall("D_8009B728 (card record reset)", PE_LoadU32(GA_B728),
-                           1u, PE_LoadU32(GA_B758) + 0xF0u, 0u, 0u);
-        PE_StoreU32(GA_5AC4, 0u);
-    } else {
-        PE_StoreU32(GA_B778, 0u);
-    }
-    PE_StoreU32(GA_B75C, 1u);
-    return cur;
-}
+/* func_800829C4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800829C4_port.c (src/func_800829C4.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* ── src/func_80082B08.c: p = D_8009B784; return 0 unless p[1] & 1 and
  * p[0] & 1; call D_8009B74C() when non-null; return 1.  (pe_dis.sh
  * 0x80082B08 0x68: the `jalr` at 0x80082B54 leaves the caller's $a0 live;
  * the C passes nothing, so no argument is forwarded.) */
-int func_80082B08(void)
-{
-    pe_addr_t p = PE_LoadU32(GA_B784);
-
-    if ((PE_LoadU32(p + 4u) & 1u) == 0u)
-        return 0;
-    if ((PE_LoadU32(p) & 1u) == 0u)
-        return 0;
-    if (PE_LoadU32(GA_B74C) != 0u)
-        (void)cd_icall("D_8009B74C (card IRQ hook)", PE_LoadU32(GA_B74C),
-                       0u, 0u, 0u, 0u);
-    return 1;
-}
+/* func_80082B08: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80082B08_port.c (src/func_80082B08.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* ── src/func_80082B70.c: VBlank card handler.  D_8009B78C = 1; the idle
  * counters D_800A5AC0/AC4 of disabled ports (D_8009B774 != 0 /
@@ -572,57 +485,17 @@ int func_800837C8(pe_addr_t a0, int a1)
 
 /* ── src/func_80083DF0.c: a0[0x53] set -> return 1 when a0[0x46] == 2,
  * else a0[0x46] = 0xFE; clear -> D_8009B728(a0).  Returns 0. */
-int func_80083DF0(pe_addr_t a0)
-{
-    if (PE_LoadU8(a0 + 0x53u) != 0u) {
-        if (PE_LoadU8(a0 + 0x46u) == 2u)
-            return 1;
-        PE_StoreU8(a0 + 0x46u, 0xFEu);
-    } else {
-        (void)cd_icall("D_8009B728 (card record reset)", PE_LoadU32(GA_B728), 1u,
-                       a0, 0u, 0u);
-    }
-    return 0;
-}
+/* func_80083DF0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80083DF0_port.c (src/func_80083DF0.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* ── src/func_80083F04.c: D_8009B7A4 = D_8009B73C(a0);
  * func_800830DC(a0, -2). */
-void func_80083F04(int a0)
-{
-    PE_StoreU32(GA_B7A4, cd_icall("D_8009B73C (card sector hook)",
-                                  PE_LoadU32(GA_B73C), 1u, (uint32_t)a0, 0u, 0u));
-    (void)CD_B_800830DC(a0, -2);
-}
+/* func_80083F04: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80083F04_port.c (src/func_80083F04.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* ── src/func_8008401C.c: with D_8009B7A4 set, D_8009B73C on buffer
  * sectors +0x1E0 and +0x2D0; r = func_800832B4(a0, a0[0x36] ? 0 :
  * D_8009B770); r < 0 -> r; no high nibble -> -9; else D_8009B79C =
  * (r & 0xF) << 1, or 0x20 when that is 0; return 0. */
-int func_8008401C(pe_addr_t a0)
-{
-    int arg, r, t;
-
-    if (ld32(GA_B7A4) != 0) {
-        (void)cd_icall("D_8009B73C (card sector hook)", PE_LoadU32(GA_B73C), 1u,
-                       PE_LoadU32(a0 + 0xCu) + 0x1E0u, 0u, 0u);
-        (void)cd_icall("D_8009B73C (card sector hook)", PE_LoadU32(GA_B73C), 1u,
-                       PE_LoadU32(a0 + 0xCu) + 0x2D0u, 0u, 0u);
-    }
-    arg = 0;
-    if (PE_LoadU8(a0 + 0x36u) == 0u)
-        arg = ld32(GA_B770);
-    r = CD_B_800832B4(a0, arg);
-    if (r < 0)
-        return r;
-    if ((r & 0xF0) == 0)
-        return -9;
-    t = (r & 0xF) << 1;
-    PE_StoreU32(GA_B79C, (uint32_t)t);
-    if (t != 0)
-        return 0;
-    PE_StoreU32(GA_B79C, 0x20u);
-    return 0;
-}
+/* func_8008401C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8008401C_port.c (src/func_8008401C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* ── src/func_800840DC.c: flag = (high nibble of **(a0 + 0x3C) == 8) &&
  * a0[0x36] == 0; r = func_800832B4(a0, D_8009B72C(a0, flag) & 0xFF);

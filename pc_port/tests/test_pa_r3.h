@@ -248,7 +248,10 @@ static void test_PA_r3_small(void)
     PE_StoreU32(0x8009B764u, 3u); PE_StoreU32(0x8009B774u, 3u);
     PE_StoreU32(0x8009B760u, 1u); PE_StoreU32(0x8009B7A4u, 1u);
     PE_StoreU32(0x8009B754u, 0x80099000u); PE_StoreU32(0x8009B750u, 0x80099100u);
-    PE_StoreU32(0x8009B73Cu, 0x80084B78u);
+    /* An unregistered hook address: the generated TU (round 6) dispatches
+     * through PE_GuestCall, which would genuinely run a registered target
+     * such as func_80084B78; this case pins the unresolved trace. */
+    PE_StoreU32(0x8009B73Cu, 0x80099200u);
     PE_StoreU32(rec + 0xCu, 0x80150000u);
     PE_StoreU8(rec + 0x36u, 0u);
     /* func_800832B4 (sio_port.c) now runs: retail SIO0 / I_STAT pointers and

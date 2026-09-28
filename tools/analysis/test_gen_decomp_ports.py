@@ -33,6 +33,20 @@ def analyze(src: str, name: str = "func_80099990") -> dict:
 
 
 class EraAsmTests(unittest.TestCase):
+    def test_member_named_like_a_pin_is_not_a_read(self):
+        # func_80070FAC: `lo = a.w.lo;` — the member `.lo` is not the pinned
+        # `lo`, which is written (`lo = lo0 + lo1`) before it is read.
+        src = ("union Sq { long long ll; struct { unsigned int lo; unsigned int hi; } w; };\n"
+               "int func_80099990(int x) {\n    union Sq a;\n"
+               '    register unsigned int lo asm("$2");\n'
+               "    a.ll = (long long)x * x;\n    lo = a.w.lo;\n    return (int)lo;\n}\n")
+        self.assertTrue(analyze(src)["eligible"], analyze(src).get("reason"))
+
+    def test_pin_read_before_write_still_rejected(self):
+        src = ('int func_80099990(void) {\n    register int v asm("$3");\n'
+               "    return v + 1;\n}\n")
+        self.assertFalse(analyze(src)["eligible"])
+
     def test_pins_and_fences_are_stripped(self):
         src = ('int f(void){ register int *p asm("$2") = &x; '
                'asm volatile("" : "=r"(p) : "0"(p)); '
@@ -581,7 +595,7 @@ class GuestCallTests(unittest.TestCase):
             "    if (D_80095748 != 0) D_80095748(&D_80011840, a0);\n}\n")
         self.assertIn("PE_DECOMP_SCALAR(0x80095748u, pe_addr_t)", out)
         self.assertIn('PE_GuestCall("@80099990:D_80095748", (pe_addr_t)(D_80095748), 2u, '
-                      "(uintptr_t)((pe_addr_t)0x80011840u), (uintptr_t)(a0), 0, 0)", out)
+                      "(uintptr_t)(uint32_t)((pe_addr_t)0x80011840u), (uintptr_t)(uint32_t)(a0), 0, 0)", out)
 
     def test_cast_slot_call(self):
         out = self.render(
@@ -590,8 +604,8 @@ class GuestCallTests(unittest.TestCase):
             "    unsigned int *v1 = D_80095744;\n"
             "    (*(void (**)(int, int))(v1 + 2))(v1[6], a);\n}\n")
         self.assertIn('PE_GuestCall("@80099990:indirect", '
-                      "(pe_addr_t)(*(pe_addr_t *)(v1 + 2)), 2u, (uintptr_t)(v1[6]), "
-                      "(uintptr_t)(a), 0, 0)", out)
+                      "(pe_addr_t)(*(pe_addr_t *)(v1 + 2)), 2u, (uintptr_t)(uint32_t)(v1[6]), "
+                      "(uintptr_t)(uint32_t)(a), 0, 0)", out)
 
     def test_int_word_cast_to_function_pointer(self):
         out = self.render(
@@ -601,7 +615,7 @@ class GuestCallTests(unittest.TestCase):
             "    h = (int (*)())D_80095744[13];\n"
             "    h(1);\n}\n")
         self.assertIn("h = (pe_addr_t)D_80095744[13];", out)
-        self.assertIn('PE_GuestCall("@80099990:h", (pe_addr_t)(h), 1u, (uintptr_t)(1), 0, 0, 0)', out)
+        self.assertIn('PE_GuestCall("@80099990:h", (pe_addr_t)(h), 1u, (uintptr_t)(uint32_t)(1), 0, 0, 0)', out)
 
     def test_prototype_parameter_is_an_address(self):
         text, why = g.rewrite_guest_calls(
@@ -669,7 +683,7 @@ class GuestMemberCallTests(unittest.TestCase):
         out = g.render("func_80099990", plan, {"func_80099990": leaf}, set(), {})
         self.assertIn("pe_addr_t fn;", out)
         self.assertIn('PE_GuestCall("@80099990:fn", (pe_addr_t)(host_o->fn), 1u, '
-                      "(uintptr_t)( pe_o), 0, 0, 0)", out)
+                      "(uintptr_t)(uint32_t)( pe_o), 0, 0, 0)", out)
         cc = g.find_compiler()
         if cc:
             self.assertEqual(g.compile_check(cc, [("func_80099990", out)]), {}, out)
@@ -761,6 +775,71 @@ class PointerRelationalCompareTests(unittest.TestCase):
                        "    if (p[0] < n) return 1;\n    if (n > 3) return 2;\n"
                        "    return (p[1] << 2) > n;\n}\n")
         self.assertTrue(plan["eligible"], plan.get("reason"))
+
+
+class SignednessAdapterTests(unittest.TestCase):
+    """E20: canonical prototype differs only by 32-bit integer signedness."""
+
+    def test_agreeing_signature_needs_no_adapter(self):
+        canon = {"ret": "int", "params": ["int a0"]}
+        self.assertIsNone(g.signedness_adapter("int ", "int a0", canon))
+
+    def test_uint32_vs_int_adapts(self):
+        canon = {"ret": "uint32_t", "params": ["uint32_t a", "uint32_t b"]}
+        ad = g.signedness_adapter("int ", "int a0, int a1", canon)
+        self.assertEqual(ad["params"], ["uint32_t", "uint32_t"])
+        self.assertEqual(ad["leaf_params"], ["int", "int"])
+        thunk = g.signedness_thunk("func_8003708C", ad)
+        self.assertIn("uint32_t func_8003708C(uint32_t pe_a0, uint32_t pe_a1)", thunk)
+        self.assertIn("return (uint32_t)pe_leaf_func_8003708C((int)pe_a0, (int)pe_a1);", thunk)
+
+    def test_void_header_discards_int_result(self):
+        canon = {"ret": "void", "params": ["void"]}
+        ad = g.signedness_adapter("int ", "void", canon)
+        thunk = g.signedness_thunk("func_80067A78", ad)
+        self.assertIn("void func_80067A78(void)", thunk)
+        self.assertIn("(void)pe_leaf_func_80067A78();", thunk)
+
+    def test_int_header_over_void_leaf_rejected(self):
+        # A void leaf leaves $v0 to its callee; the host caller would read an
+        # invented value (the retail v0-residual class) -> not adapted.
+        canon = {"ret": "int", "params": ["int a0"]}
+        self.assertEqual(g.signedness_adapter("void ", "int a0", canon), "reject")
+
+    def test_width_or_arity_change_rejected(self):
+        self.assertEqual(g.signedness_adapter(
+            "void ", "short a0", {"ret": "void", "params": ["uint32_t a0"]}), "reject")
+        self.assertEqual(g.signedness_adapter(
+            "void ", "int a0", {"ret": "void", "params": ["uint32_t s", "pe_addr_t r"]}),
+            "reject")
+        self.assertEqual(g.signedness_adapter(
+            "long ", "int a0", {"ret": "int", "params": ["int a0"]}), "reject")
+
+    def test_rename_definition_only(self):
+        body = "int func_80001234(int a0) {\n    return func_80001234(a0 - 1);\n}\n"
+        out = g.rename_definition(body, "func_80001234", "pe_leaf_func_80001234")
+        self.assertTrue(out.startswith("static int pe_leaf_func_80001234(int a0) {"))
+        self.assertIn("return func_80001234(a0 - 1);", out)
+
+
+class HostTypedefTests(unittest.TestCase):
+    def test_libgpu_rect_is_the_header_rect(self):
+        out = g.neutralize_host_typedefs("typedef struct { short x, y, w, h; } RECT;\nint a;\n")
+        self.assertNotIn("typedef", out)
+        self.assertIn("psx_compat.h", out)
+
+    def test_other_rect_layouts_stay(self):
+        src = "typedef struct { int x, y, w, h; } RECT;\n"
+        self.assertEqual(g.neutralize_host_typedefs(src), src)
+
+
+class GuestCallArgWidthTests(unittest.TestCase):
+    def test_int_args_are_32_bit_register_values(self):
+        src = 'x = PE_GuestCall("@1:f", (pe_addr_t)(f), 2u, (uintptr_t)(*(int *)(p + 0xC)), (uintptr_t)(a1), 0, 0);'
+        out = g.canonical_guest_call_args(src)
+        self.assertIn("(uintptr_t)(uint32_t)(*(int *)(p + 0xC))", out)
+        self.assertIn("(uintptr_t)(uint32_t)(a1), 0, 0)", out)
+        self.assertEqual(g.canonical_guest_call_args(out), out)
 
 
 if __name__ == "__main__":

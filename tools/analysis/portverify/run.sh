@@ -78,7 +78,7 @@ done
 grep -o '"func_[0-9A-F]*"' "$W/driver_table.c" | tr -d '"' > "$W/names.txt"
 rm -f "$W"/chunk_* "$W"/res_chunk_*
 ( cd "$W" && split -n l/8 names.txt chunk_ )
-for c in "$W"/chunk_*; do "$W/pvh" "$TRIALS" "$(paste -sd, "$c")" > "$W/res_$(basename "$c").txt" 2>/dev/null & done
-wait
+# Parallel chunks via xargs (no shell `&` job control; every chunk is waited on).
+ls "$W"/chunk_* | xargs -P8 -I{} sh -c '"$0/pvh" "$1" "$(paste -sd, "$2")" > "$0/res_$(basename "$2").txt" 2>/dev/null || true' "$W" "$TRIALS" {}
 cat "$W"/res_chunk_* | sort > "$W/sweep.txt"
 awk '{print $1}' "$W/sweep.txt" | sort | uniq -c

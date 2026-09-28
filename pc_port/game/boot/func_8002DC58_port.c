@@ -94,18 +94,7 @@ static void exit_default_colors(unsigned first)
     }
 }
 
-void func_800295E4(void)
-{
-    pe_addr_t aya=PE_LoadU32(0x8009D254u);
-    exit_default_colors(1u);
-    func_80021D4C();
-    PE_StoreU8(0x8009D2ECu,0u); PE_StoreU8(0x8009D2A0u,0u);
-    PE_StoreU32((aya<0x200000u?aya|0x80000000u:aya)+0x194u,PE_LoadU32(0x800915E0u));
-    exit_set_flags(exit_flags()&~2u);
-    PE_StoreU32(0x8009D2E8u,PE_LoadU32(0x8009D2E8u)&~0x10u);
-    PE_StoreU8(0x800B0CE6u,PE_LoadU8(0x800B0CE6u)|2u);
-    func_80051510();
-}
+/* func_800295E4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800295E4_port.c (src/func_800295E4.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* func_8002F9CC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8002F9CC_port.c (src/func_8002F9CC.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 

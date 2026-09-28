@@ -28,34 +28,4 @@
 #define GA_FCAC_X 0x8009D124u
 #define GA_FCAC_Y 0x8009D128u
 
-void func_8005FCAC(int32_t value)
-{
-    int32_t magnitude = value;
-    int digits = 3;
-    int32_t divisor = 1;
-    int i;
-
-    if (magnitude < 0) {
-        magnitude = -magnitude;
-        func_8005EB64(0x52u);
-        digits = 2;
-        PE_StoreU32(GA_FCAC_X, PE_LoadU32(GA_FCAC_X) + 5u);
-    } else if (magnitude > 0) {
-        func_8005EB64(0x89u);
-        PE_StoreU32(GA_FCAC_X, PE_LoadU32(GA_FCAC_X) + 5u);
-    }
-    /* Retail also reloads and re-stores the y cursor ($gp + 0x3B8) unchanged. */
-
-    for (i = 1; i < digits; i++)
-        divisor *= 10;
-
-    for (i = 0; i < digits; i++) {
-        int32_t digit = magnitude / divisor;
-
-        if (i < digits - 1 && digit == 0)
-            digit = -1;
-        func_8005F874(digit);
-        divisor /= 10;
-        PE_StoreU32(GA_FCAC_X, PE_LoadU32(GA_FCAC_X) + 5u);
-    }
-}
+/* func_8005FCAC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8005FCAC_port.c (src/func_8005FCAC.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */

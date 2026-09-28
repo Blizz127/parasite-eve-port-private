@@ -9,6 +9,8 @@
  * docs/evidence/portverify/REPORT.md.
  */
 
+#include "pe_guest_decomp.h"   /* PE_Decomp_* boundary log, hand-adapter protos */
+
 static void pv_seed_vm_task(pe_addr_t task, pe_addr_t actor)
 {
     PE_StoreU32(0x8009D300u, task);
@@ -245,8 +247,140 @@ static void test_PV_52F70_signed_cap(void)
     PASS();
 }
 
+static void test_PV_67A78_null_header_low_ram(void)
+{
+    TEST("PV_67A78_null_header_low_ram");
+    /* src/func_80067A78.c (retail 0x80067A78): no null test on D_800B1624.
+     * A zero header pointer rebases through KUSEG low RAM (0x00000038/3A ==
+     * 0x80000038/3A); the old hand port returned early and wrote nothing.
+     * Round 6: hand port retired for the generated TU. */
+    ResetTestState();
+    PE_StoreU32(0x800B1624u, 0u);
+    PE_StoreU16(0x8000002Cu, 0x0120u);
+    PE_StoreU16(0x8000002Eu, 0x0090u);
+    PE_StoreU16(0x800BCF8Cu, 0x00B0u);       /* -> (short)(0xB0 - 0xA0) = 0x10 */
+    PE_StoreU16(0x800BCF8Eu, 0x0070u);       /* -> 0 */
+    PE_StoreU16(0x80000006u, 0u);            /* entry count 0: no walk */
+    PE_StoreU32(0x80000014u, 0u);
+    func_80067A78();
+    ASSERT(PE_LoadU16(0x80000038u) == 0x0110u, "+0x38 = +0x2C - (CF8C - 0xA0)");
+    ASSERT(PE_LoadU16(0x8000003Au) == 0x0090u, "+0x3A = +0x2E - (CF8E - 0x70)");
+    PASS();
+}
+
+/* Immediate libgpu entry points (src/func_800775E8.c, func_800777C0.c):
+ * previously absent from the port.  Same GPU authority as the queued
+ * wrappers (B54KR/B54KS); the rectangle is a guest address. */
+static void test_PV_777C0_immediate_moveimage(void)
+{
+    static const uint16_t pixels[] = {
+        0x101u, 0x102u, 0x103u, 0x104u,
+        0x201u, 0x202u, 0x203u, 0x204u
+    };
+    const pe_addr_t rect = 0x80170100u;
+    PeGpuState state;
+    TEST("PV_777C0_immediate_moveimage");
+    ResetTestState();
+    B54KR_SeedGpuStatic();
+    ASSERT(B54KR_UploadPixels(10u, 20u, 4u, 2u, pixels), "source upload failed");
+    PE_StoreU32(rect, 0x0014000Au);           /* x=10, y=20 */
+    PE_StoreU32(rect + 4u, 0x00020004u);      /* w=4, h=2 */
+    ASSERT(func_800777C0(rect, 100, 30) == 0 && !PE_Port_ShouldStop(),
+           "immediate MoveImage did not return 0");
+    ASSERT(PE_LoadU32(0x800957ECu) == 0x0014000Au &&
+           PE_LoadU32(0x800957F0u) == 0x001E0064u &&
+           PE_LoadU32(0x800957F4u) == 0x00020004u,
+           "packet xy/col/wh differ");
+    ASSERT(B54KR_PixelIs(100u, 30u, 0x101u) && B54KR_PixelIs(103u, 31u, 0x204u),
+           "moved pixels differ");
+    ASSERT(PE_LoadU32(PE_DMA_CallbackSlotAddress(2u)) == 0x80077A00u,
+           "DMA2 callback slot not func_80077A00");
+    ASSERT(PE_LoadU32(0x8009588Cu) == 0u &&
+           PE_LoadU32(0x80095888u) == PE_GPU_VSyncQuery() + 0xF0u,
+           "deadline preamble differs");
+    PE_GPU_GetState(&state);
+    ASSERT(state.move_count == 1u, "not exactly one move");
+
+    /* Zero height: -1 after the wait + callback install, packet untouched. */
+    PE_StoreU32(0x800957ECu, 0xA5A5A5A5u);
+    PE_StoreU32(rect + 4u, 0x00000004u);
+    ASSERT(func_800777C0(rect, 1, 2) == -1 &&
+           PE_LoadU32(0x800957ECu) == 0xA5A5A5A5u && !PE_Port_ShouldStop(),
+           "zero-size immediate MoveImage submitted");
+    PASS();
+}
+
+static void test_PV_775E8_immediate_loadimage(void)
+{
+    const pe_addr_t rect = 0x80170100u;
+    uint32_t i;
+    TEST("PV_775E8_immediate_loadimage");
+    ResetTestState();
+    HostFB_Init();
+    B54KR_SeedGpuStatic();
+    for (i = 0u; i < 16u; i++)
+        PE_StoreU32(0x80170000u + i * 4u,
+                    (0x3000u + i * 2u) | ((0x3001u + i * 2u) << 16));
+    PE_StoreU32(rect, 0x001E0014u);           /* x=20, y=30 */
+    PE_StoreU32(rect + 4u, 0x00020010u);      /* w=16, h=2 */
+    ASSERT(func_800775E8(rect, 0x80170000u) == 0 && !PE_Port_ShouldStop(),
+           "immediate LoadImage did not return 0");
+    ASSERT(PE_LoadU32(PE_DMA_CallbackSlotAddress(2u)) == 0x80077A00u,
+           "DMA2 callback slot not func_80077A00");
+    ASSERT(func_80074DC0(0) == 0 && !PE_GPU_DMA2Pending() && !PE_Port_ShouldStop(),
+           "DrawSync did not complete the direct transfer");
+    ASSERT(B54KR_PixelIs(20u, 30u, 0x3000u) && B54KR_PixelIs(35u, 31u, 0x301Fu),
+           "uploaded pixels differ");
+    PASS();
+}
+
+/* src/func_80048918.c (item/equipment window constructor): absent before
+ * round 6 — its hand callers recorded a loud boundary instead.  Default mode
+ * (no frame D_8009CF0C, no equip-slot group D_8009CF30, no D_8009CF1C). */
+static void test_PV_48918_item_window_constructor(void)
+{
+    pe_addr_t window, list, w13, w15;
+    TEST("PV_48918_item_window_constructor");
+    ResetTestState();
+    PE_Decomp_ResetBoundaries();
+    menu4ae1c_build(&window, &list);
+    /* Window specs 11 and 13 (D_80092888 + id*32): ResetTestState zeroes the
+     * EXE table, and a zero column count is the retail DIV break trap in
+     * func_800647D0.  Seed one column / four visible rows / 12px rows. */
+    {
+        static const uint32_t ids[2] = {11u, 13u};
+        unsigned n;
+        for (n = 0u; n < 2u; n++) {
+            PE_StoreU32(0x80092888u + ids[n] * 32u + 8u, 1u);
+            PE_StoreU32(0x80092888u + ids[n] * 32u + 12u, 4u);
+            PE_StoreU32(0x80092888u + ids[n] * 32u + 24u, 12u);
+        }
+    }
+    PE_StoreU32(0x8009CF0Cu, 0u);
+    PE_StoreU32(0x8009CF30u, 0u);
+    PE_StoreU32(0x8009CF1Cu, 0u);
+    func_80048918(0x33E, -3, -1);
+    ASSERT(!PE_Port_ShouldStop() && PE_Decomp_BoundaryCount() == 0,
+           "constructor reached a boundary");
+    ASSERT(PE_LoadU32(0x8009CFC4u) == 0xFFFFFFFDu &&
+           PE_LoadU32(0x8009CF34u) == 0u && PE_LoadU32(0x8009CF38u) == 1u &&
+           PE_LoadU32(0x8009CF18u) == 1u, "a1 == -3 flags / a0 != 0x200");
+    w13 = func_80062A34(1u, 13u);
+    w15 = func_80062A34(1u, 15u);
+    ASSERT(w13 != 0u && PE_LoadU32(w13 + 0x2Cu) == 0x800494ACu &&
+           PE_LoadU32(w13 + 0x40u) == 1u, "0x0D list window + update 0x800494AC");
+    ASSERT(w15 != 0u && PE_LoadU32(w15 + 0x30u) == 0x8004A0C8u,
+           "0x0F detail window draw 0x8004A0C8");
+    ASSERT(func_80062A34(1u, 11u) != 0u, "0x0B window created");
+    PASS();
+}
+
 static void test_PV_all(void)
 {
+    test_PV_48918_item_window_constructor();
+    test_PV_777C0_immediate_moveimage();
+    test_PV_775E8_immediate_loadimage();
+    test_PV_67A78_null_header_low_ram();
     test_PV_52F70_signed_cap();
     test_PV_ram_mirror();
     test_PV_661EC_mask_and_mode();

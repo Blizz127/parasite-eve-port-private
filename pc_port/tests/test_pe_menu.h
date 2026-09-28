@@ -436,8 +436,10 @@ static void test_DAY2_field_menu_input_4ae1c(void)
     ASSERT(!PE_Port_ShouldStop()&&!g_stub_order_count,"close case boundary");
 
     /* 13. Modal-draw leaves.  func_8005FCAC prints a signed number: three cells
-     *     for 0 (no icon), sign icon + two cells for a negative, sign icon +
-     *     three cells for a positive, advancing x by 5 per cell. */
+     *     for 0 (no icon), sign icon + two cells for a negative OR a positive
+     *     (retail 0x8005FCF0: both sign arms share `jal func_8005EB64` with
+     *     `li s2,2` in its delay slot), advancing x by 5 per cell.  The old hand
+     *     port drew three cells for a positive; portverify round 6. */
     ResetTestState();HostFB_Init();PE_GPU_Init();
     menu4ae1c_build(&window,&list);
     menu4ae1c_draw_setup(list);
@@ -448,8 +450,8 @@ static void test_DAY2_field_menu_input_4ae1c(void)
     ASSERT(PE_LoadU32(0x8009D124u)==0x64u+15u,"5FCAC zero = three cells");
     func_8005FCAC(-12);
     ASSERT(PE_LoadU32(0x8009D124u)==0x64u+15u+5u+10u,"5FCAC negative = icon+two");
-    func_8005FCAC(345);
-    ASSERT(PE_LoadU32(0x8009D124u)==0x64u+15u+5u+10u+5u+15u,"5FCAC positive = icon+three");
+    func_8005FCAC(7);
+    ASSERT(PE_LoadU32(0x8009D124u)==0x64u+15u+5u+10u+5u+10u,"5FCAC positive = icon+two");
     ASSERT(PE_LoadU32(0x8009D128u)==0x32u,"5FCAC leaves y alone");
 
     /* 14. func_8005ED18 builds and links one 0x28-byte primitive per call. */

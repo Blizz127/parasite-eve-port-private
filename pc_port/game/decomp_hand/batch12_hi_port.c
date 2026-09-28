@@ -50,58 +50,13 @@ void func_80088E64(pe_addr_t a0, int a1)
  * sprite at translation a2 +8/+A/+C through D_800F33C0 with style
  * D_800E2250 (byte +4 = a2[3] * 2 - 0x80); then blend 3 and two satellite
  * sprites at a2 + 0x10 + i*8 through D_800F32B0 with style D_800F3460. */
-void func_800CD404(int a0, int a1, pe_addr_t a2)
-{
-    unsigned short i;
-
-    (void)a0; (void)a1;
-    func_800C2EAC(3);
-    func_800C3098(0x10);
-    func_800C2FF0(0x20, 0x20);
-    func_800C3238(2);
-    PE_StoreU32(0x800F33C0u + 0x14u, (uint32_t)(int32_t)(int16_t)PE_LoadU16(a2 + 8u));
-    PE_StoreU32(0x800F33C0u + 0x18u, (uint32_t)(int32_t)(int16_t)PE_LoadU16(a2 + 0xAu));
-    PE_StoreU32(0x800F33C0u + 0x1Cu, (uint32_t)(int32_t)(int16_t)PE_LoadU16(a2 + 0xCu));
-    PE_StoreU8(0x800E2250u + 4u, (uint8_t)(PE_LoadU8(a2 + 3u) * 2 - 0x80));
-    func_800C42A4(0x800E2250u, 0x800F33C0u, 1);
-    func_800C3238(3);
-    for (i = 0; i < 2; i++) {
-        pe_addr_t p = a2 + i * 8u;
-
-        PE_StoreU32(0x800F32B0u + 0x14u, (uint32_t)(int32_t)(int16_t)PE_LoadU16(p + 0x10u));
-        PE_StoreU32(0x800F32B0u + 0x18u, (uint32_t)(int32_t)(int16_t)PE_LoadU16(p + 0x12u));
-        PE_StoreU32(0x800F32B0u + 0x1Cu, (uint32_t)(int32_t)(int16_t)PE_LoadU16(p + 0x14u));
-        func_800C42A4(0x800F3460u, 0x800F32B0u, 1);
-    }
-}
+/* func_800CD404: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800CD404_port.c (src/func_800CD404.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* src/func_800CD0BC.c: seed the burst record — position from D_800E27F8
  * [0..2], +4 = 0x7F, +6 = 0x3B4, +3 = 0; two satellites at +0x10 + i*8
  * start at the same position with velocity (+0x20 + i*8) of
  * (r % 50 - 25, r % 50 - 25, 0) (signed int remainders). */
-void func_800CD0BC(int a0, int a1, pe_addr_t a2)
-{
-    unsigned short i = 0;
-
-    (void)a0; (void)a1;
-    PE_StoreU16(a2 + 8u, PE_LoadU16(0x800E27F8u));
-    PE_StoreU16(a2 + 0xAu, PE_LoadU16(0x800E27FAu));
-    PE_StoreU16(a2 + 0xCu, PE_LoadU16(0x800E27FCu));
-    PE_StoreU16(a2 + 4u, 0x7Fu);
-    PE_StoreU16(a2 + 6u, 0x3B4u);
-    PE_StoreU8(a2 + 3u, 0u);
-    do {
-        pe_addr_t p = a2 + i * 8u;
-
-        PE_StoreU16(p + 0x10u, PE_LoadU16(0x800E27F8u));
-        PE_StoreU16(p + 0x12u, PE_LoadU16(0x800E27FAu));
-        PE_StoreU16(p + 0x14u, PE_LoadU16(0x800E27FCu));
-        PE_StoreU16(p + 0x20u, (uint16_t)((int)func_80071A54() % 50 - 0x19));
-        PE_StoreU16(p + 0x22u, (uint16_t)((int)func_80071A54() % 50 - 0x19));
-        PE_StoreU16(p + 0x24u, 0u);
-        i++;
-    } while (i < 2);
-}
+/* func_800CD0BC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800CD0BC_port.c (src/func_800CD0BC.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* src/func_800CA824.c: the D_800E27A8 twin of func_800C7E50 (base z read
  * before the +2/+1 stores, stored last). */

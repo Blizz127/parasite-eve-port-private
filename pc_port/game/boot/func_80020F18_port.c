@@ -109,7 +109,7 @@ static int32_t clear_effect_pool(unsigned first)
     return 0;
 }
 
-int32_t func_800702DC(void) { return clear_effect_pool(0u); }
+/* func_800702DC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800702DC_port.c (src/func_800702DC.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 int32_t func_800701B4(void) { return clear_effect_pool(11u); }
 /* func_800703F4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800703F4_port.c (src/func_800703F4.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 

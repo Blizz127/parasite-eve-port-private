@@ -223,4 +223,4 @@ static void equipment_small_number(int32_t value,unsigned show_plus)
     }
 }
 /* func_8005FDF0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8005FDF0_port.c (src/func_8005FDF0.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
-void func_8005FF28(int32_t value) {equipment_small_number(value,1u);}
+/* func_8005FF28: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8005FF28_port.c (src/func_8005FF28.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */

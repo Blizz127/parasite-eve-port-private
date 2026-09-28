@@ -210,10 +210,7 @@ int func_8003E0FC(pe_addr_t a0, short key, pe_addr_t out)
 }
 
 /* src/func_80042BC8.c: return D_800A1870 (a callback pointer) != 0. */
-int func_80042BC8(void)
-{
-    return PE_LoadU32(0x800A1870u) != 0u;
-}
+/* func_80042BC8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80042BC8_port.c (src/func_80042BC8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* src/func_80047BEC.c: task 0xA (draw 0x80047C50, update 0x80047D74) and a
  * 0x1C child (draw 0x8004FFD0, +0x44 = -1). */
@@ -262,15 +259,7 @@ void func_8004EBCC(int a0)
 
 /* src/func_80050544.c: when enabled: func_80062F3C(0x1F); func_8004D978(0x45);
  * func_80042B50(func_800504F4). */
-void func_80050544(int unused, int enabled)
-{
-    (void)unused;
-    if (enabled) {
-        func_80062F3C(0x1Fu);
-        func_8004D978(0x45);
-        func_80042B50(0x800504F4u);
-    }
-}
+/* func_80050544: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80050544_port.c (src/func_80050544.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* src/func_80050690.c declares `func_80058E08(void)` and calls it with no
  * arguments.  Retail keeps the caller's $a0 live into that call

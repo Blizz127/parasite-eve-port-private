@@ -79,14 +79,10 @@ static void test_PA_hi2_voice_claim(void)
     PE_StoreU32(out, 0u);
 
     func_8008900C(v, 0x7u, 0x1u, out);
-    ASSERT(PE_Decomp_BoundaryCount() >= 1 &&
-           strcmp(PE_Decomp_BoundaryName(0), "func_80088344") == 0,
-           "8900C calls func_80088344 (boundary)");
-    ASSERT(g_bootstrap_arg4_call_count == 3 &&
-           g_bootstrap_arg4_calls[1].arg0 == v + 0x11Cu &&
-           g_bootstrap_arg4_calls[1].arg1 == 2u &&
-           g_bootstrap_arg4_calls[1].arg2 == 1u,
-           "8900C boundary gets (record, bit, i)");
+    /* func_80088344 is a real port now (port7_port.c; retail oracle case
+     * set P7 entry 12): the claim loop runs without a boundary. */
+    ASSERT(PE_Decomp_BoundaryCount() == 0 && !PE_Port_ShouldStop(),
+           "8900C runs func_80088344 natively");
     ASSERT(PE_LoadU32(v + 0xF0u) == 0u, "8900C voice 0 takes voice 0");
     ASSERT(PE_LoadU32(v + 0x11Cu + 0xF0u) == 5u, "8900C voice 1 claims slot 5");
     ASSERT(PE_LoadU16(0x800B002Cu + 5u * 8u) == 0x7FFFu, "8900C slot marked 0x7FFF");

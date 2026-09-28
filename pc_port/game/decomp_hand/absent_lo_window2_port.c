@@ -46,7 +46,7 @@ void func_8004D084(int a0)
 /* src/func_80047D74.c: item-menu update.  Bit 14: hide this list, open
  * window 2/0xB; bit 16: func_80048254; bit 6: func_80059FD0, close the item
  * windows, return focus to 2/0 (or 2/0x32) and post message 0x33E for the
- * other party slot.  func_80048254 and func_80048918 have no pc_port
+ * other party slot.  func_80048254 has no pc_port
  * implementation yet: loud boundaries with the leaf's arguments. */
 int func_80047D74(int a0, int a1)
 {
@@ -75,8 +75,8 @@ int func_80047D74(int a0, int a1)
         if (q == 0u)
             q = func_80062A34(2u, 0x32u);
         func_80062CB8(q);
-        (void)PE_D_COMP_BOUNDARY3("func_80048918", 0x80048918u, 0x33E, -1,
-            func_80059F08((uint32_t)(PE_LoadU32(0x8009CF24u) == 0u)));
+        func_80048918(0x33E, -1,
+                (int)func_80059F08((uint32_t)(PE_LoadU32(0x8009CF24u) == 0u)));
         func_80052634();
     }
     return 1;
@@ -159,7 +159,7 @@ void func_8005DF6C(int mask, pe_addr_t out)
  * close the item windows, refocus, post message 0x33E, and for each of the
  * two party slots that holds the equipped item (D_800C0E20[0] / [2]) outside
  * battle send equip command 2 / 3; cell 1 or cancel (bit 6): close and back
- * out.  func_80048918 is also a loud boundary. */
+ * out.  func_80048918: port6_port.c. */
 int func_80047A30(int a0, int a1)
 {
     int k;
@@ -191,8 +191,8 @@ int func_80047A30(int a0, int a1)
                 q = func_80062A34(2u, 0x32u);
             func_80062CB8(q);
             i = 0;
-            (void)PE_D_COMP_BOUNDARY3("func_80048918", 0x80048918u, 0x33E, -1,
-                func_80059F08((uint32_t)(PE_LoadU32(0x8009CF24u) == 0u)));
+            func_80048918(0x33E, -1,
+                (int)func_80059F08((uint32_t)(PE_LoadU32(0x8009CF24u) == 0u)));
             do {
                 h = func_80059F08((uint32_t)i);
                 if (func_80052F0C() == 0u) {

@@ -5,6 +5,7 @@
 #include "pe_sdk.h"
 #include "pe_gpu.h"
 #include "game_port.h"
+#include "pe_guestcode.h"
 #include "game/decomp_hand/hand_lo_protos.h"
 #include <stdio.h>
 
@@ -124,6 +125,12 @@ static void menu_draw_callback(pe_addr_t fn,uint32_t value)
     case 0x8004F2E4u:func_8004F2E4((int32_t)value);break;  /* equip list */
     case 0x8004FEECu:func_8004FEEC((int32_t)value);break;  /* card slot list */
     default:
+        /* Registry fallback (port lane round 6): a draw the guest-code
+         * registry resolves is called exactly as retail's `jalr` does. */
+        if (PE_GuestCode_Resolve(fn)) {
+            (void)PE_GuestCall("menu drawing callback",fn,1u,value,0u,0u,0u);
+            break;
+        }
         fprintf(stderr,"[MENU] Unported drawing callback %08X\n",fn);
         Bootstrap_ReturnVoid("PE_MenuDrawCallback","menu drawing callback");
         PE_Port_RequestStop(PE_PORT_STOP_UNRESOLVED_BOUNDARY);break;

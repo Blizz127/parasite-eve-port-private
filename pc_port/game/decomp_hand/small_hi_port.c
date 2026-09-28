@@ -13,31 +13,19 @@ extern int func_8007C044(int a0, unsigned int a1);
 extern void func_80090F68(pe_addr_t pe_a0, unsigned int a1);
 
 /* src/func_8007A354.c: return &D_8009AFD0. */
-pe_addr_t func_8007A354(void) { return 0x8009AFD0u; }
+/* func_8007A354: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8007A354_port.c (src/func_8007A354.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* src/func_8007FC28.c: return &D_8009B582. */
-pe_addr_t func_8007FC28(void) { return 0x8009B582u; }
+/* func_8007FC28: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8007FC28_port.c (src/func_8007FC28.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* src/func_8007FBC0.c: D_800A36A0 = cb. */
-void func_8007FBC0(pe_addr_t cb) { PE_StoreU32(0x800A36A0u, cb); }
+/* func_8007FBC0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8007FBC0_port.c (src/func_8007FBC0.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* src/func_8007A4A8.c: exchange the D_8009AFB4 callback, return the old one. */
-pe_addr_t func_8007A4A8(pe_addr_t callback)
-{
-    pe_addr_t old = PE_LoadU32(0x8009AFB4u);
-
-    PE_StoreU32(0x8009AFB4u, callback);
-    return old;
-}
+/* func_8007A4A8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8007A4A8_port.c (src/func_8007A4A8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* src/func_80081254.c: exchange the D_8009B6D0 callback, return the old one. */
-pe_addr_t func_80081254(pe_addr_t callback)
-{
-    pe_addr_t old = PE_LoadU32(0x8009B6D0u);
-
-    PE_StoreU32(0x8009B6D0u, callback);
-    return old;
-}
+/* func_80081254: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80081254_port.c (src/func_80081254.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* src/func_800C2B10.c: return D_800E2248 + arg0 * 4 + 8. */
 pe_addr_t func_800C2B10(int arg0)
@@ -93,9 +81,9 @@ void func_80091080(pe_addr_t a0, unsigned int a1)
 }
 
 /* src/func_8007FBCC.c / 8007FBD8 / 8007FBE4: D_800A36A4 / A8 / AC = callback. */
-void func_8007FBCC(pe_addr_t callback) { PE_StoreU32(0x800A36A4u, callback); }
-void func_8007FBD8(pe_addr_t callback) { PE_StoreU32(0x800A36A8u, callback); }
-void func_8007FBE4(pe_addr_t callback) { PE_StoreU32(0x800A36ACu, callback); }
+/* func_8007FBCC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8007FBCC_port.c (src/func_8007FBCC.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
+/* func_8007FBD8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8007FBD8_port.c (src/func_8007FBD8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
+/* func_8007FBE4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8007FBE4_port.c (src/func_8007FBE4.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* src/func_80074330.c / 800744A4 / 8007474C: zero arg1 words from arg0
  * (arg1 == 0 is a no-op; the counter runs arg1-1 .. -1). */
@@ -112,43 +100,20 @@ static void zero_words(pe_addr_t arg0, int arg1)
         arg0 += 4u;
     } while (v0 != -1);
 }
-void func_80074330(pe_addr_t arg0, int arg1) { zero_words(arg0, arg1); }
-void func_800744A4(pe_addr_t arg0, int arg1) { zero_words(arg0, arg1); }
-void func_8007474C(pe_addr_t arg0, int arg1) { zero_words(arg0, arg1); }
+/* func_80074330: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80074330_port.c (src/func_80074330.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
+/* func_800744A4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800744A4_port.c (src/func_800744A4.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
+/* func_8007474C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8007474C_port.c (src/func_8007474C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* src/func_80077A28.c: fill arg2 bytes at arg0 with arg1 (0 is a no-op). */
-void func_80077A28(pe_addr_t arg0, unsigned char arg1, int arg2)
-{
-    int v0;
-
-    if (arg2 == 0)
-        return;
-    v0 = arg2 - 1;
-    do {
-        PE_StoreU8(arg0, arg1);
-        v0--;
-        arg0 += 1u;
-    } while (v0 != -1);
-}
+/* func_80077A28: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80077A28_port.c (src/func_80077A28.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* src/func_80077A00.c: func_80073CF4(2, func_80076EE4) — the handler is the
  * retail text address of func_80076EE4. */
-void func_80077A00(void)
-{
-    (void)func_80073CF4(2u, 0x80076EE4u);
-}
+/* func_80077A00: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80077A00_port.c (src/func_80077A00.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* src/func_80082ADC.c: p = D_800A5AB4; p[0] = func_80082B70; p[1] =
  * func_80082B08 (retail text addresses); p[-1] = 0; p[2] = 0. */
-void func_80082ADC(void)
-{
-    const pe_addr_t p = 0x800A5AB4u;
-
-    PE_StoreU32(p + 0u, 0x80082B70u);
-    PE_StoreU32(p + 4u, 0x80082B08u);
-    PE_StoreU32(p - 4u, 0u);
-    PE_StoreU32(p + 8u, 0u);
-}
+/* func_80082ADC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80082ADC_port.c (src/func_80082ADC.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* src/func_800C7D00.c and its seven byte-identical twins (800C8E44,
  * 800C9B3C, 800CA6D4, 800CBEE0, 800CCEBC, 800CD89C, 800CE118): forward to

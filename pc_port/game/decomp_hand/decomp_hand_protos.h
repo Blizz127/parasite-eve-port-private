@@ -45,6 +45,12 @@
 #if __has_include("hand_absent_ovl_protos.h")
 #include "hand_absent_ovl_protos.h"   /* overlay-resident 0x800C0000.. */
 #endif
+#if __has_include("hand_port6_protos.h")
+#include "hand_port6_protos.h"        /* port lane round 6 (2026-09-27) */
+#endif
+#if __has_include("hand_port7_protos.h")
+#include "hand_port7_protos.h"        /* port lane round 7 (2026-09-27) */
+#endif
 #endif
 
 #endif /* PE_DECOMP_HAND_PROTOS_H */

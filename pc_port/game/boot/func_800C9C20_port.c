@@ -27,15 +27,7 @@ void func_800C3098(int32_t colors)
 
 /* func_800C2FF0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800C2FF0_port.c (src/func_800C2FF0.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-void func_800C3238(unsigned blend)
-{
-    blend&=255u;PE_StoreU8(0x800F33B8u,(uint8_t)blend);
-    if (blend<5u) {
-        PE_StoreU8(0x800F337Au,blend?1u:0u);
-        PE_StoreU8(0x800E224Cu,blend?(uint8_t)(blend-1u):0u);
-    }
-    quad_page();
-}
+/* func_800C3238: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800C3238_port.c (src/func_800C3238.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* func_800C608C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800C608C_port.c (src/func_800C608C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 

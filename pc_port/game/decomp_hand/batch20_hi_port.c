@@ -124,12 +124,4 @@ int func_80085A64(int a0)
 /* src/func_8007BBB0.c: clear the four CD callback words, DMA-callback reset
  * (func_80073C94), then install func_8007C13C (retail text address) as the
  * DMA channel-3 handler through func_80073CC4(2, ·). */
-void func_8007BBB0(void)
-{
-    PE_StoreU32(0x8009AFB8u, 0u);
-    PE_StoreU32(0x8009AFB4u, 0u);
-    PE_StoreU32(0x8009AFC8u, 0u);
-    PE_StoreU32(0x8009AFC4u, 0u);
-    func_80073C94();
-    (void)func_80073CC4(2u, 0x8007C13Cu);
-}
+/* func_8007BBB0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8007BBB0_port.c (src/func_8007BBB0.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */

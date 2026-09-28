@@ -238,17 +238,7 @@ uint32_t func_800CE5AC(pe_addr_t out, uint32_t offset, uint32_t size, int32_t co
     return func_800CE560(pool,size,count,fn);
 }
 
-pe_addr_t func_800CE610(pe_addr_t pool)
-{
-    int32_t i,count=(int32_t)PE_LoadU32(pool+4u);
-    uint32_t stride=PE_LoadU32(pool);
-    for (i=0;i<count;i++) {
-        pe_addr_t p=pool+12u+(uint32_t)i*stride;
-        if ((int16_t)PE_LoadU16(p)) continue;
-        PE_StoreU16(p,1u);PE_StoreU16(p+2u,0u);return p+4u;
-    }
-    return 0u;
-}
+/* func_800CE610: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800CE610_port.c (src/func_800CE610.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 static int pe_particles(pe_addr_t pool,int mode)
 {

@@ -191,7 +191,7 @@ static void test_PA_cd_tables(void)
            PE_LoadU32(0x800B8AB8u) == 0x2222u, "8008214C installs p[-2], p[-1]");
     ASSERT(PE_LoadU32(0x8009B70Cu) == 0u, "8008214C clears p[1]");
     ASSERT(g_bootstrap_arg4_call_count == 1 &&
-           pacd_call(0, "D_8009B6F4 (card event callback)", PACD_UNK, 5u, 77u, 0u),
+           pacd_call(0, "@8008214C:f", PACD_UNK, 5u, 77u, 0u), /* generated TU, round 6 */
            "8008214C callback gets (a0, a1, 0)");
 
     /* func_80082444, a0 != 1: D_800B28F8 = 2, func_80081DF8 (clears
@@ -250,7 +250,7 @@ static void test_PA_cd_ports(void)
     ASSERT(PE_LoadU32(0x800A5AC0u) == 0u && PE_LoadU32(0x800A5AC4u) == 0u,
            "800829C4 zeroes both idle counters");
     ASSERT(g_bootstrap_arg4_call_count == 1 &&
-           pacd_call(0, "D_8009B728 (card record reset)", PACD_UNK, PACD_R, 0u, 0u),
+           pacd_call(0, "@800829C4:D_8009B728", PACD_UNK, PACD_R, 0u, 0u),
            "800829C4 resets only the record idle >= 0x96");
     ASSERT(PE_LoadU32(0x8009B75Cu) == 1u, "800829C4 re-arms D_8009B75C");
     ASSERT(func_800829C4(0) == 3, "800829C4 cur = (1 << 1) | (0 == 0)");
@@ -429,7 +429,7 @@ static void test_PA_cd_records(void)
     PE_StoreU8(PACD_S + 0x53u, 0u);
     PE_StoreU32(0x8009B728u, PACD_UNK);
     ASSERT(func_80083DF0(PACD_S) == 0 &&
-           pacd_call(0, "D_8009B728 (card record reset)", PACD_UNK, PACD_S, 0u, 0u),
+           pacd_call(0, "@80083DF0:(*host_D_8009B728)", PACD_UNK, PACD_S, 0u, 0u),
            "80083DF0 +0x53 clear -> D_8009B728(a0)");
 
     /* func_80083F04 */
@@ -441,7 +441,7 @@ static void test_PA_cd_records(void)
     ASSERT(PE_LoadU32(0x8009B7A4u) == 0u, "80083F04 D_8009B7A4 = D_8009B73C(a0)");
     /* then the real func_800830DC(a0, -2) (src/func_800830DC.c a1 < 0):
      * +0x44 = 0xFF, +0x45 = 1, *(+0x40) = ~-2 = 1, the byte ~a1 sent */
-    ASSERT(pacd_call(0, "D_8009B73C (card sector hook)", PACD_UNK, PACD_S, 0u, 0u) &&
+    ASSERT(pacd_call(0, "@80083F04:D_8009B73C", PACD_UNK, PACD_S, 0u, 0u) &&
            g_bootstrap_arg4_call_count == 1 &&
            PE_LoadU8(PACD_S + 0x44u) == 0xFFu && PE_LoadU8(PACD_S + 0x45u) == 1u &&
            PE_LoadU8(PACD_B + 0x3F0u) == 1u && (PE_LoadU16(0x1F801044u) & 2u),
@@ -462,8 +462,8 @@ static void test_PA_cd_records(void)
     ASSERT(func_8008401C(PACD_S) == -2, "8008401C no card: func_800832B4 -2 returned");
     ASSERT(PE_LoadU32(0x8009B79Cu) == 0x77u, "8008401C r < 0 leaves D_8009B79C");
     ASSERT(g_bootstrap_arg4_call_count == 2 &&
-           pacd_call(0, "D_8009B73C (card sector hook)", PACD_UNK, 0x80160000u + 0x1E0u, 0u, 0u) &&
-           pacd_call(1, "D_8009B73C (card sector hook)", PACD_UNK, 0x80160000u + 0x2D0u, 0u, 0u),
+           pacd_call(0, "@8008401C:(*host_D_8009B73C)", PACD_UNK, 0x80160000u + 0x1E0u, 0u, 0u) &&
+           pacd_call(1, "@8008401C:(*host_D_8009B73C)", PACD_UNK, 0x80160000u + 0x2D0u, 0u, 0u),
            "8008401C sectors +0x1E0/+0x2D0 before the exchange");
     ASSERT(PE_LoadU32(0x800BD02Cu) == 0x190u, "8008401C exchange armed RCNT2 0x190");
     pacd_reset();

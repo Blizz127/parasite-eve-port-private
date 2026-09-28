@@ -27,6 +27,7 @@
 #include "psx_compat.h"
 #include "pe_sdk.h"
 #include "pe_gpu.h"
+#include "pe_guestcode.h"
 #include "game_port.h"
 #include <string.h>
 
@@ -208,6 +209,95 @@ int func_80074DC0(int mode)
     /* Host telemetry/presentation policy is separate from GPU authority. */
     HostFB_DrawSync(mode);
     return PE_func_80077294(mode);
+}
+
+/* ── Immediate libgpu entry points (port lane, portverify round 6) ─────────
+ * src/func_800775E8.c, func_800776D4.c, func_800777C0.c, func_80077904.c:
+ * the non-queued LoadImage / StoreImage / MoveImage / DrawOTag variants.
+ * Each (a) runs the func_800773D0 deadline preamble (retail inlines the same
+ * `D_80095888 = VSync(-1) + 240; D_8009588C = 0` stores), (b) polls until
+ * DMA2 CHCR bit 24 is clear AND GPUSTAT bit 26 (GP0 ready) is set, returning
+ * -1 when func_80077404 reports a timeout, (c) installs func_80077A00 as the
+ * DMA2 (slot 2) callback through func_80073CF4, and (d) calls the jtb worker
+ * directly (`jalr`) instead of queueing it through jtb[2].  The poll uses the
+ * same GPU/DMA authority and wait step as DrawSync(0) above; a timeout or an
+ * unresolved wait is that step's loud boundary.  Rectangles are guest
+ * addresses (the retail parameter is a 32-bit pointer); func_80074E28 reads
+ * the translated RECT, which has the same 4 x int16 layout. */
+#define GA_GPU_JTB_PTR_IMM   0x80095744u
+#define GA_GPU_MOVE_PACKET   0x800957E4u   /* D_800957E4: tag,cmd,xy,col,wh */
+#define GA_GPU_DMA2_DONE_CB  0x80077A00u
+
+static int PE_GpuImmediateReady(void)
+{
+    (void)func_800773D0();
+    while ((PE_GPU_ReadDMA2CHCR() & PE_GPU_DMA2_CHCR_BUSY) != 0u ||
+           (PE_GPU_ReadStatus() & PE_GPU_STATUS_READY_GP0) == 0u) {
+        if (!PE_DrawSyncWaitStep(0))
+            return -1;                      /* func_80077404 != 0 -> -1 */
+    }
+    (void)func_80073CF4(2u, GA_GPU_DMA2_DONE_CB);
+    return 0;
+}
+
+static pe_addr_t PE_GpuJtbWorker(uint32_t slot)
+{
+    return PE_LoadU32(PE_LoadU32(GA_GPU_JTB_PTR_IMM) + slot * 4u);
+}
+
+/* 0x800775E8 ("LoadImage2" @0x800119BC): immediate LoadImage, jtb[8](rect, data). */
+int func_800775E8(pe_addr_t rect, pe_addr_t data)
+{
+    func_80074E28(0x800119BCu, (const RECT *)PE_TranslateConst(rect, sizeof(RECT)));
+    if (PE_GpuImmediateReady() != 0)
+        return -1;
+    (void)PE_GuestCall("func_800775E8", PE_GpuJtbWorker(8u), 2u, rect, data, 0u, 0u);
+    return 0;
+}
+
+/* 0x800776D4 (validator name "StoreImage" @0x800118E0): immediate StoreImage,
+ * jtb[7](rect, data). */
+int func_800776D4(pe_addr_t rect, pe_addr_t data)
+{
+    func_80074E28(0x800118E0u, (const RECT *)PE_TranslateConst(rect, sizeof(RECT)));
+    if (PE_GpuImmediateReady() != 0)
+        return -1;
+    (void)PE_GuestCall("func_800776D4", PE_GpuJtbWorker(7u), 2u, rect, data, 0u, 0u);
+    return 0;
+}
+
+/* 0x800777C0 (validator name "MoveImage" @0x800118EC): immediate MoveImage.  After the wait and callback install, a
+ * zero width or height returns -1 (retail order); otherwise the static
+ * packet D_800957E4 gets xy = rect word 0, col = (y << 16) | (x & 0xFFFF),
+ * wh = rect word 1, and jtb[6] consumes it. */
+int func_800777C0(pe_addr_t rect, int x, int y)
+{
+    func_80074E28(0x800118ECu, (const RECT *)PE_TranslateConst(rect, sizeof(RECT)));
+    if (PE_GpuImmediateReady() != 0)
+        return -1;
+    if (PE_LoadU16(rect + 4u) == 0u || PE_LoadU16(rect + 6u) == 0u)
+        return -1;
+    PE_StoreU32(GA_GPU_MOVE_PACKET + 8u, PE_LoadU32(rect));
+    PE_StoreU32(GA_GPU_MOVE_PACKET + 12u,
+                ((uint32_t)y << 16) | ((uint32_t)x & 0xFFFFu));
+    PE_StoreU32(GA_GPU_MOVE_PACKET + 16u, PE_LoadU32(rect + 4u));
+    (void)PE_GuestCall("func_800777C0", PE_GpuJtbWorker(6u), 1u,
+                       GA_GPU_MOVE_PACKET, 0u, 0u, 0u);
+    return 0;
+}
+
+/* 0x80077904: immediate DrawOTag.  Debug level (D_8009574E) >= 2 first calls
+ * the installed print hook D_80095748("DrawOTag(%08x)...\n" @0x80011928, ot)
+ * exactly as retail's jalr does. */
+int func_80077904(pe_addr_t ot)
+{
+    if (PE_LoadU8(0x8009574Eu) >= 2u)
+        (void)PE_GuestCall("func_80077904", PE_LoadU32(0x80095748u), 2u,
+                           0x80011928u, ot, 0u, 0u);
+    if (PE_GpuImmediateReady() != 0)
+        return -1;
+    (void)PE_GuestCall("func_80077904", PE_GpuJtbWorker(6u), 1u, ot, 0u, 0u, 0u);
+    return 0;
 }
 
 pe_addr_t func_80074924(pe_addr_t env, int x, int y, int w, int h)

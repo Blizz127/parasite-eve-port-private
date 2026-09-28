@@ -39,24 +39,7 @@ pe_addr_t func_8005DD3C(uint32_t id)
     return table+(uint32_t)(int32_t)(int16_t)PE_LoadU16(table+id*2u+2u);
 }
 
-void func_800534E4(pe_addr_t record,pe_addr_t name)
-{
-    uint32_t kind;
-    func_8005E8C4();kind=PE_LoadU8(record+6u);
-    if (kind<8u) {
-        int32_t maximum=PE_LoadU8(record+9u)+(int16_t)PE_LoadU16(record+18u);
-        if (PE_LoadU16(record+10u)==(maximum<1000?maximum:999)) func_8005EB64(105u);
-    }
-    func_8005EB64(PE_LoadU8(record)-1u);func_8005E8A4(18,0);
-    if (name) func_8005F27C(name);
-    kind=PE_LoadU8(record+6u);
-    if ((kind>0u && kind<8u) || kind>=19u) {
-        func_8005E8A4(86,0);
-        func_8005EB64(kind<8u?(kind<=4u?31u:kind+26u):kind+12u);
-        func_8005E8A4(0,5);func_8005FB74(PE_LoadU16(record+10u));
-    }
-    func_8005E914();
-}
+/* func_800534E4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800534E4_port.c (src/func_800534E4.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 void func_80053648(pe_addr_t record)
 {

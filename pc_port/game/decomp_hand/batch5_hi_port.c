@@ -35,10 +35,7 @@ static void mark_records(unsigned int m, unsigned int bit, pe_addr_t p)
 
 /* src/func_8008ABF0.c: m = D_800BCD50, first bit 0x1000, records at
  * D_800BC000 + 0xF4. */
-void func_8008ABF0(void)
-{
-    mark_records(PE_LoadU32(0x800BCD50u), 0x1000u, 0x800BC000u + 0xF4u);
-}
+/* func_8008ABF0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8008ABF0_port.c (src/func_8008ABF0.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* src/func_8008AB9C.c: m = D_8009D2C8[1], first bit 1, records at a0 + 0xF4. */
 void func_8008AB9C(pe_addr_t a0)

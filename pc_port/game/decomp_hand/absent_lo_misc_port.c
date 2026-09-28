@@ -45,24 +45,7 @@ void func_8003F2FC(void)
  * name by id) and format it with func_8004006C (hand adapter in
  * e9_guest_ptr_port.c) using the format string whose guest address is held
  * in D_8009222C / D_80092228.  Returns the header's guest address. */
-pe_addr_t func_80040210(int a0, int secs)
-{
-    (void)func_80071A24(0x8009EE8Cu, 0x44u);
-    PE_StoreU32(0x800A1708u, (uint32_t)a0);
-    PE_StoreU32(0x800A170Cu, (uint32_t)(secs / 3600));
-    PE_StoreU32(0x800A1710u, (uint32_t)(secs / 60 - (int)PE_LoadU32(0x800A170Cu) * 60));
-    PE_StoreU32(0x800A1714u, (uint32_t)(secs - (secs / 60) * 60));
-    if (PE_LoadU32(0x800A1704u) != 0u) {
-        PE_StoreU32(0x800A1718u, func_8005DE08(-1));
-        func_8004006C(0x8009EE8Cu, PE_LoadU32(0x8009222Cu));
-    } else {
-        PE_StoreU32(0x800A1718u,
-                    (uint32_t)func_80043474((int)PE_LoadU32(0x800A7918u)));
-        PE_StoreU32(0x800A171Cu, func_8005DE08(func_8005D940()));
-        func_8004006C(0x8009EE8Cu, PE_LoadU32(0x80092228u));
-    }
-    return 0x8009EE8Cu;
-}
+/* func_80040210: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80040210_port.c (src/func_80040210.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* src/func_800490B0.c: leave the equip menu — copy the 7 selected halfwords
  * (every other entry of D_800A18D8) into D_800C0E28, commit, close the item
@@ -107,7 +90,7 @@ void func_800490B0(void)
  * slot detail (func_8004A570 with the current cell); cancel (bit 6) closes
  * the item windows, refocuses, copies the 7 selected halfwords back
  * (as func_800490B0), commits and posts message 0x37E through func_80048918
- * (no pc_port implementation yet: loud boundary). */
+ * (port6_port.c). */
 int func_80049354(int a0, int a1)
 {
     pe_addr_t p;
@@ -143,7 +126,7 @@ int func_80049354(int a0, int a1)
             d += 2u;
         } while (i < 7);
         PE_StoreU32(0x800C0E10u, PE_LoadU32(0x8009CF68u));
-        (void)PE_D_COMP_BOUNDARY3("func_80048918", 0x80048918u, 0x37E, -1, -1);
+        func_80048918(0x37E, -1, -1);
         func_80052634();
     }
     return 1;
@@ -214,64 +197,13 @@ void func_80063D30(pe_addr_t pe_a0);
  * then D_800C0E44/40, the two 60-tick timers in seconds, the D_800C0DFF /
  * DFD / DFE option bytes, the room name id (D_800C0E3C) and the current
  * location text id (D_800C0E3E, from func_8005D940's $v0). */
-void func_8005C25C(void)
-{
-    int i = 0;
-    int off = 0;
-    pe_addr_t dst = 0x800C1EACu;
-    int t;
-    int u;
-
-    do {
-        PE_StoreU16(dst, PE_LoadU16(0x800A1E6Eu + (uint32_t)off));
-        off += 0x20;
-        i++;
-        dst += 2u;
-    } while (i < 6);
-    PE_StoreU32(0x800C0E44u, (uint32_t)func_800614A0());
-    t = func_800438E0();
-    PE_StoreU16(0x800C0E40u, (unsigned short)t);
-    PE_StoreU32(0x800C0DE8u, PE_LoadU32(0x800A76BCu) / 60u);
-    PE_StoreU32(0x800C0DECu, PE_LoadU32(0x800A76A4u) / 60u);
-    PE_StoreU8(0x800C0DFFu, (unsigned char)func_8005E884());
-    u = func_800527B4();
-    PE_StoreU8(0x800C0DFDu, (unsigned char)(u | (func_80064A48() << 2)));
-    PE_StoreU8(0x800C0DFEu, 0u);
-    PE_StoreU16(0x800C0E3Cu,
-                (unsigned short)func_80043474((int)PE_LoadU32(0x800A7918u)));
-    PE_StoreU16(0x800C0E3Eu, (unsigned short)func_8005D940());
-}
+/* func_8005C25C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8005C25C_port.c (src/func_8005C25C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* src/func_8005C374.c: restore what func_8005C25C saved — party halfwords
  * back to D_800A1E6E (0x20 stride), D_800C0E44 / D_800C0E40 to their
  * owners, timers back to ticks (* 60), the option bytes, then reload the
  * room from D_800C0DE0 (or D_800C0DF0 when D_8009D218 is set). */
-void func_8005C374(void)
-{
-    int i = 0;
-    int off = 0;
-    pe_addr_t src = 0x800C1EACu;
-    const pe_addr_t base = 0x800C0E44u;
-    pe_addr_t p;
-
-    do {
-        PE_StoreU16(0x800A1E6Eu + (uint32_t)off, PE_LoadU16(src));
-        src += 2u;
-        i++;
-        off += 0x20;
-    } while (i < 6);
-    (void)func_800614AC((int)PE_LoadU32(base));
-    (void)func_800438C0((short)PE_LoadU16(0x800C0E40u));
-    PE_StoreU32(0x800A76BCu, PE_LoadU32(0x800C0DE8u) * 60u);
-    PE_StoreU32(0x800A76A4u, PE_LoadU32(0x800C0DECu) * 60u);
-    func_8005E850(0, (signed char)PE_LoadU8(0x800C0DFFu) - func_8005E884());
-    func_80052790(PE_LoadU8(0x800C0DFDu) & 3);
-    func_800649D0((PE_LoadU8(0x800C0DFDu) >> 2) & 1);
-    p = base - 0x64u;
-    if (PE_LoadU32(0x8009D218u) != 0u)
-        p = base - 0x54u;
-    (void)func_80052594(p);
-}
+/* func_8005C374: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8005C374_port.c (src/func_8005C374.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* src/func_800491C8.c: equip-slot detail update.  Bit 14: hide this list,
  * show window 2/0x10 and realign windows 1/0xF, 1/0xB, 1/0x2F exactly as

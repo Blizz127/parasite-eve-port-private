@@ -212,36 +212,19 @@ void func_8004D690(int arg0)
 }
 
 /* src/func_8004EC3C.c: func_80052E30(0); func_800638D8(a0, func_80050690). */
-void func_8004EC3C(pe_addr_t a0)
-{
-    func_80052E30(0u);
-    func_800638D8(a0, 0x80050690u);
-}
+/* func_8004EC3C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8004EC3C_port.c (src/func_8004EC3C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* src/func_8004EC78.c: func_80052E30(1); func_800638D8(a0, func_800506E8). */
-void func_8004EC78(pe_addr_t a0)
-{
-    func_80052E30(1u);
-    func_800638D8(a0, 0x800506E8u);
-}
+/* func_8004EC78: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8004EC78_port.c (src/func_8004EC78.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* src/func_8004EF30.c: func_800638D8(slot, func_80050708). */
-void func_8004EF30(int slot)
-{
-    func_800638D8((pe_addr_t)slot, 0x80050708u);
-}
+/* func_8004EF30: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8004EF30_port.c (src/func_8004EF30.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* src/func_80050038.c: func_800638D8(slot, func_80050DC0). */
-void func_80050038(int slot)
-{
-    func_800638D8((pe_addr_t)slot, 0x80050DC0u);
-}
+/* func_80050038: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80050038_port.c (src/func_80050038.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* src/func_80050060.c: func_800638D8(slot, func_80050E70). */
-void func_80050060(int slot)
-{
-    func_800638D8((pe_addr_t)slot, 0x80050E70u);
-}
+/* func_80050060: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80050060_port.c (src/func_80050060.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* src/func_8005421C.c: return func_8005DB44(value - 1)[6]. */
 unsigned char func_8005421C(int value)

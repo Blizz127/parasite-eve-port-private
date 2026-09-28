@@ -14,41 +14,15 @@ extern void func_80085F74(pe_addr_t pe_a0);   /* generated TU (src/func_80085F74
 /* src/func_8008D820.c: word copy of arg2 >> 2 words from arg0 to arg1 as a
  * do/while — retail copies one word even when arg2 >> 2 == 0 and then runs
  * the counter through zero (reproduced: the count is unsigned). */
-void func_8008D820(pe_addr_t arg0, pe_addr_t arg1, unsigned int arg2)
-{
-    arg2 >>= 2;
-    do {
-        uint32_t v0 = PE_LoadU32(arg0);
-        arg0 += 4u;
-        arg2--;
-        PE_StoreU32(arg1, v0);
-        arg1 += 4u;
-    } while (arg2);
-}
+/* func_8008D820: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8008D820_port.c (src/func_8008D820.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* src/func_800850C0.c: D_8009D24C = 1; func_80085F44(func_80085098) — the
  * callback argument is the retail text address of func_80085098. */
-void func_800850C0(void)
-{
-    PE_StoreU32(0x8009D24Cu, 1u);
-    func_80085F44((int)0x80085098u);
-}
+/* func_800850C0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800850C0_port.c (src/func_800850C0.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* src/func_80080B44.c (CdIntToPos): signed int math on arg0 + 150; bytes
  * [2] frames, [1] seconds, [0] minutes, each packed BCD (d/10)*16 + d%10. */
-pe_addr_t func_80080B44(int arg0, pe_addr_t arg1)
-{
-    int t = arg0 + 0x96;
-    int q = t / 75;
-    int s = t % 75;
-    int h = q / 60;
-    int m = q % 60;
-
-    PE_StoreU8(arg1 + 2u, (uint8_t)((s / 10) * 16 + s % 10));
-    PE_StoreU8(arg1 + 1u, (uint8_t)((m / 10) * 16 + m % 10));
-    PE_StoreU8(arg1 + 0u, (uint8_t)((h / 10) * 16 + h % 10));
-    return arg1;
-}
+/* func_80080B44: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80080B44_port.c (src/func_80080B44.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* src/func_8007FCBC.c: if D_8009B598 > 0 return 0; else D_8009B570
  * (= &D_8009B598 - 10 words) = 0x20 and return func_8007FCFC((u8)a0).
@@ -98,7 +72,7 @@ void func_8008AF08(void)
 /* src/func_8008AFB8.c: back up the D_8009D2C8 record (0x68 bytes to +0x68)
  * and D_800B8AC0 (0x1AA0 bytes to +0x1AA0) when +4 != 0 and +0x6C == 0,
  * then func_8008A068(a0->+4) and D_8009D2C8->+0x54 = (short)a0->+0xC.
- * func_8008A068 has no pc_port implementation: loud boundary. */
+ * func_8008A068: port7_port.c (round 7). */
 void func_8008AFB8(pe_addr_t a0)
 {
     pe_addr_t p = PE_LoadU32(0x8009D2C8u);
@@ -107,7 +81,7 @@ void func_8008AFB8(pe_addr_t a0)
         func_8008D820(p, p + 0x68u, 0x68u);
         func_8008D820(0x800B8AC0u, 0x800B8AC0u + 0x1AA0u, 0x1AA0u);
     }
-    PE_D_COMP_BOUNDARY1("func_8008A068", 0x8008A068u, (int)PE_LoadU32(a0 + 4u));
+    func_8008A068(PE_LoadU32(a0 + 4u));
     PE_StoreU16(PE_LoadU32(0x8009D2C8u) + 0x54u,
                 (uint16_t)PE_LoadU32(a0 + 0xCu));
 }
@@ -135,14 +109,4 @@ int func_80081D18(int a0, int a1, int a2)
 
 /* src/func_8008D7D0.c: seed the attribute block at D_800C0D90 (mask 0x1C0,
  * +0x14 = 0, +0x12/+0x10 = D_8009D2B6) and apply it via func_80085F74(p). */
-void func_8008D7D0(void)
-{
-    const pe_addr_t p = 0x800C0D90u;
-    unsigned short v = PE_LoadU16(0x8009D2B6u);
-
-    PE_StoreU32(p, 0x1C0u);
-    PE_StoreU32(0x800C0DA4u, 0u);
-    PE_StoreU16(0x800C0DA2u, v);
-    PE_StoreU16(0x800C0DA0u, v);
-    func_80085F74(p);
-}
+/* func_8008D7D0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8008D7D0_port.c (src/func_8008D7D0.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */

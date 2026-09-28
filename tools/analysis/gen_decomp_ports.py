@@ -87,6 +87,14 @@ Later additions (see docs/ai_context/PC_PORT_FROM_DECOMP.md §3):
       `&D_X[k]`, `D_X + k` become retail guest addresses where the callee's
       host parameter takes one;
   E18 no leaf struct with pointer members (guest layout has 4-byte pointers).
+  RECT a leaf-local `typedef struct { short x, y, w, h; } RECT;` is the
+      psx_compat.h RECT (identical layout) and is replaced by a comment.
+  E20 a leaf whose own canonical pc_port header prototype differs from the
+      matched definition only by 32-bit integer signedness (int / unsigned /
+      int32_t / uint32_t / pe_addr_t), or returns `void` where the leaf
+      returns such an integer, keeps its verbatim body as a static
+      `pe_leaf_func_X` behind an exported thunk with the header signature
+      (same-width casts: identity on the retail register value).
   Unit tests: test_gen_decomp_ports.py.
 
 E13-E16 all describe the same underlying fact from different angles: a 32-bit
@@ -501,6 +509,38 @@ def pc_port_definitions() -> dict[str, set[str]]:
     return defined
 
 
+INLINE_SHIM_RE = re.compile(
+    r"^[ \t]*static[ \t]+inline[ \t]+([A-Za-z_][A-Za-z0-9_ \t\*]*?)\b"
+    r"(func_[0-9A-Fa-f]{8})[ \t]*\(([^;{}]*?)\)[ \t]*\{([^{}]*)\}",
+    re.MULTILINE)
+
+
+def inline_shims() -> dict[str, dict]:
+    """func_* -> host signature of a `static inline` shim in a pc_port header.
+
+    psx_compat.h implements a few SDK leaves inline (VSync func_80073A44 ->
+    HostFB_VSync, SetDispMask func_80074D28).  Every generated TU includes
+    that header, so the shim is the callee the rest of the port already uses;
+    treating it as unimplemented made generated TUs record a loud boundary and
+    read 0 where retail reads the VSync counter.  Shims that only record a
+    bootstrap boundary (Bootstrap_*) are not implementations and are skipped.
+    """
+    out: dict[str, dict] = {}
+    for root in shim_header_roots():
+        if not root.is_dir():
+            continue
+        for path in sorted(root.rglob("*.h")):
+            if "build" in path.parts:
+                continue
+            text = strip_comments(path.read_text(encoding="utf-8", errors="replace"))
+            for m in INLINE_SHIM_RE.finditer(text):
+                if "Bootstrap_" in m.group(4):
+                    continue
+                out.setdefault(m.group(2), {"ret": m.group(1).strip(),
+                                            "params": split_top(m.group(3))})
+    return out
+
+
 def pc_port_macros() -> set[str]:
     """D_ symbols already provided as macros by the pc_port shim headers."""
     names: set[str] = set()
@@ -718,6 +758,22 @@ def wrapper_safe(name: str, stripped: str, inner: str) -> tuple[bool, str]:
     return True, ""
 
 
+# Leaf-local typedefs that are layout-identical to a pc_port header type of
+# the same name.  psx_compat.h declares `typedef struct { int16_t x, y, w, h;
+# } RECT;` (the libgpu RECT); a leaf repeating it with `short` members is the
+# same object, but C rejects the second typedef as conflicting.  Only the exact
+# member list is accepted — any other RECT stays verbatim and the E17 compile
+# gate judges it.
+HOST_TYPEDEF_RE = re.compile(
+    r"^[ \t]*typedef\s+struct\s*\{\s*(?:signed\s+)?short\s+x\s*,\s*y\s*,\s*w\s*,"
+    r"\s*h\s*;\s*\}\s*RECT\s*;[ \t]*$", re.MULTILINE)
+
+
+def neutralize_host_typedefs(text: str) -> str:
+    return HOST_TYPEDEF_RE.sub(
+        "/* RECT: psx_compat.h (int16_t x, y, w, h — identical layout) */", text)
+
+
 def analyze(name: str, src_text: str, matched: dict,
             known: set[str], existing_macros: set[str],
             proto: dict[str, int], sigs: dict[str, dict]) -> dict:
@@ -727,11 +783,13 @@ def analyze(name: str, src_text: str, matched: dict,
             r"\bregister\b[^;{}()=]*?\b([A-Za-z_]\w*)\s*(?:__asm__|asm)\s*"
             r"\(\s*\"\$[0-9A-Za-z]+\"\s*\)\s*;", strip_comments(src_text)):
         rest = strip_comments(src_text)[m.end():]
-        use = re.search(rf"\b{re.escape(m.group(1))}\b", rest)
+        # A struct member of the same name (`a.w.lo`, `p->lo`) is not the pin.
+        use = re.search(rf"(?<![.\w])(?<!->)\s*\b{re.escape(m.group(1))}\b", rest)
         if use and not re.match(r"\s*=(?!=)", rest[use.end():]):
             return {"eligible": False,
                     "reason": f"pinned register {m.group(1)} read before written"}
     src_text = rewrite_code_addresses(strip_era_asm(src_text))
+    src_text = neutralize_host_typedefs(src_text)
     src_text, why = rewrite_guest_calls(src_text, name)
     if why:
         return {"eligible": False, "reason": why}
@@ -780,6 +838,14 @@ def analyze(name: str, src_text: str, matched: dict,
                     "reason": "pointer return type (recursive self-call)"}
         ptr_ret = rt
     params, has_ptr_param = parse_params(hdr.group(2))
+    sign_adapt = None
+    if not ptr_ret and not has_ptr_param and name in sigs:
+        sign_adapt = signedness_adapter(ret_type, hdr.group(2), sigs[name])
+        if sign_adapt == "reject":
+            # Not an E20 shape (e.g. an unprototyped `T func_X()` header, which
+            # the verbatim definition is compatible with); the E17 compile
+            # gate stays the judge.
+            sign_adapt = None
     wrap: dict | None = None
     if has_ptr_param:
         ok, why = wrapper_safe(name, stripped, hdr.group(2))
@@ -1148,6 +1214,7 @@ def analyze(name: str, src_text: str, matched: dict,
         "wrap": wrap,
         "param_inner": hdr.group(2) if wrap else "",
         "ptr_ret": ptr_ret,
+        "sign_adapt": sign_adapt,
         "header_params": hdr.group(2),
         "hostptr_args": sorted(hostptr_args),
         "rel_rewrites": rel_rewrites,
@@ -1681,8 +1748,11 @@ def render(name: str, plan: dict, matched: dict, known_funcs: set[str],
         hp = plan["header_params"].strip()
         body += "\n" + ptr_return_thunk(
             name, hp if hp else "void", param_call_names(hp), ptr_roots_expr(plan))
+    elif plan.get("sign_adapt"):
+        body = rename_definition(body, name, f"pe_leaf_{name}")
+        body += "\n" + signedness_thunk(name, plan["sign_adapt"])
     lines.append(body + "\n")
-    return "\n".join(lines) + "\n"
+    return canonical_guest_call_args("\n".join(lines) + "\n")
 
 
 def param_base_type(decl: str, pname: str) -> str:
@@ -1815,6 +1885,79 @@ def ptr_roots_expr(plan: dict, pparams_names: set[str] | None = None) -> list[st
         if r is not None:
             return [exprs[r]]
     return list(exprs.values())
+
+
+# E20 — 32-bit integer class.  On the host these are all exactly 32 bits, so a
+# conversion between any two of them is the identity on the retail register
+# value (`long` is excluded: 64-bit on LP64 hosts; narrower types are excluded
+# because the conversion would truncate where retail's callee did not).
+INT32_CLASS = {
+    "int", "signed", "signed int", "unsigned", "unsigned int", "int32_t",
+    "uint32_t", "pe_addr_t", "s32", "u32",
+}
+
+
+def _norm_type(t: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"^\s*extern\s+", "", t)).strip()
+
+
+def signedness_adapter(leaf_ret: str, leaf_params: str, canon: dict):
+    """E20: the leaf's own name has a canonical pc_port header prototype.
+
+    Returns None when the two signatures already agree (the verbatim
+    definition compiles against the header), a dict describing the adapter
+    when they differ only by 32-bit integer signedness (or the header returns
+    `void` where the leaf returns a 32-bit integer — callers cannot read a
+    value the host prototype does not return), and "reject" otherwise.
+    """
+    lret = _norm_type(leaf_ret)
+    cret = _norm_type(canon["ret"])
+    lp = _param_types(split_top(leaf_params.strip())) if leaf_params.strip() not in ("", "void") else []
+    cparams = [p for p in canon["params"] if p.strip() not in ("", "void")]
+    cp = _param_types(cparams)
+    if lret == cret and lp == cp:
+        return None
+    if len(lp) != len(cp):
+        return "reject"
+    for a, b in zip(lp, cp):
+        if a != b and not (a in INT32_CLASS and b in INT32_CLASS):
+            return "reject"
+    if lret != cret:
+        if cret == "void" and lret in INT32_CLASS:
+            pass
+        elif not (lret in INT32_CLASS and cret in INT32_CLASS):
+            return "reject"
+    return {"leaf_ret": lret, "ret": cret, "leaf_params": lp, "params": cp}
+
+
+def rename_definition(body: str, name: str, new_name: str) -> str:
+    """`T func_X(...) {` -> `static T <new_name>(...) {` (definition only)."""
+    for m in HDR_RE.finditer(body):
+        if m.group(1) != name:
+            continue
+        head = m.group(0)
+        lead = len(head) - len(head.lstrip())
+        new = head[:lead] + "static " + head[lead:]
+        new = re.sub(rf"\b{re.escape(name)}(?=\s*\()", new_name, new, count=1)
+        return body[:m.start()] + new + body[m.end():]
+    raise AssertionError(f"no definition header for {name}")
+
+
+def signedness_thunk(name: str, ad: dict) -> str:
+    """The exported half of the E20 adapter: the canonical host signature,
+    forwarding to the verbatim leaf with same-width integer casts."""
+    formals = ", ".join(f"{t} pe_a{i}" for i, t in enumerate(ad["params"])) or "void"
+    actuals = ", ".join(f"({t})pe_a{i}" for i, t in enumerate(ad["leaf_params"]))
+    call = f"pe_leaf_{name}({actuals})"
+    head = ("\n/* E20 signedness adapter: the canonical pc_port prototype types this\n"
+            " * leaf's 32-bit integers differently; the casts are the identity on\n"
+            " * the retail register value. */\n"
+            f"{ad['ret']} {name}({formals})\n{{\n")
+    if ad["ret"] == "void":
+        stmt = f"    (void){call};\n" if ad["leaf_ret"] != "void" else f"    {call};\n"
+    else:
+        stmt = f"    return ({ad['ret']}){call};\n"
+    return head + stmt + "}\n"
 
 
 def ptr_return_thunk(name: str, sig_params: str, call_args: str,
@@ -2191,7 +2334,33 @@ def render_wrapper(name: str, plan: dict, leaf: dict, report: Path,
             name, ", ".join(sig_params) or "void",
             param_call_names(plan["param_inner"], pnames),
             ptr_roots_expr(plan, {p for p in pnames if p not in argvec_params(plan["param_inner"])})))
-    return "".join(lines)
+    return canonical_guest_call_args("".join(lines))
+
+
+def canonical_guest_call_args(text: str) -> str:
+    """Final pass: every `PE_GuestCall` register argument `(uintptr_t)(X)`
+    becomes `(uintptr_t)(uint32_t)(X)`.  A retail argument register holds 32
+    bits; a signed `int` X would otherwise sign-extend into the 64-bit
+    uintptr_t (0x80150000 recorded as 0xFFFFFFFF80150000 in the boundary
+    trace; registered thunks truncate, so only the trace was wrong)."""
+    out = []
+    i = 0
+    for m in re.finditer(r"\bPE_GuestCall\(", text):
+        if m.start() < i:
+            continue
+        close = _balanced_end(text, m.end() - 1)
+        args = split_top(text[m.end(): close - 1])
+        new_args = [a.strip() for a in args[:3]]
+        for a in args[3:]:
+            a = a.strip()
+            if a.startswith("(uintptr_t)(") and not a.startswith("(uintptr_t)(uint32_t)"):
+                a = "(uintptr_t)(uint32_t)" + a[len("(uintptr_t)"):]
+            new_args.append(a)
+        out.append(text[i:m.start()])
+        out.append("PE_GuestCall(" + ", ".join(new_args) + ")")
+        i = close
+    out.append(text[i:])
+    return "".join(out)
 
 
 def _host_locals(plan: dict, pparams: list, body: str) -> list[str]:
@@ -2334,6 +2503,11 @@ def main() -> int:
         shim_macros = pc_port_macros()
         protos = canonical_protos()
         sigs = canonical_signatures()
+        for n, s in inline_shims().items():
+            known.add(n)
+            protos.setdefault(n, len([p for p in s["params"]
+                                      if p.strip() not in ("", "void")]))
+            sigs.setdefault(n, s)
         # Generated decomp-derived definitions are host authorities too (see
         # derived_signatures); a canonical header prototype still wins.
         header_protos = set(protos)

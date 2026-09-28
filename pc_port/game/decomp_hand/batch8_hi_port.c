@@ -143,48 +143,10 @@ int func_800C6C18(pe_addr_t a0)
  * D_800E2818[0x14] = (short)(a2[3] << 8) >> 7; then for i < (short)a2->+4
  * (unsigned compare) emit the point (+8, +0x28, +0x48 halfword columns)
  * through func_800C3B04(D_800E2818). */
-void func_800CC7AC(int a0, int a1, pe_addr_t a2)
-{
-    unsigned int i;
-    unsigned char c;
-
-    (void)a0; (void)a1;
-    func_800C2EAC(3);
-    func_800C3098(0x10);
-    func_800C2FF0(0x10, 0x10);
-    func_800C3238(0);
-    c = PE_LoadU8(a2 + 3u);
-    PE_StoreU16(0x800E2818u + 0x28u, (uint16_t)((int16_t)(c << 8) >> 7));
-    for (i = 0; i < (unsigned int)(int)(int16_t)PE_LoadU16(a2 + 4u); i++) {
-        PE_StoreU16(0x800E2818u + 0u, PE_LoadU16(a2 + i * 2u + 8u));
-        PE_StoreU16(0x800E2818u + 2u, PE_LoadU16(a2 + i * 2u + 0x28u));
-        PE_StoreU16(0x800E2818u + 4u, PE_LoadU16(a2 + i * 2u + 0x48u));
-        func_800C3B04(0x800E2818u);
-    }
-}
+/* func_800CC7AC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800CC7AC_port.c (src/func_800CC7AC.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* src/func_800CC55C.c: draw state (page 3, 0x10 colours, 32x32, blend 2);
  * three words at D_800E2260 + 0x10/0x14/0x18 = (short)a2->+6, halfword
  * [0x14] = a2[1]; for i < (s8)a2[2] (unsigned compare) emit the point at
  * a2 + 0x26 + i*8 through func_800C3B04(D_800E2260). */
-void func_800CC55C(int a0, int a1, pe_addr_t a2)
-{
-    unsigned int i;
-    uint32_t s6 = (uint32_t)(int32_t)(int16_t)PE_LoadU16(a2 + 6u);
-
-    (void)a0; (void)a1;
-    func_800C2EAC(3);
-    func_800C3098(0x10);
-    func_800C2FF0(0x20, 0x20);
-    func_800C3238(2);
-    PE_StoreU32(0x800E2260u + 0x10u, s6);
-    PE_StoreU32(0x800E2260u + 0x14u, (uint32_t)(int32_t)(int16_t)PE_LoadU16(a2 + 6u));
-    PE_StoreU32(0x800E2260u + 0x18u, (uint32_t)(int32_t)(int16_t)PE_LoadU16(a2 + 6u));
-    PE_StoreU16(0x800E2260u + 0x28u, PE_LoadU8(a2 + 1u));
-    for (i = 0; i < (unsigned int)(int)(signed char)PE_LoadU8(a2 + 2u); i++) {
-        PE_StoreU16(0x800E2260u + 0u, PE_LoadU16(a2 + i * 8u + 0x26u));
-        PE_StoreU16(0x800E2260u + 2u, PE_LoadU16(a2 + i * 8u + 0x28u));
-        PE_StoreU16(0x800E2260u + 4u, PE_LoadU16(a2 + i * 8u + 0x2Au));
-        func_800C3B04(0x800E2260u);
-    }
-}
+/* func_800CC55C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800CC55C_port.c (src/func_800CC55C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */

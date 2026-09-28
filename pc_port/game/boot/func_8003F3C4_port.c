@@ -209,23 +209,8 @@ void func_800E01BC(void)
     } while(processed<(int16_t)PE_LoadU16(0x800E21A4u));
 }
 
-int func_8006EC08(void)
-{
-    int8_t a;
-    int16_t h;
-    int8_t b;
-
-    a = (int8_t)PE_LoadU8(0x800B0DBAu);
-    if (a == 0)
-        return 0;
-    h = (int16_t)PE_LoadU16(0x800B0DBCu);
-    if (h <= 0)
-        return 0;
-    b = (int8_t)PE_LoadU8(0x800B0DBBu);
-    if (b == 0)
-        return 1;
-    return 2;
-}
+/* func_8006EC08: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8006EC08_port.c (src/func_8006EC08.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
+int func_8006EC08(void);
 
 static uint32_t pe_3f3c4_loaded_dest;
 static uint64_t pe_3f3c4_ram_generation;

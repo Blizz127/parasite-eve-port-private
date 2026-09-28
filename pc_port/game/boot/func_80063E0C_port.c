@@ -3,6 +3,7 @@
 #include "psx_compat.h"
 #include "pe_port_compat.h"
 #include "game_port.h"
+#include "pe_guestcode.h"
 #include <stdio.h>
 
 static uint32_t menu_callback(pe_addr_t fn,uint32_t a0,uint32_t a1,uint32_t a2,uint32_t a3)
@@ -44,6 +45,11 @@ static uint32_t menu_callback(pe_addr_t fn,uint32_t a0,uint32_t a1,uint32_t a2,u
     case 0x8004B394u:return (uint32_t)func_8004B394(a0,a1);
     case 0x8004B650u:return (uint32_t)func_8004B650(a0,a1);
     default:
+        /* Any other retail input handler the guest-code registry resolves
+         * (generated TUs, canonical-header ports) is the retail `jalr`
+         * target itself (port lane round 6). */
+        if (PE_GuestCode_Resolve(fn))
+            return (uint32_t)PE_GuestCall("menu input callback",fn,4u,a0,a1,a2,a3);
         fprintf(stderr,"[MENU] Unported input callback %08X\n",fn);
         Bootstrap_ReturnVoid("PE_MenuInputCallback","menu input callback");
         PE_Port_RequestStop(PE_PORT_STOP_UNRESOLVED_BOUNDARY);return 0u;

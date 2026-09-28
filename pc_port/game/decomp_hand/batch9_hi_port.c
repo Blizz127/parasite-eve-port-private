@@ -82,29 +82,7 @@ void func_8008B1FC(pe_addr_t a0)
 /* src/func_800CC480.c: draw state (page 3, 0x10, 32x32, blend 2); scale
  * [0x14] = max(0, (short)(0x80 - a1->+2 * 2)); point = a2 +6/+8/+A; words
  * +0x10/+0x14/+0x18 = r, 2r, r with r = (short)a2->+4; emit D_800F3430. */
-void func_800CC480(int a0, pe_addr_t a1, pe_addr_t a2)
-{
-    short v;
-    int r;
-
-    (void)a0;
-    func_800C2EAC(3);
-    func_800C3098(0x10);
-    func_800C2FF0(0x20, 0x20);
-    func_800C3238(2);
-    v = (short)(0x80 - PE_LoadU16(a1 + 2u) * 2);
-    if (v < 0)
-        v = 0;
-    PE_StoreU16(0x800F3430u + 0x28u, (uint16_t)v);
-    PE_StoreU16(0x800F3430u + 0u, PE_LoadU16(a2 + 6u));
-    PE_StoreU16(0x800F3430u + 2u, PE_LoadU16(a2 + 8u));
-    PE_StoreU16(0x800F3430u + 4u, PE_LoadU16(a2 + 0xAu));
-    r = (int16_t)PE_LoadU16(a2 + 4u);
-    PE_StoreU32(0x800F3430u + 0x10u, (uint32_t)r);
-    PE_StoreU32(0x800F3430u + 0x14u, (uint32_t)(r * 2));
-    PE_StoreU32(0x800F3430u + 0x18u, (uint32_t)r);
-    func_800C3B04(0x800F3430u);
-}
+/* func_800CC480: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800CC480_port.c (src/func_800CC480.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* src/func_800CD1FC.c: jittered position around D_800E27F8/FA — x +
  * rand % 201 - 100, y + rand % 101 - 50 (signed int remainders, as the leaf
@@ -201,26 +179,4 @@ int func_8006BD68(void)
  * whose D_800BCD50 bit (from 0x1000) is set and whose +0x2C word lacks bit
  * 0x2000000: set the bit in D_800BCD5C, func_8008F1B0(record, bit), clear
  * +0x38.  Then D_8009D2C4 |= 0x10 and the three voice-update passes. */
-void func_8008C46C(void)
-{
-    pe_addr_t base = 0x800BC000u;
-    unsigned int mask = 0x1000u;
-    unsigned int i = 0;
-
-    do {
-        if (PE_LoadU32(0x800BCD50u) & mask) {
-            if ((PE_LoadU32(base + 0x38u - 0xCu) & 0x2000000u) == 0u) {
-                PE_StoreU32(0x800BCD5Cu, PE_LoadU32(0x800BCD5Cu) | mask);
-                func_8008F1B0(base, mask);
-                PE_StoreU32(base + 0x38u, 0u);
-            }
-        }
-        i++;
-        base += 0x11Cu;
-        mask <<= 1;
-    } while (i < 0xCu);
-    PE_StoreU32(0x8009D2C4u, PE_LoadU32(0x8009D2C4u) | 0x10u);
-    func_80089960();
-    func_80089B28();
-    func_80089CF0();
-}
+/* func_8008C46C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8008C46C_port.c (src/func_8008C46C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */

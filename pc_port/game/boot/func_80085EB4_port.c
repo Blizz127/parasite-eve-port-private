@@ -66,37 +66,4 @@
 #define PE_SPU_MAX_OFFSET 0x7EFE8u
 
 /* ── func_80085EB4: SPU-memory address validation ───────────────────── */
-pe_addr_t func_80085EB4(pe_addr_t spu_addr)
-{
-    uint32_t offset;
-    uint32_t aligned;
-    uint32_t shifted;
-    uint32_t shift;
-
-    /* 1. Range check: reject addresses outside valid SPU RAM. */
-    offset = spu_addr - PE_SPU_BASE;
-    if (offset > PE_SPU_MAX_OFFSET) {
-        return 0;
-    }
-
-    /* 2. Alignment (inline func_8007DB24(-1, spu_addr)):
-     *    If D_8009B420 != 0, align to D_8009B428 boundary using
-     *    ~D_8009B42C mask.  Then right-shift by D_8009B424 and
-     *    truncate to 16 bits. */
-    aligned = spu_addr;
-    if (PE_LoadU32(GA_D_8009B420) != 0) {
-        uint32_t div = PE_LoadU32(GA_D_8009B428);
-        uint32_t rem = aligned % div;
-        if (rem != 0) {
-            uint32_t mask = PE_LoadU32(GA_D_8009B42C);
-            aligned = (aligned + div) & ~mask;
-        }
-    }
-
-    shift = PE_LoadU32(GA_D_8009B424);
-    shifted = (aligned >> shift) & 0xFFFFu;
-
-    /* 3. Store to D_8009B414 (halfword) and return shifted back. */
-    PE_StoreU16(GA_D_8009B414, (uint16_t)shifted);
-    return shifted << shift;
-}
+/* func_80085EB4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80085EB4_port.c (src/func_80085EB4.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */

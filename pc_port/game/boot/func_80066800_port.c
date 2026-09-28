@@ -101,42 +101,7 @@ int func_80065E48_position(int32_t x, int32_t y, int32_t z)
 /* 66268: advance an explicit camera pan before the actor-follow update.
  * Stage dialogue issues 661EC even when Aya is absent. Both background
  * scroll and geometry offset must advance together. */
-int func_80066268(void)
-{
-    uint32_t flags=PE_LoadU32(GA_D_800BCF88),phase=flags&7u;
-    int32_t dx,dy,step,duration,x,y;
-    pe_addr_t container,view;
-    if (!(flags&0x40u)) return -20;
-    if (phase<1u || phase>3u) return 0;
-    dx=(int16_t)(PE_LoadU16(0x800BCF9Cu)-PE_LoadU16(0x800BCF98u));
-    dy=(int16_t)(PE_LoadU16(0x800BCF9Eu)-PE_LoadU16(0x800BCF9Au));
-    step=(int16_t)PE_LoadU16(0x800BCFA0u);
-    duration=(int16_t)PE_LoadU16(0x800BCFA2u);
-    /* A zero duration is a retail division trap, never a completed pan. */
-    if (!duration) {
-        Bootstrap_ReturnVoid("func_80066268_zero_duration", "func_80066268");
-        PE_Port_RequestStop(PE_PORT_STOP_UNRESOLVED_BOUNDARY); return -20;
-    }
-    if (flags&8u) {
-        int32_t weight=func_80077DC4(step*2048/duration+2048)+4096;
-        x=(int32_t)((uint32_t)dx*(uint32_t)weight)/8192;
-        y=(int32_t)((uint32_t)dy*(uint32_t)weight)/8192;
-    } else { x=dx*step/duration; y=dy*step/duration; }
-    PE_StoreU16(0x800BCF8Cu,(uint16_t)(PE_LoadU16(0x800BCF98u)+x));
-    PE_StoreU16(0x800BCF8Eu,(uint16_t)(PE_LoadU16(0x800BCF9Au)+y));
-    container=PE_LoadU32(GA_D_800B1624);
-    view=container+PE_LoadU32(container+0x1Cu)+PE_LoadU8(GA_D_800BCFFD)*52u;
-    PE_StoreU16(0x800BCF94u,(uint16_t)(160+(int16_t)PE_LoadU16(view+0x28u)/2-(int16_t)PE_LoadU16(0x800BCF8Cu)));
-    PE_StoreU16(0x800BCF96u,(uint16_t)(112+(int16_t)PE_LoadU16(view+0x2Au)/2-(int16_t)PE_LoadU16(0x800BCF8Eu)));
-    if (phase==1u) PE_StoreU32(GA_D_800BCF88,(PE_LoadU32(GA_D_800BCF88)&~7u)|2u);
-    step=(int16_t)(PE_LoadU16(0x800BCFA0u)+1u);
-    PE_StoreU16(0x800BCFA0u,(uint16_t)step);
-    if (step>duration) {
-        flags=PE_LoadU32(GA_D_800BCF88);
-        PE_StoreU32(GA_D_800BCF88,(flags&~7u)|((flags&7u)==2u?0x84u:0x80u));
-    }
-    return 0;
-}
+/* func_80066268: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80066268_port.c (src/func_80066268.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 #define GA_RSIN_589C  0x8009589Cu
 #define GA_RSIN_509C  0x8009509Cu
@@ -525,32 +490,7 @@ int func_80067294(pe_addr_t rec)
     return 0;
 }
 
-void func_80067A78(void)
-{
-    pe_addr_t container;
-    pe_addr_t rec;
-    uint16_t count;
-    uint16_t i;
-    int32_t x;
-    int32_t y;
-
-    container = PE_LoadU32(GA_D_800B1624);
-    if (container == 0u)
-        return;
-    x = (int32_t)PE_LoadU16(container + 0x2Cu)
-        - ((int32_t)PE_LoadU16(GA_D_800BCF8C) - 160);
-    y = (int32_t)PE_LoadU16(container + 0x2Eu)
-        - ((int32_t)PE_LoadU16(GA_D_800BCF8E) - 112);
-    PE_StoreU16(container + 0x38u, (uint16_t)x);
-    PE_StoreU16(container + 0x3Au, (uint16_t)y);
-    count = PE_LoadU16(container + 6u);
-    rec = container + PE_LoadU32(container + 0x14u);
-    for (i = 0; i < count; i++, rec += 56u) {
-        if ((PE_LoadU8(rec) & 2u) != 0u
-            && PE_LoadU8(rec + 0x24u) == PE_LoadU8(GA_D_800BCFFD))
-            func_80067294(rec);
-    }
-}
+/* func_80067A78: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80067A78_port.c (src/func_80067A78.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* Shared colour walk of src/func_80067B74.c and src/func_80067D18.c: for
  * each of the container's n 0x38-byte records, write `col` to bytes +6/+5/+4

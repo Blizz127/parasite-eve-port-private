@@ -28,57 +28,12 @@ void func_8007DAE0(int a0, unsigned int a1, int a2);
  * tests use the value `fl` read on entry; each clear re-reads flags.  Field
  * widths: pe_dis.sh 0x800878F0 0x80 — `lhu a1,28(s0)` for f1C, `lh a1,40` /
  * `lh a2,42` for the signed f28/f2A pair. */
-void func_800878F0(int a0, pe_addr_t a1)
-{
-    const pe_addr_t fp = a1 + 4u;
-    unsigned int fl = PE_LoadU32(fp);
-
-#define HI2_CLEAR(bits) \
-    do { PE_StoreU32(fp, PE_LoadU32(fp) & ~(uint32_t)(bits)); \
-         if (PE_LoadU32(fp) == 0) return; } while (0)
-
-    if (fl == 0)
-        return;
-    if (fl & 0x10u) {
-        func_800877BC(a0, PE_LoadU16(a1 + 0x1Cu));
-        HI2_CLEAR(0x10u);
-    }
-    if (fl & 3u) {
-        func_80087798(a0, (short)PE_LoadU16(a1 + 0x28u), (short)PE_LoadU16(a1 + 0x2Au));
-        HI2_CLEAR(3u);
-    }
-    if (fl & 0x80u) {
-        func_800877D4(a0, PE_LoadU32(a1 + 8u));
-        HI2_CLEAR(0x80u);
-    }
-    if (fl & 0x10000u) {
-        func_800877F0(a0, PE_LoadU32(a1 + 0xCu));
-        HI2_CLEAR(0x10000u);
-    }
-    if (fl & 0x2200u) {
-        func_8008788C(a0, PE_LoadU16(a1 + 0x24u), PE_LoadU32(a1 + 0x14u));
-        HI2_CLEAR(0x2200u);
-    }
-    if (fl & 0x900u) {
-        func_8008780C(a0, PE_LoadU16(a1 + 0x1Eu), PE_LoadU32(a1 + 0x10u));
-        HI2_CLEAR(0x900u);
-    }
-    if (fl & 0x4400u) {
-        func_800878C0(a0, PE_LoadU16(a1 + 0x26u), PE_LoadU32(a1 + 0x18u));
-        HI2_CLEAR(0x4400u);
-    }
-#undef HI2_CLEAR
-    if (fl & 0x9000u) {
-        func_8008783C(a0, PE_LoadU16(a1 + 0x20u));
-        func_80087864((unsigned int)a0, PE_LoadU16(a1 + 0x22u));
-    }
-    PE_StoreU32(fp, 0u);
-}
+/* func_800878F0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800878F0_port.c (src/func_800878F0.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* ── src/func_8008900C.c ───────────────────────────────────────────────
  * For every set bit of a1 (voice records a0[i], stride 0x11C): run
- * func_80088344(a0, bit, i) (no pc_port implementation: loud boundary with
- * the guest record address); if the record's +0xF4 flags are live and the
+ * func_80088344(a0, bit, i) (port7_port.c; src/func_80088344.c takes only
+ * (v, mask), so the third argument is dropped); if the record's +0xF4 flags are live and the
  * bit is in a1 & D_8009D2C8->+0x10, either take voice i (a2 bit set) or
  * claim the first free D_800B002C slot (stride 8, 0x7FFF marks it taken,
  * D_8009D2C4 |= 0x100) — with none free, +0xF0 = 24 and *D_8009D2C8 |= 1.
@@ -97,7 +52,7 @@ void func_8008900C(pe_addr_t a0, unsigned int a1, unsigned int a2, pe_addr_t a3)
     m = a1 & PE_LoadU32(PE_LoadU32(0x8009D2C8u) + 0x10u);
     do {
         if (a1 & bit) {
-            PE_D_COMP_BOUNDARY3("func_80088344", 0x80088344u, a0, bit, i);
+            func_80088344(a0, bit);
             if (PE_LoadU32(a0 + 0xF4u) != 0) {
                 if (m & bit) {
                     if (a2 & bit) {
@@ -264,58 +219,7 @@ static void hi2_stop(pe_addr_t base, unsigned int mask)
     }
 }
 
-void func_8008A400(unsigned int a0, unsigned int a1)
-{
-    pe_addr_t base;
-    unsigned int mask = 0x1000;
-    unsigned int act;
-    unsigned int i;
-    int max;
-    unsigned int id = a0 & 0xFFFFu;
-
-    if (id == 0xFFFF)
-        return;
-    base = 0x800BC000u;
-    act = PE_LoadU32(0x800BCD50u);
-    if (a1 & 0x0FFFFFFFu) {
-        for (i = 0; i < 12; i++, base += 0x11Cu, mask <<= 1)
-            if ((act & mask) && (PE_LoadU32(base + 0x2Cu) & a1))
-                hi2_stop(base, mask);
-    } else if ((int)a1 < 0) {
-        base += id * 0x11Cu;
-        mask <<= id;
-        if (act & mask)
-            func_8008A400(PE_LoadU32(base + 0x28u), 0);
-        mask <<= 1;
-        base += 0x11Cu;
-        if (act & mask)
-            func_8008A400(PE_LoadU32(base + 0x28u), 0);
-        return;
-    } else if (a1 & 0x40000000u) {
-        for (i = 0; i < 12; i++, base += 0x11Cu, mask <<= 1)
-            if (PE_LoadU32(base + 0x2Cu))
-                act &= ~mask;
-        base = 0x800BC000u;
-        mask = 0x1000;
-        max = 0;
-        for (i = 0; i < 12; i++, base += 0x11Cu, mask <<= 1)
-            if ((act & mask) && max < (int)PE_LoadU32(base + 0x50u))
-                max = (int)PE_LoadU32(base + 0x50u);
-        base = 0x800BC000u;
-        mask = 0x1000;
-        for (i = 0; i < 12; i++, base += 0x11Cu, mask <<= 1)
-            if ((act & mask) && max == (int)PE_LoadU32(base + 0x50u))
-                hi2_stop(base, mask);
-    } else {
-        for (i = 0; i < 12; i++, base += 0x11Cu, mask <<= 1)
-            if ((act & mask) && PE_LoadU32(base + 0x28u) == id)
-                hi2_stop(base, mask);
-    }
-    PE_StoreU32(0x8009D2C4u, PE_LoadU32(0x8009D2C4u) | 0x10u);
-    func_80089960();
-    func_80089B28();
-    func_80089CF0();
-}
+/* func_8008A400: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8008A400_port.c (src/func_8008A400.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* ── src/func_8008CF70.c ───────────────────────────────────────────────
  * Select reverb preset a0 (bit 0x100 = also clear the work area): reject

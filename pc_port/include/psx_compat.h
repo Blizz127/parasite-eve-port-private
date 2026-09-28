@@ -219,6 +219,11 @@ extern int  PE_func_80076664_Inline8(uint32_t rect_word0,
                                      uint32_t rect_word1,
                                      pe_addr_t source);
 extern uint32_t func_800773D0(void);
+/* Immediate (non-queued) libgpu entry points, platform/pe_libgpu.c. */
+extern int  func_800775E8(pe_addr_t rect, pe_addr_t data);
+extern int  func_800776D4(pe_addr_t rect, pe_addr_t data);
+extern int  func_800777C0(pe_addr_t rect, int x, int y);
+extern int  func_80077904(pe_addr_t ot);
 extern uint16_t func_80073E10(uint16_t new_mask);
 extern pe_addr_t func_80073CF4(uint32_t dma_channel, pe_addr_t handler);
 extern pe_addr_t func_800746A0(uint32_t dma_channel, pe_addr_t handler);

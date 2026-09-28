@@ -560,22 +560,7 @@ int func_8007A360(int a0)
  * = a0, D_8009B6FC = a1, D_8009B700 = func_800824C8(func_80081E70),
  * D_8009B704 = func_800824DC(func_8008214C) (code addresses as the retail
  * VMA), D_8009B70C = 1; returns 1. */
-int func_80081D74(int a0, int a1)
-{
-    const pe_addr_t p = 0x8009B70Cu;
-
-    if ((int)PE_LoadU32(p) == 1)
-        return 0;
-    PE_StoreU32(p - 32u, 0xFFFFFFFFu);
-    PE_StoreU32(p - 28u, 0u);
-    PE_StoreU32(p - 20u, 0u);
-    PE_StoreU32(p - 24u, (uint32_t)a0);
-    PE_StoreU32(p - 16u, (uint32_t)a1);
-    PE_StoreU32(p - 12u, (uint32_t)func_800824C8((int)0x80081E70u));
-    PE_StoreU32(p - 8u, (uint32_t)func_800824DC((int)0x8008214Cu));
-    PE_StoreU32(p, 1u);
-    return 1;
-}
+/* func_80081D74: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80081D74_port.c (src/func_80081D74.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* ── src/func_80083F44.c: card read step.  When D_8009B764 ==
  * D_8009B774 and D_8009B760 != 0 call the D_8009B754 then D_8009B750
@@ -585,23 +570,4 @@ int func_80081D74(int a0, int a1)
  * func_800832B4 reads root counter 2 (0x1F801120), which pc_port does not
  * model: all are loud boundaries (the slot's loaded guest address is the
  * recorded vma). */
-int func_80083F44(pe_addr_t a0)
-{
-    unsigned int m;
-
-    if (PE_LoadU32(0x8009B764u) == PE_LoadU32(0x8009B774u) &&
-        PE_LoadU32(0x8009B760u) != 0) {
-        (void)PE_Decomp_Boundary("D_8009B754 (card hook)", PE_LoadU32(0x8009B754u),
-                                 0u, 0u, 0u, 0u, 0u);
-        (void)PE_Decomp_Boundary("D_8009B750 (card hook)", PE_LoadU32(0x8009B750u),
-                                 0u, 0u, 0u, 0u, 0u);
-    }
-    if (PE_LoadU32(0x8009B7A4u) != 0) {
-        (void)PE_Decomp_Boundary("D_8009B73C (card sector hook)", PE_LoadU32(0x8009B73Cu),
-                                 1u, PE_LoadU32(a0 + 0xCu), 0u, 0u, 0u);
-        (void)PE_Decomp_Boundary("D_8009B73C (card sector hook)", PE_LoadU32(0x8009B73Cu),
-                                 1u, PE_LoadU32(a0 + 0xCu) + 0xF0u, 0u, 0u, 0u);
-    }
-    m = PE_LoadU8(a0 + 0x36u);
-    return func_800832B4(a0, m != 0 ? m : 0x42);   /* sio_port.c */
-}
+/* func_80083F44: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80083F44_port.c (src/func_80083F44.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */

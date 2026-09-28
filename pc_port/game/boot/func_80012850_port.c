@@ -32,17 +32,7 @@
 #define GA_D_8009CE00 0x8009CE00u
 #define GA_D_8009D300 0x8009D300u
 
-uint32_t func_8003708C(uint32_t a, uint32_t b)
-{
-    int64_t prod;
-    uint32_t lo;
-    uint32_t hi;
-
-    prod = (int64_t)(int32_t)a * (int64_t)(int32_t)b;
-    lo = (uint32_t)prod;
-    hi = (uint32_t)((uint64_t)prod >> 32);
-    return (hi << 16) | (lo >> 16);
-}
+/* func_8003708C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8003708C_port.c (src/func_8003708C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 uint32_t func_800370A8(uint32_t a, uint32_t b)
 {

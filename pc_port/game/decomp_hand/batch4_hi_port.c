@@ -89,15 +89,7 @@ void func_8007C444(int a0, unsigned int a1)
 
 /* src/func_8008594C.c: u = a0 & 0xFFFF; u >= 3 -> 0; else clear the
  * halfword at D_8009B7D0 + u * 16 and return 1. */
-int func_8008594C(int a0)
-{
-    int u = a0 & 0xFFFF;
-
-    if (u >= 3)
-        return 0;
-    PE_StoreU16(PE_LoadU32(0x8009B7D0u) + (uint32_t)(u * 16), 0u);
-    return 1;
-}
+/* func_8008594C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8008594C_port.c (src/func_8008594C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* src/func_80083790.c: ((a0->+0xE3 + 1) >> 1) << 2  +
  * ((a0->+0xE9 * 5 + 3) & 0xFFC) + 4  +  a0->+0xEC. */
@@ -183,13 +175,7 @@ void func_800CC440(int a0, int a1, pe_addr_t a2)
 
 /* src/func_80082400.c: a0 == 2 -> func_80081D74(func_80082444, 0), else
  * D_800B28F8 = 2. */
-void func_80082400(unsigned char a0)
-{
-    if (a0 == 2)
-        func_80081D74((int)0x80082444u, 0);   /* absent_r3_port.c; code pointer = retail VMA */
-    else
-        PE_StoreU32(0x800B28F8u, 2u);
-}
+/* func_80082400: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80082400_port.c (src/func_80082400.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* src/func_8008B040.c: func_8008AE94(a0); D_8009D22C = a0[4] ? a0[4] - 1 : 0. */
 void func_8008B040(int a0)

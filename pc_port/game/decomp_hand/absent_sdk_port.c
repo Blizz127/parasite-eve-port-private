@@ -421,18 +421,7 @@ int func_80074C14(int a0)
 
 /* src/func_80074CC8.c: debug print as above (&D_80011854), then exchange
  * the word at D_8009574E + 0xA (D_80095758) with a0. */
-int func_80074CC8(int a0)
-{
-    const pe_addr_t p = 0x8009574Eu;
-    int old;
-
-    if (PE_LoadU8(p) >= 2u)
-        (void)pa_call("func_80074CC8_debug_print", PE_LoadU32(0x80095748u),
-                      2u, 0x80011854u, (uint32_t)a0, 0, 0);
-    old = (int)PE_LoadU32(p + 0xAu);
-    PE_StoreU32(p + 0xAu, (uint32_t)a0);
-    return old;
-}
+/* func_80074CC8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80074CC8_port.c (src/func_80074CC8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* ── 0x80074FD4: ClearImage ─────────────────────────────────────────
  * src/func_80074FD4.c: validate/log the RECT at guest a0 through

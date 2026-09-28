@@ -409,66 +409,7 @@ void func_800292EC_victory_ready_cut(void)
     func_8002F300_mode2_cut();
 }
 
-void func_8002B0E8(void)
-{
-    uint8_t phase;
-    pe_addr_t aya;
-    uint32_t flags;
-    uint32_t d1a0;
-    unsigned int cmd;
-
-    phase = PE_LoadU8(GA_D_8009CE74);
-    aya = PE_LoadU32(GA_D_8009D254);
-    d1a0 = PE_LoadU32(GA_D_8009D1A0);
-    if (aya < 0x200000u) aya |= 0x80000000u;
-
-    if (phase == 0u) {
-        if (PE_LoadU16(aya + 0x16u) != 10u && (d1a0 & 0x800u) == 0u)
-            return;
-        flags = PE_LoadU32(aya + 0x98u);
-        PE_StoreU32(aya + 0x98u, flags | 0x100u);
-        func_800703F4();
-        func_8004B70C(PE_LoadU32(0x8009D304u),
-                      PE_LoadU16(0x8009D21Cu),
-                      0x800A7FF0u);
-        func_80067CBC();
-        PE_StoreU8(GA_D_8009CE74, PE_LoadU8(GA_D_8009CE74) + 1u);
-        return;
-    }
-    if (phase == 1u) {
-        if ((int16_t)PE_LoadU16(GA_D_8009D2A4) != 1000)
-            return;
-        PE_StoreU8(GA_D_8009CE74, 2u);
-        if (aya != 0u) {
-            flags = PE_LoadU32(aya + 0x98u);
-            PE_StoreU32(aya + 0x98u, flags & ~0x100u);
-        }
-        return;
-    }
-    if (phase == 2u) {
-        if (PE_LoadU8(aya + 0x0Fu) != PE_LoadU16(aya + 0x1Au))
-            return;
-        if ((d1a0 & 0x1800u) != 0u) {
-            d1a0 &= ~0x1800u;
-            D_8009D1A0 = d1a0;
-            PE_StoreU32(GA_D_8009D1A0, d1a0);
-            cmd = 0x18u;
-        } else {
-            cmd = 0x15u;
-        }
-        func_8001A680_command_cut(aya, cmd);
-        PE_StoreU8(GA_D_8009CE74, PE_LoadU8(GA_D_8009CE74) + 1u);
-        return;
-    }
-    if (phase != 3u)
-        return;
-    if (func_8006D60C(0) == 1)
-        return;
-    func_800295E4();
-    PE_StoreU32(GA_D_8009D28C, 9u);
-    flags = PE_LoadU32(GA_D_800B0CD8) & ~0x8000u;
-    PE_StoreU32(GA_D_800B0CD8, flags);
-}
+/* func_8002B0E8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8002B0E8_port.c (src/func_8002B0E8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 void func_8002A7F8_mode3_cut(void)
 {

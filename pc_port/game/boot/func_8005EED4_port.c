@@ -119,9 +119,9 @@ static void name_control_icon(uint32_t index,uint32_t first)
     if (index!=(uint32_t)func_80063428(PE_LoadU32(0x8009CEF4u))) func_8005EB58(1u);
     func_8005E8A4(-2,-2);func_8005EB64(index+first);
 }
-void func_80050F64(uint32_t index) { name_control_icon(index,99u); }
-void func_80050FB8(uint32_t index) { name_control_icon(index,102u); }
-void func_8005100C(uint32_t index) { name_control_icon(index,98u); }
+/* func_80050F64: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80050F64_port.c (src/func_80050F64.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
+/* func_80050FB8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80050FB8_port.c (src/func_80050FB8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
+/* func_8005100C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8005100C_port.c (src/func_8005100C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 void func_8005E6F0(void)
 {
