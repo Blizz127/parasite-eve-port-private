@@ -17,7 +17,10 @@ no retry through func_80082204, no CdlPause), func_8001D170 (actor vs
 boundary polygon step) and func_800DE7A8 (battle particle callback; the
 move/expire and default modes; mode 2 draws through func_800CEE20), func_80058E44 / func_80058FEC (inventory
 move check and entry swap), func_80054F58 (equipment exchange check),
-func_80088344 (SEQ voice LFO/volume/pan/pitch tick).  A case on which retail executes a DIV `break` (or exceeds the
+func_80088344 (SEQ voice LFO/volume/pan/pitch tick), func_80048254
+(equipment-exchange confirm; builds windows in the D_800A22E0 pool; a case
+whose retail call graph leaves the interpreter's supported set is
+regenerated).  A case on which retail executes a DIV `break` (or exceeds the
 instruction budget) is regenerated.  The callbacks are
 real retail leaves that the native dispatch registry resolves:
 D_8009B728 = func_8005E8A4 (D_8009D124 += a0 counts notifications; its
@@ -47,12 +50,15 @@ RANGES = [(0x150000, 0x100), (0x150200, 0x40), (0x150300, 0x40), (0x150380, 0x40
           (0x150900, 4), (0x150A00, 0x230), (0x9D254, 4), (0x9D2F8, 4), (0x9D264, 4),
           (0x150C00, 0x10), (0xE27EC, 4), (0x9D000, 0xA0), (0xC0E00, 0x1100),
           (0xA1E00, 0x200), (0xA8028, 0x1000), (0x9CF98, 4), (0x150D00, 0x200),
-          (0x151000, 0x400), (0x9B8F8, 0x200), (0x9D2C0, 4), (0x9D2CC, 4)]
+          (0x151000, 0x400), (0x9B8F8, 0x200), (0x9D2C0, 4), (0x9D2CC, 4),
+          (0xA22E0, 0xD80), (0x9D150, 0x10), (0x9CF00, 0x100), (0xA1888, 0x10),
+          (0x92478, 0xC30), (0x150F00, 0x90), (0xB0E08, 4)]
 ENTRY = {0: 0x80068710, 1: 0x80083644, 2: 0x80084C4C, 3: 0x8001CBA0, 4: 0x8001CE88,
          5: 0x8008A068, 6: 0x80081E70, 7: 0x8001D170, 8: 0x800DE7A8,
-         9: 0x80058E44, 10: 0x80058FEC, 11: 0x80054F58, 12: 0x80088344}
+         9: 0x80058E44, 10: 0x80058FEC, 11: 0x80054F58, 12: 0x80088344,
+         13: 0x80048254}
 CASES_PER_ENTRY = {0: 500, 1: 300, 2: 500, 3: 400, 4: 500, 5: 150, 6: 600, 7: 300, 8: 300,
-                   9: 250, 10: 350, 11: 500, 12: 700}
+                   9: 250, 10: 350, 11: 500, 12: 700, 13: 500}
 VOICE = 0x80151010
 
 
@@ -121,7 +127,7 @@ def gen_inv(rng, entry):
             kind = rng.choice([8, 8, 0x13, 0x14, 0x15, 0x16, 0x12, rng.getrandbits(8)])
             seeds.append((rec + 4, rng.getrandbits(8) | (rng.choice([0, 0x20, rng.getrandbits(8)]) << 8)
                           | kind << 16 | rng.getrandbits(8) << 24))
-            if entry == 11:
+            if entry in (11, 13):
                 ent = bytes([rng.choice([0, 0, 1, 2, 3, 5, 7, 11])] +
                             [rng.choice([0, 8, 9, 10, 0x28, 0x29, 0x2A, 0x48, 0x49, 0xE8, 0x2B,
                                          0x20, rng.getrandbits(8)]) for _ in range(11)])
@@ -137,6 +143,30 @@ def gen_inv(rng, entry):
         seeds += [(0x8009D048, rng.choice([0x800C0E48, 0x800C0E48, ALTLIST])),
                   (0x8009D050, rng.choice([0, 1, 5, 20, 32]))]
         return seeds, (rng.randrange(-3, 34) & 0xFFFFFFFF, 0, 0, 0)
+    if entry == 13:
+        focus = 0x80150F00
+        kind = rng.choice([6, 0x1B, 0xB, 0x1C, 6, 0xB])
+        seeds += [(focus + 0x24, kind), (focus + 0x34, rng.choice([1, 1, 2])),
+                  (focus + 0x44, rng.choice([-1, 0, 1, 2, 3]) & 0xFFFFFFFF),
+                  (focus + 0x48, rng.choice([-1, 0, 0, 1]) & 0xFFFFFFFF),
+                  (0x8009D15C, focus), (0x8009D154, 0), (0x8009D158, 0x800A22E0)]
+        for k in range(23):
+            seeds.append((0x800A22E0 + 0x90 * k, 0x800A22E0 + 0x90 * (k + 1)))
+        for wid in (4, 0x2C):
+            # frame spec D_80092478 + id*16 (func_8005DA8C) and list spec
+            # D_80092888 + id*32 (func_8005DAB4)
+            for j in range(4):
+                seeds.append((0x80092478 + wid * 16 + 4 * j,
+                              rng.randrange(0, 0x140) | rng.randrange(0, 0xF0) << 16))
+            row = [0x40, 0x30, rng.choice([1, 2]), rng.choice([1, 3, 4]), 4, 8, 12, 0]
+            for j, wv in enumerate(row):
+                seeds.append((0x80092888 + wid * 32 + 4 * j, wv))
+        for j in range(4):
+            seeds.append((0x800A1888 + 4 * j, rng.choice([0, 0, 1, 5, -1]) & 0xFFFFFFFF))
+        seeds += [(0x8009CF0C, rng.choice([0, 1])), (0x8009D090, rng.randrange(-1, 20) & 0xFFFFFFFF),
+                  (0x8009D094, rng.randrange(-1, 20) & 0xFFFFFFFF), (0x8009D098, 0),
+                  (0x8009D09C, 0)]
+        return seeds, (0, 0, 0, 0)
     if entry == 11:
         sl = [rng.randrange(-2, 34), rng.randrange(-2, 34)]
         seeds += [(0x8009D090, sl[0] & 0xFFFFFFFF), (0x8009D094, sl[1] & 0xFFFFFFFF),
@@ -325,10 +355,16 @@ def run(ex, entry, seeds, args):
         ram[lo:lo + size] = bytes(size)
     for a, v in SYNTH_COMMON + list(seeds):
         struct.pack_into('<I', ram, a & 0x1FFFFF, v & 0xFFFFFFFF)
+    global LAST_RAM
+    LAST_RAM = ram
     regs = execute(ram, ENTRY[entry], args,
                    instruction_budget=60000 if entry in (3, 7) else 400000)
     state = b''.join(bytes(ram[lo:lo + size]) for lo, size in RANGES)
     return regs[2] & 0xFFFFFFFF, fnv(state)
+
+
+DUMP = int(sys.argv[sys.argv.index('--dump') + 1]) if '--dump' in sys.argv else None
+LAST_RAM = None
 
 
 def main():
@@ -336,6 +372,7 @@ def main():
     assert hashlib.sha1(ex).hexdigest() == EXE_SHA1
     rng = random.Random(0x80068710)
     runs, words, cases = [], [], []
+    rejected = {}
     common = [(0x80000000 + a + i, struct.unpack_from('<I', ex, a - 0x10000 + 0x800 + i)[0])
               for a in (0x960BC, 0x96250) for i in range(0, 0x180, 4)] + SYNTH_COMMON
     common_addr = {a for a, _ in common}
@@ -356,16 +393,19 @@ def main():
                     seeds, args = gen_particle(rng)
                 elif entry == 12:
                     seeds, args = gen_voice(rng)
-                elif entry in (9, 10, 11):
+                elif entry in (9, 10, 11, 13):
                     seeds, args = gen_inv(rng, entry)
                 else:
                     seeds, args = record_seeds(rng), (REC, 0, 0, 0)
                 try:
                     result, h = run(ex, entry, seeds, args)
                     break
-                except AssertionError:
-                    if entry not in (3, 4, 7):
+                except AssertionError as exc:
+                    if entry not in (3, 4, 7, 13):
                         raise
+                    rejected[entry] = rejected.get(entry, 0) + 1
+                    if entry == 13 and rejected[entry] <= 3:
+                        print('entry 13 rejected:', exc)
             # A zero word inside an observed range (and outside the common
             # block) is already zero-filled.  Consecutive words form one run.
             kept = [(a, v & 0xFFFFFFFF) for a, v in seeds
@@ -379,6 +419,11 @@ def main():
                     runs.append([a, 1, len(words)])
                 words.append(v)
             cases.append((entry, args, first, len(runs), result, h))
+            if DUMP is not None and len(cases) - 1 == DUMP:
+                blob = b''.join(bytes(LAST_RAM[lo:lo + sz]) for lo, sz in RANGES)
+                (ROOT / f'build/lanes/port/p7_retail_{DUMP}.bin').write_bytes(blob)
+                print('dumped case', DUMP)
+                return
     out = ['/* Generated by pc_port/tools/pe_port7_oracle.py --write-header:',
            ' * retail-instruction results for the round-7 hand adapters. */',
            'static const uint32_t P7_ranges[][2]={']
@@ -407,6 +452,7 @@ def main():
     else:
         assert path.read_text() == header, 'retail_port7_cases.h is stale'
     print(f'PASS {len(cases)} original round-7 cases ({len(words)} seeded words, {len(runs)} runs)')
+    print('regenerated (retail DIV break / budget / unsupported):', rejected)
 
 
 if __name__ == '__main__':

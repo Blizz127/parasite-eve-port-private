@@ -36,9 +36,23 @@ static void test_P7_retail_hand_adapters(void)
         case 10: result = (uint32_t)func_80058FEC((int)a[0], (int)a[1], (int)a[2], (int)a[3]); break;
         case 11: result = (uint32_t)func_80054F58((int)a[0], (int)a[1]); break;
         case 12: func_80088344(a[0], a[1]); result = P7_cases[k].result; break;
+        case 13: func_80048254(); result = P7_cases[k].result; break;
         default: result = (uint32_t)func_8001CE88((short)a[0], (short)a[1], a[2], (unsigned short)a[3]); break;
         }
         hash = hit_camera_hash(P7_ranges, sizeof(P7_ranges) / sizeof(P7_ranges[0]));
+        if (getenv("PE_P7_DUMP") && (unsigned)atoi(getenv("PE_P7_DUMP")) == k) {
+            char path[128];
+            FILE *out;
+            unsigned r, b;
+            snprintf(path, sizeof(path), "build/lanes/port/p7_native_%u.bin", k);
+            out = fopen(path, "wb");
+            if (out) {
+                for (r = 0; r < sizeof(P7_ranges) / sizeof(P7_ranges[0]); r++)
+                    for (b = 0; b < P7_ranges[r][1]; b++)
+                        fputc(PE_LoadU8(0x80000000u + P7_ranges[r][0] + b), out);
+                fclose(out);
+            }
+        }
         if (hash != P7_cases[k].hash || result != P7_cases[k].result ||
             PE_Decomp_BoundaryCount() != 0 || PE_Port_ShouldStop()) {
             if (bad++ < 8u)

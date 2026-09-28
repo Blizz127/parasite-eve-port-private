@@ -132,6 +132,7 @@ void func_800430A0(int32_t row)
 static pe_addr_t equipment_ram(pe_addr_t p) {return p<0x200000u?p|0x80000000u:p;}
 static uint32_t equipment_word(pe_addr_t p,unsigned off) {return PE_LoadU32(equipment_ram(p+off));}
 static void equipment_store(pe_addr_t p,unsigned off,uint32_t value) {PE_StoreU32(equipment_ram(p+off),value);}
+void func_80048254(void); /* port7_port.c (src/func_80048254.c) */
 static void equipment_upgrade_boundary(const char *name)
 {
     Bootstrap_ReturnVoid(name,"equipment tool menu");PE_Port_RequestStop(PE_PORT_STOP_UNRESOLVED_BOUNDARY);
@@ -143,7 +144,7 @@ int func_80045D0C(pe_addr_t window,uint32_t event)
     pe_addr_t list=func_80062A20(window,0u),other;
     if (event&0x10000u) {
         if (!func_80054288()) {func_800526C4();return 1;}
-        if (PE_LoadU32(0x8009CF1Cu)) {equipment_upgrade_boundary("func_80048254");return 1;}
+        if (PE_LoadU32(0x8009CF1Cu)) {func_80048254();return 1;}
         if (!func_80052558()) {func_800526C4();return 1;}
         other=func_80062D2C(53u,0u,0u,0u);other=func_8006322C(53u,other,other);
         PE_StoreU32(other+48u,0x8004FA10u);list=func_80062A34(2u,7u);

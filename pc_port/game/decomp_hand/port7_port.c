@@ -1201,3 +1201,112 @@ void func_80088344(pe_addr_t v, unsigned int mask)
         VX_SET16(0x10C, p & 0x3FFF);
     }
 }
+
+/* ── src/func_80048254.c ────────────────────────────────────────────────
+ * Equipment-exchange confirm.  The focused window's kind (+0x24) picks the
+ * side: 6/0x1B = side 0, 0xB/0x1C = side 1, and 6/0xB also take the list
+ * cursor as the entry id.  An empty entry (record + id + 0x15 == 0) goes to
+ * func_800526C4.  Otherwise D_8009CF24/28 latch side/id and func_80054F58
+ * decides.  1/2/5 (D_8009CFBC = r == 5, D_8009CF18 = the slot's kind != 9):
+ * two or more ready party slots (D_800A1888..94 > 0) open the 0x2C chooser
+ * (draw 0x80047714, update 0x8004778C, list draw 0x80050038, +0x8C
+ * 0x80050020; shifted when D_8009CF0C).  Otherwise the first ready slot goes
+ * to D_8009CF2C and, when the verdict fits that slot's parity, the 0x04
+ * confirm window opens (0x8004790C / 0x80047A30 / 0x8004F950,
+ * D_8009CF14 = 5, raised by 0x1C for odd slots); if not, func_800480AC.
+ * Then func_800525EC.  0 -> func_800480AC, 4 -> message 0x63, else 7. */
+extern int func_80062CC4(void);
+extern pe_addr_t func_8005332C(int32_t resource_id);
+extern void func_80062CB8(int a0);
+extern void func_8004CC50(uint32_t first, uint32_t second);
+extern void func_800480AC(void);
+extern void func_800525EC(void);
+extern void func_800526C4(void);
+
+static pe_addr_t eq_entry(int side, int id)
+{
+    return func_8005332C(func_80059F08((uint32_t)side)) + (uint32_t)id;
+}
+
+void func_80048254(void)
+{
+    int side = 0, id = -1, r, i, cnt;
+    pe_addr_t e, f;
+
+    switch ((int)PE_LoadU32((pe_addr_t)func_80062CC4() + 0x24u)) {
+    case 6:
+        id = func_80063428((pe_addr_t)func_80062CC4());
+        /* fall through */
+    case 0x1B:
+        side = 0;
+        break;
+    case 0xB:
+        id = func_80063428((pe_addr_t)func_80062CC4());
+        /* fall through */
+    case 0x1C:
+        side = 1;
+        break;
+    }
+    if (PE_LoadU8(eq_entry(side, id) + 0x15u) == 0u) {
+        func_800526C4();
+        return;
+    }
+    PE_StoreU32(0x8009CF24u, (uint32_t)side);
+    PE_StoreU32(0x8009CF28u, (uint32_t)id);
+    r = func_80054F58(side, id);
+    PE_StoreU32(0x8009CFBCu, (uint32_t)(r == 5));
+    if (r == 1 || r == 2 || r == 5) {
+        PE_StoreU32(0x8009CF18u, (uint32_t)(func_8005415C(func_80059F08((uint32_t)side)) != 9));
+        cnt = ((int)PE_LoadU32(0x800A1888u) > 0) + ((int)PE_LoadU32(0x800A188Cu) > 0) +
+              ((int)PE_LoadU32(0x800A1890u) > 0) + ((int)PE_LoadU32(0x800A1894u) > 0);
+        if (cnt >= 2) {
+            e = func_80062D2C(0x2Cu, (pe_addr_t)func_80062CC4(), 0u, 1u);
+            f = func_8006322C(0x2Cu, e, e);
+            PE_StoreU32(e + 0x30u, 0x80047714u);
+            PE_StoreU32(e + 0x2Cu, 0x8004778Cu);
+            PE_StoreU32(f + 0x30u, 0x80050038u);
+            PE_StoreU32(f + 0x8Cu, 0x80050020u);
+            if (PE_LoadU32(0x8009CF0Cu) != 0u) {
+                PE_StoreU32(e + 0x38u, PE_LoadU32(e + 0x38u) + 0x10u);
+                PE_StoreU32(f + 0x38u, 2u);
+                PE_StoreU32(f + 0x58u, 2u);
+                PE_StoreU32(f + 0x18u, PE_LoadU32(f + 0x18u) + 0x1Cu);
+            }
+            func_80062CB8((int)f);
+        } else {
+            for (i = 0; i < 4 && PE_LoadU32(0x800A1888u + 4u * (uint32_t)i) == 0u; i++) {
+            }
+            PE_StoreU32(0x8009CF2Cu, i < 4 ? (uint32_t)i : 0u);
+            i = PE_LoadU8(eq_entry(side, id) + 0x15u) & 0x1F;
+            if (r == 1 || (!(PE_LoadU32(0x8009CF2Cu) & 1u) ? r == 2
+                                                         : (r == 5 && (unsigned int)(i - 8) >= 3u))) {
+                e = func_80062D2C(4u, (pe_addr_t)func_80062CC4(), 0u, 1u);
+                f = func_8006322C(4u, e, e);
+                PE_StoreU32(e + 0x30u, 0x8004790Cu);
+                PE_StoreU32(e + 0x2Cu, 0x80047A30u);
+                PE_StoreU32(f + 0x30u, 0x8004F950u);
+                PE_StoreU32(0x8009CF14u, 5u);
+                func_80062CB8((int)f);
+                if (PE_LoadU32(0x8009CF2Cu) & 1u) {
+                    PE_StoreU32(e + 0x38u, PE_LoadU32(e + 0x38u) - 0x1Cu);
+                    PE_StoreU32(f + 0x1Cu, PE_LoadU32(f + 0x1Cu) - 0x1Cu);
+                }
+            } else {
+                func_800480AC();
+            }
+        }
+        func_800525EC();
+    } else {
+        switch (r) {
+        case 0:
+            func_800480AC();
+            break;
+        case 4:
+            func_8004CC50(0x63, 0);
+            break;
+        default:
+            func_8004CC50(7, 0);
+            break;
+        }
+    }
+}

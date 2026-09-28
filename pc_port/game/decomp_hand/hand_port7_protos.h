@@ -34,6 +34,8 @@ int func_80058FEC(int a, int b, int c, int d);
 int func_80054F58(int side, int k);
 /* src/func_80088344.c: SEQ voice LFO / volume / pan / pitch update. */
 void func_80088344(pe_addr_t v, unsigned int mask);
+/* src/func_80048254.c: equipment-exchange confirm (menu bit 16). */
+void func_80048254(void);
 
 /* Guest scratch for round-7 retail stack buffers handed to guest-address
  * callees: 0x801FF5C0..0x801FF5FF, the unused top of the reserved round-4
