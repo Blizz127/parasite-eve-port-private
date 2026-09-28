@@ -1,5 +1,8 @@
 # Rehearsal flashes with concurrent pistol effects
 
+> Screenshots named in this file are game frames. They are not committed; they are
+> kept locally under `build/evidence-screenshots/pe-day1-flash-weapon/` (git-ignored).
+
 Run28 uses DAY1-11 binary SHA256
 `3bfcd7f5928bfdf18130af9ccf4094b7ae6a47f71450e5538ce1940a9699ade0`.
 Normal inputs reach the rehearsal fight atframe47020 withHP45. The run

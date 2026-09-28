@@ -67,30 +67,30 @@ Argument roles: `[subop, dst, a, b]` (b optional).
 
 | sub | VA | Operation | Signedness |
 |---:|---|---|---|
-| 0x00 | `0x80012894` | `dst = a + b` | wrap |
-| 0x01 | `0x800128B4` | `dst = a - b` | wrap |
-| 0x02 | `0x800128D4` | `dst = a \| b` | bits |
-| 0x03 | `0x800128F4` | `dst = a & b` | bits |
-| 0x04 | `0x80012914` | `dst = a ^ b` | bits |
-| 0x05 | `0x80012934` | `(a!=0) \|\| (b!=0)` | bool |
-| 0x06 | `0x8001296C` | `(a!=0) && (b!=0)` | bool |
-| 0x07 | `0x800129A0` | `a == 0` | bool |
-| 0x08 | `0x800129B8` | `dst = ~a` | bits |
-| 0x09 | `0x800129D0` | `dst = (b < a)` | **slt signed** |
-| 0x0A | `0x800129EC` | `dst = (a < b)` | **slt signed** |
-| 0x0B | `0x80012A0C` | `dst = (a == b)` | bit-exact |
-| 0x0C | `0x80012A30` | `dst = (a >= b)` | slt xor 1 |
-| 0x0D | `0x80012A54` | `dst = (a <= b)` | slt xor 1 |
-| 0x0E | `0x80012A74` | `dst = (a != b)` | bit-exact |
-| 0x0F | `0x80012A98` | `dst = a * b` | lo |
-| 0x10 | `0x80012AC0` | `dst = a / b` | signed div |
-| 0x11 | `0x80012B08` | `dst = a << b` | sllv |
-| 0x12 | `0x80012B28` | `dst = a >> b` | **srav** |
-| 0x13 | `0x80012B48` | `dst = a` | copy |
-| 0x14 | `0x80012B5C` | `func_8003708C(a,b)` | UNKNOWN helper |
-| 0x15 | `0x80012B80` | `func_800370A8(a,b)` | UNKNOWN helper |
-| 0x16 | `0x80012BA4` | `dst = a % b` | signed rem |
-| 0x17 | `0x80012BF0` | `dst = -a` | neg |
+| 0x00 | `.L80012894` | `dst = a + b` | wrap |
+| 0x01 | `.L800128B4` | `dst = a - b` | wrap |
+| 0x02 | `.L800128D4` | `dst = a \| b` | bits |
+| 0x03 | `.L800128F4` | `dst = a & b` | bits |
+| 0x04 | `.L80012914` | `dst = a ^ b` | bits |
+| 0x05 | `.L80012934` | `(a!=0) \|\| (b!=0)` | bool |
+| 0x06 | `.L8001296C` | `(a!=0) && (b!=0)` | bool |
+| 0x07 | `.L800129A0` | `a == 0` | bool |
+| 0x08 | `.L800129B8` | `dst = ~a` | bits |
+| 0x09 | `.L800129D0` | `dst = (b < a)` | **slt signed** |
+| 0x0A | `.L800129EC` | `dst = (a < b)` | **slt signed** |
+| 0x0B | `.L80012A0C` | `dst = (a == b)` | bit-exact |
+| 0x0C | `.L80012A30` | `dst = (a >= b)` | slt xor 1 |
+| 0x0D | `.L80012A54` | `dst = (a <= b)` | slt xor 1 |
+| 0x0E | `.L80012A74` | `dst = (a != b)` | bit-exact |
+| 0x0F | `.L80012A98` | `dst = a * b` | lo |
+| 0x10 | `.L80012AC0` | `dst = a / b` | signed div |
+| 0x11 | `.L80012B08` | `dst = a << b` | sllv |
+| 0x12 | `.L80012B28` | `dst = a >> b` | **srav** |
+| 0x13 | `.L80012B48` | `dst = a` | copy |
+| 0x14 | `.L80012B5C` | `func_8003708C(a,b)` | UNKNOWN helper |
+| 0x15 | `.L80012B80` | `func_800370A8(a,b)` | UNKNOWN helper |
+| 0x16 | `.L80012BA4` | `dst = a % b` | signed rem |
+| 0x17 | `.L80012BF0` | `dst = -a` | neg |
 
 Day-1 persist compares are almost all:
 

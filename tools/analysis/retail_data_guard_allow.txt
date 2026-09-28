@@ -1,5 +1,8 @@
 # retail_data_guard allowlist: tracked files that may legitimately contain
 # byte runs equal to the retail disc.  One path per line; keep the reason.
+# A plain line exempts the file from every check (also the docs/ media rule).
+# An "addr: <path>" line only accepts pointer/jump-table (address-only) runs
+# in that file under --strict; retail data runs there still fail.
 #
 # Matched decompilation C (CLAUDE.md hard rule 1: verified against the retail
 # binary by the checksum/rebuild harness).  A matching function's initialized
@@ -11,3 +14,27 @@ src/func_80024250.c
 # documentation, not game data). The 40-byte hit is the low-entropy -1/0/1 head
 # of the table colliding with bytes in PE.IMG.
 pc_port/platform/pe_spu_gauss.inc
+
+# Symbol maps: sorted function/label addresses that coincide with retail
+# pointer tables (address facts, the same as the committed symbol map).
+addr: configs/USA/psyq_classification.tsv
+addr: vendor/khasinski-parasite-eve-decomp/configs/USA/sym.main.txt
+
+# PENDING (owner: pc_port test lanes): test seed code that still stores retail
+# pointer/jump tables (address-only; e.g. the D_800910A0 VM dispatch table at
+# 0x800910E4/0x80091198, the CD/DMA register table at 0x8009B32C).  Headclean
+# (2026-09-28) did not change test code because other lanes are editing it.
+# Move these seeds to disc-cache reads, then delete the lines.
+addr: pc_port/tests/retail_actor_flag_vm_cases.h
+addr: pc_port/tests/retail_anchor_attachment_cases.h
+addr: pc_port/tests/retail_attachment_vm_cases.h
+addr: pc_port/tests/retail_card_operation_frame_cases.h
+addr: pc_port/tests/retail_club_effect_cases.h
+addr: pc_port/tests/retail_gameover_fade_cases.h
+addr: pc_port/tests/retail_m28_movement_cases.h
+addr: pc_port/tests/retail_m32_movement_cases.h
+addr: pc_port/tests/retail_music_consumer_cases.h
+addr: pc_port/tests/retail_pe_action_cases.h
+addr: pc_port/tests/retail_polar_vm_cases.h
+addr: pc_port/tests/retail_task_pause_cases.h
+addr: pc_port/tests/test_native.c

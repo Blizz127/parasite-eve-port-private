@@ -1,5 +1,8 @@
 # Visible Aya, model anchors and opening dialogue
 
+> Screenshots named in this file are game frames. They are not committed; they are
+> kept locally under `build/evidence-screenshots/pe-aya-visible-dialogue/` (git-ignored).
+
 2026-09-04. Native PC-port changes; not a matching-C claim. Retail authority:
 `build/disc1.candidate.exe`, SHA-1 `452fb033f2eaa4b18aa20a5bca60b8125af3a37b`.
 
@@ -241,7 +244,7 @@ FIFOs; polygon rasterization remains the documented native approximation.
 
 Visible INV15 ordinary input selected Medicine 1 after a natural hit. At frame
 26425 Aya healed38→45HP; the item was consumed and the blue particles and
-rings rendered. [Captured effect](battle-medicine-effect-inv15.png). Seven
+rings rendered. Captured effect (screenshot `battle-medicine-effect-inv15.png`, kept locally under build/). Seven
 subsequent shot events prove that healing releases command execution. This
 run ended in natural player defeat, so it is not encounter-completion proof;
 see [read-only event record](battle-medicine-progress-inv15.json).
@@ -257,8 +260,8 @@ INV17 fresh visible retry completed: name entry, full stage view and stairs,
 Medicine 1 (42→45 HP), healing particles/rings, seven shots, Eve's scripted
 exit at12938, final message60 and ordinary movement afterward. No native
 stop occurred. [Event and movement proof](complete-encounter-inv17.json),
-[stage](performance-inv17.png), [healing](battle-medicine-effect-inv17.png),
-[completed encounter](battle-complete-inv17.png). The native window remains open.
+stage (screenshot `performance-inv17.png`, kept locally under build/), healing (screenshot `battle-medicine-effect-inv17.png`, kept locally under build/),
+completed encounter (screenshot `battle-complete-inv17.png`, kept locally under build/). The native window remains open.
 The repaired defeat fade still needs its own fresh visible defeat replay.
 
 
@@ -278,19 +281,19 @@ that every ability has been visibly played.
 
 The fresh visible retry again accepted the name, rendered the full performance
 backdrop and all three actors, and reached Eve via the aisle/stairs. See
-[stage capture](performance-inv20.png). Its first menu check found PE excluded
+stage capture (screenshot `performance-inv20.png`, kept locally under build/). Its first menu check found PE excluded
 by the opening fight's mask7D; the helper mistakenly selected Equipment and
 reached that unfinished page's explicit native boundary. No live PE cast occurred.
 The second ordinary-input replay completed without native boundaries:
 Medicine1 healed40→45 with particles/rings, seven shots, Eve exit at12945,
 message60, HP17, and ordinary field movement Z633→593. See
 [completion event record](complete-encounter-inv20.json),
-[healing](battle-medicine-effect-inv20.png), and
-[completed encounter](battle-complete-inv20.png). The post-battle menu mask7F enabled PE. Ordinary V/Down/Confirm opened
+healing (screenshot `battle-medicine-effect-inv20.png`, kept locally under build/), and
+completed encounter (screenshot `battle-complete-inv20.png`, kept locally under build/). The post-battle menu mask7F enabled PE. Ordinary V/Down/Confirm opened
 Heal1, displayed its HP preview and confirmation, then applied it atframe18514:
 live and savedHP17→45, PE80→20 (cost60). Both menus closed normally with C.
 See [field PE event record](field-pe-use-inv20.json) and
-[Heal1 result](field-pe-after-inv20.png). Battle PE casts are still verified
+Heal1 result (screenshot `field-pe-after-inv20.png`, kept locally under build/). Battle PE casts are still verified
 by original-executable cases only. The window remains visible, field input
 is unlocked, and all helpers have finished with no held keys.
 

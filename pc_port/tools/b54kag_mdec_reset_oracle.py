@@ -85,12 +85,10 @@ def main() -> None:
 
     pointer_off = 0x8010DB1C - MOVIE_LOAD
     pointers = struct.unpack_from("<15I", movie, pointer_off)
-    require(pointers == (
-        0x1F801080, 0x1F801084, 0x1F801088,
-        0x1F801090, 0x1F801094, 0x1F801098,
-        0x1F8010A0, 0x1F8010A4, 0x1F8010A8,
-        0x1F8010B0, 0x1F8010B4, 0x1F8010B8,
-        0x1F801820, 0x1F801824, 0x1F8010F0),
+    # DMA ch0..ch3 MADR/BCR/CHCR, then MDEC0/MDEC1 and DPCR (psx-spx map)
+    require(pointers == tuple(
+        0x1F801080 + 0x10 * ch + 4 * reg for ch in range(4) for reg in range(3)
+    ) + (0x1F801820, 0x1F801824, 0x1F8010F0),
         "retail DMA/MDEC/DPCR pointer table")
     quant_off = QUANT_COMMAND - MOVIE_LOAD
     scale_off = SCALE_COMMAND - MOVIE_LOAD

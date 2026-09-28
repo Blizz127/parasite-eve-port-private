@@ -1,12 +1,15 @@
 # PE-POLY1 — visible opening character models
 
+> Screenshots named in this file are game frames. They are not committed; they are
+> kept locally under `build/evidence-screenshots/pe-poly1-visible-models/` (git-ignored).
+
 2026-09-04 native port continuation. Two character models are visibly rendered
 beside the limousine in M0010I. They change pose/location between 120 and
 600 frames. Both captures were inspected. **Aya is not yet controllable and
 has not reached the auditorium entrance.**
 
-![120-frame opening](opening-120.png)
-![600-frame opening](opening-600.png)
+*120-frame opening: screenshot `opening-120.png`, kept locally under build/*
+*600-frame opening: screenshot `opening-600.png`, kept locally under build/*
 
 ## Changes
 

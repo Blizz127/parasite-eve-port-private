@@ -1371,7 +1371,7 @@ def main() -> int:
         "persist_bytes": PERSIST_BYTES,
         "mode_table_ok": mode_ok,
         "handler_table_ok": handler_ok,
-        "alu_table": [f"0x{v:08X}" for v in alu_words],
+        "alu_table": [f".L{v:08X}" for v in alu_words],  # case labels (symbol form)
         "exe_persist_refs": exe_refs,
         "save_layout": save_layout,
         "scanned_scenes": scanned_scenes,

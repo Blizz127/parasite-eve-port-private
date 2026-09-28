@@ -35,18 +35,18 @@
  *   target = jtb[2] = 0x80076C34  (GPU queue/transfer dispatcher)
  *   a0     = jtb[8] = 0x80076664  (immediate transfer worker)
  * Complete jtb census (all 16 entries, static exe data):
- *   [0] 0x800117AC version string   [1] 0x80076C10 (MoveImage extra arg)
- *   [2] 0x80076C34 queue dispatcher — ClearImage/ClearImage2/LoadImage/
+ *   [0] D_800117AC version string   [1] func_80076C10 (MoveImage extra arg)
+ *   [2] func_80076C34 queue dispatcher — ClearImage/ClearImage2/LoadImage/
  *       StoreImage/MoveImage/DrawOTag/PutDrawEnv/DrawOTagEnv jalr target
- *   [3] 0x80076434 (ClearImage worker arg)   [4] 0x80076B20 SetDispMask/
- *       PutDispEnv target   [5] 0x80076B58 (func_80075358 target)
- *   [6] 0x80076B98 (MoveImage/DrawOTag/PutDrawEnv/DrawOTagEnv worker arg)
- *   [7] 0x800768A0 (StoreImage worker arg)   [8] 0x80076664 (LoadImage
- *       worker arg)   [9] 0x80076EE4 queue pump (used internally)
- *   [10] 0x80076B44 (internal)   [11] 0x80076354 (ClearOTagR target)
- *   [12] 0x80076BE0 (internal)   [13] 0x80077144 GPU version query
- *       (ResetGraph/func_80074C14 target)   [14] 0x8007633C
- *       (func_80075B1C target)   [15] 0x80077294 (DrawSync/func_80075358
+ *   [3] func_80076434 (ClearImage worker arg)   [4] func_80076B20 SetDispMask/
+ *       PutDispEnv target   [5] func_80076B58 (func_80075358 target)
+ *   [6] func_80076B98 (MoveImage/DrawOTag/PutDrawEnv/DrawOTagEnv worker arg)
+ *   [7] func_800768A0 (StoreImage worker arg)   [8] func_80076664 (LoadImage
+ *       worker arg)   [9] func_80076EE4 queue pump (used internally)
+ *   [10] func_80076B44 (internal)   [11] func_80076354 (ClearOTagR target)
+ *   [12] func_80076BE0 (internal)   [13] func_80077144 GPU version query
+ *       (ResetGraph/func_80074C14 target)   [14] func_8007633C
+ *       (func_80075B1C target)   [15] func_80077294 (DrawSync/func_80075358
  *       target)
  *
  * B53A/B53C continuation of the jalr target:

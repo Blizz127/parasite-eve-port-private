@@ -79,6 +79,20 @@ class GuardTest(unittest.TestCase):
         self.assertFalse(scan("enum{" + ",".join(f"A{i}={i}" for i in range(40)) + "};"))
         self.assertFalse(scan(" ".join(str(i) for i in range(128))))
 
+    def test_restarting_enumeration_ignored(self):
+        body = bytearray(BODY)
+        body[0x3000:0x3040] = bytes([16] + list(range(0, 40)) + [7] + list(range(40, 62)))
+        r = ref_for(EXE[:0x800] + bytes(body))
+        self.assertFalse(scan(" ".join(f"[{b}]" for b in body[0x3000:0x3040]), r))
+
+    def test_register_save_sequence_hits(self):
+        body = bytearray(BODY)
+        seq = [0x27BDFFA8] + [(0x2B << 26) | (29 << 21) | (r << 16) | (84 - 4 * k)
+                              for k, r in enumerate([31, 30, 23, 22, 21, 20, 19, 18, 17, 16])]
+        struct.pack_into(f"<{len(seq)}I", body, 0x3100, *seq)
+        r = ref_for(EXE[:0x800] + bytes(body))
+        self.assertTrue(scan(",".join(f"0x{w:08X}" for w in seq), r))
+
     def test_short_copy_not_flagged(self):
         t = ",".join(f"0x{w:08X}" for w in words(0x500, 7))  # 28 bytes < window
         self.assertFalse(scan(t))
@@ -98,6 +112,71 @@ class GuardTest(unittest.TestCase):
         blob = b"\x89junk" + BODY[0x700:0x780] + b"tail"
         hits = g.scan_bytes("x.bin", blob, ref_for(), set())
         self.assertTrue(hits)
+
+    # ── guard v3: bare (0x-less) hex ──────────────────────────────────
+    def test_bare_objdump_listing_hits(self):
+        t = "\n".join(f"{VRAM + 0x100 + 4 * i:08x}:\t{w:08x} \tlw\tv0,0(a0)"
+                      for i, w in enumerate(words(0x100, 10)))
+        hits = scan(t)
+        self.assertTrue(hits)
+        self.assertEqual(hits[0][4], "data")
+
+    def test_bare_splat_comment_hits(self):
+        t = "\n".join(f"/* {0x900 + 4 * i:X} {VRAM + 0x100 + 4 * i:08X} {w:08X} */ lui $v0,0x800B"
+                      for i, w in enumerate(words(0x100, 10)))
+        self.assertTrue(scan(t))
+
+    def test_bare_words_only_listing_hits(self):
+        t = "  ".join(f"{w:08X}" for w in words(0x600, 9))
+        self.assertTrue(scan(t))
+
+    def test_bare_memory_order_dump_hits(self):
+        # objdump -s: address column then four memory-order 8-digit groups
+        rows = []
+        for r in range(3):
+            off = 0xA00 + 16 * r
+            cols = " ".join(BODY[off + 4 * c:off + 4 * c + 4].hex() for c in range(4))
+            rows.append(f" {VRAM + off:08x} {cols}  ................")
+        self.assertTrue(scan("\n".join(rows)))
+
+    def test_bare_hex_string_hits(self):
+        self.assertTrue(scan("retail: " + BODY[0xB01:0xB31].hex() + "\n"))
+        self.assertTrue(scan("id,raw_hex\n7," + BODY[0xB41:0xB69].hex().upper() + ",x\n"))
+
+    def test_bare_spaced_byte_dump_hits(self):
+        self.assertTrue(scan(" ".join(f"{b:02X}" for b in BODY[0xC03:0xC33])))
+
+    def test_bare_hex_false_positives_ignored(self):
+        rng = random.Random(99)
+        prose = "\n".join(f"commit {rng.getrandbits(32):08x} sha {rng.getrandbits(160):040x} "
+                          f"blob {rng.getrandbits(256):064x}" for _ in range(40))
+        self.assertFalse(scan(prose))
+        self.assertFalse(scan(" ".join(f"{w:08x}" for w in words(0x100, 7))))   # 28 bytes
+        self.assertFalse(scan(BODY[0xB01:0xB1F].hex()))                          # 30 bytes
+        self.assertFalse(scan(" ".join(f"{0x80010000 + 16 * i:08x}" for i in range(64))))
+        self.assertFalse(scan("00" * 200))
+
+    def test_docs_media_rejected_unless_allowlisted(self):
+        png = b"\x89PNG\r\n\x1a\n" + bytes(64)
+        hits = g.scan_bytes("docs/evidence/x/frame.png", png, ref_for(), set())
+        self.assertEqual(len(hits), 1)
+        self.assertEqual(hits[0][4], "data")
+        self.assertFalse(g.scan_bytes("docs/evidence/x/frame.png", png, ref_for(),
+                                      {"docs/evidence/x/frame.png"}))
+        self.assertTrue(g.scan_bytes("docs/a/voice.wav", b"RIFF" + bytes(40), ref_for(), set()))
+        self.assertFalse(g.scan_bytes("pc_port/assets/icon.png", png, ref_for(), set()))
+
+    def test_allow_file_addr_lines(self):
+        with tempfile.TemporaryDirectory() as d:
+            f = Path(d) / "allow.txt"
+            f.write_text("# c\nsrc/a.c  # why\naddr: configs/x.tsv\n\n")
+            old = g.ALLOW_FILE
+            try:
+                g.ALLOW_FILE = f
+                self.assertEqual(g.load_allow(), {"src/a.c"})
+                self.assertEqual(g.load_allow_addr(), {"configs/x.tsv"})
+            finally:
+                g.ALLOW_FILE = old
 
     def test_signatures_detect_without_disc(self):
         r = g.Reference()

@@ -1,5 +1,8 @@
 # DAY1-10 Arrange Items live verification
 
+> Screenshots named in this file are game frames. They are not committed; they are
+> kept locally under `build/evidence-screenshots/pe-day1-arrange-items/` (git-ignored).
+
 Native run27, 2026-09-06. Binary SHA256:
 `07781970f1d297d9a1d8922a5d8dc4e55f6f3e66fb1432d11285059e4592e1ef`.
 Normal keyboard input only; game memory and framebuffers inspected read-only.

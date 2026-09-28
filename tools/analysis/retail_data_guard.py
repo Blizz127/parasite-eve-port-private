@@ -12,6 +12,15 @@ What is scanned (tracked files, or the staged index with --staged):
     token stream per file, plus its stride-2 and stride-3 sub-streams (so
     ``{addr, value}`` pair tables and ``Store(addr, value);`` sequences are
     caught), encoded as little-endian u32 / u16 / u8 byte runs;
+  * bare hex without a ``0x`` prefix (guard v3+): 8-digit words such as
+    objdump / splat listings (``8003e100: 8c820000  lw``,
+    ``8005DC4C 3C02800B``), as a word stream (all, stride-2/3 sub-streams and
+    one with KSEG0/IO address columns dropped), each packed as the word value
+    and byte-swapped (``objdump -s`` memory-order columns); and contiguous hex
+    byte strings of >= 32 bytes, optionally ``' '``/``':'``-separated per byte
+    (``retail: 0000828c2400...``, CSV ``raw_hex`` columns, ``FF FE 14 1F ..``);
+  * media files (images/audio/video) under ``docs/``: game frames and sounds
+    are retail data too; only paths in the allowlist may be committed;
   * the raw bytes of every binary (non-UTF-8) file.
 A hit is any 32-byte window (>= 10 distinct byte values, so zero fill and
 trivial patterns never trip it) that equals retail bytes.
@@ -53,7 +62,7 @@ SIG_FILE = ROOT / "tools/analysis/retail_data_signatures.txt"
 ALLOW_FILE = ROOT / "tools/analysis/retail_data_guard_allow.txt"
 BASELINE_FILE = ROOT / "tools/analysis/retail_data_guard_baseline.txt"
 CACHE_DIR = Path(os.environ.get("PE_DISC_CACHE_DIR") or ROOT / "build/disc-cache")
-GUARD_VERSION = 2
+GUARD_VERSION = 5
 sys.path.insert(0, str(ROOT / "tools/extract"))
 
 WIN = 32                # bytes per compared window
@@ -74,6 +83,14 @@ KNOWN_TABLES = [
 ]
 
 TOKEN_RE = re.compile(rb"0[xX][0-9A-Fa-f]+|\b[0-9]+\b")
+# bare (0x-less) 8-digit hex words: objdump/splat instruction columns
+BARE_WORD_RE = re.compile(rb"(?<![0-9A-Za-z_])[0-9A-Fa-f]{8}(?![0-9A-Za-z_])")
+# contiguous bare hex byte strings >= WIN bytes, optionally byte-separated
+BARE_HEXSTR_RE = re.compile(
+    rb"(?<![0-9A-Za-z_])(?:[0-9A-Fa-f]{2}[ :]?){%d,}" % WIN)
+MEDIA_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".tga", ".tim",
+                  ".ico", ".wav", ".mp3", ".ogg", ".flac", ".vag", ".xa", ".vab",
+                  ".seq", ".str", ".avi", ".mp4", ".mkv", ".webm", ".mov"}
 SKIP_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".ico", ".pdf", ".zip", ".gz"}
 
 
@@ -96,9 +113,17 @@ def window_ok(w: bytes, width: int = 4) -> bool:
 def _not_ramp(w: bytes, width: int) -> bool:
     # a single repeated step (0,1,2,3,...; 4,8,12,...) is a counter, not data;
     # slow-varying tables (atan, sqrt) have at least two distinct steps
+    # u8/u16 (guard v5): also a counter with up to two breaks (16,0,1,2,...:
+    # an enumerated list whose numbering restarts).  Not for u32: register
+    # save sequences (sw ra/fp/s7../s0) are near-arithmetic words and real data.
     u = array(_ARR[width], w[:len(w) - len(w) % width])
-    deltas = {(u[i + 1] - u[i]) for i in range(len(u) - 1)}
-    return len(deltas) >= 2
+    deltas = [(u[i + 1] - u[i]) for i in range(len(u) - 1)]
+    if len(set(deltas)) < 2:
+        return False
+    if width == 4:
+        return True
+    top = max(deltas.count(d) for d in set(deltas))
+    return top < len(deltas) - 2
 
 
 def window2_ok(w: bytes, width: int = 4) -> bool:
@@ -304,6 +329,55 @@ def token_streams(data: bytes):
             start = e + 1
 
 
+def _is_address(v: int) -> bool:
+    return 0x80000000 <= v < 0x80200000 or 0x1F800000 <= v < 0x1F802000
+
+
+def bare_hex_streams(data: bytes):
+    """Yield (packed bytes, positions, width) segments for 0x-less hex.
+
+    Words: every bare 8-digit token, its stride-2/3 sub-streams (address +
+    word [+ bytes] listing columns) and a stream with address-valued tokens
+    dropped (objdump -d/-s address columns), each as the u32 value and
+    byte-swapped.  Strings: runs of >= WIN hex bytes decoded in order.  Both
+    need a full WIN-byte exact disc match downstream, so prose, short hashes
+    and addresses never trip them."""
+    ms = list(BARE_WORD_RE.finditer(data))
+    need = WIN // 4
+    if len(ms) >= need:
+        vals = [int(m.group(0), 16) for m in ms]
+        poss = [m.start() for m in ms]
+        plans = [(vals, poss)]
+        for k in (2, 3):
+            for s in range(k):
+                plans.append((vals[s::k], poss[s::k]))
+        keep = [i for i, v in enumerate(vals) if not _is_address(v)]
+        if len(keep) != len(vals):
+            plans.append(([vals[i] for i in keep], [poss[i] for i in keep]))
+        for sv, sp in plans:
+            if len(sv) < need:
+                continue
+            a = array("I", sv)
+            yield a.tobytes(), sp, 4
+            a.byteswap()
+            yield a.tobytes(), sp, 4
+    for m in BARE_HEXSTR_RE.finditer(data):
+        digits = re.sub(rb"[ :]", b"", m.group(0))
+        digits = digits[:len(digits) - len(digits) % 2]
+        b = bytes.fromhex(digits.decode())
+        if len(b) < WIN:
+            continue
+        # position of byte i: walk the matched text (separators are optional)
+        pos, p, t = [], m.start(), m.group(0)
+        j = 0
+        while len(pos) < len(b):
+            while t[j:j + 1] in (b" ", b":"):
+                j += 1
+            pos.append(p + j)
+            j += 2
+        yield b, pos, 1
+
+
 def _collect_runs(buf: bytes, pos: list[int], width: int, ref: Reference, out: list):
     """Slide 32-byte windows over one encoded segment; merge overlapping hit
     windows into runs (first token pos, last token pos, bytes, match, class)."""
@@ -349,9 +423,18 @@ def _collect_runs(buf: bytes, pos: list[int], width: int, ref: Reference, out: l
     return res
 
 
+def is_docs_media(path: str) -> bool:
+    """Image/audio/video under docs/: game frames and sounds are retail data."""
+    return path.startswith("docs/") and Path(path).suffix.lower() in MEDIA_SUFFIXES
+
+
 def scan_bytes(path: str, data: bytes, ref: Reference, allow: set[str]):
     """Return [(from_line, to_line, nbytes, match, class)]."""
-    if path in allow or Path(path).suffix.lower() in SKIP_SUFFIXES:
+    if path in allow:
+        return []
+    if is_docs_media(path):
+        return [("file", "file", len(data), "media file under docs/ (not allowlisted)", "data")]
+    if Path(path).suffix.lower() in SKIP_SUFFIXES:
         return []
     try:
         data.decode("utf-8")
@@ -361,6 +444,8 @@ def scan_bytes(path: str, data: bytes, ref: Reference, allow: set[str]):
     raw = []
     if is_text:
         for buf, pos, width in token_streams(data):
+            raw.extend(_collect_runs(buf, pos, width, ref, []))
+        for buf, pos, width in bare_hex_streams(data):
             raw.extend(_collect_runs(buf, pos, width, ref, []))
     else:
         raw.extend(_collect_runs(data, list(range(len(data))), 1, ref, []))
@@ -447,15 +532,26 @@ def load_baseline() -> dict[str, int]:
     return out
 
 
-def load_allow() -> set[str]:
+def _allow_lines():
     if not ALLOW_FILE.exists():
-        return set()
-    out = set()
+        return []
+    out = []
     for line in ALLOW_FILE.read_text().splitlines():
         line = line.split("#", 1)[0].strip()
         if line:
-            out.add(line)
+            out.append(line)
     return out
+
+
+def load_allow() -> set[str]:
+    """Paths exempt from every check (plain lines of the allowlist)."""
+    return {l for l in _allow_lines() if not l.startswith("addr:")}
+
+
+def load_allow_addr() -> set[str]:
+    """``addr: <path>`` lines: pointer/jump-table (address-only) runs in that
+    file are accepted under --strict; retail data runs still fail."""
+    return {l[5:].strip() for l in _allow_lines() if l.startswith("addr:")}
 
 
 def write_signatures(exe: bytes) -> int:
@@ -523,6 +619,7 @@ def main(argv=None) -> int:
         return _ref[0]
 
     allow = load_allow()
+    allow_addr = load_allow_addr()
     baseline = load_baseline()
     mode_key = hashlib.sha1(json.dumps([GUARD_VERSION, WIN, MIN_DISTINCT, PEIMG_STRIDE,
                                         SIG_FILE.read_bytes().hex() if SIG_FILE.exists() else "",
@@ -544,6 +641,8 @@ def main(argv=None) -> int:
             hits = [list(h) for h in scan_bytes(path, load(), get_ref(), set())]
             cache[sha] = hits
         for a, b, nb, where, cls in hits:
+            if cls == "address-table" and path in allow_addr:
+                continue
             report.append({"file": path, "from": a, "to": b, "bytes": nb,
                            "match": where, "class": cls})
     try:

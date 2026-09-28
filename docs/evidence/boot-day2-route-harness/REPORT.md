@@ -1,5 +1,8 @@
 # End-to-end boot -> Day-2 route harness (control-flow / story-state traversal)
 
+> Screenshots named in this file are game frames. They are not committed; they are
+> kept locally under `build/evidence-screenshots/boot-day2-route-harness/screenshots/` (git-ignored).
+
 **Current status (2026-09-12):** the fixed cold-boot route wins the
 rehearsal encounter and the first sewer battle. The52,000frame /45milestone
 regression uses961fixed pad pairs and passes134.33s. It ends in m0027i

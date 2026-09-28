@@ -1,8 +1,9 @@
 # Provenance and notice — khasinski/parasite-eve-decomp (vendored)
 
-This directory is a verbatim, unmodified copy of the upstream repository tree
-(the `.git` directory is the only thing not copied). No file in it has been
-edited or stripped. This PROVENANCE.md is the only file added here.
+This directory is a verbatim copy of the upstream repository tree (the `.git`
+directory is the only thing not copied), with the retail-data strip listed
+under "Local modifications" below. This PROVENANCE.md is the only file added
+here.
 
 | Field | Value |
 |---|---|
@@ -62,3 +63,21 @@ this repository is public, the owner confirmed: "push it publicly anyway".
   per-batch evidence is `docs/evidence/vendor-khasinski-2026-09-28/REPORT.md`.
 * Parasite Eve is (c) Square Enix. No game data, SDK files or compiler binaries
   are in this directory (upstream is source-only; audited 2026-09-28: 0 binary files).
+
+## Local modifications (2026-09-28, lane headclean)
+
+This repository commits no bytes from the retail disc (CLAUDE.md hard rule 3;
+`tools/analysis/retail_data_guard.py`). Three upstream files embedded retail
+data tables as C initializers. Only those initializers were removed; each was
+replaced by an `extern` declaration and a `headclean 2026-09-28` comment
+saying that the bytes come from the split of the user's own disc. The rest of
+each file is unchanged.
+
+| File | Removed initializer | Retail location |
+|---|---|---|
+| `src/main/psyq/libcd/bios.c` | `g_CdCommandAckOnly`, `g_CdCommandClearsReady`, `g_CdCommandUpdatesStatus`, `g_CdCommandParamCount` (`u32[32]` each), `g_CdBiosHardwareState` (`.data` pointer block) | EXE `0x8009B07C`..`0x8009B27C`, `0x8009B294` |
+| `src/main/psyq/libgte/St_DmaHandlerTemplates.c` | `St_DmaCompleteCallback[6]`, `St_DmaPatchedCallback[6]` (the mnemonics stay as a comment) | EXE `0x8007A1E0`, `0x8007A1F8` |
+| `src/overlays/fx_field/fx_field_data.c` | `D_8018FC80[]`, `D_8018FCEC`, `D_8018FCF0`, `D_8018FCF4[]` | fx_field overlay `.text` data in PE.IMG |
+
+These files are not compiled by this repository's build. Imported functions
+in `src/` are unaffected.
