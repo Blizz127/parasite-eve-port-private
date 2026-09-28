@@ -892,7 +892,7 @@ void func_80050C50(int32_t value);
 void func_8004FDE8(pe_addr_t list);
 int func_80015AF0(pe_addr_t args);
 extern void func_8001F4D4(pe_addr_t actor);
-extern int32_t func_8001F814(pe_addr_t actor);
+extern short func_8001F814(pe_addr_t actor);   /* src/func_8001F814.c returns short (retail sign-extends $v0) */
 extern int func_800305C8(pe_addr_t pe_a0, pe_addr_t pe_a1);
 extern int func_8006DDCC(int a0, int a1, short a2, short a3, short a4);
 extern void func_80051770(int32_t ability);

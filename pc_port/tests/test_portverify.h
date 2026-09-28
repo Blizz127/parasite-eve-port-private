@@ -247,6 +247,32 @@ static void test_PV_52F70_signed_cap(void)
     PASS();
 }
 
+static void test_PV_1F814_null_actor_latch(void)
+{
+    TEST("PV_1F814_null_actor_latch");
+    /* src/func_8001F814.c (retail 0x8001F814): no null test on D_8009D254
+     * or D_8009D278.  A zero Aya pointer reads her command byte (+0x0E)
+     * and frame byte (+0x0F) from KUSEG low RAM and latches them.  The old
+     * hand port returned 0 before the latch (and on a zero actor).
+     * Round 7: hand port retired for the generated TU.  The 0x12000 state
+     * bit makes the leaf return right after the latch. */
+    ResetTestState();
+    PE_Decomp_ResetBoundaries();
+    PE_StoreU32(0x8009D254u, 0u);
+    PE_StoreU32(0x8009D278u, 0x80160000u);
+    PE_StoreU32(0x8016004Cu, 0x2000u);
+    PE_StoreU8(0x8000000Eu, 7u);
+    PE_StoreU8(0x8000000Fu, 3u);
+    PE_StoreU16(0x8009D298u, 0u);
+    (void)func_8001F814(0u);
+    ASSERT(PE_LoadU8(0x8009D29Au) == 7u && PE_LoadU8(0x8009D29Bu) == 3u,
+           "command/frame latched from low RAM");
+    ASSERT(PE_LoadU16(0x8009D298u) == 1u && PE_LoadU32(0x8009D29Cu) == (3u << 16),
+           "kind 7: D_8009D298 = 1, D_8009D29C = frame << 16");
+    ASSERT(PE_Decomp_BoundaryCount() == 0, "no boundary");
+    PASS();
+}
+
 static void test_PV_67A78_null_header_low_ram(void)
 {
     TEST("PV_67A78_null_header_low_ram");
@@ -380,6 +406,7 @@ static void test_PV_all(void)
     test_PV_48918_item_window_constructor();
     test_PV_777C0_immediate_moveimage();
     test_PV_775E8_immediate_loadimage();
+    test_PV_1F814_null_actor_latch();
     test_PV_67A78_null_header_low_ram();
     test_PV_52F70_signed_cap();
     test_PV_ram_mirror();

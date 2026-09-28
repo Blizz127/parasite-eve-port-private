@@ -35,65 +35,7 @@ unsigned int func_80071A54(void)
 
 /* func_800305C8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800305C8_port.c (src/func_800305C8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-int32_t func_8001F814(pe_addr_t actor)
-{
-    pe_addr_t aya;
-    pe_addr_t rec;
-    uint8_t kind;
-    uint8_t lo;
-    uint32_t flags;
-    int32_t s0;
-    int32_t angle;
-    unsigned int hit_cmd;
-
-    s0 = 0;
-    aya = PE_LoadU32(GA_D_8009D254);
-    if (aya == 0u)
-        return 0;
-
-    kind = PE_LoadU8(aya + 0x0Eu);
-    if (kind >= 6u && kind <= 15u) {
-        lo = PE_LoadU8(aya + 0x0Fu);
-        PE_StoreU8(GA_D_8009D29A, kind);
-        PE_StoreU16(GA_D_8009D298, 1u);
-        PE_StoreU8(GA_D_8009D29B, lo);
-        if (kind == 7u || kind == 9u || kind == 11u)
-            PE_StoreU32(GA_D_8009D29C, (uint32_t)lo << 16);
-        else
-            PE_StoreU32(GA_D_8009D29C, PE_LoadU32(aya + 0x14u));
-    }
-
-    rec = PE_LoadU32(GA_D_8009D278);
-    flags = (rec != 0u) ? PE_LoadU32(rec + 0x4Cu) : 0u;
-    if ((flags & 0x00012000u) != 0u || actor == 0u)
-        return 0;
-    s0 = func_800305C8(actor, aya);
-    angle = (int32_t)(int16_t)s0;
-    if (angle < 512)
-        hit_cmd = 0u;
-    else if (angle < 1536)
-        hit_cmd = 2u;
-    else if (angle < 2560)
-        hit_cmd = 1u;
-    else if (angle < 3584)
-        hit_cmd = 3u;
-    else
-        hit_cmd = 0u;
-    func_8001A680_command_cut(aya, hit_cmd);
-    aya = PE_LoadU32(GA_D_8009D254);
-    if (aya != 0u) {
-        func_8006DE80(0x46A, 0,
-                      (int)(int16_t)PE_LoadU16(aya + 0x2Au),
-                      (int)(int16_t)PE_LoadU16(aya + 0x2Eu),
-                      (int)(int16_t)PE_LoadU16(aya + 0x32u));
-        flags = PE_LoadU32(aya + 0x98u);
-        if (flags & 0x100u) {
-            PE_StoreU32(aya + 0x98u, flags & ~0x100u);
-            PE_StoreU16(GA_D_8009D298, 2u);
-        }
-    }
-    return (int32_t)(int16_t)s0;
-}
+/* func_8001F814: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8001F814_port.c (src/func_8001F814.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 7). */
 
 void func_8001F4D4(pe_addr_t actor)
 {

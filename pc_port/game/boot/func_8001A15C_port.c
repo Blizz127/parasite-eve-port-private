@@ -19,53 +19,7 @@
 
 #define GA_D_8009A6EC 0x8009A6ECu
 
-int32_t func_80079FB4(int32_t a0, int32_t a1)
-{
-    int sign_y;
-    int sign_x;
-    int32_t angle;
-    uint32_t idx;
-    int32_t quot;
-    int32_t denom;
-
-    sign_y = 0;
-    sign_x = 0;
-    if (a1 < 0) {
-        sign_y = 1;
-        a1 = (int32_t)(0u - (uint32_t)a1);
-    }
-    if (a0 < 0) {
-        sign_x = 1;
-        a0 = (int32_t)(0u - (uint32_t)a0);
-    }
-    if (a1 == 0 && a0 == 0)
-        return 0;
-
-    if (a0 < a1) {
-        if ((a0 & 0x7FE00000) != 0) {
-            denom = a1 >> 10;
-            quot = (denom != 0) ? (a0 / denom) : 0;
-        } else {
-            quot = (a1 != 0) ? ((int32_t)((uint32_t)a0 << 10) / a1) : 0;
-        }
-        idx = (uint32_t)quot << 1;
-        angle = (int32_t)(int16_t)PE_LoadU16(GA_D_8009A6EC + idx);
-    } else {
-        if ((a1 & 0x7FE00000) != 0) {
-            denom = a0 >> 10;
-            quot = (denom != 0) ? (a1 / denom) : 0;
-        } else {
-            quot = (a0 != 0) ? ((int32_t)((uint32_t)a1 << 10) / a0) : 0;
-        }
-        idx = (uint32_t)quot << 1;
-        angle = 1024 - (int32_t)(int16_t)PE_LoadU16(GA_D_8009A6EC + idx);
-    }
-    if (sign_y != 0)
-        angle = 2048 - angle;
-    if (sign_x != 0)
-        angle = -angle;
-    return angle;
-}
+/* func_80079FB4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80079FB4_port.c (src/func_80079FB4.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 7). */
 
 /* func_8001A15C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8001A15C_port.c (src/func_8001A15C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 

@@ -195,3 +195,36 @@ grep ^DIVERGE build/portverify/sweep.txt
 - The harness masks the `decomp_hand` guest scratch windows 0x801FF500–0x801FFD7F.
 - Suite `Results: 1569 run, 1569 passed, 0 failed, 0 skipped`; coverage
   `matched=1959 from_decomp=849 hand=1083 stub=27 absent=0`.
+
+## Round 7 (2026-09-28, lane port2)
+
+Sweep: `PORTVERIFY_WORK=$PWD/build/lanes/port/pv tools/analysis/portverify/run.sh 192`
+over 176 conflicts -> 37 EQUIV, 65 ABORTDIFF, 34 DIVERGE (38 TUs do not compile
+renamed; 2 link-excluded).
+
+- **func_8001F814, a retail bug in the hand port (newly matched leaf).**
+  The hand port returned 0 when D_8009D254 (Aya) was 0, when D_8009D278 was 0,
+  and when the actor was 0.  Retail (src/func_8001F814.c) tests none of them.
+  A zero Aya pointer reads her command/frame bytes (+0x0E/+0x0F) from KUSEG low
+  RAM and latches them into D_8009D29A/9B/98/9C.  Sweep: `ret decomp=2048
+  hand=0`.  Hand port retired.  The pc_port header now returns `short`, as the
+  leaf does, so the verbatim TU compiles.  Regression PV_1F814_null_actor_latch.
+- Retired as EQUIV with no glue, boundary or return-type flags: func_80079FB4.
+  func_800375E0 and func_80075B4C are EQUIV but stay hand ports.  Their header
+  prototypes are wider than the leaf (short / pointer parameters), and E20
+  deliberately refuses narrowing adapters.
+- New DIVERGE, triaged as known host-model classes: func_80073C94/CC4/CF4/
+  D24/D58 (libetc ResetCallback/InterruptCallback/VSyncCallback slots owned by
+  pe_libetc.c), func_800405A4 / func_800409B4 (memcard SDK model, pe_libcard.c,
+  generated side has boundaries), func_8003AF14 / func_8003B708 (generated side
+  hits the func_8003B97C GTE-wrapper boundary).
+- ABORTDIFF with only the hand side aborting: func_800850F4 (SPU DMA hardware
+  model, kept) and func_800C3098 (generated side has a boundary, kept).
+
+Absent -> real (round 7, pc_port/game/decomp_hand/port7_port.c).  Each leaf is
+checked against the retail EXE by pc_port/tools/pe_port7_oracle.py in the
+pe_battle_hud_oracle MIPS interpreter, with synthetic state; test
+P7_retail_hand_adapters.  Leaves: func_80068710, 80083644, 80084C4C, 8001CBA0,
+8001CE88, 8008A068, 80081E70 (off-hardware paths only), 8001D170, 800DE7A8
+(modes 0/1/3), 80058E44, 80058FEC, 80054F58, 80088344, 80048254 (window paths;
+the func_8004CC50 message id is not observable in the hashed ranges).
