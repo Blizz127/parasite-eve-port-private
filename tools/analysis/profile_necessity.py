@@ -58,6 +58,16 @@ DEFAULT_CACHE = ROOT / "build" / "profile_necessity_cache.json"
 def _exact(src: Path, vram: int, size: int, flags: list[str], env: dict[str, str],
            cache: dict, cache_key: str, refresh: bool) -> tuple[bool, list[str]]:
     """Return (exact, detail) for one compile/link/compare of a leaf."""
+    # Key on everything that changes the bytes: source, flags, environment and
+    # the vendored maspsx (a profile fixed under the same name, or a new knob,
+    # must not reuse a stale result).
+    digest = hashlib.sha1()
+    digest.update(Path(src).read_bytes())
+    digest.update(json.dumps([flags, sorted(env.items())]).encode())
+    maspsx = ROOT / "tools" / "era" / "maspsx" / "maspsx" / "__init__.py"
+    if maspsx.is_file():
+        digest.update(maspsx.read_bytes())
+    cache_key = f"{cache_key}|{digest.hexdigest()}"
     if not refresh and cache_key in cache:
         return cache[cache_key]["exact"], cache[cache_key]["out"]
     child = os.environ.copy()

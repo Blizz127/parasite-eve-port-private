@@ -126,7 +126,7 @@ segments:
       - [0x63AC, c, func_80015BAC]
       # lane1: func_80015C7C VRAM 0x80015C7C size 0x130.
       - [0x647C, c, func_80015C7C]
-      - [0x65AC, asm]
+      - [0x65AC, c, func_80015DAC]
       # task script cmd dispatch
       - [0x7110, c, func_80016910]
       - [0x75F8, c, func_80016DF8]
@@ -637,7 +637,7 @@ segments:
       - [0x166E8, c, func_80025EE8]
       - [0x16E00, c, func_80026600]
       - [0x17024, c, func_80026824]
-      - [0x174F0, asm]
+      - [0x174F0, c, func_80026CF0]
       - [0x177D0, c, func_80026FD0]
       # battle target highlight flash
       - [0x177F8, c, func_80026FF8]
@@ -673,11 +673,11 @@ segments:
       - [0x1B298, c, func_8002AA98]
       # lane1: func_8002B0E8 VRAM 0x8002B0E8 size 0x1B4.
       - [0x1B8E8, c, func_8002B0E8]
-      - [0x1BA9C, asm]
+      - [0x1BA9C, c, func_8002B29C]
       - [0x1C14C, c, func_8002B94C]
       - [0x1C490, c, func_8002BC90]
       - [0x1D9F0, c, func_8002D1F0]
-      - [0x1E458, asm]
+      - [0x1E458, c, func_8002DC58]
       # func_8002F0B0 — battle death step (3-state D_8009CE74 machine over the D_8009D20C actor list). era -O2 -G8 with
       # D_8009D20C/D_8009D254 absolute. LEVERS: 'info == 0' arm first; one volatile-qualified read of the +0x98 flag word
       # after the |= 0x1000 store (retail reloads it).
@@ -739,7 +739,7 @@ segments:
       # era -O2 -G0. Mid-20210 carve: prefix 0xC30, C 0xA0, resume 20EE0.s.
       - [0x20E40, c, func_80030640]
       - [0x20EE0, c, func_800306E0]
-      - [0x21094, asm]
+      - [0x21094, c, func_80030894]
       # Battle status panel mode dispatch (switch jtbl_80010E4C).
       - [0x21CE4, c, func_800314E4]
       - [0x21F60, c, func_80031760]
@@ -2275,6 +2275,7 @@ segments:
       - [0x573D8, c, func_80066BD8]
       - [0x5747C, c, func_80066C7C]
       - [0x574E8, asm]
+      - [0x57760, c, func_80066F60]
       - [0x579C8, c, func_800671C8]
       - [0x57A94, asm]
       - [0x57E78, c, func_80067678]
@@ -2974,7 +2975,8 @@ segments:
       # Phase 5EF: write-only opaque 32-bit setter.
       # BCD MSF -> LBA: ((m*60+s)*75+f)-150, nibble decode per byte
       - [0x6B234, c, func_8007AA34]
-      - [0x6B2B4, asm]
+      - [0x6B2B4, c, func_8007AAB4]
+      - [0x6B810, asm]
       - [0x6C164, c, func_8007B964]
       # pin p=$3; non-volatile asm() re-opaque after p[2]=0 forces the reload; and '{ unsigned char *r =
       - [0x6C1EC, c, func_8007B9EC]
@@ -3311,7 +3313,7 @@ segments:
       # 184w DsSearchFile. SIZE CORRECTION: 0x2E0, not the 0x2C4 I used in the earlier park (184 words; 
       - [0x71C14, c, func_80081414]
       - [0x71EF4, c, func_800816F4]
-      - [0x71F14, asm]
+      - [0x71F14, c, func_80081714]
       # 0x2C-stride keyed table search with a strcmp-style callback. Writing the loop with explicit `got
       - [0x721D8, c, func_800819D8]
       - [0x7227C, c, func_80081A7C]
@@ -4611,7 +4613,7 @@ segments:
       - [0xC6200, asm]
       # FieldEng_*Effect template sibling (case 1 field updates + switch-break; case 2 buf/vec fill, fun
       - [0xC64E4, c, func_800D5CE4]
-      - [0xC66B4, asm]
+      - [0xC66B4, c, func_800D5EB4]
       # Template sibling with two signed /24 magic divisions and a 4-byte unaligned blk copy from D_800C
       - [0xC6A9C, c, func_800D629C]
       - [0xC6D14, asm]

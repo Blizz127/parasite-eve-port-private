@@ -2284,6 +2284,70 @@
         "MASPSX_HOIST_BLOCK_LI": "D_8009CDDC",
         "MASPSX_HOIST_BLOCK_LI_TAIL1": "D_800B0130"
       }
+    },
+    "era_o2_g8_func_8002B29C": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_THREE_WORD_SYMBOL_STORE": "1",
+        "MASPSX_DISPATCH_FOLD": "jtbl_80010910",
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009D254,D_8009D20C,D_8009CDDC"
+      }
+    },
+    "era_o2_g8_func_80015DAC": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_THREE_WORD_SYMBOL_STORE": "1",
+        "MASPSX_DISPATCH_FOLD": "jtbl_800101B0",
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009D2F0,D_8009D254,D_8009D20C,D_800B0E64,D_800B0CEA,D_800B0DBE,D_800B0DB8,D_800B0DB9,D_800B0DFC,D_800B0DCE"
+      }
+    },
+    "era_o2_g8_hud_colour_block_tail1_0158": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_THREE_WORD_SYMBOL_STORE": "1",
+        "MASPSX_HOIST_BLOCK_LI": "D_8009CDDC",
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009D254,D_8009D230,D_8009D250,D_8009CDDC,D_8009D1F4,D_8009D1F0,D_8009D1A0,D_8009D290,D_8009D294,D_8009D1AC,D_8009D20C,D_8009D235,D_8009D298,D_800B0CE6,D_8009D29A,D_8009D29C,D_8009D2E8,D_8009D1CE",
+        "MASPSX_HOIST_BLOCK_LI_TAIL1": "D_800B0158"
+      }
+    },
+    "era_o2_g0_symbol_load_dest_temp_fill_call_epilogue": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0"
+      ],
+      "environment": {
+        "MASPSX_SYMBOL_LOAD_DEST_TEMP": "1",
+        "MASPSX_FILL_CALL_DELAY_SLOT": "1",
+        "MASPSX_FILL_EPILOGUE_DELAY_SLOT": "1"
+      }
+    },
+    "era_o2_g0_dispatch_80011b8c_cc1_281_fill_call_delay_slot_symbol_load_dest_temp": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-mno-split-addresses"
+      ],
+      "environment": {
+        "ERA_CC1_VER": "2.8.1",
+        "MASPSX_THREE_WORD_SYMBOL_STORE": "1",
+        "MASPSX_DISPATCH_FOLD": "jtbl_80011B8C",
+        "MASPSX_FILL_CALL_DELAY_SLOT": "1",
+        "MASPSX_SYMBOL_LOAD_DEST_TEMP": "1"
+      }
     }
   },
   "assignments": {
@@ -3387,7 +3451,8 @@
       "func_80017018"
     ],
     "era_o2_g8_force_d8009d278_absolute": [
-      "func_80022D7C"
+      "func_80022D7C",
+      "func_80026CF0"
     ],
     "era_o2_g8_expand_div_force_d8009cddc_absolute": [
       "func_8003C818"
@@ -3633,6 +3698,21 @@
     ],
     "era_o2_g8_expand_div_hud_colour_block_tail1_d340": [
       "func_8001D340"
+    ],
+    "era_o2_g8_func_8002B29C": [
+      "func_8002B29C"
+    ],
+    "era_o2_g8_func_80015DAC": [
+      "func_80015DAC"
+    ],
+    "era_o2_g8_hud_colour_block_tail1_0158": [
+      "func_8002DC58"
+    ],
+    "era_o2_g0_symbol_load_dest_temp_fill_call_epilogue": [
+      "func_80081714"
+    ],
+    "era_o2_g0_dispatch_80011b8c_cc1_281_fill_call_delay_slot_symbol_load_dest_temp": [
+      "func_8007AAB4"
     ]
   }
 }
