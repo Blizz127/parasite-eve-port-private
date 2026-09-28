@@ -16,7 +16,7 @@ objective evidence: a byte-matched C path, a numeric comparison against the
 matched code and disc data, or an emulator/video diff. Anything not checked is
 marked **untested**.
 
-Last updated: 2026-09-28. **Open divergences: 24.**
+Last updated: 2026-09-28. **Open divergences: 27.**
 
 ## Structural (whole classes of code)
 
@@ -52,10 +52,13 @@ Last updated: 2026-09-28. **Open divergences: 24.**
 | 18 | Police-siren ambience after Carnegie Hall | owner report (unsure) | **Untested** — to be checked against the retail video first |
 | 19 | Frame pacing paces one host frame per emulated VBlank at 59.94 Hz | `host_window.c` | Believed faithful (240 Hz sequencer tick measured retail-exact); window-side timing **untested** on the owner's PC beyond his playtest |
 | 20 | Second Eve battle: the music's vocal/choir layer is missing (instrumental plays) | owner report on r2 | Under investigation (audio sweep): check against the retail video and the matched sound-driver C |
-| 21 | On death there is no Game Over screen: the game resets to the intro logo, and the music is left in a bad state | owner report on r2 | Open: the game-over path (script / overlay / state transition) is missing or stubbed |
+| 21 | On death there is no Game Over screen: the game resets to the intro logo, and the music is left in a bad state | owner report on r2 | Cause found: field op 0x31 runs a cut `func_80017BB4` that drops the Game Over/continue branch, and `func_8006A25C` keeps 3 of its stores (no audio stop/reset); full versions exist and are being wired in (day1) |
 | 22 | Battle tick `func_800299CC` is not a port of the matched unit: hand cuts drop `func_8003495C` (flag 0x300), the `D_8009D23C` script commands (`func_8006F6D4` ×2) and `func_80033430` | shadow audit vs `src/func_800299CC.c` | Switching to the matched C (port3) |
 | 23 | Battle mode 3 cut drops item-0x12 consume (`func_8005409C`), the rec+0x56/+0x66 countdowns and the per-enemy walk | shadow audit + day1 vs `src/func_800299CC.c:305-323` | Switching to the matched C |
 | 24 | `func_80024A3C` (Aya's action step) phases 4/6 deferred: effect teardown/spawn and Aya's reposition/facing/SFX 0x4B6 missing | shadow audit | Switching to the matched C |
+| 25 | Field op 0xED runs a cut of `func_80016910` that drops ~10 keys; key 0x8FC writes `D_8009CED4` directly instead of calling `func_800375D0` | shadow audit | Wiring the full version (day1) |
+| 26 | The field-VM dispatcher `func_80017018` is itself a hand port; 47 opcodes are re-implemented inline (34 have generated matched TUs, 12 have faithful ports) and an unlisted opcode stops the port | shadow audit | Switch to matched C in batches |
+| 27 | `func_8006FC18` (Pm_Stop) skips unknown destroy callbacks and always returns 0 instead of the callback's result | shadow audit | Open |
 
 ## Fixed (kept for the record)
 
