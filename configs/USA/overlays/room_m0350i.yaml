@@ -134,7 +134,7 @@ segments:
       - [0x9AD4, c, func_80198ABC]
       - [0x9D10, c, func_80198CF8]
       - [0xA160, c, func_80199148]
-      - [0xA2B8, asm]
+      - [0xA2B8, c, func_801992A0]
       - [0xA6D4, c, func_801996BC]
       - [0xA8A4, c, func_8019988C]
       - [0xAB24, c, func_80199B0C]

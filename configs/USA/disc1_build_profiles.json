@@ -3253,7 +3253,12 @@
       "func_8007FBF0",
       "func_80085918",
       "func_800800F4",
-      "func_8007E5C4"
+      "func_8007E5C4",
+      "func_800794C4",
+      "func_80079754",
+      "func_800799E4",
+      "func_80079C74",
+      "func_80079E14"
     ],
     "era_o2_g8_force_descriptor_absolute": [
       "func_80052E30",
@@ -3449,7 +3454,8 @@
       "func_80073BBC",
       "func_80082444",
       "func_8007F994",
-      "func_80085C44"
+      "func_80085C44",
+      "func_8007A214"
     ],
     "era_o2_g0_fill_call_delay_slot_fill_epilogue_delay_slot": [
       "func_8007C2A0",

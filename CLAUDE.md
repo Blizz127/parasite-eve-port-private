@@ -36,16 +36,16 @@ doing anything**.
 
 ## Current phase
 
-**2206 matching C leaves** (EXE; 61 of them flagged `inline GTE/asm` or inline-asm (`main`), counted separately) + **3328 overlay `c` spans** across 72
+**2241 matching C leaves** (EXE; 94 of them flagged `inline GTE/asm` or inline-asm (`main`), counted separately) + **3331 overlay `c` spans** across 72
 PE.IMG targets — exact count via
 `python3 tools/build/disc1_plan.py --check` (prints
-`2353 spans (2206 c, 145 asm, 2 rodata)`) or equivalently
+`2387 spans (2241 c, 144 asm, 2 rodata)`) or equivalently
 `grep -cE ',[[:space:]]*c,' configs/USA/disc1.yaml`; overlays via
 `cat configs/USA/overlays/*.yaml | grep -cE ',[[:space:]]*c,'` (hand-matched
 leaves plus masked-body ports of shared room bodies). This count is the
 authoritative number; re-derive it, do not trust prose here.
 
-**Newest (2026-09-28): 2206 EXE gate PASS** (batch 20: 24 more vendor GTE leaves split out one function per span; `plan=5e85814e722e…`, `yaml=e8e54e824fff…`, `VERIFY_SWEEP=PASS leaves=2206`). Prior: **2182 EXE gate PASS** (batch 19: 36 vendor-derived GTE bodies from khasinski, all flagged `inline GTE/asm`; 18 are Psy-Q libgte and are matching-build only, never pulled into pc_port; `plan=b062f8f958e3…`, `yaml=794331c51d15…`, `VERIFY_SWEEP=PASS leaves=2182`). Prior: **2146 EXE gate PASS** — every matchable EXE function is now C (batch 18: `func_8007CEAC` on maspsx K5 `MASPSX_NUMERIC_LOAD_ASPSX`, `func_80071A84` on the gcc-2.7.2-cdk cc1 + `MASPSX_CDK_SPLIT_DISPATCH`; `plan=bed6c1f65eb1…`, `yaml=311cc1587fe6…`, `VERIFY_SWEEP=PASS leaves=2146`). Prior: **2144 EXE gate PASS** (batch 17: `main` = `func_8001220C`, flagged inline-asm for the scratchpad stack handoff; vendor-derived `func_80014BA0`; `plan=be6eb4d4a58b…`, `yaml=5c951c8272d6…`, `VERIFY_SWEEP=PASS leaves=2144`). Prior: **2142 EXE gate PASS** (`plan=279a64bd8f24…`,
+**Newest (2026-09-28): 2241 EXE gate PASS** (batch 21: vendor re-survey, 35 EXE + 3 overlay bodies; `plan=8b67747d3c23…`, `yaml=38267c98259c…`, `VERIFY_SWEEP=PASS leaves=2241`; vendor import now exhausted). Prior: **2206 EXE gate PASS** (batch 20: 24 more vendor GTE leaves split out one function per span; `plan=5e85814e722e…`, `yaml=e8e54e824fff…`, `VERIFY_SWEEP=PASS leaves=2206`). Prior: **2182 EXE gate PASS** (batch 19: 36 vendor-derived GTE bodies from khasinski, all flagged `inline GTE/asm`; 18 are Psy-Q libgte and are matching-build only, never pulled into pc_port; `plan=b062f8f958e3…`, `yaml=794331c51d15…`, `VERIFY_SWEEP=PASS leaves=2182`). Prior: **2146 EXE gate PASS** — every matchable EXE function is now C (batch 18: `func_8007CEAC` on maspsx K5 `MASPSX_NUMERIC_LOAD_ASPSX`, `func_80071A84` on the gcc-2.7.2-cdk cc1 + `MASPSX_CDK_SPLIT_DISPATCH`; `plan=bed6c1f65eb1…`, `yaml=311cc1587fe6…`, `VERIFY_SWEEP=PASS leaves=2146`). Prior: **2144 EXE gate PASS** (batch 17: `main` = `func_8001220C`, flagged inline-asm for the scratchpad stack handoff; vendor-derived `func_80014BA0`; `plan=be6eb4d4a58b…`, `yaml=5c951c8272d6…`, `VERIFY_SWEEP=PASS leaves=2144`). Prior: **2142 EXE gate PASS** (`plan=279a64bd8f24…`,
 `yaml=cae71072082…`, retail SHA-1 `452fb033…` reproduced,
 `VERIFY_SWEEP=PASS leaves=2142`; maspsx patches 34/35, K3/K3b, K4 `MASPSX_HOIST_BLOCK_LI` (+`_TAIL1`), K6, 36–42 incl. `MASPSX_RELOAD_CSE_CONST`; fan-out batches 1–2 on top of 2042;
 `func_8001F814` is no longer NONMATCHING_C). `func_80031760` closed with the

@@ -817,7 +817,8 @@ segments:
       - [0x278A8, c, func_800370A8]
       # Phase 5FQ-370DC: packet setup/submit wrapper, era -O2 -G0.
       # Mid-278BC carve: prefix 0x20, C 0x64, resume 27940.s.
-      - [0x278BC, asm]
+      - [0x278BC, c, func_800370BC]
+      - [0x278CC, c, func_800370CC]
       - [0x278DC, c, func_800370DC]
       # Phase 5FR-37140: packet setup/submit twin, era -O2 -G0.
       - [0x27940, c, func_80037140]
@@ -2584,6 +2585,9 @@ segments:
       # byte-swap loop; i=0 hoisted above the guard + do/while (a `for` here would add a phantom 8-byte 
       - [0x62CF4, c, func_800724F4]
       - [0x62D30, asm]
+      - [0x62F14, c, func_80072714]
+      - [0x62F24, c, func_80072724]
+      - [0x62F34, asm]
       - [0x62FB4, c, func_800727B4]
       # jal/j/jalr slot macro split (maspsx patch 8, MASPSX_FILL_CALL_DELAY_SLOT)
       - [0x63150, c, func_80072950]
@@ -2957,11 +2961,27 @@ segments:
       - [0x69634, c, func_80078E34]
       - [0x69664, c, func_80078E64]
       - [0x69694, c, func_80078E94]
-      - [0x696B4, asm]
+      - [0x696B4, c, func_80078EB4]
+      - [0x696C4, c, func_80078EC4]
+      - [0x696D4, c, func_80078ED4]
+      - [0x696E4, c, func_80078EE4]
+      - [0x69704, c, func_80078F04]
+      - [0x69718, c, func_80078F18]
+      - [0x6972C, c, func_80078F2C]
+      - [0x69738, c, func_80078F38]
+      - [0x6974C, c, func_80078F4C]
+      - [0x69764, c, func_80078F64]
+      - [0x69778, c, func_80078F78]
+      - [0x6978C, c, func_80078F8C]
+      - [0x697A0, c, func_80078FA0]
+      - [0x697AC, c, func_80078FAC]
+      - [0x697B8, c, func_80078FB8]
       - [0x697C4, c, func_80078FC4]
       - [0x697E4, c, func_80078FE4]
       - [0x69804, c, func_80079004]
       - [0x6981C, asm]
+      - [0x69824, c, func_80079024]
+      - [0x69830, asm]
       - [0x69834, c, func_80079034]
       - [0x6985C, c, func_8007905C]
       - [0x69884, c, func_80079084]
@@ -2985,9 +3005,20 @@ segments:
       - [0x69B84, c, func_80079384]
       - [0x69C0C, asm]
       - [0x69C14, c, func_80079414]
-      - [0x69CC4, asm]
+      - [0x69CC4, c, func_800794C4]
+      - [0x69F50, asm]
+      - [0x69F54, c, func_80079754]
+      - [0x6A1E0, asm]
+      - [0x6A1E4, c, func_800799E4]
+      - [0x6A470, asm]
+      - [0x6A474, c, func_80079C74]
+      - [0x6A60C, asm]
+      - [0x6A614, c, func_80079E14]
+      - [0x6A7AC, asm]
       - [0x6A7B4, c, func_80079FB4]
       - [0x6A928, asm]
+      - [0x6AA14, c, func_8007A214]
+      - [0x6AA40, asm]
       # Phase 5BK: C leaf func_8007A324 — VRAM 0x8007A324, size 0x10.
       # Unsigned-byte global getter on D_8009AFC4; plain -O1 matches.
       - [0x6AA44, c, func_8007A244]
@@ -3170,7 +3201,8 @@ segments:
       - [0x6EA2C, asm]
       # global register $v1 poll then jr through *(int *)0xDFFC
       - [0x6EB70, c, func_8007E370]
-      - [0x6EBB4, asm]
+      - [0x6EBB4, c, func_8007E3B4]
+      - [0x6EBC4, asm]
       # word copy to 0xDF80; -O1 keeps the load-delay nop
       - [0x6ECE0, c, func_8007E4E0]
       - [0x6ED14, asm]
@@ -4626,13 +4658,13 @@ segments:
       - [0xBFBAC, c, func_800CF3AC]
       - [0xBFCB4, c, func_800CF4B4]
       - [0xBFDB0, c, func_800CF5B0]
-      - [0xBFE58, asm]
+      - [0xBFE58, c, func_800CF658]
       # OT primitive linker: allocates 8 bytes from D_8009CDD8 inside D_800B0E58[D_8009CDDC], calls func
       - [0xBFEF8, c, func_800CF6F8]
       - [0xC0044, asm]
       # matching C leaf
       - [0xC02A8, c, func_800CFAA8]
-      - [0xC037C, asm]
+      - [0xC037C, c, func_800CFB7C]
       # signed angle delta with sign flag; `register int d asm("$2") / ad asm("$3")` pins stop cc1 coale
       - [0xC04F4, c, func_800CFCF4]
       # lhu before volatile stack half
@@ -4665,7 +4697,7 @@ segments:
       - [0xC4E20, c, func_800D4620]
       # guarded handler dispatch f8C[0xC](a2..a5); &a0->fC computed before the if. TRUE SIZE 0x6C (band 
       - [0xC4E98, c, func_800D4698]
-      - [0xC4F04, asm]
+      - [0xC4F04, c, func_800D4704]
       - [0xC5050, c, func_800D4850]
       # six func_8006E498(D_800B0E20, magic) calls. NEW LEVER: declaring the repeatedly-read global as a
       - [0xC5060, c, func_800D4860]
@@ -4702,14 +4734,16 @@ segments:
       - [0xC8678, c, func_800D7E78]
       - [0xC87BC, c, func_800D7FBC]
       - [0xC8B88, asm]
+      - [0xC8E8C, c, func_800D868C]
       - [0xC9178, c, func_800D8978]
       - [0xC936C, c, func_800D8B6C]
       # FieldEng effect dispatcher template: `switch (a0) { case 1: <field updates>; if (T < K) break; r
       - [0xC9514, c, func_800D8D14]
       - [0xC9674, c, func_800D8E74]
-      - [0xC9A7C, asm]
+      - [0xC9A7C, c, func_800D927C]
       - [0xC9D54, c, func_800D9554]
-      - [0xC9EF4, asm]
+      - [0xC9EF4, c, func_800D96F4]
+      - [0xCA28C, asm]
       # FieldEng effect dispatcher template: `switch (a0) { case 1: <field updates>; if (T < K) break; r
       - [0xCA65C, c, func_800D9E5C]
       - [0xCA7D4, c, func_800D9FD4]
@@ -4724,10 +4758,10 @@ segments:
       # FieldEng effect dispatcher: case 1 updates fields with /64 rounding divisions and a 1000*T shift
       - [0xCB78C, c, func_800DAF8C]
       - [0xCB8D0, c, func_800DB0D0]
-      - [0xCBA5C, asm]
+      - [0xCBA5C, c, func_800DB25C]
       # unlocked by the switch-break lever (was 33 mismatches with return 0/return 1).
       - [0xCBDF4, c, func_800DB5F4]
-      - [0xCBEBC, asm]
+      - [0xCBEBC, c, func_800DB6BC]
       - [0xCC29C, c, func_800DBA9C]
       # effect-dispatcher template; `t = func_80077AA4(...) & 0xFFFF;` (masking at the assignment, not a
       - [0xCC4D8, c, func_800DBCD8]
