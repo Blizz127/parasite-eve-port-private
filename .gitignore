@@ -115,6 +115,12 @@ tools/era/maspsx/tests/*
 !tools/era/maspsx/tests/test_narrow_shifted_reg_load.py
 !tools/era/maspsx/tests/test_fill_jump_reg_store.py
 !tools/era/maspsx/tests/test_hoist_block_li_tail1.py
+!tools/era/maspsx/tests/test_ulw_load_delay_nop.py
+!tools/era/maspsx/tests/test_shift_count_const.py
+!tools/era/maspsx/tests/test_swap_s1_s2_save_pairs_rev.py
+!tools/era/maspsx/tests/test_symbol_pointer_load_li_after.py
+!tools/era/maspsx/tests/test_branch_steal_jump_slot.py
+!tools/era/maspsx/tests/test_fill_branch_tested_li_void.py
 build-port/
 pc_port/build/
 pc_port/build-san/

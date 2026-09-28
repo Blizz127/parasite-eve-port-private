@@ -2381,6 +2381,76 @@
       "environment": {
         "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_800B0DD8,D_800942E0"
       }
+    },
+    "era_o2_g8_dispatch_80010e6c_force_d8009cddc_d8009d1f4_d8009169d_absolute": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_THREE_WORD_SYMBOL_STORE": "1",
+        "MASPSX_DISPATCH_FOLD": "jtbl_80010E6C",
+        "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009CDDC,D_8009D1F4,D_8009169D"
+      }
+    },
+    "era_o2_g0_cc1_281_fill_call_delay_slot_reload_cse_const_fill_branch_tested_li_void": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-mno-split-addresses"
+      ],
+      "environment": {
+        "ERA_CC1_VER": "2.8.1",
+        "MASPSX_FILL_CALL_DELAY_SLOT": "1",
+        "MASPSX_RELOAD_CSE_CONST": "1",
+        "MASPSX_FILL_BRANCH_TESTED_LI_VOID": "1"
+      }
+    },
+    "era_o2_g0_dispatch_80011c9c_cc1_281_three_word_symbol_store_symbol_load_dest_temp_ulw_load_delay_nop_shift_count_const": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-mno-split-addresses"
+      ],
+      "environment": {
+        "ERA_CC1_VER": "2.8.1",
+        "MASPSX_DISPATCH_FOLD": "jtbl_80011C9C",
+        "MASPSX_THREE_WORD_SYMBOL_STORE": "1",
+        "MASPSX_SYMBOL_LOAD_DEST_TEMP": "1",
+        "MASPSX_ULW_LOAD_DELAY_NOP": "1",
+        "MASPSX_SHIFT_COUNT_CONST": "1"
+      }
+    },
+    "era_o2_g0_cc1_281_swap_s1_s2_save_pairs_rev_symbol_pointer_load_li_after": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-mno-split-addresses"
+      ],
+      "environment": {
+        "ERA_CC1_VER": "2.8.1",
+        "MASPSX_SWAP_S1_S2_SAVE_PAIRS_REV": "1",
+        "MASPSX_SYMBOL_POINTER_LOAD_LI_AFTER": "1"
+      }
+    },
+    "era_o2_g0_cc1_281_return_via_epilogue_jump_shift_count_const_reload_cse_const_branch_steal_jump_slot": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0",
+        "-mno-split-addresses"
+      ],
+      "environment": {
+        "ERA_CC1_VER": "2.8.1",
+        "MASPSX_RETURN_VIA_EPILOGUE_JUMP": "1",
+        "MASPSX_SHIFT_COUNT_CONST": "1",
+        "MASPSX_RELOAD_CSE_CONST": "1",
+        "MASPSX_BRANCH_STEAL_JUMP_SLOT": "1"
+      }
     }
   },
   "assignments": {
@@ -3093,7 +3163,8 @@
       "func_8005FCAC",
       "func_8001CBA0",
       "func_80061044",
-      "func_8001CE88"
+      "func_8001CE88",
+      "func_8001B5FC"
     ],
     "era_o2_g0_dispatch_80010080": [
       "func_80012E7C"
@@ -3470,7 +3541,8 @@
     "era_o2_g8_force_d800c0e20_d800c0e22_absolute": [
       "func_80058030",
       "func_8004A0C8",
-      "func_80058FEC"
+      "func_80058FEC",
+      "func_8005A318"
     ],
     "era_o2_g8_dispatch_800112dc_force_d800c0e0c_absolute": [
       "func_8005D2B4"
@@ -3756,6 +3828,25 @@
     ],
     "era_o2_g8_force_d800b0dd8_d800942e0_absolute": [
       "func_8006B4F8"
+    ],
+    "era_o2_g8_dispatch_80010e6c_force_d8009cddc_d8009d1f4_d8009169d_absolute": [
+      "func_80037870"
+    ],
+    "era_o2_g0_cc1_281_fill_call_delay_slot_reload_cse_const_fill_branch_tested_li_void": [
+      "func_8008486C"
+    ],
+    "era_o2_g0_dispatch_80011c9c_cc1_281_three_word_symbol_store_symbol_load_dest_temp_ulw_load_delay_nop_shift_count_const": [
+      "func_8007F0C8"
+    ],
+    "era_o2_g0_cc1_281_swap_s1_s2_save_pairs_rev_symbol_pointer_load_li_after": [
+      "func_80076664",
+      "func_800768A0"
+    ],
+    "era_o2_g0_cc1_281_return_via_epilogue_jump_shift_count_const_reload_cse_const_branch_steal_jump_slot": [
+      "func_80083944"
+    ],
+    "era_o2_g0_cc1_281_symbol_load_dest_temp": [
+      "func_800755F0"
     ]
   }
 }

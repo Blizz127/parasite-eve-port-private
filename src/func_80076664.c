@@ -1,0 +1,71 @@
+typedef struct {
+    short x, y;
+    short w, h;
+} Rect;
+
+extern short D_80095750;
+extern short D_80095752;
+extern unsigned int *D_80095850;
+extern unsigned int *D_80095854;
+extern unsigned int *D_80095858;
+extern unsigned int *D_8009585C;
+extern unsigned int *D_80095860;
+
+extern void func_800773D0(void);
+extern int func_80077404(void);
+
+int func_80076664(Rect *r0, unsigned int *p0)
+{
+    register Rect *r asm("$17") = r0;
+    register unsigned int *p asm("$18") = p0;
+    int size;
+    int n;
+    int full;
+    unsigned int c;
+
+    full = 0;
+    func_800773D0();
+    r->w = r->w < 0 ? 0 : (D_80095750 < r->w ? D_80095750 : r->w);
+    r->h = r->h < 0 ? 0 : (D_80095752 < r->h ? D_80095752 : r->h);
+    { int words; { register int t asm("$3") = r->w * r->h + 1; words = t / 2; } size = words >> 4; if (words <= 0) return -1; { int t = size; size = words - (t << 4); n = t; } }
+    {
+        unsigned int st = *D_80095854;
+        unsigned int m;
+        asm("" : "=r"(m), "=r"(st) : "0"(0x4000000), "1"(st));
+        if (!(st & m)) {
+            do {
+                if (func_80077404()) {
+                    return -1;
+                }
+            } while (!(*D_80095854 & 0x4000000));
+        }
+    }
+    c = 0xA0000000;
+    asm("" : "=r"(c) : "0"(c));
+    *D_80095854 = 0x4000000;
+    *D_80095850 = 0x1000000;
+    {
+        unsigned int *d = D_80095850;
+        if (full) c = 0xB0000000;
+        *d = c;
+    }
+    *D_80095850 = *(unsigned int *)&r->x;
+    *D_80095850 = *(unsigned int *)&r->w;
+    {
+        int k = -1;
+        asm("" : "=r"(k) : "0"(k));
+        size--;
+        if (size != k) {
+            do {
+                *D_80095850 = *p++;
+            } while (--size != -1);
+        }
+    }
+    if (n) {
+        *D_80095854 = 0x4000002;
+        *D_80095858 = (unsigned int)p;
+        *D_8009585C = (n << 16) | 0x10;
+        *D_80095860 = 0x1000201;
+    }
+    return 0;
+}

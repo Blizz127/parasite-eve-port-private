@@ -539,6 +539,7 @@ segments:
       # lane1: func_8001ACE0 VRAM 0x8001ACE0 size 0x160.
       - [0xB4E0, c, func_8001ACE0]
       - [0xB640, asm]
+      - [0xBDFC, c, func_8001B5FC]
       # LINK_EXACT on swept stable source
       - [0xC964, c, func_8001C164]
       # gp-relative G8
@@ -842,7 +843,7 @@ segments:
       - [0x27DD0, c, func_800375D0]
       - [0x27DE0, c, func_800375E0]
       - [0x28064, c, func_80037864]
-      - [0x28070, asm]
+      - [0x28070, c, func_80037870]
       # func_80038910 — seed a fixed gp-relative record (h at 0x148/0x14C/0x150,
       # bytes at 0x144/0x154/0x158/0x15C) from 6 args, last two on the stack.
       # era -O2 -G8 (all destinations gp-relative), LINK_EXACT.
@@ -1875,7 +1876,7 @@ segments:
       - [0x4A708, c, func_80059F08]
       # item/Inv_SelectionState. LINK_EXACT first try with the compounded recipe: two list-selection blo
       - [0x4A7D0, c, func_80059FD0]
-      - [0x4AB18, asm]
+      - [0x4AB18, c, func_8005A318]
       # the other comparator; LEVERS: read D_8009D0B4 ONCE into a local `f` (used for the compare and th
       - [0x4B7FC, c, func_8005AFFC]
       # sort comparator; a real `switch` for the 3 field-offset cases, and `goto one;` to put the `retur
@@ -2739,7 +2740,7 @@ segments:
       # func_800755BC — 0x5C-byte record reset from the D_8009575C template
       # (wrapper returning a0). era -O2 -G0 + patch 3; LINK_EXACT.
       - [0x65DBC, c, func_800755BC]
-      - [0x65DF0, asm]
+      - [0x65DF0, c, func_800755F0]
       # func_80075AE8 — 0x14-byte record reset from the D_800957B8 template
       # (wrapper returning a0). era -O2 -G0 + patch 3; LINK_EXACT.
       - [0x662E8, c, func_80075AE8]
@@ -2780,7 +2781,8 @@ segments:
       # restored after lane merge (row belongs to another agent)
       - [0x66B54, c, func_80076354]
       - [0x66C34, c, func_80076434]
-      - [0x66E64, asm]
+      - [0x66E64, c, func_80076664]
+      - [0x670A0, c, func_800768A0]
       # func_80076B20 — write *D_80095854 = a0 then index D_800A3348 by
       # a0 >> 24; era -O2 -G0 + maspsx patch 4
       # (MASPSX_SYMBOL_LOAD_DEST_TEMP=1) for the jr-delay-slot indexed store
@@ -3132,7 +3134,7 @@ segments:
       # Phase 5EF: direct func_8007FB04 forwarding wrapper.
       - [0x6F664, c, func_8007EE64]
       - [0x6F684, c, func_8007EE84]
-      - [0x6F8C8, asm]
+      - [0x6F8C8, c, func_8007F0C8]
       # dest-temp load plus epilogue delay fill
       - [0x6FC18, c, func_8007F418]
       # duplicate the whole body in BOTH arms (cc1 cross-jumps the tail) and pin the outgoing arg 'regis
@@ -3412,7 +3414,7 @@ segments:
       - [0x73FC8, c, func_800837C8]
       # switch(a0[0x46]) 2/3/4 with a nested a0[0x48] gate in case 4
       - [0x7409C, c, func_8008389C]
-      - [0x74144, asm]
+      - [0x74144, c, func_80083944]
       # D_8009B740(a0) guard then handler/arg install; function symbols taken as data addresses
       - [0x743B8, c, func_80083BB8]
       # Volume campaign: callback func_80083C20, exact-start address stored by
@@ -3463,7 +3465,7 @@ segments:
       # Former 74FB0 asm prefix: 0x814, C 0x20, resume 0xA0.
       # default O2
       - [0x74FB0, c, func_800847B0]
-      - [0x7506C, asm]
+      - [0x7506C, c, func_8008486C]
       # Probe: two-entry D_800A5B70 address-to-slot mapper.
       - [0x752E8, c, func_80084AE8]
       # Probe: conditional D_800A5B70 address selector.

@@ -1382,6 +1382,47 @@ class MaspsxProcessor:
             swap_s2_s1_save_pairs
             or os.environ.get("MASPSX_SWAP_S2_S1_SAVE_PAIRS") == "1"
         )
+        # LOCAL PATCH 36 (K-ULW): cc1 follows `ulw $r` with a `#nop` load-delay
+        # comment that maspsx drops; ASPSX kept a real nop after lwl/lwr.
+        # Opt-in: an `ulw` line immediately followed by `#nop` gets a real nop.
+        self.ulw_load_delay_nop = os.environ.get("MASPSX_ULW_LOAD_DELAY_NOP") == "1"
+        # LOCAL PATCH 37 (K-SHIFT): cc1 2.8.1 reload_cse substitutes a hard
+        # reg known to hold a constant into a shift count (`sll $d,$s,$t`,
+        # assembled as sllv). PSY-Q cc1 never does. Opt-in: fold the count
+        # back to the `li $t,K` immediate (0..31) seen earlier in the block.
+        self.shift_count_const = os.environ.get("MASPSX_SHIFT_COUNT_CONST") == "1"
+        # LOCAL PATCH 40 (K-RCSE): the same reload_cse artifact on a copy or
+        # an add -- `move $d,$s` / `addu $d,$s,$t` where a source register
+        # holds a known `li` constant -> `li $d,K` / `addu $d,$s,K`.
+        self.move_const_li = os.environ.get("MASPSX_RELOAD_CSE_CONST") == "1"
+        # LOCAL PATCH 41 (K-STEAL): the retail reorg steals the delay insn of
+        # a `j` sequence at a reorder-mode conditional branch's target and
+        # retargets the branch to that `j`'s label (gcc
+        # steal_delay_list_from_target). cc1 2.8.1 cannot, because its target
+        # is a RETURN (`j $31`). Runs after patch 12 turned those into `j $L`.
+        # Opt-in; the stolen insn's destination must be dead on fall-through.
+        self.branch_steal_jump_slot = (
+            os.environ.get("MASPSX_BRANCH_STEAL_JUMP_SLOT") == "1"
+        )
+        # LOCAL PATCH 42 (K-TESTED-LI): the retail reorg fills a reorder-mode
+        # conditional branch's slot with the next `li` even though it writes
+        # a register the branch tests (cc1 reorg refuses: the trial sets a
+        # resource the branch needs). Opt-in, and only for a VOID function:
+        # a return counts as killing every caller-saved register.
+        self.fill_branch_tested_li_void = (
+            os.environ.get("MASPSX_FILL_BRANCH_TESTED_LI_VOID") == "1"
+        )
+        # LOCAL PATCH 38 (K-SAVE-REV): the reverse of patch 26 -- cc1 saves
+        # the $s2=$a1 pair before $s1=$a0; retail saves $s1 first.
+        self.swap_s1_s2_save_pairs_rev = (
+            os.environ.get("MASPSX_SWAP_S1_S2_SAVE_PAIRS_REV") == "1"
+        )
+        # LOCAL PATCH 39 (K-LDLI): cc1 puts a `li` between a symbolic pointer
+        # load and the dependent `lw 0($r)`; retail loads both pointers first
+        # (a preceding independent move fills the first load delay).
+        self.symbol_pointer_load_li_after = (
+            os.environ.get("MASPSX_SYMBOL_POINTER_LOAD_LI_AFTER") == "1"
+        )
         # LOCAL PATCH 27: an empty asm barrier emits #APP/#NO_APP between a
         # label and the `.set noreorder` that patch 14 looks for, so the
         # load-delay nop stays after the label. Opt-in companion to patch 14.
@@ -1894,6 +1935,281 @@ class MaspsxProcessor:
             out.append(line)
         self.lines = out
 
+    def _ulw_load_delay_nop(self):
+        """Keep cc1's `#nop` after `ulw $r,...` as a real load-delay nop."""
+        out = []
+        lines = self.lines
+        for i, line in enumerate(lines):
+            out.append(line)
+            if (
+                re.match(r"^ulw\t\$\w+,", line)
+                and i + 1 < len(lines)
+                and lines[i + 1] == "#nop"
+            ):
+                out += [".set\tnoreorder", "nop", ".set\treorder"]
+        self.lines = out
+
+    def _shift_count_const(self):
+        """Undo cc1 2.8.1 post-reload reload_cse constant->register
+        substitutions (PSY-Q cc1 has no such pass).
+
+        Tracks registers whose latest write is `li $r,K` within one extended
+        block, the way reload_cse does: a label resets everything; a `j`/`jr`
+        resets after its delay slot (noreorder) or at once (reorder, where the
+        next line is dead or a label); `jal`/`jalr` likewise, after the slot
+        in noreorder mode and before the next line in reorder mode.
+        Conditional branches do not reset (reload_cse does not either).
+
+        MASPSX_SHIFT_COUNT_CONST: `sll|srl|sra $d,$s,$t` with $t == K
+        (0..31) -> `sll|srl|sra $d,$s,K`.
+        MASPSX_RELOAD_CSE_CONST: `move $d,$s` with $s == K (16-bit) ->
+        `li $d,K` (`move $d,$0` for 0); `addu $d,$s,$t` with exactly one of
+        $s/$t == K (16-bit signed) -> `addu $d,<other>,K`.
+        """
+        shift_re = re.compile(r"^(sll|srl|sra)\t(\$\w+),(\$\w+),(\$\w+)$")
+        move_re = re.compile(r"^move\t(\$\w+),(\$\w+)$")
+        addu_re = re.compile(r"^addu\t(\$\w+),(\$\w+),(\$\w+)$")
+        li_re = re.compile(r"^li\t(\$\w+),(-?\d+)$")
+        dest_re = re.compile(r"^(\w+)\t(\$\w+)")
+        do_shift = getattr(self, "shift_count_const", False)
+        do_move = getattr(self, "move_const_li", False)
+        known = {}
+        noreorder = False
+        pending_reset = False
+        out = []
+        for line in self.lines:
+            bare = line.split("#", 1)[0].strip()
+            if bare == ".set\tnoreorder":
+                noreorder = True
+            elif bare == ".set\treorder":
+                noreorder = False
+            if re.match(r"^[\$.\w]+:$", bare):
+                known = {}
+                pending_reset = False
+            is_insn = bool(bare) and not bare.startswith(".") and not bare.endswith(":")
+            if is_insn:
+                m = shift_re.match(bare) if do_shift else None
+                if m and m.group(4) in known and 0 <= known[m.group(4)] <= 31:
+                    line = f"{m.group(1)}\t{m.group(2)},{m.group(3)},{known[m.group(4)]}"
+                    bare = line
+                m = move_re.match(bare) if do_move else None
+                if (
+                    m and m.group(2) in known and m.group(1) != m.group(2)
+                    and -0x8000 <= known[m.group(2)] <= 0x7FFF
+                ):
+                    if known[m.group(2)] == 0:
+                        line = f"move\t{m.group(1)},$0"
+                    else:
+                        line = f"li\t{m.group(1)},{known[m.group(2)]}"
+                    bare = line
+                m = addu_re.match(bare) if do_move else None
+                if m:
+                    a, b = m.group(2), m.group(3)
+                    if (a in known) != (b in known):
+                        other, k = (b, known[a]) if a in known else (a, known[b])
+                        if -0x8000 <= k <= 0x7FFF and other not in ("$0", "$zero"):
+                            line = f"addu\t{m.group(1)},{other},{k}"
+                            bare = line
+                m = li_re.match(bare)
+                if m:
+                    known[m.group(1)] = int(m.group(2))
+                elif bare.startswith("move\t") and bare.endswith(",$0"):
+                    known[bare[5:].split(",")[0]] = 0
+                else:
+                    m = dest_re.match(bare)
+                    if m and m.group(2) in known and not m.group(1).startswith(
+                        ("sw", "sb", "sh", "b", "j")
+                    ):
+                        known.pop(m.group(2), None)
+                if pending_reset:
+                    known = {}
+                    pending_reset = False
+                if re.match(r"^(jal|j|jalr|jr)\b", bare):
+                    if noreorder:
+                        pending_reset = True
+                    else:
+                        known = {}
+            out.append(line)
+        self.lines = out
+
+    def _swap_s1_s2_save_pairs_rev(self):
+        """Swap a prologue `sw/move $s2,$a1` pair with the following `$s1,$a0` pair."""
+        lines = self.lines
+        move_s1 = ("move\t$17,$4", "addu\t$17,$4,$0", "addu\t$17,$4,$zero")
+        move_s2 = ("move\t$18,$5", "addu\t$18,$5,$0", "addu\t$18,$5,$zero")
+        for i in range(len(lines) - 3):
+            if (
+                lines[i] == "sw\t$18,24($sp)"
+                and lines[i + 1] in move_s2
+                and lines[i + 2] == "sw\t$17,20($sp)"
+                and lines[i + 3] in move_s1
+            ):
+                a, b, c, d = lines[i:i + 4]
+                lines[i:i + 4] = [c, d, a, b]
+                self.lines = lines
+                return
+
+    def _symbol_pointer_load_li_after(self):
+        """`lw $r,SYM` / `li $k,K` / `lw $d,0($r)` -> load, load, li; a
+        preceding independent `move` moves into the first load delay."""
+        out = list(self.lines)
+        sym_re = re.compile(r"^lw\t(\$\w+),[A-Za-z_]\w*$")
+        li_re = re.compile(r"^li\t(\$\w+),")
+        ld_re = re.compile(r"^lw\t(\$\w+),0\((\$\w+)\)$")
+        mv_re = re.compile(r"^move\t(\$\w+),(\$\w+)$")
+        i = 0
+        while i < len(out) - 2:
+            b = sym_re.match(out[i])
+            c = li_re.match(out[i + 1])
+            d = ld_re.match(out[i + 2])
+            if (
+                b and c and d
+                and d.group(2) == b.group(1)
+                and c.group(1) not in (b.group(1), d.group(1))
+            ):
+                out[i + 1], out[i + 2] = out[i + 2], out[i + 1]
+                pm = mv_re.match(out[i - 1]) if i > 0 else None
+                if pm and b.group(1) not in (pm.group(1), pm.group(2)):
+                    out[i - 1], out[i] = out[i], out[i - 1]
+                i += 3
+                continue
+            i += 1
+        self.lines = out
+
+    def _branch_steal_jump_slot(self):
+        """Reorder-mode `bXX ...,$L` where `$L:` opens a noreorder
+        `j $M` / I block -> noreorder `bXX ...,$M` / I (I stays at $L too)."""
+        self._branch_fill_label_map = None
+        self._branch_fill_reorder = None
+        lines = self.lines
+        labels = self._branch_fill_labels()
+        reorder = self._branch_fill_reorder_flags()
+        edits = {}
+        for i, line in enumerate(lines):
+            if not reorder[i]:
+                continue
+            bare = strip_comments(line)
+            if not bare:
+                continue
+            op = bare.split(None, 1)[0]
+            if op not in cond_branch_mnemonics:
+                continue
+            operands = self._branch_fill_operands(bare)
+            want = 3 if op in cond_branch_two_reg else 2
+            if len(operands) != want or operands[-1] not in labels:
+                continue
+            k = labels[operands[-1]] + 1
+            body = []
+            while k < len(lines) and len(body) < 6:
+                t = strip_comments(lines[k])
+                if t:
+                    body.append(t)
+                k += 1
+            if (
+                len(body) < 6
+                or body[0] != ".set\tnoreorder"
+                or body[1] != ".set\tnomacro"
+                or body[4] != ".set\tmacro"
+                or body[5] != ".set\treorder"
+            ):
+                continue
+            jm = re.match(r"^j\t(\$L\d+)$", body[2])
+            if not jm or jm.group(1) not in labels:
+                continue
+            cand = body[3]
+            cop = cand.split(None, 1)[0]
+            cargs = self._branch_fill_operands(cand)
+            if cop == "move" and len(cargs) == 2:
+                pass
+            elif cop == "li" and len(cargs) == 2 and is_number(cargs[1]) and (
+                -0x8000 <= int(cargs[1], 0) <= 0xFFFF
+            ):
+                pass
+            else:
+                continue
+            dest = gpr_number(cargs[0])
+            if dest is None or dest in (0, 1) or dest >= 26:
+                continue
+            if not self._branch_fill_reg_dead_at(None, dest, start_index=i + 1):
+                continue
+            new_ops = ",".join(operands[:-1] + [jm.group(1)])
+            edits[i] = [
+                ".set\tnoreorder",
+                ".set\tnomacro",
+                f"{op}\t{new_ops}",
+                cand,
+                ".set\tmacro",
+                ".set\treorder",
+            ]
+        if edits:
+            out = []
+            for i, line in enumerate(lines):
+                out.extend(edits.get(i, [line]))
+            self.lines = out
+        self._branch_fill_label_map = None
+        self._branch_fill_reorder = None
+
+    def _fill_branch_tested_li_void(self):
+        """Reorder-mode `bXX ...,$L` + `li $r,K` ($r tested by the branch,
+        dead at $L with a void return) -> noreorder `bXX` / `li` pair."""
+        self._branch_fill_label_map = None
+        self._branch_fill_reorder = None
+        lines = self.lines
+        labels = self._branch_fill_labels()
+        reorder = self._branch_fill_reorder_flags()
+        edits = {}
+        drop = set()
+        for i, line in enumerate(lines):
+            if not reorder[i] or i in drop:
+                continue
+            bare = strip_comments(line)
+            if not bare:
+                continue
+            op = bare.split(None, 1)[0]
+            if op not in cond_branch_mnemonics:
+                continue
+            operands = self._branch_fill_operands(bare)
+            want = 3 if op in cond_branch_two_reg else 2
+            if len(operands) != want or operands[-1] not in labels:
+                continue
+            j = i + 1
+            while j < len(lines) and lines[j] == "":
+                j += 1
+            if j >= len(lines) or not reorder[j]:
+                continue
+            cand = strip_comments(lines[j])
+            m = re.match(r"^li\t(\$\w+),(-?\w+)$", cand)
+            if not m or not is_number(m.group(2)):
+                continue
+            if not -0x8000 <= int(m.group(2), 0) <= 0xFFFF:
+                continue
+            dest = gpr_number(m.group(1))
+            tested = [gpr_number(t) for t in operands[:-1]]
+            if dest is None or dest in (0, 1) or dest not in tested:
+                continue
+            if not self._branch_fill_reg_dead_at(
+                operands[-1], dest, void_return=True
+            ):
+                continue
+            edits[i] = [
+                ".set\tnoreorder",
+                ".set\tnomacro",
+                bare,
+                cand,
+                ".set\tmacro",
+                ".set\treorder",
+            ]
+            drop.add(j)
+        if edits:
+            out = []
+            for i, line in enumerate(lines):
+                if i in drop:
+                    continue
+                out.extend(edits.get(i, [line]))
+            self.lines = out
+        self._branch_fill_label_map = None
+        self._branch_fill_reorder = None
+
     def _swap_s2_s1_save_pairs(self):
         """Swap a prologue `sw/move $s1,$a0` pair with the following `$s2,$a1` pair."""
         lines = self.lines
@@ -2175,6 +2491,16 @@ class MaspsxProcessor:
             lines[j] = "# DROP_TARGET_DUP_LI " + lines[j]
 
     def process_lines(self):
+        if getattr(self, "ulw_load_delay_nop", False):
+            self._ulw_load_delay_nop()
+        if getattr(self, "shift_count_const", False) or getattr(
+            self, "move_const_li", False
+        ):
+            self._shift_count_const()
+        if getattr(self, "swap_s1_s2_save_pairs_rev", False):
+            self._swap_s1_s2_save_pairs_rev()
+        if getattr(self, "symbol_pointer_load_li_after", False):
+            self._symbol_pointer_load_li_after()
         if getattr(self, "drop_target_dup_li", False):
             self._drop_target_dup_li_pass()
         self.is_reorder = True
@@ -2213,6 +2539,10 @@ class MaspsxProcessor:
             self._fold_rodata_literals()
         if self.return_via_epilogue_jump:
             self._retarget_mid_function_returns()
+        if getattr(self, "branch_steal_jump_slot", False):
+            self._branch_steal_jump_slot()
+        if getattr(self, "fill_branch_tested_li_void", False):
+            self._fill_branch_tested_li_void()
         if self.sink_return_zero_into_flag_delay:
             self._sink_return_zero_into_flag_delay()
         if self.unfill_epilogue_delay_slot:
@@ -3184,7 +3514,8 @@ class MaspsxProcessor:
         return "read" if reg in regs else "none"
 
     def _branch_fill_reg_dead_at(
-        self, label: str, reg: int, extended: bool = False
+        self, label: str, reg: int, extended: bool = False, start_index=None,
+        void_return: bool = False,
     ) -> bool:
         """True when `reg` is provably dead at `label`.
 
@@ -3195,11 +3526,14 @@ class MaspsxProcessor:
         the end of the function, a blown step budget) makes it answer False.
         """
         labels = self._branch_fill_labels()
-        if label not in labels:
-            return False
+        if start_index is None:
+            if label not in labels:
+                return False
+            start_index = labels[label]
         reorder = self._branch_fill_reorder_flags()
+        caller_saved = 2 <= reg <= 15 or reg in (24, 25)
 
-        stack = [labels[label]]
+        stack = [start_index]
         seen = set()
         steps = 0
         budget = 4096
@@ -3291,6 +3625,9 @@ class MaspsxProcessor:
                     target = operands[0]
                     if reorder[i]:
                         if target in ("$31", "$ra"):
+                            if void_return and caller_saved:
+                                killed = True
+                                break
                             # reg is live out of the function at a return we
                             # cannot prove kills it
                             return False
@@ -3305,6 +3642,9 @@ class MaspsxProcessor:
                     if effect in ("bail", "read"):
                         return False
                     if effect == "write":
+                        killed = True
+                        break
+                    if target in ("$31", "$ra") and void_return and caller_saved:
                         killed = True
                         break
                     if target in ("$31", "$ra") or target not in labels:
