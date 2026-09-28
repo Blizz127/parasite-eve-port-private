@@ -64,7 +64,7 @@ segments:
       - [0x3AF4, c, func_801247F4]
       - [0x3B9C, c, func_8012489C]
       - [0x3DA4, c, func_80124AA4]
-      - [0x3F04, asm]
+      - [0x3F04, c, func_80124C04]
       - [0x4240, c, func_80124F40]
       - [0x4394, c, func_80125094]
       - [0x4744, c, func_80125444]
