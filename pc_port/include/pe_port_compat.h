@@ -470,6 +470,12 @@ extern void PE_WeaponCallback(pe_addr_t fn,pe_addr_t slot,pe_addr_t rec,pe_addr_
 int PE_M34BossEffectOverlay(void);
 void PE_M34BossProjectileInit(pe_addr_t data,const int32_t retained[6]);
 int PE_M34BossEffectInit(pe_addr_t slot);
+int PE_M0348iEffectOverlay(void);          /* M34 phase 2 room m0348i resident */
+int PE_M0348iEffectInit(pe_addr_t slot);   /* room_m0348i func_8018F06C */
+int PE_M0348iEffectCallback(pe_addr_t o);  /* room_m0348i func_8018F0C4 */
+int PE_M0348iEffectUpdate(pe_addr_t o);    /* room_m0348i func_8018F128 */
+int PE_M0348iEffectCleanup(pe_addr_t o);   /* room_m0348i func_8018F1B4 */
+void PE_M0348iEffectF240(pe_addr_t slot, pe_addr_t data); /* room_m0348i func_8018F240 */
 int PE_M34BossEffectCommand(pe_addr_t slot,uint32_t mode,uint32_t index,uint32_t value,uint32_t extra0,uint32_t extra1);
 void PE_M34StackField(int begin);
 void PE_M34StackActor(pe_addr_t actor);

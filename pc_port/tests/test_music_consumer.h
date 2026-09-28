@@ -1,7 +1,7 @@
 #include "retail_music_consumer_cases.h"
 static void test_DAY2_music_consumer(void)
 {
-    TEST("DAY2_music_consumer");
+    TEST_RETAIL_DISC1("DAY2_music_consumer"); TEST_RETAIL_FIXUPS(RETAILFIX_music_consumer);
     for(unsigned k=0;k<sizeof(MUSICCON_cases)/sizeof(MUSICCON_cases[0]);k++) {
         ResetTestState();
         for(unsigned i=0;i<sizeof(MUSICCON_common)/sizeof(MUSICCON_common[0]);i++)PE_StoreU32(0x80000000u|MUSICCON_common[i][0],MUSICCON_common[i][1]);

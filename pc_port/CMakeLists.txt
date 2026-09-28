@@ -689,3 +689,4 @@ if(BUILD_TESTS)
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..
     )
 endif()
+include(cmake/psyq_guard.cmake)

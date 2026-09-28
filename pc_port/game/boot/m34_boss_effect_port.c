@@ -518,3 +518,143 @@ static void boss_projectile_draw(pe_addr_t slot,pe_addr_t rec,pe_addr_t data)
         PE_EffectQuadC42A4(style,&matrix,0u);
     }
 }
+
+/* ── M34 phase 2 (sewer tunnel, room m0348i, token A8064448) ──────────────
+ * Line-for-line from the matched room leaves src/overlays/room_m0348i/
+ * func_8018F06C.c and func_8018F0C4.c (the overlay generator rejects both:
+ * callee arity / pointer-to-pointer parameter).  Resident check = the
+ * retail words at both entry points (build/extracted room_m0348i_c2.bin). */
+int PE_M0348iEffectOverlay(void)
+{
+    return PE_LoadU32(0x8018F06Cu)==0x27BDFFE8u && PE_LoadU32(0x8018F074u)==0x0C0308BEu &&
+        PE_LoadU32(0x8018F080u)==0x24632928u &&
+        PE_LoadU32(0x8018F0D0u)==0x0C031B38u && PE_LoadU32(0x8018F0D8u)==0x24030003u;
+}
+
+/* func_8018F06C: *func_800C22F8() = (int)D_80192928; return 0; */
+int PE_M0348iEffectInit(pe_addr_t slot)
+{
+    PE_StoreU32(func_800C22F8(slot), 0x80192928u);
+    return 0;
+}
+
+/* func_8018F0C4: if (func_800C6CE0(o) == 3) { w = P(P(o, 8), 0);
+ * *w &= 0xBFFFFFFF; func_800C2414(o, D_80192880); } return 0; */
+int PE_M0348iEffectCallback(pe_addr_t o)
+{
+    if (func_800C6CE0(o) == 3) {
+        pe_addr_t w = PE_LoadU32(PE_LoadU32(o + 8u));
+        PE_StoreU32(w, PE_LoadU32(w) & 0xBFFFFFFFu);
+        (void)func_800C2414(o, 0x80192880u);
+    }
+    return 0;
+}
+
+/* room_m0348i func_8018F1B4 (masked twin of room_m0034i func_8018F1B8 =
+ * PE_M34BossEffectCleanup): o[0] = 4; if (func_800C6CE0(o) >= 2) {
+ * W(P(P(o,8),0),0) &= 0xC0FFFFFF; *(u8 *)P(P(P(o,8),0),0x18) = 4; } */
+int PE_M0348iEffectCleanup(pe_addr_t o)
+{
+    return PE_M34BossEffectCleanup(o);   /* identical body */
+}
+
+/* room_m0348i func_8018F128 (masked twin of room_m0034i func_8018F12C =
+ * PE_M34BossEffectUpdate): state 3 runs the two effect-VM tables
+ * D_801928B8 / (D_80192848, D_801928F0); -1 -> func_8018F1B4(o). */
+int PE_M0348iEffectUpdate(pe_addr_t o)
+{
+    int r = -1;
+    if (func_800C6CE0(o) == 3) {
+        r = func_800C251C(o, 0x801928B8u);
+        r |= func_800C2758(o, 0x80192848u, 0x801928F0u);
+    }
+    if (r == -1)
+        (void)PE_M0348iEffectCleanup(o);
+    return 0;
+}
+
+/* room_m0348i func_8018F240 (effect-VM init callback; masked twin of room_m0174i
+ * func_80190358), line-for-line from src/overlays/room_m0348i/func_8018F240.c.
+ * a0 = slot, a2 = effect data block. */
+void func_800C2B40(unsigned int arg0);   /* generated TU */
+pe_addr_t func_800C2B28(int arg0);       /* decomp_hand/small_hi_port.c */
+static void m0348i_copy32(pe_addr_t dst, pe_addr_t src)
+{
+    uint32_t w[8];
+    for (unsigned i = 0; i < 8u; i++) w[i] = PE_LoadU32(src + i * 4u);   /* loads first */
+    for (unsigned i = 0; i < 8u; i++) PE_StoreU32(dst + i * 4u, w[i]);
+}
+void PE_M0348iEffectF240(pe_addr_t a0, pe_addr_t a2)
+{
+    pe_addr_t x, y, pkg;
+    int32_t t;
+    func_800C2B40(a2);
+    pkg = PE_LoadU32(0x800B0E64u);
+    if (pkg < 0x200000u) pkg |= 0x80000000u;
+    t = (int32_t)func_8006E498(pkg, 0x118704u);
+    x = PE_LoadU32(a0 + 8u);
+    PE_StoreU32(a2, x);
+    y = PE_LoadU32(x + 0x238u);
+    PE_StoreU32(0x80192E1Cu, (uint32_t)t);
+    m0348i_copy32(a2 + 4u, y);
+    m0348i_copy32(a2 + 0x24u, PE_LoadU32(PE_LoadU32(a2) + 0x238u) + 0xA0u);
+    PE_StoreU32(a2 + 0x44u, (uint32_t)func_8006DC18(9));
+    PE_StoreU16(a2 + 0x4Au, 0);
+    PE_StoreU16(a2 + 0x4Cu, 0);
+    PE_StoreU16(a2 + 0x48u, 0x96u);
+    PE_StoreU16(a2 + 0x4Eu, (uint16_t)PE_LoadU32(func_800C2B28(0)));
+    PE_StoreU32(a2 + 0x50u, PE_LoadU32(func_800C2B28(1)));
+    PE_StoreU32(a2 + 0x54u, PE_LoadU32(func_800C2B28(2)));
+    PE_StoreU32(a2 + 0x58u, PE_LoadU32(func_800C2B28(3)));
+    PE_StoreU8(0x80192E04u, 0x22u);
+    PE_StoreU8(0x80192E05u, 0x30u);
+    PE_StoreU8(0x80192E24u, 0x40u);
+    PE_StoreU8(0x80192E25u, 0x5u);
+    PE_StoreU16(0x80192E18u, 0x64u);
+    PE_StoreU8(0x80192EB4u, 0x6u);
+    PE_StoreU16(0x80192E08u, 0x0u);
+    PE_StoreU16(0x80192E0Au, 0x80u);
+    PE_StoreU8(0x80192E00u, 0x80u);
+    PE_StoreU8(0x80192E01u, 0x80u);
+    PE_StoreU8(0x80192E02u, 0x80u);
+    PE_StoreU8(0x80192E06u, 0x0u);
+    PE_StoreU16(0x80192E28u, 0x0u);
+    PE_StoreU16(0x80192E2Au, 0x80u);
+    PE_StoreU8(0x80192E20u, 0x80u);
+    PE_StoreU8(0x80192E21u, 0x80u);
+    PE_StoreU8(0x80192E22u, 0x80u);
+    PE_StoreU8(0x80192E26u, 0x0u);
+    PE_StoreU16(0x80192EC8u, 0x0u);
+    PE_StoreU16(0x80192ECAu, 0x80u);
+    PE_StoreU8(0x80192EC0u, 0x80u);
+    PE_StoreU8(0x80192EC1u, 0x80u);
+    PE_StoreU8(0x80192EC2u, 0x80u);
+    PE_StoreU8(0x80192EC6u, 0x0u);
+    PE_StoreU8(0x80192E14u, 0x68u);
+    PE_StoreU8(0x80192E15u, 0x7u);
+    PE_StoreU16(0x80192E1Au, 0x80u);
+    PE_StoreU8(0x80192E10u, 0x80u);
+    PE_StoreU8(0x80192E11u, 0x80u);
+    PE_StoreU8(0x80192E12u, 0x80u);
+    PE_StoreU8(0x80192E16u, 0x0u);
+    PE_StoreU8(0x80192EB5u, 0x60u);
+    PE_StoreU8(0x80192E44u, 0x2u);
+    PE_StoreU16(0x80192EB8u, 0x0u);
+    PE_StoreU16(0x80192EBAu, 0x60u);
+    PE_StoreU8(0x80192EB0u, 0x80u);
+    PE_StoreU8(0x80192EB1u, 0x80u);
+    PE_StoreU8(0x80192EB2u, 0x80u);
+    PE_StoreU8(0x80192EB6u, 0x0u);
+    PE_StoreU8(0x80192E45u, 0x20u);
+    PE_StoreU16(0x80192E48u, 0x0u);
+    PE_StoreU16(0x80192E4Au, 0x60u);
+    PE_StoreU8(0x80192E40u, 0x80u);
+    PE_StoreU8(0x80192E41u, 0x80u);
+    PE_StoreU8(0x80192E42u, 0x80u);
+    PE_StoreU8(0x80192E46u, 0x0u);
+    PE_StoreU8(0x80192E34u, 0x68u);
+    PE_StoreU8(0x80192E35u, 0x7u);
+    PE_StoreU16(0x80192E38u, 0x0u);
+    PE_StoreU16(0x80192E3Au, 0x80u);
+    PE_StoreU8(0x80192E36u, 0x0u);
+}

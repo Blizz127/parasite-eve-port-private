@@ -35,6 +35,7 @@ CHECKPOINTS = [
     ("m0033i",         "token",   0xA80031C8, "M0033I"),
     ("m34_entry",      "token",   0xA8003248, "M0034I alligator arena (story 0x6C)"),
     ("m34_tail_broken","line",    "M34_TAIL_BROKEN", "M34 type-4 tail HP <= 1,000,000"),
+    ("m34_phase2",     "token",   0xA8064448, "M34 phase 2 sewer tunnel (after tail break)"),
     ("m34_exit",       "story>=", 0x70, "M34 script exit (story 0x70)"),
     ("m0359i",         "token",   0xA80654C8, "M0359I post-boss room"),
     ("day1_exit_78",   "story>=", 0x78, "M0359I -> M0036I (story 0x78)"),

@@ -347,6 +347,21 @@ static void PresentHook_BlitWindow(void)
         RecordSewerVictory();
         RouteAmmoTrace();
         {
+            /* PE_ROUTE_SHOT_DIR=<dir>: write <dir>/<frame>_<token>.ppm on every
+             * room change (+120 frames, so the room is drawn) during a route run. */
+            static const char *dir = (const char *)1;
+            static uint32_t shot_tok; static int shot_at = -1;
+            if (dir == (const char *)1) dir = getenv("PE_ROUTE_SHOT_DIR");
+            if (dir) {
+                if ((uint32_t)D_8009D280 != shot_tok) { shot_tok = (uint32_t)D_8009D280; shot_at = g_frame + 120; }
+                if (g_frame == shot_at) {
+                    char path[512];
+                    snprintf(path, sizeof path, "%s/%06d_%08X.ppm", dir, g_frame, (unsigned)shot_tok);
+                    if (HostFB_WritePPM(path) == 0) fprintf(stderr, "[ROUTE] shot %s\n", path);
+                }
+            }
+        }
+        {
             static uint32_t last_tok = 0xFFFFFFFFu, last_story = 0xFFFFFFFFu;
             uint32_t tok = (uint32_t)D_8009D280, st = PE_LoadU32(0x800A7918u);
             if (tok != last_tok || st != last_story) {

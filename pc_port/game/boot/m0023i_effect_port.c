@@ -1,5 +1,6 @@
 /* Original M0023I effects. Native callbacks, not matching C. */
 #include "psx_compat.h"
+#include <stdlib.h>
 #include "pe_port_compat.h"
 #include "pe_sdk.h"
 #include "game_port.h"
@@ -96,6 +97,13 @@ int PE_M0023I_Main(int32_t mode,pe_addr_t data)
 /* 1 = keep the unresolved caller-stack read as an explicit boundary that
  * stops the port (pre-Day-1 behaviour; tests use it).  0 = Day-1 shim. */
 int g_pe_strict_effect_stack = 0;
+/* PE_STRICT_BOUNDARY=1: start in strict mode (unported effect callbacks stop
+ * the port instead of the logged Day-1 skip). */
+__attribute__((constructor)) static void pe_strict_boundary_env(void)
+{
+    const char *e = getenv("PE_STRICT_BOUNDARY");
+    if (e && e[0] == '1') g_pe_strict_effect_stack = 1;
+}
 
 int PE_M0023I_Flash(int32_t mode,pe_addr_t data,int16_t retained_position[3])
 {

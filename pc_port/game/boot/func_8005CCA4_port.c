@@ -166,9 +166,12 @@ void func_8005CCA4(void)
         }
     }
 
-    if (s0 != 0u) (void)func_80053D2C(0);
+    if (s0 != 0u) (void)func_80053D2C((int)s0);   /* retail a0 = found id (0x8005CED0) */
 
-    /* 8005CED8..CFAC: second scan loop (records with byte6 == 9) */
+    /* 8005CED8..CFAC: second scan loop (records with byte6 == 9).  Retail
+     * zeroes a0 at 0x8005CEEC and exits with s0 = a0, so s0 is 0 unless
+     * this scan finds a record. */
+    s0 = 0u;
     {
         pe_addr_t a1 = GA_EAC;
         pe_addr_t end = a1 + 0x1000u;
@@ -205,7 +208,7 @@ void func_8005CCA4(void)
         }
     }
 
-    if (s0 != 0u) (void)func_80053D2C(0);
+    if (s0 != 0u) (void)func_80053D2C((int)s0);   /* retail a0 = found id (0x8005CFB8) */
 
     /* 8005CFB0..CFF4: retail sets v0 = 1 in the beq delay slot AND on the
      * fall-through path, so GA_E22 is written 1 unconditionally. */

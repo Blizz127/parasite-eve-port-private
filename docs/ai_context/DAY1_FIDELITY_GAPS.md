@@ -182,6 +182,7 @@ code. A human player with a real pad is unaffected.
 | --- | --- |
 | What | `RouteBattleShim()`: during the M0023I rehearsal battle (token `A80021C8`, `D1A0&2`), Aya's HP is locked to max, the aid keeps 300..600u from the nearest enemy, presses Cross every 8f and, in mode 1, Crosses the default target. |
 | Why | The replayed pads for this fight drifted with port changes: the 09-22 binary wins it, while the 09-28 02:18 build resets to New Game. |
+| Scope | Rooms `A80021C8` (M0023I) and `A8064448` (M34 phase 2, sewer tunnel). |
 | Restore | `PE_ROUTE_BATTLE_NO_SHIM=1` (replayed pads). The route counts as green only once a run in which Eve's flash (`PE_M0023I_Flash`) fires passes. |
 
 ---
@@ -202,3 +203,13 @@ autopilot. Each keeps a strict switch so tests still see the retail boundary.
 ### Not a port bug: first Eve fight route reset (09-22 pass → 09-28 fail)
 
 Bisect (`build/lanes/port/NOTES.md`, "port3"): b04c438e passes `--until eve1_victory`; 9dd1bd1c and later fail. The cause is the retail-matching generated TU for `func_800144FC` (field-VM battle-entry state machine). It replaced the approximate hand port (`func_800144FC_state*_cut` in `func_80029810_port.c`). Every battle now starts 2–3 frames earlier (d1a0 `|=0x80`/`|=2` and mode 7→0: M0002I 10252→10250, M0011I 18903→18900, M0023I 42934→42931). Room entry frames and field RNG call counts are unchanged. The replayed exact pads `[42713,45041)` were recorded on the old timing. Shifting them by −3 frames does not reproduce the fight because Eve's AI state also differs. The fix therefore belongs in the route (battle aid above), not in reverting the retail TU.
+
+### Port shim: unported room effect init / callback (func_8006F39C, PE_EffectCallback)
+
+| Field | Value |
+| --- | --- |
+| What | The effect constructor `func_8006F39C` (`pc_port/game/boot/func_8006F39C_port.c`) and the effect callback dispatcher `PE_EffectCallback` (`func_800D413C_port.c`) used to stop the game (`stop_reason=unresolved-boundary`) on any overlay init/callback address with no native port. That happened first at M34 phase 2 (room m0348i, token `A8064448`, frame ~64603). Both now try the generated guest-code registry (`PE_GuestCode_Resolve`/`PE_GuestCall`) first. If that fails they skip the call and log `[DAY1_SHIM] func_8006F39C: init fn=... not ported` / `[DAY1_SHIM] PE_EffectCallback: room effect ... not ported` once per address. A skipped update returns "finished" (1), so the effect pool retires the record. |
+| Also | `PE_WeaponCallback` (`func_800C2414_port.c`, effect-VM callbacks) and the destroy callback in `func_80020F18_port.c` (`func_8006FC18`) take the same registry-then-skip path; a skipped VM callback retires its record (`rec+1 = 2`), a skipped destroy callback still frees the slot. First hit: m0348i `0x8018F240` (particle/actor-attached effect chain, ~30 unported overlay leaves). |
+| Ported instead of shimmed | m0348i `func_8018F06C` (init), `func_8018F0C4` (callback), `func_8018F128` (update) and `func_8018F1B4` (cleanup), from the matched `src/overlays/room_m0348i/*.c`, in `m34_boss_effect_port.c` (`PE_M0348iEffect*`, gated on the resident m0348i words). |
+| Accuracy cost | A skipped effect is not drawn (visual only). Its effect-bytecode side effects (sounds, child effects) do not run. |
+| Restore | `g_pe_strict_effect_stack = 1` restores the explicit boundary + stop. `SEW12_m0013i_command_callback` checks strict mode. |

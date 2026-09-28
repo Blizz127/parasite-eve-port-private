@@ -55,6 +55,17 @@ D_801223F8, func_801918F8 → func_80121004). era_link_check: word mismatches=0 
     preflight: disc1_preflight: PASS (deep, 6 c / 3 asm / 0 rodata)
     EXACT_REBUILD_GATE[ovl_03C5]=PASS plan=c47b7bc5205fb827d25915fb363ca09ebb3a6cb038553c39daaa91789a8bef2c yaml=6c3f4affae741efdc2e3e59f41c48b45affc1c7d31894f4cbb5a5c2511752b72 spans=[6 c, 3 asm, 0 rodata, 2 bin] sha1_orig=f8f6ea3892df4a7b1c8b58c7fb76222e4bb52736 sha1_cand=f8f6ea3892df4a7b1c8b58c7fb76222e4bb52736 sha1=f8f6ea3892df4a7b1c8b58c7fb76222e4bb52736
 
+### func_8018F468 (ovl_03D2 blob 0x478, 0x388) — profile era_o2_g0 (default)
+Dirty-rect compositor. Ladder: first draft 176 → `miny, minx, maxy, maxx` init order + int clamp
+locals `x0 = minx; if (c->x < minx) x0 = c->x;` 107 → no `Scr *c` local in the union block (cse keeps
+D_801D11C4 in $a0) + else-branch `r.h` stored last (cross-jumped with the then tail) 92 → draw args
+via `a2 = r.w - s->w; a1 = ...` locals 31 → `if (r.w > 0 && (h = r.h) > 0)` loop bound (an in-loop
+`r.h` reload aliases the int stores) 19/size right → image base `b = D_80193254 + D_80193258;` in its
+own statement (inline, expand folds the +0x14 into the symbol) 0.
+
+    preflight: disc1_preflight: PASS (deep, 21 c / 4 asm / 0 rodata)
+    EXACT_REBUILD_GATE[ovl_03D2]=PASS plan=1483a3225cef5d94e48a8b1b77707f277d9a2a1ae00670f7d02bfb533ac70f1a yaml=551739005986feea048cdd29f89bb5d5c1d6e328c870b7b10c031213af8f2c9f spans=[21 c, 4 asm, 0 rodata, 2 bin] sha1_orig=a0b604ead810592dd9a8d74f7c74fe94151f4d32 sha1_cand=a0b604ead810592dd9a8d74f7c74fe94151f4d32 sha1=a0b604ead810592dd9a8d74f7c74fe94151f4d32
+
 ## Parked (best drafts under build/lanes/ovl6/drafts/park_*.c)
 
 * **func_801F15DC** (ovl_03C9, 0x1B4) best 10w (was 62w in ovl4): `int k = D_800F336C;` followed by an

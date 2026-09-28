@@ -1,7 +1,7 @@
 #include "retail_actor_flag_vm_cases.h"
 static void test_DAY1_actor_flag_vm(void)
 {
-    TEST("DAY1_actor_flag_vm");
+    TEST_RETAIL_DISC1("DAY1_actor_flag_vm"); TEST_RETAIL_FIXUPS(RETAILFIX_actor_flag_vm);
     for(unsigned k=0;k<sizeof(actor_flag_cases)/sizeof(actor_flag_cases[0]);k++) {
         ResetTestState();
         for(unsigned i=0;i<sizeof(actor_flag_common)/sizeof(actor_flag_common[0]);i++)

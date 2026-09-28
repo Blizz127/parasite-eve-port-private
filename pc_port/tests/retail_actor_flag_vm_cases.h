@@ -1,3 +1,4 @@
+#pragma once
 /* Generated original VM actor flag and wait cases. */
 static const uint32_t actor_flag_ranges[][2]={
  {0x910A0u,0x80u},
@@ -11,7 +12,7 @@ static const uint32_t actor_flag_ranges[][2]={
  {0xB6A80u,0x20u},
  {0x140000u,0x400u},
 };
-static const uint32_t actor_flag_common[][2]={
+static uint32_t actor_flag_common[][2]={
  {0x910A0u,0x80017294u},
  {0x910A4u,0x800172BCu},
  {0x910A8u,0x800172E0u},
@@ -25,21 +26,21 @@ static const uint32_t actor_flag_common[][2]={
  {0x910D0u,0x80012E7Cu},
  {0x910D4u,0x80017410u},
  {0x910D8u,0x80014228u},
- {0x910E4u,0x800130B4u},
- {0x910E8u,0x800131E8u},
- {0x910ECu,0x800176B8u},
- {0x910F0u,0x80017588u},
- {0x910F4u,0x800188C4u},
- {0x910F8u,0x80017540u},
- {0x910FCu,0x80017444u},
- {0x91100u,0x8001787Cu},
- {0x91104u,0x800176E0u},
- {0x91108u,0x800176FCu},
- {0x9110Cu,0x80018F74u},
- {0x91110u,0x80017764u},
- {0x91114u,0x80017E20u},
- {0x91118u,0x80019658u},
- {0x9111Cu,0x800177ACu},
+ {0x910E4u,0u},
+ {0x910E8u,0u},
+ {0x910ECu,0u},
+ {0x910F0u,0u},
+ {0x910F4u,0u},
+ {0x910F8u,0u},
+ {0x910FCu,0u},
+ {0x91100u,0u},
+ {0x91104u,0u},
+ {0x91108u,0u},
+ {0x9110Cu,0u},
+ {0x91110u,0u},
+ {0x91114u,0u},
+ {0x91118u,0u},
+ {0x9111Cu,0u},
  {0x9D2F0u,0x80140000u},
  {0x9D300u,0x80140280u},
  {0x140094u,0x1738597Au},
@@ -359,4 +360,11 @@ static const struct { unsigned first,end; uint64_t hash; } actor_flag_cases[]={
  {218,222,UINT64_C(0x625441BFA4BB6A71)},
  {222,226,UINT64_C(0xE3A58BE93F1C330D)},
  {226,230,UINT64_C(0x9FC2572DADD8E6B9)},
+};
+
+/* Retail bytes stripped by tools/analysis/strip_retail_seeds.py: these
+ * regions are zero here and restored at test time from the user's disc
+ * (test_retail_fixups.h / pe_disc_cache.h).  Never commit them. */
+static const PE_TestRetailFixup RETAILFIX_actor_flag_vm[]={
+    {PE_RF_ROWS,&actor_flag_common[0][0],13u,15u,PE_RF_EXE,0x818E4u},
 };

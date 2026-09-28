@@ -57,10 +57,27 @@ int32_t func_8006FC18(uint32_t index, pe_addr_t owner, uint32_t force)
         if(fn==0x8018F1B8u && PE_M34BossEffectOverlay()) {
             (void)PE_M34BossEffectCleanup(slot);break;
         }
-        (void)Bootstrap_ReturnInt4Indirect("effect_destroy_callback", "func_8006FC18",
-            -1,fn,slot,owner,force,0u,NULL,0u);
-        PE_Port_RequestStop(PE_PORT_STOP_UNRESOLVED_BOUNDARY);
-        return -1;
+        if(fn==0x8018F1B4u && PE_M0348iEffectOverlay()) {
+            (void)PE_M0348iEffectCleanup(slot);break;
+        }
+        if (g_pe_strict_effect_stack) {
+            (void)Bootstrap_ReturnInt4Indirect("effect_destroy_callback", "func_8006FC18",
+                -1,fn,slot,owner,force,0u,NULL,0u);
+            PE_Port_RequestStop(PE_PORT_STOP_UNRESOLVED_BOUNDARY);
+            return -1;
+        }
+        /* DAY1 SHIM (DAY1_FIDELITY_GAPS.md, "unported room effect init /
+         * callback"): unported destroy callback -> skip it, free the slot. */
+        {
+            static pe_addr_t seen[16]; static unsigned nseen; unsigned k;
+            for (k = 0; k < nseen && seen[k] != fn; k++) {}
+            if (k == nseen && nseen < 16u) {
+                seen[nseen++] = fn;
+                fprintf(stderr,"[DAY1_SHIM] func_8006FC18: destroy callback %08X (token %08X) not ported; skipped\n",
+                        fn,(unsigned)PE_LoadU32(0x8009D280u));
+            }
+        }
+        break;
     }
     clear_effect_slot(effect_slot(index));
     return 0;

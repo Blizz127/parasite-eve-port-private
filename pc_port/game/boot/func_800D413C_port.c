@@ -1,6 +1,7 @@
 /* Original effect scheduler, room-effect VM and particle pools (5F484.s,
  * BEC9C.s, BF0F0.s). Effect bytecode stays data; callbacks execute natively. */
 #include "psx_compat.h"
+#include "pe_guestcode.h"
 #include "pe_port_compat.h"
 #include "pe_sdk.h"
 #include "game_port.h"
@@ -102,6 +103,11 @@ int PE_EffectCallback(pe_addr_t fn, int32_t mode, pe_addr_t data, pe_addr_t extr
         if(fn==0x8018F1B8u)return PE_M34BossEffectCleanup(data);
         if(fn==0x8018F23Cu || fn==0x8018F244u)return 0;
     }
+    if (PE_M0348iEffectOverlay()) {
+        if (fn==0x8018F0C4u) return PE_M0348iEffectCallback(data);
+        if (fn==0x8018F128u) return PE_M0348iEffectUpdate(data);
+        if (fn==0x8018F1B4u) return PE_M0348iEffectCleanup(data);
+    }
     if (PE_M32MovementOverlay()) {
         if (fn==0x801917ECu) return PE_M32MovementUpdate(data);
         if (fn==0x80192090u) return PE_M28MovementCleanup(data);
@@ -192,10 +198,30 @@ int PE_EffectCallback(pe_addr_t fn, int32_t mode, pe_addr_t data, pe_addr_t extr
         if (mode==1) PE_StoreU16(PE_LoadU32(0x800E2368u)+18u,1u);
         return (int32_t)0x80190B80u;
     }
-    fprintf(stderr,"[EFFECT] Unported callback %08X mode %d\n",fn,mode);
-    Bootstrap_ReturnVoid("PE_EffectCallback", "room effect callback");
-    PE_Port_RequestStop(PE_PORT_STOP_UNRESOLVED_BOUNDARY);
-    return 0;
+    if (PE_GuestCode_Resolve(fn))   /* generated overlay / EXE TU (pe_guestcode.h) */
+        return PE_GuestCall("@800D413C:effect", fn, 2u, (uintptr_t)(uint32_t)mode, (uintptr_t)data, 0, 0);
+    if (g_pe_strict_effect_stack) {
+        fprintf(stderr,"[EFFECT] Unported callback %08X mode %d\n",fn,mode);
+        Bootstrap_ReturnVoid("PE_EffectCallback", "room effect callback");
+        PE_Port_RequestStop(PE_PORT_STOP_UNRESOLVED_BOUNDARY);
+        return 0;
+    }
+    /* DAY1 SHIM (docs/ai_context/DAY1_FIDELITY_GAPS.md, "unported room effect
+     * callback"): room effect callbacks are the visual effect pool
+     * (init/update/draw).  An unported one is skipped instead of stopping the
+     * game: mode 1 (update) reports finished so the pool retires the record,
+     * modes 0/2 do nothing.  Logged once per distinct fn. */
+    {
+        static pe_addr_t seen[32]; static unsigned nseen;
+        unsigned k;
+        for (k = 0; k < nseen && seen[k] != fn; k++) {}
+        if (k == nseen && nseen < 32u) {
+            seen[nseen++] = fn;
+            fprintf(stderr,"[DAY1_SHIM] PE_EffectCallback: room effect %08X (mode %d, token %08X) not ported; skipped\n",
+                    fn, mode, (unsigned)PE_LoadU32(0x8009D280u));
+        }
+    }
+    return mode == 1 ? 1 : 0;
 }
 
 int func_8006DC18(uint32_t code)

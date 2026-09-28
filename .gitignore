@@ -150,3 +150,20 @@ local/live/
 pc_port/game/decomp/
 # Generated overlay-derived TUs + guest-code registry (tools/analysis/gen_overlay_ports.py)
 pc_port/game/decomp_ovl/
+
+# PsyCross (OpenDriver2, MIT) — fetched by scripts/fetch_psycross.sh, never committed
+pc_port/third_party/psycross/
+
+# Game frames / audio are retail data: never under docs/ (retail_data_guard.py
+# media rule; keep screenshots under build/). Allowlisted exceptions: git add -f.
+docs/**/*.png
+docs/**/*.jpg
+docs/**/*.jpeg
+docs/**/*.gif
+docs/**/*.bmp
+docs/**/*.webp
+docs/**/*.wav
+docs/**/*.mp3
+docs/**/*.ogg
+docs/**/*.flac
+docs/**/*.mp4

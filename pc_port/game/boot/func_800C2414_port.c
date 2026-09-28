@@ -1,6 +1,7 @@
 /* Original shared weapon-effect renderer, child scheduler and bytecode VM.
  * Authority: B2AF8.s / B3390.s and the matching callback leaves in src/. */
 #include "psx_compat.h"
+#include "pe_guestcode.h"
 #include "pe_port_compat.h"
 #include "game_port.h"
 #include <stdio.h>
@@ -48,6 +49,7 @@ void PE_WeaponCallback(pe_addr_t fn,pe_addr_t slot,pe_addr_t rec,pe_addr_t data)
     PE_M34StackCallback(fn);
     (void)slot;
     if(PE_M34BossEffectOverlay() && PE_M34BossEffectChild(fn,slot,rec,data))return;
+    if(fn==0x8018F240u && PE_M0348iEffectOverlay()) { PE_M0348iEffectF240(slot,data); return; }
     switch (fn) {
     case 0x800CE1FCu:func_800CE1FC();return;
     case 0x800CE2B4u:func_800CE2B4((int)slot,(int)rec,data);return; /* retail a0/a1/a2 */
@@ -93,9 +95,29 @@ void PE_WeaponCallback(pe_addr_t fn,pe_addr_t slot,pe_addr_t rec,pe_addr_t data)
         if ((int8_t)PE_LoadU8(data+1u)<3) PE_StoreU8(rec+1u,2u);
         return;
     }
-    fprintf(stderr,"[EFFECT] Unported weapon callback %08X slot %08X record %08X\n",fn,slot,rec);
-    Bootstrap_ReturnVoid("PE_WeaponCallback","weapon effect callback");
-    PE_Port_RequestStop(PE_PORT_STOP_UNRESOLVED_BOUNDARY);
+    if (PE_GuestCode_Resolve(fn)) {   /* generated overlay / EXE TU (pe_guestcode.h) */
+        (void)PE_GuestCall("@800C2414:weapon", fn, 3u, (uintptr_t)slot, (uintptr_t)rec, (uintptr_t)data, 0);
+        return;
+    }
+    if (g_pe_strict_effect_stack) {
+        fprintf(stderr,"[EFFECT] Unported weapon callback %08X slot %08X record %08X\n",fn,slot,rec);
+        Bootstrap_ReturnVoid("PE_WeaponCallback","weapon effect callback");
+        PE_Port_RequestStop(PE_PORT_STOP_UNRESOLVED_BOUNDARY);
+        return;
+    }
+    /* DAY1 SHIM (DAY1_FIDELITY_GAPS.md, "unported room effect init /
+     * callback"): skip the unported effect-VM callback and retire its record
+     * (rec+1 = 2, as the ported callbacks do when they finish). */
+    {
+        static pe_addr_t seen[32]; static unsigned nseen; unsigned k;
+        for (k = 0; k < nseen && seen[k] != fn; k++) {}
+        if (k == nseen && nseen < 32u) {
+            seen[nseen++] = fn;
+            fprintf(stderr,"[DAY1_SHIM] PE_WeaponCallback: effect callback %08X (token %08X) not ported; record retired\n",
+                    fn,(unsigned)PE_LoadU32(0x8009D280u));
+        }
+    }
+    PE_StoreU8(rec+1u,2u);
 }
 
 static void weapon_context(pe_addr_t slot,int owner)

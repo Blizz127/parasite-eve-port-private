@@ -59,13 +59,25 @@ static uint16_t RouteM34ShimMove(int ax, int az, int wx, int wz, int stop2)
     static int last_dir=-1, hold=0, px, pz;
     int c=(int16_t)PE_LoadU16(0x800BD000u),sn=(int16_t)PE_LoadU16(0x800BD004u);
     int best=-1; long long bd=0;
+    {
+        /* M34's arena camera changes angle as Aya moves (m34d: stuck holding a
+         * stale Up at (-734,768)), so re-derive the map from the live matrix
+         * whenever it changes. */
+        static int lc=0x7FFFFFFF, lsn=0x7FFFFFFF;
+        if (GA_TOKEN==0xA8003248u && (c!=lc || sn!=lsn)) {
+            if (lc!=0x7FFFFFFF) g_m34s_init=0;
+            lc=c; lsn=sn;
+        }
+    }
     if (!g_m34s_init) {
         if (!c && !sn) c=4096;
-        /* w = M p with M=[[c,-sn],[sn,c]] (transposed-aim convention). */
-        g_m34s_vx[0]=-sn; g_m34s_vz[0]=c;     /* Up    p=(0,1)  */
-        g_m34s_vx[1]=c;   g_m34s_vz[1]=sn;    /* Right p=(1,0)  */
-        g_m34s_vx[2]=sn;  g_m34s_vz[2]=-c;    /* Down  p=(0,-1) */
-        g_m34s_vx[3]=-c;  g_m34s_vz[3]=-sn;   /* Left  p=(-1,0) */
+        /* w = M^T p. m34c proved it live in M34 (c=101, sn=-4095):
+         * Down->east, Right->north, Left->south, hence Up->west, which matches
+         * the 09-18 handoff. The earlier M p seed had Up/Down swapped there. */
+        g_m34s_vx[0]=sn;  g_m34s_vz[0]=c;     /* Up    */
+        g_m34s_vx[1]=c;   g_m34s_vz[1]=-sn;   /* Right */
+        g_m34s_vx[2]=-sn; g_m34s_vz[2]=-c;    /* Down  */
+        g_m34s_vx[3]=-c;  g_m34s_vz[3]=sn;    /* Left  */
         for (int i=0;i<4;i++) {
             int n=abs(g_m34s_vx[i])+abs(g_m34s_vz[i]); if(!n)n=1;
             g_m34s_vx[i]=g_m34s_vx[i]*1000/n; g_m34s_vz[i]=g_m34s_vz[i]*1000/n;
@@ -77,7 +89,8 @@ static uint16_t RouteM34ShimMove(int ax, int az, int wx, int wz, int stop2)
     }
     /* Learn: after 12 frames of the same single direction, the net
      * displacement over the last window is that pad's world direction. */
-    if (last_dir>=0 && hold>=12) {
+    /* Learning off in M34: knockback from the head corrupts it (m34c flipped Left). */
+    if (last_dir>=0 && hold>=12 && GA_TOKEN!=0xA8003248u) {
         int dx=ax-px,dz=az-pz,n=abs(dx)+abs(dz);
         if (n>=40) {
             int nx=dx*1000/n,nz=dz*1000/n;
@@ -90,9 +103,24 @@ static uint16_t RouteM34ShimMove(int ax, int az, int wx, int wz, int stop2)
         hold=0; px=ax; pz=az;
     }
     if ((long long)wx*wx+(long long)wz*wz<=stop2) { last_dir=-1; hold=0; return 0xFFFFu; }
-    for (int i=0;i<4;i++) {
-        long long d=(long long)wx*g_m34s_vx[i]+(long long)wz*g_m34s_vz[i];
-        if (best<0 || d>bd) { bd=d; best=i; }
+    {
+        /* Unstick: if the held direction moved Aya <40u over 60f, use the
+         * next-best direction for 30f (m34e pinned at (-734,768) on Up). */
+        static int sx, sz, sf, alt_until;
+        int second=-1; long long sd=0;
+        for (int i=0;i<4;i++) {
+            long long d=(long long)wx*g_m34s_vx[i]+(long long)wz*g_m34s_vz[i];
+            if (best<0 || d>bd) { second=best; sd=bd; bd=d; best=i; }
+            else if (second<0 || d>sd) { second=i; sd=d; }
+        }
+        if (g_frame-sf>=60) {
+            if (abs(ax-sx)+abs(az-sz)<40 && g_frame>=alt_until) {
+                alt_until=g_frame+30;
+                fprintf(stderr,"M34_SHIM_UNSTICK %d pos=%d,%d best=%d alt=%d\n",g_frame,ax,az,best,second);
+            }
+            sx=ax; sz=az; sf=g_frame;
+        }
+        if (g_frame<alt_until && second>=0) best=second;
     }
     if (best!=last_dir) { last_dir=best; hold=0; px=ax; pz=az; }
     else hold++;
@@ -107,6 +135,8 @@ static uint16_t RouteM34Shim(void)
     pe_addr_t tail=0,head=0; unsigned tail_idx=0xFFu, count=PE_LoadU8(0x8009D2B0u);
     int ax=0,az=0,tx=0,tz=0,tailhp=0,headhp=0,t2=0;
     uint16_t mask=0xFFFFu;
+    static int seeded;
+    if (!seeded) { seeded=1; g_m34s_init=0; }   /* reseed the pad map for M34's camera */
     if (rec) {
         unsigned mx=PE_LoadU16(rec+28u);
         if (mx && PE_LoadU16(rec+12u)<mx) PE_StoreU16(rec+12u,(uint16_t)mx);
@@ -138,13 +168,29 @@ static uint16_t RouteM34Shim(void)
     }
     (void)head;
     if (mode==1u) {
-        /* ATB target menu: select the type-4 tail, then commit. */
+        /* ATB target menu. Out of range (world > ~950): Circle-cancel and
+         * walk. In range: cycle the selection onto the type-4 tail, then
+         * commit. m34a showed Down never moved 0x8009CE44, so rotate through
+         * Down/Right/Up/Left and log which one moves it. */
+        static const uint16_t cyc[4]={0xFFBFu,0xFFDFu,0xFFEFu,0xFF7Fu};
+        static unsigned last_sel=0xFFu, tries, dir;
         unsigned sel=PE_LoadU8(0x8009CE44u);
+        if (sel!=last_sel) {
+            if (last_sel!=0xFFu)
+                fprintf(stderr,"M34_SHIM_SEL %d sel %u->%u via dir=%u\n",g_frame,last_sel,sel,dir);
+            last_sel=sel; tries=0;
+        }
+        /* func_80021278: hit reliable <=1071u, possible <=1928u, hard miss beyond. */
+        if (t2>2250000) { if (g_frame%8==3) mask=0xDFFFu; return mask; }
         if (tail_idx!=0xFFu && sel!=tail_idx) {
-            if (g_frame%8==3) mask=tail_idx>sel?0xFFBFu:0xFFEFu;
+            if (g_frame%8==3) {
+                if (++tries>3) { tries=0; dir=(dir+1)%4u; }
+                mask=cyc[dir];
+            }
         } else if (g_frame%8==3) mask=0xBFFFu;
         return mask;
     }
+    /* mode 7 = battle intro; it needs Cross to advance (m34b idled there forever). */
     if (mode!=0u) {
         /* Outro / dialogue / transfer: slow Cross to advance text. */
         if (g_frame%32==3) mask=0xBFFFu;
@@ -153,7 +199,7 @@ static uint16_t RouteM34Shim(void)
     if (tail && tailhp>1000000) {
         int stop2=500000; /* ~707 world units: well inside the 1071 band */
         mask=RouteM34ShimMove(ax,az,tx-ax,tz-az,stop2);
-        if (t2<=900000 && g_frame%8==3) mask&=0xBFFFu; /* attack / reload */
+        if (t2<=2250000 && g_frame%8==3) mask&=0xBFFFu; /* attack / reload (<=1500u; m34e sat at 1066u unfired) */
     } else if (g_frame%32==3) mask=0xBFFFu;
     return mask;
 }
@@ -326,7 +372,8 @@ static uint16_t RouteRewardSewerPilot(uint16_t mask)
      * The recorded supply suffix is Cross/idle, so leaving it in control
      * parks Aya on the alligator's charge line. */
     if (m34 && g_route_m34_shim) return RouteM34Shim();
-    if (g_route_battle_shim && GA_TOKEN==0xA80021C8u && (PE_LoadU32(0x8009D1A0u)&2u))
+    /* A8064448 = M34 phase 2 (sewer tunnel), entered after the tail breaks (m34f @64370). */
+    if (g_route_battle_shim && (GA_TOKEN==0xA80021C8u || GA_TOKEN==0xA8064448u) && (PE_LoadU32(0x8009D1A0u)&2u))
         return RouteBattleShim();
     if ((GA_TOKEN==0xA80023C8u || GA_TOKEN==0xA8002448u || GA_TOKEN==0xA8003148u || m34) &&
         (m34 || (PE_LoadU32(0x8009D1A0u)&2u))) {
@@ -945,6 +992,11 @@ static uint16_t RouteRewardSewerPilot(uint16_t mask)
         } else if (aya) {
             int dx=-((int32_t)PE_LoadU32(aya+40u)>>16);
             int dz=(GA_TOKEN==0xA80023C8u?-1250:450)-((int32_t)PE_LoadU32(aya+48u)>>16);
+            /* day1 (09-28): M0028I spawns Aya at (0,-3240) and the fight can end
+             * off-lane (742,-3434); the direct diagonal to (0,450) snags at
+             * ~(910,-1370) forever (build/lanes/day1/m28.log). Walk back to the
+             * x=0 lane first, then north. */
+            if (GA_TOKEN==0xA8002448u && abs(dx)>80) dz=0;
             int c=(int16_t)PE_LoadU16(0x800BD000u),sn=(int16_t)PE_LoadU16(0x800BD004u);
             int x=c*dx-sn*dz,z=sn*dx+c*dz;
             if (dx*dx+dz*dz>1600) {

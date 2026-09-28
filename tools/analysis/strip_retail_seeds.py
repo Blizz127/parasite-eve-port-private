@@ -57,6 +57,9 @@ FIXROW_RE = re.compile(rb"\{(PE_RF_ROWS|PE_RF_BYTES),\s*([^,]+),\s*(\d+)u,\s*(\d
 WIDTH = {b"uint8_t": 1, b"unsigned char": 1, b"uint16_t": 2, b"unsigned short": 2,
          b"uint32_t": 4, b"unsigned int": 4}
 EXE_HDR = 0x800
+# --strict parity: also strip pointer/jump tables (address-only runs), which
+# retail_data_guard.py --strict fails on.  On by default.
+STRIP_ADDRESSES = True
 
 
 def _int(t: bytes) -> int:
@@ -99,11 +102,11 @@ def matches(buf: bytes, ref: guard.Reference, step: int, width: int):
         w = buf[i:i + guard.WIN]
         hit = ref.lookup_pos(w, width)
         span = guard.WIN
-        if not hit or (width == 4 and guard.address_only(w)):
+        if not hit or (width == 4 and not STRIP_ADDRESSES and guard.address_only(w)):
             w2 = buf[i:i + guard.WIN2]
             hit = ref.lookup_pos2(w2, width) if len(w2) == guard.WIN2 else None
             span = guard.WIN2
-            if not hit or (width == 4 and guard.address_only(w2)):
+            if not hit or (width == 4 and not STRIP_ADDRESSES and guard.address_only(w2)):
                 i += step
                 continue
         label, blob, off = hit
@@ -225,7 +228,11 @@ def main(argv=None) -> int:
     ap.add_argument("--exe")
     ap.add_argument("--peimg")
     ap.add_argument("--check", action="store_true")
+    ap.add_argument("--keep-addresses", action="store_true",
+                    help="leave pointer/jump tables (address-only runs) in place")
     a = ap.parse_args(argv)
+    global STRIP_ADDRESSES
+    STRIP_ADDRESSES = not a.keep_addresses
     ref = build_reference(a)
     dirty = 0
     for h in a.headers:

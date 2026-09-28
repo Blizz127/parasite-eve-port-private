@@ -18,6 +18,8 @@
 #include "pe_guest_image.h"
 #include "test_retail_fixups.h"
 /* Stripped retail-oracle headers (RETAILFIX tables used across test files). */
+#include "retail_actor_flag_vm_cases.h"
+#include "retail_music_consumer_cases.h"
 #include "retail_anchor_attachment_cases.h"
 #include "retail_attachment_vm_cases.h"
 #include "retail_aya_reaction_cases.h"
@@ -1973,16 +1975,9 @@ static void test_B54KY_192CE8_real_disc_issue_poll_and_boundary(void)
     ASSERT(PE_LoadU32(0x8009B574u) == 1u, "opening-FMV SDK ready");
     /* EXE .rodata CD/DMA pointer table (fmv-autonomous-stream REPORT §2).
      * ResetTestState zeroes these; retail boot has them before any code. */
-    PE_StoreU32(0x8009B32Cu, 0x1F801800u);
-    PE_StoreU32(0x8009B330u, 0x1F801801u);
-    PE_StoreU32(0x8009B334u, 0x1F801802u);
-    PE_StoreU32(0x8009B338u, 0x1F801803u);
-    PE_StoreU32(0x8009B33Cu, 0x1F801018u);
-    PE_StoreU32(0x8009B340u, 0x1F801020u);
-    PE_StoreU32(0x8009B344u, 0x1F8010F0u);
-    PE_StoreU32(0x8009B348u, 0x1F8010F4u);
-    PE_StoreU32(0x8009B34Cu, 0x1F801098u);
-    PE_StoreU32(0x8009B35Cu, 0x1F8010B8u);
+    /* CD/DMA register table from the disc EXE (0x8009B32C..0x8009B34C, 0x8009B35C). */
+    ASSERT(PE_TestRetail_LoadExeRange(0x8009B32Cu, 0x24u) == 0 &&
+           PE_TestRetail_LoadExeRange(0x8009B35Cu, 4u) == 0, "EXE 0x8009B32C table");
     D_800B0DD8 = 1013u;
     D_80011614 = 0x8018EFF0u;
     D_80093164[0] = 0x03D2u;
@@ -35050,16 +35045,9 @@ static void test_OPEN1_909B4_enters_fmv_without_skip_movie(void)
          !PE_Port_ShouldStop(); tick++)
         HostFB_VSync(0);
     ASSERT(PE_LoadU32(0x8009B574u) == 1u, "SDK ready");
-    PE_StoreU32(0x8009B32Cu, 0x1F801800u);
-    PE_StoreU32(0x8009B330u, 0x1F801801u);
-    PE_StoreU32(0x8009B334u, 0x1F801802u);
-    PE_StoreU32(0x8009B338u, 0x1F801803u);
-    PE_StoreU32(0x8009B33Cu, 0x1F801018u);
-    PE_StoreU32(0x8009B340u, 0x1F801020u);
-    PE_StoreU32(0x8009B344u, 0x1F8010F0u);
-    PE_StoreU32(0x8009B348u, 0x1F8010F4u);
-    PE_StoreU32(0x8009B34Cu, 0x1F801098u);
-    PE_StoreU32(0x8009B35Cu, 0x1F8010B8u);
+    /* CD/DMA register table from the disc EXE (0x8009B32C..0x8009B34C, 0x8009B35C). */
+    ASSERT(PE_TestRetail_LoadExeRange(0x8009B32Cu, 0x24u) == 0 &&
+           PE_TestRetail_LoadExeRange(0x8009B35Cu, 4u) == 0, "EXE 0x8009B32C table");
     D_800B0DD8 = 1013u;
     D_80011614 = 0x8018EFF0u;
     D_80093164[0] = 0x03D2u;
@@ -35660,6 +35648,7 @@ static void test_ATK3_retail_attack_initialization(void)
 #include "test_m34_effect.h"
 #include "test_m34_projectile.h"
 #include "test_m34_children.h"
+#include "test_pe_plat.h"
 #include "test_actor_contact.h"
 #include "test_clear_image.h"
 #include "test_script_sound.h"
@@ -38091,9 +38080,11 @@ static void test_SEW12_m0013i_command_callback(void)
            && PE_LoadU32(0x8018FCF4u) == 0x33333333u, "a1/a2/a3 stored in the overlay block");
     /* A different overlay at the same address must not match the signature. */
     PE_StoreU32(fn + 4u, 0x2442FCF0u);
+    g_pe_strict_effect_stack = 1;
     (void)func_800D4698(slot, 0u, 1u, 0u, 0u, 0u);
+    g_pe_strict_effect_stack = 0;
     ASSERT(PE_Port_ShouldStop() && PE_Port_GetStopReason() == PE_PORT_STOP_UNRESOLVED_BOUNDARY,
-           "unknown overlay code at 8018FC54 stays an explicit boundary");
+           "strict mode: unknown overlay code at 8018FC54 stays an explicit boundary");
     PASS();
 }
 
@@ -40850,6 +40841,7 @@ int main(void)
     test_HANDLO_all();
     test_HANDHI_all();
     test_PORTABSENT_all();
+    test_PLAT_all();   /* step P0: pe_plat adapters (test_pe_plat.h) */
 
     /* Guard tests (4 tests) */
     test_no_emulator_process();

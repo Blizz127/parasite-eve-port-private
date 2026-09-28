@@ -20,6 +20,7 @@
  * skips it). Unknown jalr targets are not invented.
  */
 #include "psx_compat.h"
+#include "pe_guestcode.h"
 #include "pe_port_compat.h"
 #include "game_port.h"
 
@@ -204,15 +205,35 @@ int func_8006F39C(unsigned int code, pe_addr_t userdata)
         (void)func_800CD728(slot);
     else if (fn == 0x8018F00Cu && PE_M34BossEffectOverlay())
         (void)PE_M34BossEffectInit(slot);
+    else if (fn == 0x8018F06Cu && PE_M0348iEffectOverlay())
+        (void)PE_M0348iEffectInit(slot);
     else if (fn == 0x800CE084u)
         (void)func_800CE084(slot);
     else if (fn == 0x8019151Cu && PE_M28MovementOverlay())
         (void)PE_M28MovementInit(slot);
     else if (fn == 0x8019150Cu && PE_M32MovementOverlay())
         (void)PE_M32MovementInit(slot);
-    else {
+    else if (PE_GuestCode_Resolve(fn))
+        /* Generated overlay / EXE TU at that address (pe_guestcode.h). */
+        (void)PE_GuestCall("@8006F39C:init", fn, 1u, (uintptr_t)slot, 0, 0, 0);
+    else if (g_pe_strict_effect_stack) {
+        fprintf(stderr, "[func_8006F39C] unresolved init fn=%08X code=%02X token=%08X slot=%08X\n",
+                fn, code, (unsigned)PE_LoadU32(0x8009D280u), slot);
         Bootstrap_ReturnVoid("func_8006F39C_constructor", "func_8006F39C");
         PE_Port_RequestStop(PE_PORT_STOP_UNRESOLVED_BOUNDARY);
+    } else {
+        /* DAY1 SHIM (docs/ai_context/DAY1_FIDELITY_GAPS.md, "func_8006F39C
+         * unresolved init"): the record is allocated exactly as retail but
+         * its overlay init callback has no native port; skip it and keep
+         * running.  Logged once per distinct fn. */
+        static pe_addr_t seen[16]; static unsigned nseen;
+        unsigned k;
+        for (k = 0; k < nseen && seen[k] != fn; k++) {}
+        if (k == nseen && nseen < 16u) {
+            seen[nseen++] = fn;
+            fprintf(stderr, "[DAY1_SHIM] func_8006F39C: init fn=%08X code=%02X token=%08X slot=%08X not ported; skipped\n",
+                    fn, code, (unsigned)PE_LoadU32(0x8009D280u), slot);
+        }
     }
     return index + ((code >= 0x46u && code < 0x55u) ? 11 : 0);
 }
