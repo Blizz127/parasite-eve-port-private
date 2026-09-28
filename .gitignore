@@ -121,6 +121,10 @@ tools/era/maspsx/tests/*
 !tools/era/maspsx/tests/test_symbol_pointer_load_li_after.py
 !tools/era/maspsx/tests/test_branch_steal_jump_slot.py
 !tools/era/maspsx/tests/test_fill_branch_tested_li_void.py
+!tools/era/maspsx/tests/test_sink_volatile_stack_load.py
+!tools/era/maspsx/tests/test_branch_steal_target_insn.py
+!tools/era/maspsx/tests/test_fill_jump_preceding_move.py
+!tools/era/maspsx/tests/test_load_delay_nop_before_any_label.py
 build-port/
 pc_port/build/
 pc_port/build-san/

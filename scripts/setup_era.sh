@@ -107,6 +107,10 @@ MASPSX_TRACKED=(
     "tests/test_symbol_pointer_load_li_after.py"
     "tests/test_branch_steal_jump_slot.py"
     "tests/test_fill_branch_tested_li_void.py"
+    "tests/test_sink_volatile_stack_load.py"
+    "tests/test_branch_steal_target_insn.py"
+    "tests/test_fill_jump_preceding_move.py"
+    "tests/test_load_delay_nop_before_any_label.py"
 )
 
 if [[ -f "$ERA/maspsx/maspsx.py" ]]; then

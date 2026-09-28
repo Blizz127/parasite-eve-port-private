@@ -1409,6 +1409,36 @@ class MaspsxProcessor:
         # a register the branch tests (cc1 reorg refuses: the trial sets a
         # resource the branch needs). Opt-in, and only for a VOID function:
         # a return counts as killing every caller-saved register.
+        # LOCAL PATCH 44 (K-SINK-VRELOAD): a volatile stack local stands in
+        # for a pseudo that retail spilled; retail's reload of it is placed by
+        # sched2 one insn before its use. Opt-in: sink a `#.set volatile`
+        # `lw $r,N($sp)` down to just before the insn preceding its first use.
+        self.sink_volatile_stack_load = (
+            os.environ.get("MASPSX_SINK_VOLATILE_STACK_LOAD") == "1"
+        )
+        # LOCAL PATCH 45 (K-STEAL-TGT): the retail reorg steals a branch
+        # target's first insn into the slot even when it writes the tested
+        # register, and retargets past it. cc1 refuses (the trial sets a
+        # resource the branch needs). Opt-in; the destination must be dead
+        # on the fall-through path.
+        # "1": only an insn writing a tested register (cc1 never steals
+        # those); "any": also untested destinations cc1 left unstolen.
+        self.branch_steal_target_insn = os.environ.get(
+            "MASPSX_BRANCH_STEAL_TARGET_INSN", ""
+        ) in ("1", "any")
+        self.branch_steal_target_any = (
+            os.environ.get("MASPSX_BRANCH_STEAL_TARGET_INSN") == "any"
+        )
+        # LOCAL PATCH 46 (K-JMOVE): ASPSX fills a reorder-mode `j $L` slot
+        # with the immediately preceding one-word register move. Opt-in.
+        self.fill_jump_preceding_move = (
+            os.environ.get("MASPSX_FILL_JUMP_PRECEDING_MOVE") == "1"
+        )
+        # LOCAL PATCH 47: patch 14 for any following label (not only one
+        # that opens a cc1 directive block). Opt-in.
+        self.load_delay_nop_before_any_label = (
+            os.environ.get("MASPSX_LOAD_DELAY_NOP_BEFORE_ANY_LABEL") == "1"
+        )
         self.fill_branch_tested_li_void = (
             os.environ.get("MASPSX_FILL_BRANCH_TESTED_LI_VOID") == "1"
         )
@@ -2210,6 +2240,210 @@ class MaspsxProcessor:
         self._branch_fill_label_map = None
         self._branch_fill_reorder = None
 
+    def _sink_volatile_stack_load(self):
+        """`#.set volatile` / `lw $r,N($sp)` / `#.set novolatile` followed by
+        straight-line insns that neither touch $r nor store to N($sp) ->
+        move the triple to just before the insn that precedes $r's first use.
+        """
+        load_re = re.compile(r"^lw\t(\$\d+),(-?\d+)\(\$sp\)$")
+        regs_re = re.compile(r"\$\w+")
+        lines = self.lines
+        i = 0
+        while i < len(lines) - 2:
+            m = load_re.match(strip_comments(lines[i + 1]))
+            if not (
+                lines[i] == "#.set\tvolatile"
+                and m
+                and lines[i + 2] == "#.set\tnovolatile"
+            ):
+                i += 1
+                continue
+            r, off = m.group(1), m.group(2)
+            insns = []  # indices of the following straight-line insns
+            use = None
+            k = i + 3
+            ok = True
+            while k < len(lines):
+                t = strip_comments(lines[k])
+                if not t:
+                    k += 1
+                    continue
+                if t.startswith(".") or t.endswith(":") or t.startswith("#"):
+                    ok = False
+                    break
+                op = t.split(None, 1)[0]
+                ops = self._branch_fill_operands(t)
+                toks = regs_re.findall(" ".join(ops))
+                if op in cond_branch_mnemonics or op in ("j", "jr", "jal", "jalr"):
+                    ok = False
+                    break
+                if r in toks[1:] or (toks and toks[0] == r and op.startswith("s")):
+                    use = k
+                    break
+                if toks and toks[0] == r:
+                    ok = False  # $r overwritten before use
+                    break
+                if op in ("sw", "sh", "sb", "swl", "swr"):
+                    base = ops[-1] if ops else ""
+                    if not base.endswith("($sp)") or base == f"{off}($sp)":
+                        ok = False
+                        break
+                insns.append(k)
+                k += 1
+            if not ok or use is None or len(insns) < 2:
+                i += 1
+                continue
+            dest = insns[-1]  # insert before the insn that precedes the use
+            triple = lines[i:i + 3]
+            lines = lines[:i] + lines[i + 3:dest] + triple + lines[dest:]
+            i = dest
+        self.lines = lines
+
+    def _branch_steal_target_insn(self):
+        """Reorder-mode `bXX r..,$L` (next line is not fillable: another
+        branch) whose `$L:` starts with a one-word ALU insn writing a tested
+        register -> noreorder `bXX r..,$Lnew` / insn, `$Lnew:` after it."""
+        self._branch_fill_label_map = None
+        self._branch_fill_reorder = None
+        lines = self.lines
+        labels = self._branch_fill_labels()
+        reorder = self._branch_fill_reorder_flags()
+        counter = getattr(self, "_steal_target_counter", 0)
+        edits = {}
+        new_labels = {}
+        for i, line in enumerate(lines):
+            if not reorder[i]:
+                continue
+            bare = strip_comments(line)
+            if not bare:
+                continue
+            op = bare.split(None, 1)[0]
+            if op not in cond_branch_mnemonics:
+                continue
+            operands = self._branch_fill_operands(bare)
+            want = 3 if op in cond_branch_two_reg else 2
+            if len(operands) != want or operands[-1] not in labels:
+                continue
+            j = i + 1
+            while j < len(lines) and (
+                lines[j] == "" or lines[j].startswith(".set\t")
+            ):
+                j += 1
+            nxt = strip_comments(lines[j]) if j < len(lines) else ""
+            if not nxt or nxt.split(None, 1)[0] not in cond_branch_mnemonics:
+                continue
+            t = labels[operands[-1]] + 1
+            while t < len(lines) and lines[t] == "":
+                t += 1
+            if t >= len(lines) or not reorder[t]:
+                continue
+            cand = strip_comments(lines[t])
+            cop = cand.split(None, 1)[0] if cand else ""
+            cargs = self._branch_fill_operands(cand)
+            lui_li = (
+                cop == "li" and len(cargs) == 2 and is_number(cargs[1])
+                and (int(cargs[1], 0) & 0xFFFF) == 0
+                and -0x80000000 <= int(cargs[1], 0) <= 0xFFFFFFFF
+            )
+            spec = (2, None) if lui_li else branch_fill_candidates.get(cop)
+            if spec is None or ";" in cand:
+                continue
+            if len(cargs) != spec[0]:
+                continue
+            if spec[1] in ("s16", "u16", "sh") and gpr_number(cargs[-1]) is None:
+                if not is_number(cargs[-1]):
+                    continue
+                v = int(cargs[-1], 0)
+                if spec[1] == "sh" and not 0 <= v <= 31:
+                    continue
+                if spec[1] != "sh" and not -0x8000 <= v <= 0xFFFF:
+                    continue
+            dest = gpr_number(cargs[0])
+            tested = [gpr_number(x) for x in operands[:-1]]
+            if dest is None or dest in (0, 1) or dest >= 26:
+                continue
+            if dest not in tested and not self.branch_steal_target_any:
+                continue
+            if any(gpr_number(x) == dest for x in cargs[1:]):
+                continue
+            if not self._branch_fill_reg_dead_at(
+                None, dest, extended=True, start_index=i + 1
+            ):
+                continue
+            # the target label right after the next branch, referenced only
+            # by this branch: the fall-through already ran the slot, so the
+            # insn MOVES (retail's reorg deletes the now-redundant copy)
+            lab_idx = labels[operands[-1]]
+            k = j + 1
+            while k < len(lines) and lines[k] == "":
+                k += 1
+            refs = sum(
+                1 for x in lines
+                if re.search(r"[,\s]" + re.escape(operands[-1]) + r"$", strip_comments(x))
+            )
+            if k == lab_idx and refs == 1:
+                new_ops = ",".join(operands)
+                edits[i] = [
+                    ".set\tnoreorder",
+                    ".set\tnomacro",
+                    f"{op}\t{new_ops}",
+                    cand,
+                    ".set\tmacro",
+                    ".set\treorder",
+                ]
+                new_labels[t] = None
+                continue
+            counter += 1
+            lab = f"$L{910000 + counter}"
+            new_ops = ",".join(operands[:-1] + [lab])
+            edits[i] = [
+                ".set\tnoreorder",
+                ".set\tnomacro",
+                f"{op}\t{new_ops}",
+                cand,
+                ".set\tmacro",
+                ".set\treorder",
+            ]
+            new_labels[t] = f"{lab}:"
+        self._steal_target_counter = counter
+        if edits:
+            out = []
+            for i, line in enumerate(lines):
+                if i in new_labels and new_labels[i] is None:
+                    continue  # moved into the branch slot
+                out.extend(edits.get(i, [line]))
+                if i in new_labels:
+                    out.append(new_labels[i])
+            self.lines = out
+        self._branch_fill_label_map = None
+        self._branch_fill_reorder = None
+
+    def _fill_jump_preceding_move(self):
+        """Reorder-mode `move $d,$s` immediately followed by `j $L` ->
+        noreorder `j $L` / `move $d,$s`."""
+        self._branch_fill_reorder = None
+        reorder = self._branch_fill_reorder_flags()
+        lines = self.lines
+        out = []
+        i = 0
+        while i < len(lines):
+            a = strip_comments(lines[i])
+            b = strip_comments(lines[i + 1]) if i + 1 < len(lines) else ""
+            if (
+                reorder[i]
+                and re.match(r"^move\t\$\w+,\$\w+$", a)
+                and re.match(r"^j\t\$L\d+$", b)
+            ):
+                out += [".set\tnoreorder", ".set\tnomacro", b, a,
+                        ".set\tmacro", ".set\treorder"]
+                i += 2
+                continue
+            out.append(lines[i])
+            i += 1
+        self.lines = out
+        self._branch_fill_reorder = None
+        self._branch_fill_label_map = None
+
     def _swap_s2_s1_save_pairs(self):
         """Swap a prologue `sw/move $s1,$a0` pair with the following `$s2,$a1` pair."""
         lines = self.lines
@@ -2539,8 +2773,14 @@ class MaspsxProcessor:
             self._fold_rodata_literals()
         if self.return_via_epilogue_jump:
             self._retarget_mid_function_returns()
+        if getattr(self, "sink_volatile_stack_load", False):
+            self._sink_volatile_stack_load()
         if getattr(self, "branch_steal_jump_slot", False):
             self._branch_steal_jump_slot()
+        if getattr(self, "branch_steal_target_insn", False):
+            self._branch_steal_target_insn()
+        if getattr(self, "fill_jump_preceding_move", False):
+            self._fill_jump_preceding_move()
         if getattr(self, "fill_branch_tested_li_void", False):
             self._fill_branch_tested_li_void()
         if self.sink_return_zero_into_flag_delay:
@@ -4028,7 +4268,8 @@ class MaspsxProcessor:
                     skip=0, ignore_nop=True, ignore_set=True
                 )
                 if is_label(label) and (
-                    (
+                    getattr(self, "load_delay_nop_before_any_label", False)
+                    or (
                         self.load_delay_nop_before_label
                         and self._label_opens_directive_block(label)
                     )

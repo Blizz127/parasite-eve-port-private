@@ -1265,7 +1265,7 @@ segments:
       # func_8004A6CC — bonus-point spend panel draw: stat rows (base byte + bonus short, clamped 999) for rows 0-2, or the
       # level/exp view for rows >= 3. era -O2 -G8.
       - [0x3AECC, c, func_8004A6CC]
-      - [0x3B1A0, asm]
+      - [0x3B1A0, c, func_8004A9A0]
       # Two-object construct with crossed field stores.
       - [0x3B59C, c, func_8004AD9C]
       - [0x3B61C, c, func_8004AE1C]
@@ -2323,7 +2323,7 @@ segments:
       - [0x59E60, c, func_80069660]
       # asset/Asset_UnloadTableEntries. The hinted -fno-force-mem changes nothing (matches with and with
       - [0x59EF0, c, func_800696F0]
-      - [0x5A0D4, asm]
+      - [0x5A0D4, c, func_800698D4]
       - [0x5A308, c, func_80069B08]
       - [0x5A8E8, c, func_8006A0E8]
       - [0x5AA5C, c, func_8006A25C]
@@ -2580,12 +2580,15 @@ segments:
       # jal/j/jalr slot macro split (maspsx patch 8, MASPSX_FILL_CALL_DELAY_SLOT)
       - [0x63150, c, func_80072950]
       - [0x63250, asm]
+      - [0x63274, c, func_80072A74]
+      - [0x635E8, asm]
       # 64-bit add: the four 16-bit halves live in a local `unsigned int w[4]` (an array is what puts th
       - [0x635F4, c, func_80072DF4]
       - [0x636A0, asm]
       # 64-bit shift (arithmetic right); explicit i=0/do-while kills the phantom frame, counter pinned $
       - [0x636A4, c, func_80072EA4]
       - [0x63760, asm]
+      - [0x63764, c, func_80072F64]
       # unsigned 64-bit compare; last sltu in $v1
       - [0x63A44, c, func_80073244]
       # twin of 80072EA4 with a logical right shift
@@ -2597,7 +2600,7 @@ segments:
       - [0x63C54, c, func_80073454]
       # 64-bit negate: struct-by-value ~x then func_80072DF4(x,{1,0}); hi-before-lo statement order
       - [0x63D54, c, func_80073554]
-      - [0x63DC4, asm]
+      - [0x63DC4, c, func_800735C4]
       # 32x32->64 multiply via three func_80072DF4 adds. ERA_ASPSX_VER=2.30 is REQUIRED: maspsx omits th
       - [0x640D8, c, func_800738D8]
       - [0x641C4, c, func_800739C4]

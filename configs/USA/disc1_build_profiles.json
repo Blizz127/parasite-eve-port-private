@@ -2463,6 +2463,54 @@
         "MASPSX_DISPATCH_FOLD": "jtbl_80010F6C",
         "MASPSX_FORCE_ABSOLUTE_SYMBOLS": "D_8009EE70,D_80092224,D_80092230,D_800A1704,D_800A1838,D_800A1854,D_800A1864,D_800A186C"
       }
+    },
+    "era_o2_g8_dispatch_80010ff4_80011014": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G8"
+      ],
+      "environment": {
+        "MASPSX_THREE_WORD_SYMBOL_STORE": "1",
+        "MASPSX_DISPATCH_FOLD": "jtbl_80010FF4,jtbl_80011014"
+      }
+    },
+    "era_o2_g0_fill_jump_stack_store_fill_epilogue_delay_slot_sink_volatile_stack_load": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0"
+      ],
+      "environment": {
+        "MASPSX_FILL_JUMP_STACK_STORE": "1",
+        "MASPSX_FILL_EPILOGUE_DELAY_SLOT": "1",
+        "MASPSX_SINK_VOLATILE_STACK_LOAD": "1"
+      }
+    },
+    "era_o2_g0_fill_epilogue_delay_slot_branch_steal_target_insn_fill_jump_preceding_move_load_delay_nop_before_any_label": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0"
+      ],
+      "environment": {
+        "MASPSX_FILL_EPILOGUE_DELAY_SLOT": "1",
+        "MASPSX_BRANCH_STEAL_TARGET_INSN": "1",
+        "MASPSX_FILL_JUMP_PRECEDING_MOVE": "1",
+        "MASPSX_LOAD_DELAY_NOP_BEFORE_ANY_LABEL": "1"
+      }
+    },
+    "era_o2_g0_fill_epilogue_delay_slot_branch_steal_target_insn_any_load_delay_nop_before_any_label": {
+      "toolchain": "era",
+      "flags": [
+        "-O2",
+        "-G0"
+      ],
+      "environment": {
+        "MASPSX_FILL_EPILOGUE_DELAY_SLOT": "1",
+        "MASPSX_BRANCH_STEAL_TARGET_INSN": "any",
+        "MASPSX_LOAD_DELAY_NOP_BEFORE_ANY_LABEL": "1"
+      }
     }
   },
   "assignments": {
@@ -3864,6 +3912,18 @@
     ],
     "era_o2_g8_dispatch_80010f6c_force_d8009ee70_d80092224_d80092230_d800a1704_d800a1838_d800a1854_d800a1864_d800a186c_absolute": [
       "func_80041108"
+    ],
+    "era_o2_g8_dispatch_80010ff4_80011014": [
+      "func_8004A9A0"
+    ],
+    "era_o2_g0_fill_jump_stack_store_fill_epilogue_delay_slot_sink_volatile_stack_load": [
+      "func_800735C4"
+    ],
+    "era_o2_g0_fill_epilogue_delay_slot_branch_steal_target_insn_fill_jump_preceding_move_load_delay_nop_before_any_label": [
+      "func_80072A74"
+    ],
+    "era_o2_g0_fill_epilogue_delay_slot_branch_steal_target_insn_any_load_delay_nop_before_any_label": [
+      "func_80072F64"
     ]
   }
 }
