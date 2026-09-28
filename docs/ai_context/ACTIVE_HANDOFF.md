@@ -1,3 +1,11 @@
+## UPDATE 2026-09-28: batch 9 — 2118 EXE c spans, gate PASS; port rounds 6–7 committed
+
+`EXACT_REBUILD_GATE=PASS plan=a116c59dbb862fd937f6e870201d610ad488f44494ef06bd17f318cceb9eb10b yaml=c7a5c9428a41b69576346d81c3eb98c861a7a023de46dd26ed219e31ac9f55bf spans=[2118 c, 165 asm, 2 rodata] sha1_orig=sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=2118` (log `build/tmp/gate-2118.log`). Leaves (each `LEAF_STRONG=EXACT` + deep preflight + `PROFILE_NECESSITY=PASS` on main): `func_8006B4F8` (540w), `func_8002312C`, `func_8001C7DC` (loop.c `threshold -= 3` per moved insn: extra movables ahead of a chain keep it in the loop), `func_800D8978` (hard-reg destination is not a sched1 birth), `func_80088980`, `func_80089328`, `func_800C2758`, `func_8007D778`.
+
+Port (`8c5d9f47`): rounds 6–7 — `func_8005FCAC` digit-count bug and `func_80067A78` non-retail null guard fixed, 78 hand ports retired for generated decomp TUs, 21 absent leaves ported and checked against a retail-instruction oracle (`pc_port/tools/pe_port7_oracle.py`, 5350 cases). `scripts/build_pc_port.sh --build-dir build/pcbuild-port` → 1574/1574; coverage matched 2118 / from_decomp 942 / hand 1108 / stub 33 / absent 35.
+
+**Held for owner decision:** `func_8001220C` (`main`) is byte-exact but keeps an instruction-bearing `__asm__ volatile` scratchpad stack switch around `jal func_8019234C` (no C spelling); lane results mark it `exact-inline-asm`, not integrated. Also flagged: `retail_port7_cases.h` embeds the two libgte sqrt/normalize tables (same as the committed `retail_polygon_boundary_cases.h`).
+
 ## UPDATE 2026-09-28: batch 8 — 2110 EXE c spans, gate PASS
 
 `EXACT_REBUILD_GATE=PASS plan=d159541db2972e29f297a4a488bf45b4d79998d93bc80eab46a75c50a0adb6eb yaml=2931089d41ec7debbc89f4383cebd4e083d726fdecdc3e8a4e97945567595f75 spans=[2110 c, 172 asm, 2 rodata] sha1_orig=sha1_cand=452fb033f2eaa4b18aa20a5bca60b8125af3a37b`, `VERIFY_SWEEP=PASS leaves=2110` (log `build/tmp/gate-2110.log`). Leaves (each `LEAF_STRONG=EXACT` + deep preflight + `PROFILE_NECESSITY=PASS` on main): `func_8002DC58` (1302w HUD, K4 + `TAIL1=D_800B0158`), `func_80030894` (788w), `func_80015DAC` (729w), `func_8002B29C`, `func_80026CF0`, `func_80066F60`, `func_800D5EB4`, `func_80081714` (2.7.2 despite sitting in the 2.8.1 band — block-move scratch v0/v1 is a 2.7.2 tell), `func_8007AAB4`.

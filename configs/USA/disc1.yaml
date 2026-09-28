@@ -543,7 +543,7 @@ segments:
       - [0xC964, c, func_8001C164]
       # gp-relative G8
       - [0xCE14, c, func_8001C614]
-      - [0xCFDC, asm]
+      - [0xCFDC, c, func_8001C7DC]
       # lane1: func_8001CAB0 VRAM 0x8001CAB0 size 0xF0.
       - [0xD2B0, c, func_8001CAB0]
       - [0xD3A0, c, func_8001CBA0]
@@ -619,7 +619,7 @@ segments:
       - [0x1357C, c, func_80022D7C]
       # lane1: func_80023008 VRAM 0x80023008 size 0x124.
       - [0x13808, c, func_80023008]
-      - [0x1392C, asm]
+      - [0x1392C, c, func_8002312C]
       - [0x13EE8, c, func_800236E8]
       # Battle item-use effect switch (heal amounts, status toggles, clears).
       - [0x14614, c, func_80023E14]
@@ -2347,7 +2347,7 @@ segments:
       - [0x5B540, c, func_8006AD40]
       # D_800B0CD8 subsystem reset: eight clear loops, a func_8006E498(D_800B0CD8+0x14C, 0x5EAF6804) see
       - [0x5BB5C, c, func_8006B35C]
-      - [0x5BCF8, asm]
+      - [0x5BCF8, c, func_8006B4F8]
       # two-level retry driver over func_8006E6A8/func_8006E7E8. Needs `if (a != b) { ... }` (not an ear
       - [0x5C568, c, func_8006BD68]
       # Volume campaign: byte-field updater and flag setter over D_800B0CD8.
@@ -3035,7 +3035,7 @@ segments:
       - [0x6DE14, c, func_8007D614]
       # func_8007D6D0 — SPU transfer kick (volatile SPU ctrl). era cc1 2.8.1 -mno-split-addresses.
       - [0x6DED0, c, func_8007D6D0]
-      - [0x6DF78, asm]
+      - [0x6DF78, c, func_8007D778]
       # D_8009B418 gated variant of func_8007DA7C
       - [0x6E1F8, c, func_8007D9F8]
       # three func_8007D778 calls, D_8009B414 << D_8009B424
@@ -3685,14 +3685,14 @@ segments:
       - [0x782A8, c, func_80087AA8]
       - [0x787A0, c, func_80087FA0]
       - [0x78B44, c, func_80088344]
-      - [0x79180, asm]
+      - [0x79180, c, func_80088980]
       - [0x79664, c, func_80088E64]
       # two func_800878F0 calls around a 0x11C-stride D_800B8AC0 record copy; asm barrier on the index c
       - [0x7976C, c, func_80088F6C]
       - [0x7980C, c, func_8008900C]
       - [0x79A18, c, func_80089218]
       - [0x79A50, c, func_80089250]
-      - [0x79B28, asm]
+      - [0x79B28, c, func_80089328]
       # bit-walk over 0x11C-stride records OR-ing 1<<rec[0xF0] into *a1, then *a1 &= a3
       - [0x79F24, c, func_80089724]
       - [0x79F84, c, func_80089784]
@@ -4124,7 +4124,7 @@ segments:
       - [0xB2C14, c, func_800C2414]
       # CLOSED from band7's 116. Four independent levers, each measured load-bearing (drop-one costs 98/
       - [0xB2D1C, c, func_800C251C]
-      - [0xB2F58, asm]
+      - [0xB2F58, c, func_800C2758]
       - [0xB32F0, c, func_800C2AF0]
       # Probe: indexed D_800E2248 address-return helpers.
       - [0xB3310, c, func_800C2B10]
@@ -4634,6 +4634,7 @@ segments:
       - [0xC8678, c, func_800D7E78]
       - [0xC87BC, c, func_800D7FBC]
       - [0xC8B88, asm]
+      - [0xC9178, c, func_800D8978]
       - [0xC936C, c, func_800D8B6C]
       # FieldEng effect dispatcher template: `switch (a0) { case 1: <field updates>; if (T < K) break; r
       - [0xC9514, c, func_800D8D14]
