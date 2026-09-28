@@ -36,7 +36,7 @@ doing anything**.
 
 ## Current phase
 
-**2182 matching C leaves** (EXE; 38 of them flagged `inline GTE/asm`, counted separately) + **2545 overlay `c` spans** across 72
+**2182 matching C leaves** (EXE; 37 of them flagged `inline GTE/asm` or inline-asm (`main`), counted separately) + **2545 overlay `c` spans** across 72
 PE.IMG targets — exact count via
 `python3 tools/build/disc1_plan.py --check` (prints
 `2330 spans (2182 c, 146 asm, 2 rodata)`) or equivalently
