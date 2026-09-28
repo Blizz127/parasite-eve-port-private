@@ -923,7 +923,7 @@ segments:
       # null-guarded record walk
       - [0x2D4B0, c, func_8003CCB0]
       - [0x2D6F8, c, func_8003CEF8]
-      - [0x2D850, asm]
+      - [0x2D850, c, func_8003D050]
       # Phase 5AJ: C leaf func_8003D82C — VRAM 0x8003D82C, size 0x8.
       # File span 0x2E02C–0x2E034 exclusive. Return-1 stub (jr; addiu $v0,1).
       # Prefix size 0x2B620 (= 0x2E02C - 0x2A0C); contiguous — no ROM holes.
@@ -1017,7 +1017,7 @@ segments:
       - [0x31380, c, func_80040B80]
       # memcard abort active op
       - [0x31780, c, func_80040F80]
-      - [0x31908, asm]
+      - [0x31908, c, func_80041108]
       # memcard slot select
       - [0x32820, c, func_80042020]
       - [0x32970, c, func_80042170]
@@ -2065,7 +2065,7 @@ segments:
       # geometry/UV block; P_TAG bitfield addPrim as in func_8005EB64.
       - [0x4F518, c, func_8005ED18]
       - [0x4F6C8, c, func_8005EEC8]
-      - [0x4F6D4, asm]
+      - [0x4F6D4, c, func_8005EED4]
       - [0x4F9A0, c, func_8005F1A0]
       - [0x4FA7C, c, func_8005F27C]
       # gpu/Draw_PrintCenteredTextInWidth. Long grind, 125 -> 0. Levers, in the order they mattered: the
@@ -2637,7 +2637,7 @@ segments:
       - [0x64628, c, func_80073E28]
       # psyq/libapi/intr_state - the PSY-Q interrupt dispatcher. FIRST of the four entries that were par
       - [0x64700, c, func_80073F00]
-      - [0x648D0, asm]
+      - [0x648D0, c, func_800740D0]
       # teardown; asm barrier on D_800945E4, D_80095678 declared pointer-to-volatile for the double load
       - [0x64A18, c, func_80074218]
       - [0x64AB8, c, func_800742B8]
