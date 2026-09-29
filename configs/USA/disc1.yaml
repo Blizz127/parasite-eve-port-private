@@ -4683,7 +4683,9 @@ segments:
       - [0xC084C, c, func_800D004C]
       # shaded ring (POLY_G4 annulus; inline GTE)
       - [0xC0F28, c, func_800D0728]
-      - [0xC1688, asm]
+      # shaded blade: one POLY_G3 fan triangle (inline GTE)
+      - [0xC1688, c, func_800D0E88]
+      - [0xC1B84, asm]
       # GPU primitive allocator + OT linker: bump-allocates from D_800B0E58[D_8009CDDC] via the D_8009CD
       - [0xC22E0, c, func_800D1AE0]
       # (a2<<10)/a1 then func_80077DC4, *a0/4096 with the bgez/+0xFFF rounding, four -0x80/0x80 stores t
@@ -4693,7 +4695,9 @@ segments:
       - [0xC2904, asm]
       # shaded textured ribbon (POLY_GT4; inline GTE)
       - [0xC2B70, c, func_800D2370]
-      - [0xC2FFC, asm]
+      # glow point on a rotated offset: TILE_1 core + 3x3 TILE halo (inline GTE)
+      - [0xC2FFC, c, func_800D27FC]
+      - [0xC3358, asm]
       # default O2 G0
       - [0xC42FC, c, func_800D3AFC]
       - [0xC43C8, asm]
