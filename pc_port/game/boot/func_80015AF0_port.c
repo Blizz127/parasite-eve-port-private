@@ -136,42 +136,17 @@ int func_8004D2DC(pe_addr_t window,uint32_t event)
 }
 
 /* Card confirmation, progress display and delayed record transition. */
-void func_800428D4(void)
-{ PE_StoreU8(0x800A0ED5u+(PE_LoadU32(0x800A1860u)-1u)*0x418u,13u); }
+/* func_800428D4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800428D4_port.c (src/func_800428D4.c); hand port retired (port3 switch-over D). */
 
 /* func_80042B50: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80042B50_port.c (src/func_80042B50.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 /* func_8004DA9C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8004DA9C_port.c (src/func_8004DA9C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-int32_t func_80042464(void)
-{
-    pe_addr_t record=PE_LoadU32(0x800A1854u);
-    if(!record)return 0;
-    uint32_t value=PE_LoadU32(0x800A1858u)-(uint32_t)(int32_t)(int16_t)PE_LoadU16(record+20u)+0x400u;
-    int32_t count=(int32_t)value>>10;
-    return count<9?count:8;
-}
+/* func_80042464: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80042464_port.c (src/func_80042464.c); hand port retired (port3 switch-over D). */
 
-void func_8004DA04(void)
-{
-    unsigned epoch=PE_Port_StopEpoch();
-    func_8005E8A4(0,10);func_80062A7C(PE_LoadU32(0x8009D000u));
-    if(PE_Port_StopEpoch()!=epoch || PE_LoadU32(0x8009D000u)==0x40u)return;
-    int32_t count=func_80042464();func_8005E8A4(16,20);
-    for(int i=0;i<8;i++) {
-        func_8005EB64(i<count?0x83u:0x82u);
-        if(PE_Port_StopEpoch()!=epoch)return;
-        func_8005E8A4(16,0);
-    }
-}
+/* func_8004DA04: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8004DA04_port.c (src/func_8004DA04.c); hand port retired (port3 switch-over D). */
 
-void func_8004CFD4(void)
-{
-    unsigned epoch=PE_Port_StopEpoch();
-    func_8005E8A4(0,10);func_8005F594(0x800A1A20u);
-    if(PE_Port_StopEpoch()!=epoch)return;
-    func_8005E8A4(0,14);func_8005F594(0x800A1A60u);
-}
+/* func_8004CFD4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8004CFD4_port.c (src/func_8004CFD4.c); hand port retired (port3 switch-over D). */
 
 void func_8004CE28(uint32_t first,uint32_t second)
 {

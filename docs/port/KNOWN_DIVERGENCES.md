@@ -16,7 +16,7 @@ objective evidence: a byte-matched C path, a numeric comparison against the
 matched code and disc data, or an emulator/video diff. Anything not checked is
 marked **untested**.
 
-Last updated: 2026-09-29. **Open divergences: 19.**
+Last updated: 2026-09-29. **Open divergences: 18.**
 
 ## Structural (whole classes of code)
 
@@ -39,7 +39,6 @@ Last updated: 2026-09-29. **Open divergences: 19.**
 
 | # | Divergence | Evidence | Status |
 |---|---|---|---|
-| 11 | Damage far too high in both directions: enemies die in one shot, and Eve one-shots Aya | owner reports on build r2 | Being diffed against the matched combat C (shared damage path suspected) |
 | 13 | Aya's gun is not drawn when she readies it before the rat fight | owner report | Open |
 | 15 | Plaza: the date's walk to the door with Aya after the dialogue (retail part 01 @ 5:16) not yet observed in the port | owner report; emulator oracle | **Untested past the dialogue**: every date state observed matches retail (arrival anims 0B→00→01→00 confirmed after the turn fix; plaza anim 04 standing identical to the oracle through VSync 16500, `persist[0]` bit 2 clear in both). The walk needs the player input the video used; parked (cosmetic) |
 | 16 | Unported room-effect callbacks are skipped with a `[DAY1_SHIM] … not ported` line, so those effects do not draw (M34 phase 2: 80191A98, 80191FE0, 80190E98 — no matched C yet — and 8019253C; M0359I 8018F238; rooms A8002148/A8001148) | port logs | Port from matched C where it exists |
@@ -54,6 +53,7 @@ Last updated: 2026-09-29. **Open divergences: 19.**
 
 ## Fixed (kept for the record)
 
+- Damage "far too high in both directions" (owner report on r2): **no divergence on the current tree**. The combat path equals the matched C; Aya's persistent stats, inventory and equipment at the first field room are byte-identical between a normal movies-on New Game (real title, opening movie, name entry) and route mode (only name-entry UI residue differs; build/lanes/day1/ayarec/mem_diff.txt). Hits-to-kill match or are harder than retail (first rat: port 2 commands, retail part 01 @ 15:53–16:03 one); Eve hits Aya for 5–11. r2 still ran the hand-cut battle tick, since replaced by the matched C (66d5f407), so the owner's r2 observation is not re-checked on r2 itself (former #11).
 - With movies on, the port stopped at the end of Day 1 (story 0x80, after the car ride). Cause: `func_80076C34` (libgpu command-ring enqueue) cut retail's full-ring wait (`while (full) { if (func_80077404()) return -1; func_80076EE4(); }`) and stopped on the first full 64-entry ring (first attributed to StoreImage `func_800768A0`; a fatal-path diagnostic there never fired). Fixed 2026-09-29: the full-ring path now waits as retail does (`func_80077404` normal half, DMA/IRQ checkpoint, pump); the movies-on run continues into Day 2 (story 0x90) with no boundary, and the Day 1 closing narration and Day 2 opening audio match retail part 02 @ 18:17–18:42 and part 03 @ 0:06 (former #27).
 - Retail's per-VBlank game callback `func_8003E91C` (RNG advance + the four timer ramps incl. play time) now runs every VBlank in normal play, as verbatim retail TUs; rates identical to the emulator oracle (frame counter +1/VSync, play time +600 per 600 VSyncs). Saves now record real play time (former #29).
 - `func_8006FC18` (Pm_Stop) now follows the matched C: calls the destroy callback, returns its result, frees the slot; 0 destroy-callback skips over the whole Day-1 route (former #27).

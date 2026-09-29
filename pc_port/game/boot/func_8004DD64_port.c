@@ -36,12 +36,7 @@ void func_8005BE1C(void)
     do {ch=PE_LoadU8(source++);PE_StoreU8(p++,ch);} while (ch!=255u);
 }
 
-int32_t func_8005BF08(void)
-{
-    uint32_t remaining=PE_LoadU32(0x8009D0C4u);pe_addr_t p=func_8005BEDC();
-    while (remaining && PE_LoadU8(p)!=255u) remaining-=PE_LoadU8(p++)<250u;
-    return (int32_t)remaining;
-}
+/* func_8005BF08: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8005BF08_port.c (src/func_8005BF08.c); hand port retired (port3 switch-over E). */
 
 /* func_80052FCC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80052FCC_port.c (src/func_80052FCC.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 

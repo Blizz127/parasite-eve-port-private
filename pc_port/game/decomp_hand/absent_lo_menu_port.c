@@ -255,25 +255,7 @@ int func_8005DD8C(int a0)
  * (0x800A8028); p = base + D_800A8054; count = a0 >= 0 ?
  * base[a0 + D_800A804C] : 0xF; count == 0 -> 0; else advance p past `count`
  * NUL terminators and return it. */
-pe_addr_t func_8005DE08(int a0)
-{
-    const pe_addr_t q = 0x800A8054u;
-    const pe_addr_t base = q - 11u * 4u;
-    pe_addr_t p = base + PE_LoadU32(q);
-
-    if (a0 >= 0)
-        a0 = PE_LoadU8(base + (uint32_t)(a0 + (int)PE_LoadU32(0x800A804Cu)));
-    else
-        a0 = 0xF;
-    if (a0 != 0) {
-        do {
-            if (PE_LoadU8(p++) == 0u)
-                a0--;
-        } while (a0 > 0);
-        return p;
-    }
-    return 0u;
-}
+/* func_8005DE08: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8005DE08_port.c (src/func_8005DE08.c); hand port retired (port3 switch-over E). */
 
 /* Decomp-derived callee (pc_port/game/decomp/, no header prototype). */
 void func_800622B0(int a0);

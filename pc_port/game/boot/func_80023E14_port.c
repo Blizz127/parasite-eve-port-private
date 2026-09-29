@@ -56,27 +56,7 @@ int32_t func_8005485C(void)
     return 0;
 }
 
-void func_800553A4(pe_addr_t category,pe_addr_t amount)
-{
-    pe_addr_t stock;
-    unsigned id;
-    if (!category || !amount) return;
-    if (!(int16_t)PE_LoadU16(category)) {
-        unsigned i,count=0u;
-        for (i=0;i<3;i++) if (PE_LoadU16(0x800A1E6Eu+i*32u)) count++;
-        /* The original constructs a list but selects the ordinal itself. */
-        if (count) PE_StoreU16(category,(uint16_t)(count*item_random_byte()/256u+1u));
-    }
-    id=PE_LoadU16(category);
-    if ((id-1u)>=3u) return;
-    stock=0x800A1E4Eu+(uint32_t)(int32_t)(int16_t)id*32u;
-    if (!(int16_t)PE_LoadU16(amount))
-        PE_StoreU16(amount,(uint16_t)(PE_LoadU16(stock)*item_random_byte()/256u));
-    else if ((int16_t)PE_LoadU16(amount)<0)
-        PE_StoreU16(amount,(uint16_t)(PE_LoadU16(stock)*-(int16_t)PE_LoadU16(amount)/100));
-    if ((int16_t)PE_LoadU16(amount)>PE_LoadU16(stock)) PE_StoreU16(amount,PE_LoadU16(stock));
-    PE_StoreU16(stock,(uint16_t)(PE_LoadU16(stock)-PE_LoadU16(amount)));
-}
+/* func_800553A4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800553A4_port.c (src/func_800553A4.c); hand port retired (port3 switch-over E). */
 
 void func_800523F8(pe_addr_t rate,pe_addr_t delay)
 {

@@ -56,29 +56,7 @@ void func_80046334(void)
 
 /* func_8005C488: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8005C488_port.c (src/func_8005C488.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-void func_80042B6C(void)
-{
-    pe_addr_t callback=PE_LoadU32(0x800A1870u);
-    uint32_t count;
-    if (!callback) return;
-    count=PE_LoadU32(0x800A1874u)+1u;PE_StoreU32(0x800A1874u,count);
-    if (count!=4u) return;
-    switch (callback) {
-    case 0x800428D4u:func_800428D4();break;
-    case 0x8005C488u:func_8005C488();break;
-    case 0x80062F9Cu:func_80062F9C();break;
-    default:
-        /* Retail jalr: any other code pointer resolves through the verified
-         * guest-code registry (e.g. 800504F4, the save-menu write step). */
-        if (!PE_GuestCode_Resolve(callback)) {
-            fprintf(stderr,"[MENU] Unported delayed callback %08X\n",callback);
-            menu_boundary("func_80042B6C_callback");return;
-        }
-        (void)PE_GuestCall("func_80042B6C",callback,0u,0u,0u,0u,0u);
-        if (PE_Port_ShouldStop()) return;
-    }
-    PE_StoreU32(0x800A1870u,0u);PE_StoreU32(0x800A1874u,0u);
-}
+/* func_80042B6C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80042B6C_port.c (src/func_80042B6C.c); hand port retired (port3 switch-over D). */
 
 void func_800339A0(uint32_t style)
 {
@@ -152,24 +130,7 @@ void func_8005E788(int32_t wait)
     }
 }
 
-int func_8005C498(pe_addr_t result)
-{
-    int32_t timer;
-    if (PE_LoadU32(0x8009CED8u)) {func_80042F44();return 0;}
-    PE_StoreU32(0x8009D1E0u,result);PE_StoreU32(0x8009D010u,0u);
-    func_8005E6F0();func_80046334();func_8005E30C();
-    if (PE_Port_ShouldStop()) return 0;
-    func_8004F464();if (PE_Port_ShouldStop()) return 0;
-    func_80042B6C();if (PE_Port_ShouldStop()) return 0;
-    func_80062FEC();if (PE_Port_ShouldStop()) return 0;
-    func_8005E788(1);if (PE_Port_ShouldStop()) return 0;
-    timer=(int32_t)PE_LoadU32(0x8009D030u);
-    if (timer>1) {func_800425DC();if (PE_Port_ShouldStop()) return 0;}
-    else if (timer>0) PE_StoreU32(0x8009D030u,(uint32_t)timer+1u);
-    if (PE_LoadU32(0x8009D034u)) {PE_StoreU32(0x8009D034u,0u);func_800512AC(9,0u);}
-    if (PE_LoadU32(0x8009D010u)) func_800339A0(PE_LoadU8(0x8009D02Cu));
-    return (int32_t)PE_LoadU32(0x8009D010u);
-}
+/* func_8005C498: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8005C498_port.c (src/func_8005C498.c); hand port retired (port3 switch-over E). */
 
 void PE_FieldMenuFrame(void)
 {

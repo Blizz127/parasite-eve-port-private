@@ -151,13 +151,7 @@ void PE_CardOperationFrame(uint32_t index,pe_addr_t caller_sp,const uint32_t inc
     legacy_frame_operation(index,frame,incoming);
 }
 
-void func_80042228(void)
-{
-    unsigned epoch=PE_Port_StopEpoch();
-    const uint32_t ids[]={38,37,36};
-    for(unsigned i=0;i<3;i++) {func_80062F3C(ids[i]);if(PE_Port_StopEpoch()!=epoch)return;}
-    func_800512AC(12,0u);
-}
+/* func_80042228: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80042228_port.c (src/func_80042228.c); hand port retired (port3 switch-over D). */
 
 void func_8004D5CC(uint32_t index)
 {

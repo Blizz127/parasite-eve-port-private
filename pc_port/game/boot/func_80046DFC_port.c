@@ -91,12 +91,7 @@ int func_800474D0(pe_addr_t window,uint32_t event)
     return 1;
 }
 
-void func_80050280(uint32_t index)
-{
-    func_8005E8A4(0,2);func_8005EB64((uint32_t)(int32_t)(int16_t)PE_LoadU16(0x800922D0u+index*2u));
-    func_8005E8A4(18,4);func_8005EB64(34u);func_8005E8A4(12,-4);
-    func_8005EB64((uint32_t)(int32_t)(int16_t)PE_LoadU16(0x800922D0u+(index?0u:2u)));
-}
+/* func_80050280: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80050280_port.c (src/func_80050280.c); hand port retired (port3 switch-over D). */
 
 void func_80050308(uint32_t index)
 {func_8005EB64(index+(PE_LoadU32(0x8009CF18u)?124u:127u));}

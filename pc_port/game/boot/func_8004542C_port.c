@@ -102,15 +102,7 @@ void func_8004F9A0(pe_addr_t list)
     func_800638D8(list,0x80050AD8u);
 }
 
-void func_80050AD8(int32_t index)
-{
-    pe_addr_t item=PE_LoadU32(0x8009CF20u);unsigned glyph=70u;
-    if (index<PE_LoadU8(item+20u)) {
-        glyph=PE_LoadU8(item+21u+(uint32_t)index)&31u;if (!glyph) return;
-        glyph+=PE_LoadU32(0x8009CF18u)?34u:54u;
-    }
-    func_8005EB64(glyph);
-}
+/* func_80050AD8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80050AD8_port.c (src/func_80050AD8.c); hand port retired (port3 switch-over E). */
 
 /* func_8005E988: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8005E988_port.c (src/func_8005E988.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 

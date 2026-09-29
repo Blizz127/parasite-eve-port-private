@@ -119,12 +119,7 @@ void func_800405A4(uint32_t index)
 }
 
 /* func_8004DC84: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8004DC84_port.c (src/func_8004DC84.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
-void func_8004CDAC(void)
-{
-    unsigned epoch=PE_Port_StopEpoch();func_80062F3C(40u);
-    if(PE_Port_StopEpoch()!=epoch)return;
-    func_80062F3C(61u);
-}
+/* func_8004CDAC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8004CDAC_port.c (src/func_8004CDAC.c); hand port retired (port3 switch-over D). */
 void func_80042928(void)
 {
     unsigned epoch=PE_Port_StopEpoch();func_8004298C(PE_LoadU32(0x800A1860u)-1u,1u);
