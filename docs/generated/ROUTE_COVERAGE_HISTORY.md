@@ -1064,3 +1064,25 @@ reproducible; provenance is the plan SHA-256. Read the narrative in
 - **provably non-C-matchable**: 64 funcs, 4475 words (3.6%)
 - **real remaining asm**: 10 funcs, 308 words (0.3%)
 - non-C classes: handwritten-cop:22 handwritten-gte-wrapper:106 handwritten-jr-t2:53 handwritten-syscall:2
+
+### 2026-12-20T08:38:30Z
+
+- plan SHA-256: `7dc9bcb473ab3fe1fce4396ecc712e7c1dd9d48af35f5e2e443d7bd4317765f9`
+- yaml SHA-256: `19d9c88d72a7cb6c2760be85838259435e1bda58f1efb9289c0abb53b7ba6a1d`
+- spans: 2246 c, 141 asm, 2 rodata
+- union (on-path): 1573 functions
+- **matched C**: 1502 funcs, 119330 words (96.8%)
+- **provably non-C-matchable**: 60 funcs, 592 words (0.5%)
+- **real remaining asm**: 11 funcs, 3363 words (2.7%)
+- non-C classes: handwritten-integer:22 handwritten-jr-t2:53
+
+### 2026-05-13T03:52:06Z
+
+- plan SHA-256: `612167c0cdd33ab032d850cfc117ca14f61c4c1fda94875eda3dd047de91cd17`
+- yaml SHA-256: `de5d0ccba54f61ed6efee45ec8964148dc14b9f5d9f4370f514b142055c80baa`
+- spans: 2250 c, 140 asm, 2 rodata
+- union (on-path): 1573 functions
+- **matched C**: 1506 funcs, 120180 words (97.5%)
+- **provably non-C-matchable**: 60 funcs, 592 words (0.5%)
+- **real remaining asm**: 7 funcs, 2513 words (2.0%)
+- non-C classes: handwritten-integer:22 handwritten-jr-t2:53

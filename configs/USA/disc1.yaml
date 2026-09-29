@@ -2403,7 +2403,8 @@ segments:
       # func_8006E514; return -1 on a null lookup, else forward to
       # func_80086608(r, a2, a3, a4). era -O2 -G0; LINK_EXACT.
       - [0x5E750, c, func_8006DF50]
-      - [0x5E7A8, asm]
+      # 3D sound pan/volume from a world position (RotTransPers; inline GTE)
+      - [0x5E7A8, c, func_8006DFA8]
       # func_8006E6A8 — sector-read issue wrapper, VRAM 0x8006E6A8, size 0x2C
       # (11 words). Forwards (lba, dest, sectors) to
       # func_8006E6D4(lba, 0, dest, sectors). era -O2 -G0 (default).
@@ -4654,7 +4655,8 @@ segments:
       - [0xBF53C, c, func_800CED3C]
       # func_800CED3C wrapped in a D_800F34E4 != a0 guard. TRUE SIZE 0x78 (band said 0x7C)
       - [0xBF5A8, c, func_800CEDA8]
-      - [0xBF620, asm]
+      # effect sprite model (POLY_FT4 quads from a model table; inline GTE)
+      - [0xBF620, c, func_800CEE20]
       # expand div
       - [0xBFBAC, c, func_800CF3AC]
       - [0xBFCB4, c, func_800CF4B4]
@@ -4676,13 +4678,22 @@ segments:
       - [0xC070C, c, func_800CFF0C]
       # D_800E21C8 rotor + two func_80071A54 draws into a short[3]
       - [0xC07AC, c, func_800CFFAC]
-      - [0xC084C, asm]
-      - [0xC0850, asm]
+      # shaded fan (POLY_G3; inline GTE). The former [0xC084C, asm] / [0xC0850, asm] rows split
+      # this function after its first instruction (the splitter named the body func_800D0050).
+      - [0xC084C, c, func_800D004C]
+      # shaded ring (POLY_G4 annulus; inline GTE)
+      - [0xC0F28, c, func_800D0728]
+      - [0xC1688, asm]
       # GPU primitive allocator + OT linker: bump-allocates from D_800B0E58[D_8009CDDC] via the D_8009CD
       - [0xC22E0, c, func_800D1AE0]
       # (a2<<10)/a1 then func_80077DC4, *a0/4096 with the bgez/+0xFFF rounding, four -0x80/0x80 stores t
       - [0xC2524, c, func_800D1D24]
-      - [0xC25EC, asm]
+      # glow point: TILE_1 core + 3x3 TILE halo (inline GTE)
+      - [0xC25EC, c, func_800D1DEC]
+      - [0xC2904, asm]
+      # shaded textured ribbon (POLY_GT4; inline GTE)
+      - [0xC2B70, c, func_800D2370]
+      - [0xC2FFC, asm]
       # default O2 G0
       - [0xC42FC, c, func_800D3AFC]
       - [0xC43C8, asm]
@@ -4780,7 +4791,8 @@ segments:
       - [0xCD99C, c, func_800DD19C]
       - [0xCDB80, c, func_800DD380]
       - [0xCDF6C, c, func_800DD76C]
-      - [0xCE1E4, asm]
+      # effect task callback: drift/flash + glow point + effect sprite (inline GTE)
+      - [0xCE1E4, c, func_800DD9E4]
       - [0xCE570, c, func_800DDD70]
       - [0xCE8A8, asm]
       - [0xCEFA8, c, func_800DE7A8]
