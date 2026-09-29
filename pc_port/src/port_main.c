@@ -194,13 +194,13 @@ static void RoutePadLoadSequence(void)
     }
 }
 
-static struct { int frame; uint16_t mask; } g_script_pad[256];
+static struct { int frame; uint16_t mask; } g_script_pad[1024];
 static unsigned g_script_pad_count;
 
 static void ScriptPadLoad(const char *s)
 {
     g_script_pad_count = 0;
-    while (s && *s && g_script_pad_count < 256u) {
+    while (s && *s && g_script_pad_count < 1024u) {
         char *end;
         unsigned long frame = strtoul(s, &end, 10), mask;
         if (end == s || *end != ':') break;
@@ -211,13 +211,28 @@ static void ScriptPadLoad(const char *s)
         g_script_pad[g_script_pad_count++].mask = (uint16_t)mask;
         s = *end == ',' ? end + 1 : end;
     }
+    if (s && *s) {
+        fprintf(stderr, "[PAD] PE_PAD_SCRIPT: more than %u changes (or a malformed entry at \"%.20s\"); refusing to truncate\n",
+                (unsigned)(sizeof(g_script_pad) / sizeof(g_script_pad[0])), s);
+        exit(2);
+    }
 }
 
+/* PE_PAD_SCRIPT frames count host presents by default.  The game presents
+ * nothing while paused (retail's pause only waits VSync), so a present-keyed
+ * script can never send the unpausing Start.  PE_PAD_SCRIPT_CLOCK=vblank
+ * keys the script on emulated VBlanks instead, like a real pad. */
 static uint16_t ScriptPadSource(void)
 {
-    int presented = 0;
+    static int by_vblank = -1;
+    int presented = 0, vsync = 0;
     uint16_t mask = 0xFFFFu;
-    HostFB_GetState(NULL, NULL, &presented, NULL);
+    if (by_vblank < 0) {
+        const char *c = getenv("PE_PAD_SCRIPT_CLOCK");
+        by_vblank = c && !strcmp(c, "vblank");
+    }
+    HostFB_GetState(&vsync, NULL, &presented, NULL);
+    if (by_vblank) presented = vsync;
     for (unsigned i = 0; i < g_script_pad_count && presented >= g_script_pad[i].frame; i++)
         mask = g_script_pad[i].mask;
     return mask;
@@ -588,6 +603,15 @@ static void PresentHook_BlitWindow(void)
     HostWindow_Blit(pe_plat_cheats_overlay(HostFB_GetPixels(), PE_PORT_FB_WIDTH, PE_PORT_FB_HEIGHT),
                     PE_PORT_FB_WIDTH, PE_PORT_FB_HEIGHT);
     (void)HostWindow_Poll();
+}
+
+/* VBlank scan-out refresh (host_framebuffer.c): show what the GPU displays
+ * between PutDispEnv calls.  Display only — input is already polled by the
+ * per-VBlank pacer, and nothing here counts as a present. */
+static void ScanoutHook_BlitWindow(void)
+{
+    HostWindow_Blit(pe_plat_cheats_overlay(HostFB_GetPixels(), PE_PORT_FB_WIDTH, PE_PORT_FB_HEIGHT),
+                    PE_PORT_FB_WIDTH, PE_PORT_FB_HEIGHT);
 }
 
 static int ParsePositiveLimit(const char *option, const char *value) {
@@ -1077,6 +1101,7 @@ int main(int argc, char **argv) {
         else {
             PE_Port_SetQuitPoll(HostWindow_Poll);
             PE_Port_SetPresentHook(PresentHook_BlitWindow);
+            HostFB_SetScanoutHook(ScanoutHook_BlitWindow);
             PE_Port_SetPadSource(HostWindow_PadRaw);
         }
     }

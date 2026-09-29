@@ -400,65 +400,7 @@ extern int func_8006BECC(void);
  * byte/bit stores.  +0x14C==0 skips the lookup (host guard;
  * ROM would deref).
  */
-void func_8006B35C(void)
-{
-    unsigned int i;
-    unsigned int j;
-    pe_addr_t row;
-    pe_addr_t wordp;
-    pe_addr_t base;
-    uint32_t overlay;
-    pe_addr_t lookup;
-
-    for (i = 0; i < 10u; i++)
-        PE_StoreU32(0x800B0E70u + (9u - i) * 4u, 0u);
-
-    row = GA_OVERLAY;
-    for (i = 0; i < 10u; i++) {
-        wordp = row + 0x27Cu;
-        for (j = 0; j < 48u; j++) {
-            PE_StoreU32(wordp, 0u);
-            wordp -= 4u;
-        }
-        row += 192u;
-    }
-
-    PE_StoreU32(GA_OVERLAY + 0x940u, 0u);
-    PE_StoreU32(GA_OVERLAY + 0x944u, 0u);
-    PE_StoreU32(GA_OVERLAY + 0x948u, 0u);
-    PE_StoreU32(GA_OVERLAY + 0x94Cu, 0u);
-    PE_StoreU32(GA_OVERLAY + 0x954u, 0u);
-    PE_StoreU32(GA_OVERLAY + 0x950u, 0u);
-    PE_StoreU32(GA_OVERLAY + 0x958u, 0u);
-
-    base = PE_LoadU32(GA_OVERLAY + 0x14Cu);
-    PE_StoreU32(GA_OVERLAY + 0x128u, PE_LoadU32(GA_OVERLAY + 0x150u));
-    PE_StoreU32(GA_OVERLAY + 0x12Cu,
-                PE_LoadU32(GA_OVERLAY + 0x150u) + 0x1400u);
-    lookup = 0u;
-    if (base >= 0x80000000u)
-        lookup = func_8006E498(base, 0x5EAF6804u);
-    PE_StoreU32(GA_OVERLAY + 0x124u, lookup);
-
-    overlay = PE_LoadU32(GA_OVERLAY) & ~0x400000u;
-    PE_StoreU32(GA_OVERLAY, overlay);
-    PE_StoreU8(GA_OVERLAY + 0xE0u, 39u);
-    PE_StoreU8(GA_OVERLAY + 0xE1u, 13u);
-    PE_StoreU8(GA_OVERLAY + 0x11u, 0u);
-    PE_StoreU8(GA_OVERLAY + 0x12u, 0u);
-    /* src/func_8006B35C.c: p = D_80094488; for (k = 0; k < 0x20; k += 8)
-     * { *(short *)(p + 6) = 0; *(short *)(D_8009448C + k) = 0; p += 8; }
-     * -- the +6 halfword of each of the four 8-byte records, interleaved
-     * with the +4 halfword.  (Was one store to 0x80094488; portverify.) */
-    for (i = 0; i < 4u; i++) {
-        PE_StoreU16(0x80094488u + i * 8u + 6u, 0u);
-        PE_StoreU16(0x8009448Cu + i * 8u, 0u);
-    }
-    PE_StoreU8(GA_OVERLAY + 0xF6u, 48u);
-    PE_StoreU8(GA_OVERLAY + 0xF7u, 127u);
-    PE_StoreU16(GA_OVERLAY + 0xF8u, 256u);
-    PE_StoreU16(GA_OVERLAY + 0xFAu, 2048u);
-}
+/* func_8006B35C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8006B35C_port.c (src/func_8006B35C.c); hand port retired (port3 switch-over F). */
 
 /*
  * 6B4F8 after 72724: hdr+1 → CE2, hdr+3 → overlay+8, then

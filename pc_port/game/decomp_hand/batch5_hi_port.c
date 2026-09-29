@@ -38,10 +38,7 @@ static void mark_records(unsigned int m, unsigned int bit, pe_addr_t p)
 /* func_8008ABF0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8008ABF0_port.c (src/func_8008ABF0.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* src/func_8008AB9C.c: m = D_8009D2C8[1], first bit 1, records at a0 + 0xF4. */
-void func_8008AB9C(pe_addr_t a0)
-{
-    mark_records(PE_LoadU32(PE_LoadU32(0x8009D2C8u) + 4u), 1u, a0 + 0xF4u);
-}
+/* func_8008AB9C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8008AB9C_port.c (src/func_8008AB9C.c); hand port retired (port3 switch-over F). */
 
 /* src/func_80080CDC.c: dst == NULL -> func_8007FC28(); else copy the 4-byte
  * quad it points to into dst and return dst. */
@@ -230,27 +227,7 @@ void func_80082204(void)
  * voices: masked -> D_800B002C[i*4] = 0x7FFF; otherwise read the voice's
  * +0xC register into D_800B002C[i*4] (func_80089F08) and, when it reads 0,
  * func_80089218 on both D_800B8AC0 banks (+0 and +0x1AA0). */
-void func_80089250(unsigned int a0)
-{
-    pe_addr_t rec = PE_LoadU32(0x8009D2C8u);
-    unsigned int m = (PE_LoadU32(rec + 4u) & PE_LoadU32(rec + 0xCu)) |
-                     (PE_LoadU32(rec + 0x6Cu) & PE_LoadU32(rec + 0x74u)) | a0;
-    unsigned int i;
-
-    for (i = 0; i < 0x18u; i++) {
-        pe_addr_t slot = 0x800B002Cu + i * 8u;
-
-        if (m & (1u << i)) {
-            PE_StoreU16(slot, 0x7FFFu);
-        } else {
-            func_80089F08(i, slot);
-            if (PE_LoadU16(slot) == 0u) {
-                func_80089218(0x800B8AC0u, i);
-                func_80089218(0x800B8AC0u + 0x1AA0u, i);
-            }
-        }
-    }
-}
+/* func_80089250: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80089250_port.c (src/func_80089250.c); hand port retired (port3 switch-over F). */
 
 /* src/func_800CCFA0.c / 800CD980.c: advance the overlay's sequence cursor
  * (slot 0xD of the func_800C2B10 table) through the pointer list at

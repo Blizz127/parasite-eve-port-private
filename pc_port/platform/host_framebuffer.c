@@ -40,6 +40,11 @@ static int     fb_drawsync_count = 0;
 static uint32_t fb_vsync_timer = 0;      /* 0x80094578 (1F801110 low half) */
 static uint32_t fb_vsync_baseline = 0;   /* 0x8009457C, 16-bit scanline latch */
 
+/* Last PutDispEnv geometry, reused by the VBlank scan-out below. */
+static struct { int valid; uint32_t dw, top, dh; int rgb24; } fb_scan;
+static int  fb_idle_vblanks;
+static void (*fb_scanout_hook)(void);
+
 /* ── public API ───────────────────────────────────────────────────────── */
 
 void HostFB_Init(void)
@@ -52,6 +57,8 @@ void HostFB_Init(void)
     fb_drawsync_count = 0;
     fb_vsync_timer = 0;
     fb_vsync_baseline = 0;
+    memset(&fb_scan, 0, sizeof(fb_scan));
+    fb_idle_vblanks = 0;
 }
 
 void HostFB_ClearImage(int x, int y, int w, int h, uint8_t r, uint8_t g, uint8_t b)
@@ -82,6 +89,28 @@ void HostFB_Present(void)
     PE_Port_InvokePresentHook();
 }
 
+static void ScanDisplay(uint32_t dx, uint32_t dy, uint32_t dw, uint32_t top, uint32_t dh, int rgb24);
+
+void HostFB_SetScanoutHook(void (*hook)(void)) { fb_scanout_hook = hook; }
+
+/* Hardware scans the GP1(05h) display area out of VRAM on every frame, not
+ * only when the game calls PutDispEnv.  Anything drawn into the displayed
+ * buffer between swaps (retail's pause overlay, func_8006A0E8, is drawn once
+ * after the last swap and then the tick only waits VSync(2)) is therefore on
+ * screen on the PS1.  On a VBlank with no PutDispEnv this rescans the current
+ * display start with the last PutDispEnv geometry.  Display only: it is not
+ * a present (no present count, present hook, route clock or shot). */
+static void HostFB_ScanOutIdleVBlank(void)
+{
+    PeGpuState st;
+    if (++fb_idle_vblanks < 2 || !fb_scan.valid) return;
+    if (!PE_Port_FramePresentationAllowed()) return;
+    PE_GPU_GetState(&st);
+    ScanDisplay(st.display_start & 1023u, (st.display_start >> 10) & 511u,
+                fb_scan.dw, fb_scan.top, fb_scan.dh, fb_scan.rgb24);
+    if (fb_scanout_hook) fb_scanout_hook();
+}
+
 void HostFB_PresentDispEnv(pe_addr_t env)
 {
     uint32_t dx = (uint32_t)PE_LoadU16(env);
@@ -99,13 +128,24 @@ void HostFB_PresentDispEnv(pe_addr_t env)
     else if (end > 258) end = 258;
     uint32_t top = (uint32_t)(start - 16);
     uint32_t dh = (uint32_t)(end - start);
-    uint32_t row, col;
 
     if (!PE_Port_FramePresentationAllowed()) return;
+    fb_scan.valid = 1; fb_scan.dw = dw; fb_scan.top = top; fb_scan.dh = dh;
+    fb_scan.rgb24 = PE_LoadU8(env + 17u) != 0u;
+    fb_idle_vblanks = 0;
+    ScanDisplay(dx, dy, dw, top, dh, fb_scan.rgb24);
+    fb_presented++;
+    PE_Port_FramePresented(fb_presented);
+    PE_Port_InvokePresentHook();
+}
+
+static void ScanDisplay(uint32_t dx, uint32_t dy, uint32_t dw, uint32_t top, uint32_t dh, int rgb24)
+{
+    uint32_t row, col;
     /* Blank scanlines outside this frame's display range. Keeping the
      * old framebuffer there leaks pixels when a scene narrows the range. */
     memset(fb, 0, sizeof(fb));
-    if (fb_mask && PE_LoadU8(env + 17u)) {
+    if (fb_mask && rgb24) {
         /* DISPENV.isrgb24 (MDEC movies): VRAM holds packed R,G,B bytes;
          * disp.w may be given in 16-bit VRAM units (480 for 320 px). */
         uint32_t pw = dw > (uint32_t)PE_PORT_FB_WIDTH ? dw * 2u / 3u : dw;
@@ -137,9 +177,6 @@ void HostFB_PresentDispEnv(pe_addr_t env)
             }
         }
     }
-    fb_presented++;
-    PE_Port_FramePresented(fb_presented);
-    PE_Port_InvokePresentHook();
 }
 
 void HostFB_SetDispMask(int mask)
@@ -240,9 +277,25 @@ uint32_t HostFB_VSync(int mode)
             if(device) HostFB_DeviceTime(564480u);
             else { PE_GPU_VBlankStep(); HostFB_VBlankGameCallbacks(); }
             if(PE_Port_ShouldStop()) break;
+            HostFB_ScanOutIdleVBlank();
         }
     }
     fb_vsync_count++;
+    {   /* Harness aid (off by default): PE_SHOT_VSYNC=<dir>:<first>:<step>
+         * writes <dir>/v<vsync>.ppm of the displayed image every <step>
+         * VBlanks from <first>, also while the game presents nothing
+         * (pause), which present-keyed shots cannot capture. */
+        static int init, first, step; static char dir[400];
+        if (!init) {
+            const char *e = getenv("PE_SHOT_VSYNC"); init = 1;
+            if (!e || sscanf(e, "%399[^:]:%d:%d", dir, &first, &step) != 3 || step < 1) dir[0] = 0;
+        }
+        if (dir[0] && fb_vsync_count >= first && (fb_vsync_count - first) % step == 0) {
+            char path[512];
+            snprintf(path, sizeof path, "%s/v%06d.ppm", dir, fb_vsync_count);
+            (void)HostFB_WritePPM(path);
+        }
+    }
     /* VBlank edge. The retail return contract (80073A44) samples the free-
      * running scanline timer at ENTRY and returns `(entry - baseline) &
      * 0xFFFF` for every non-negative mode; waiting modes then re-latch the

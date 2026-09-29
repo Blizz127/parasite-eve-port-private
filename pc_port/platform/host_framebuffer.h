@@ -43,5 +43,7 @@ void HostFB_DrawSync(int mode);
 int  HostFB_WritePPM(const char *path);
 const uint8_t *HostFB_GetPixels(void);
 void HostFB_GetState(int *vsync, int *drawsync, int *presented, int *mask);
+/* Display-only refresh after a VBlank scan-out (not a present). */
+void HostFB_SetScanoutHook(void (*hook)(void));
 
 #endif
