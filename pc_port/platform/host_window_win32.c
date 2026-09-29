@@ -18,6 +18,7 @@
 #include "host_window.h"
 #include "host_frame_pacer.h"
 #include "host_window_scale.h"
+#include "pe_plat/cheats.h"
 
 /* GetTickCount64 needs Vista+ declarations on older MinGW defaults. */
 #ifndef _WIN32_WINNT
@@ -85,6 +86,29 @@ static void paint_window(HDC hdc)
                   g_imgbuf, &g_bmi, DIB_RGB_COLORS, SRCCOPY);
 }
 
+/* Cheat console (pe_plat/cheats.h): F1-F5, F7, F8; arrows and Enter only
+ * while its warp menu is open.  repeat = key auto-repeat (ignored for F-keys). */
+static int win32_cheat_key(WPARAM vk, int pressed, int repeat)
+{
+    PeCheatKey ck = PE_CHEAT_KEY_NONE;
+    switch (vk) {
+    case VK_F1: ck = PE_CHEAT_KEY_F1; break;
+    case VK_F2: ck = PE_CHEAT_KEY_F2; break;
+    case VK_F3: ck = PE_CHEAT_KEY_F3; break;
+    case VK_F4: ck = PE_CHEAT_KEY_F4; break;
+    case VK_F5: ck = PE_CHEAT_KEY_F5; break;
+    case VK_F7: ck = PE_CHEAT_KEY_F7; break;
+    case VK_F8: ck = PE_CHEAT_KEY_F8; break;
+    case VK_UP: if (pe_plat_cheats_menu_open()) ck = PE_CHEAT_KEY_UP; break;
+    case VK_DOWN: if (pe_plat_cheats_menu_open()) ck = PE_CHEAT_KEY_DOWN; break;
+    case VK_RETURN: if (pe_plat_cheats_menu_open()) ck = PE_CHEAT_KEY_ENTER; break;
+    default: break;
+    }
+    if (ck == PE_CHEAT_KEY_NONE) return 0;
+    if (pressed && repeat && ck != PE_CHEAT_KEY_UP && ck != PE_CHEAT_KEY_DOWN) return 1;
+    return pe_plat_cheats_key(ck, pressed);
+}
+
 static LRESULT CALLBACK PE_WndProc(HWND hwnd, UINT msg,
                                    WPARAM wparam, LPARAM lparam)
 {
@@ -100,6 +124,7 @@ static LRESULT CALLBACK PE_WndProc(HWND hwnd, UINT msg,
         return 1;
     case WM_KEYDOWN:
     case WM_SYSKEYDOWN:
+        if (win32_cheat_key(wparam, 1, (lparam & ((LPARAM)1 << 30)) != 0)) return 0;
         if (wparam==VK_F6) {
             if (!(lparam & ((LPARAM)1 << 30))) {
                 g_fast_forward=!g_fast_forward;
@@ -114,6 +139,7 @@ static LRESULT CALLBACK PE_WndProc(HWND hwnd, UINT msg,
         return 0;
     case WM_KEYUP:
     case WM_SYSKEYUP:
+        if (win32_cheat_key(wparam, 0, 0)) return 0;
         g_sony_held &= (uint16_t)~vk_to_pad_bit((UINT)wparam);
         return 0;
     case WM_KILLFOCUS:
@@ -271,14 +297,20 @@ static uint64_t monotonic_ns(void)
 int HostWindow_Pace(void)
 {
     uint64_t deadline;
-    if (g_fast_forward) return HostWindow_Poll();
+    if (g_fast_forward) {
+        /* Cheat console F7: fixed N-x speed pays one wall frame per N
+         * presents; 0 = uncapped (the F6 default). */
+        static unsigned ff_n;
+        int mult = pe_plat_cheats_ff_multiplier();
+        if (mult <= 0 || (++ff_n % (unsigned)mult) != 0u) return HostWindow_Poll();
+    }
     if (!g_frame_timer || !g_clock_frequency.QuadPart) return 1;
     deadline=HostFramePacer_Deadline(&g_pacer,monotonic_ns());
     for (;;) {
         uint64_t now,remaining;
         LARGE_INTEGER due;
         if (HostWindow_Poll()) return 1;
-        if (g_fast_forward) return 0;
+        if (g_fast_forward && pe_plat_cheats_ff_multiplier() == 0) return 0;
         now=monotonic_ns();
         if (now>=deadline) return 0;
         remaining=deadline-now;

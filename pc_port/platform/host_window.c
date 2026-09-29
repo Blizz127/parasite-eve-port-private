@@ -12,6 +12,7 @@
 #include "host_audio.h"
 #include "pe_audio_driver.h"
 #include "game_port.h"
+#include "pe_plat/cheats.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -32,6 +33,8 @@ typedef unsigned long KeySym;
 #define XK_Z      0x005A
 #define XK_X      0x0058
 #define XK_F6     0xFFC3
+#define XK_F1     0xFFBE
+#define XK_F8     0xFFC5
 #define KeyPress    2
 #define KeyRelease  3
 #define ButtonPress 4
@@ -260,6 +263,38 @@ int HostWindow_Poll(void)
         } else if (ev.type == KeyPress || ev.type == KeyRelease) {
             KeySym ks = XLookupKeysym(&ev.xkey, 0);
             uint16_t bit = 0;
+            {
+                /* Cheat console (pe_plat/cheats.h): F1-F5, F7, F8; arrows and
+                 * Enter only while its warp menu is open. */
+                PeCheatKey ck = PE_CHEAT_KEY_NONE;
+                static uint16_t cheat_held;
+                if (ks >= XK_F1 && ks <= XK_F8 && ks != XK_F6) {
+                    static const PeCheatKey fk[8] = {PE_CHEAT_KEY_F1, PE_CHEAT_KEY_F2,
+                        PE_CHEAT_KEY_F3, PE_CHEAT_KEY_F4, PE_CHEAT_KEY_F5, PE_CHEAT_KEY_NONE,
+                        PE_CHEAT_KEY_F7, PE_CHEAT_KEY_F8};
+                    ck = fk[ks - XK_F1];
+                } else if (pe_plat_cheats_menu_open()) {
+                    if (ks == XK_Up) ck = PE_CHEAT_KEY_UP;
+                    else if (ks == XK_Down) ck = PE_CHEAT_KEY_DOWN;
+                    else if (ks == XK_Return) ck = PE_CHEAT_KEY_ENTER;
+                }
+                if (ck != PE_CHEAT_KEY_NONE) {
+                    uint16_t bitk = (uint16_t)(1u << ck);
+                    if (ev.type==KeyRelease && XPending(g_dpy)) {
+                        XEvent next;XPeekEvent(g_dpy,&next);
+                        if (next.type==KeyPress && next.xkey.keycode==ev.xkey.keycode &&
+                            next.xkey.time==ev.xkey.time) continue;   /* auto-repeat */
+                    }
+                    if (ev.type == KeyPress) {
+                        int was = (cheat_held & bitk) != 0;
+                        cheat_held |= bitk;
+                        if (was && ck != PE_CHEAT_KEY_UP && ck != PE_CHEAT_KEY_DOWN) continue;
+                    } else {
+                        cheat_held &= (uint16_t)~bitk;
+                    }
+                    if (pe_plat_cheats_key(ck, ev.type == KeyPress)) continue;
+                }
+            }
             if (ks == XK_F6) {
                 /* X11 auto-repeat may synthesize release/press pairs. */
                 if (ev.type==KeyRelease && XPending(g_dpy)) {
@@ -342,7 +377,7 @@ static int pace_one_frame(void)
         struct timespec delay;
         uint64_t remaining;
         if (HostWindow_Poll() || !monotonic_ns(&now)) return 1;
-        if (g_ff_active) return 0;
+        if (g_ff_active && pe_plat_cheats_ff_multiplier() == 0) return 0;
         if (now>=deadline) return 0;
         remaining=deadline-now;
         delay.tv_sec=0;
@@ -359,8 +394,16 @@ static void pace_vblank(void)
     g_vblank_paced=1;
     if (g_close_requested) return;
     if (g_ff_active) {
-        /* uncapped, but keep input (and the fast-forward keys) live */
+        /* Cheat console F7: fixed N-x speed pays one wall frame per N
+         * emulated VBlanks; 0 = uncapped (the F6 default). */
+        int mult = pe_plat_cheats_ff_multiplier();
         static unsigned n;
+        if (mult > 0) {
+            if ((++n % (unsigned)mult) == 0u && pace_one_frame())
+                PE_Port_RequestStop(PE_PORT_STOP_HOST_QUIT);
+            return;
+        }
+        /* uncapped, but keep input (and the fast-forward keys) live */
         if ((++n & 7u)==0u) (void)HostWindow_Poll();
         return;
     }
