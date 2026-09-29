@@ -41,6 +41,8 @@
  */
 #include "pe_disc.h"
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include "psx_compat.h"
 #include "pe_port_compat.h"
 #include "game_port.h"
@@ -50,6 +52,9 @@
 #define GA_D_8009D254 0x8009D254u
 #define GA_D_8009CE00 0x8009CE00u
 #define GA_D_800910A0 0x800910A0u
+/* Full retail VM handlers (decomp_hand), routed for ops 0xED / 0x31. */
+int func_80016910(pe_addr_t a);
+int func_80017BB4(pe_addr_t a0);
 #define GA_D_800A77F0 0x800A77F0u
 #define GA_D_8009DF70 0x8009DF70u
 #define GA_D_800B6A80 0x800B6A80u
@@ -139,10 +144,20 @@
 #define GA_OPC6       0x80013300u
 #define GA_OP55       0x800144FCu
 #define GA_OPCF       0x80019D24u
-/* Host stand-in for ROM sp+16. APPROXIMATION: native has no guest $sp. */
-#define GA_VM_FRAME   0x80120F80u
+/* Host stand-in for ROM sp+16. APPROXIMATION: native has no guest $sp.
+ * It must lie in the guest stack area, like retail's frame, and outside
+ * every overlay load window.  It used to be 0x80120F80, inside the
+ * 0x80120D00 overlay window: opcode 0x35 (func_80014E30) loads the movie
+ * overlay there and only then reads **args, so every field movie
+ * resolved to id 0 (FMV000) instead of the id the script passed.
+ * 0x801FF400..0x801FF4EF is the port stack-scratch block, below every
+ * hand scratch window (0x801FF4F0 and up): frame 400..43F, 375E0 list
+ * 460, GA_POLY 480..49F and GA_DESC 4A0 (func_8001735C_port.c),
+ * GA_EA_SLOT 4B0..4B7 (func_80015DAC_port.c).  PE_VMFRAME_AUDIT=1
+ * checks that nothing writes the block between opcodes. */
+#define GA_VM_FRAME   0x801FF400u
 /* Host stand-in for 17410's stack s16 = -1. APPROXIMATION. */
-#define GA_375E0_LIST 0x80120F20u
+#define GA_375E0_LIST 0x801FF460u
 
 
 extern int func_80013300(pe_addr_t args);
@@ -838,7 +853,10 @@ static int pe_17018_dispatch_body(pe_addr_t fn, pe_addr_t args)
         /* HOST_ADAPTED --skip-movie: opcode 35 loads the movie
          * overlay and calls 1216C4/121C04/1223A8. Skip before its
          * display disable and arena overwrites; retail returns 1. */
-        if (PE_Port_SkipMovie()) {
+        /* PE_ROUTE_PLAY_MOVIES=1 (route harness aid, see port_main.c):
+         * the route keeps --skip-movie for boot/title but plays field
+         * movies, so each Day-1 movie can be checked end to end. */
+        if (PE_Port_SkipMovie() && getenv("PE_ROUTE_PLAY_MOVIES") == NULL) {
             Stub_Record("func_80014E30_skip_movie", "HOST_ADAPTED");
             return 1;
         }
@@ -891,8 +909,8 @@ static int pe_17018_dispatch_body(pe_addr_t fn, pe_addr_t args)
         return func_80017D7C();
     if (fn == GA_OP3F)
         return func_80017D5C();
-    if (fn == GA_OPED)
-        return func_80016910_key2900_cut(args);
+    if (fn == GA_OPED)   /* full retail op 0xED (decomp_hand/absent_r3_port.c, src/func_80016910.c) */
+        return func_80016910(args);
     if (fn == GA_OPE1)
         return func_8001A374(args);
     if (fn == GA_OP84)
@@ -1012,8 +1030,8 @@ static int pe_17018_dispatch_body(pe_addr_t fn, pe_addr_t args)
         return func_800179F8(args);
     if (fn == GA_OP87)
         return func_80018F0C(args);
-    if (fn == GA_OP31)
-        return func_80017BB4_btl1_cut(args);
+    if (fn == GA_OP31)   /* full retail op 0x31 incl. the A9400048 game-over branch (src/func_80017BB4.c) */
+        return func_80017BB4(args);
     if (fn == 0x800194B0u) return func_800194B0(args);
     if (fn == 0x80019540u) return func_80019540(args);
     if (fn == 0x80015BACu) return func_80015BAC(args);
@@ -1314,8 +1332,84 @@ static void pe_17018_walk_next(void)
     PE_StoreU32(GA_D_8009D300, next);
 }
 
+/* PE_VMFRAME_AUDIT=1 (fmv2 debug aid): prove nothing but this VM writes
+ * the host arg-frame window 0x801FF400..0x801FF4EF.  (a) After each
+ * dispatch the frame must still hold the decoded pointers (a load that
+ * lands on it, as the movie overlay did at 0x80120F80, fails this);
+ * (b) between dispatches the whole window must be unchanged. */
+#define VMFRAME_WIN_BYTES 0xF0u
+static int g_vmframe_audit = -1;
+static uint8_t g_vmframe_snap[VMFRAME_WIN_BYTES];
+static int g_vmframe_have_snap;
+static unsigned long g_vmframe_ops, g_vmframe_bad;
+static int vmframe_audit_on(void)
+{
+    if (g_vmframe_audit < 0)
+        g_vmframe_audit = getenv("PE_VMFRAME_AUDIT") != NULL;
+    return g_vmframe_audit;
+}
+static void vmframe_audit_pre(uint32_t op)
+{
+    if (!vmframe_audit_on() || !g_vmframe_have_snap)
+        return;
+    if (memcmp(PE_Translate(GA_VM_FRAME, VMFRAME_WIN_BYTES), g_vmframe_snap,
+               VMFRAME_WIN_BYTES) != 0) {
+        g_vmframe_bad++;
+        fprintf(stderr, "[VMFRAME] foreign write between ops (next op %03X) bad=%lu\n",
+                (unsigned)op, g_vmframe_bad);
+    }
+}
+static void vmframe_audit_post(uint32_t op, const uint32_t *written)
+{
+    unsigned i;
+
+    if (!vmframe_audit_on())
+        return;
+    g_vmframe_ops++;
+    for (i = 0; i < 16u; i++)
+        if (PE_LoadU32(GA_VM_FRAME + i * 4u) != written[i]) {
+            g_vmframe_bad++;
+            fprintf(stderr, "[VMFRAME] frame word %u clobbered during op %03X: %08X -> %08X bad=%lu\n",
+                    i, (unsigned)op, (unsigned)written[i],
+                    (unsigned)PE_LoadU32(GA_VM_FRAME + i * 4u), g_vmframe_bad);
+            break;
+        }
+    memcpy(g_vmframe_snap, PE_Translate(GA_VM_FRAME, VMFRAME_WIN_BYTES),
+           VMFRAME_WIN_BYTES);
+    g_vmframe_have_snap = 1;
+    if ((g_vmframe_ops % 200000u) == 0u)
+        fprintf(stderr, "[VMFRAME] ops=%lu bad=%lu\n", g_vmframe_ops, g_vmframe_bad);
+}
+
 static void pe_17018_run(void)
 {
+    {
+        /* day1 diagnostics (with PE_VM_TRACE): log persist[0]/persist[74]/token
+         * whenever persist[0] changes, whatever wrote it. */
+        static uint32_t last_p0 = 0xFFFFFFFFu; static int p0_init; static FILE *pf;
+        if (!p0_init) { p0_init = 1; if (getenv("PE_VM_TRACE")) pf = stderr; }
+        if (getenv("PE_DUMP_AYA")) {
+            /* day1 diagnostics: dump Aya's record and weapon on each room change
+             * and battle start (compare route vs normal-start New Game). */
+            static uint32_t lt; static uint32_t lb;
+            uint32_t tok = PE_LoadU32(0x8009D280u), b = PE_LoadU32(0x8009D1A0u) & 2u;
+            pe_addr_t rec = PE_LoadU32(0x8009D278u);
+            if (rec && (tok != lt || (b && !lb))) {
+                pe_addr_t gun = PE_LoadU32(rec + 0x68u);
+                fprintf(stderr, "AYAREC tok=%08X battle=%u rec=%08X:", tok, b, rec);
+                for (unsigned k = 0; k < 0x70u; k += 4u) fprintf(stderr, " %08X", PE_LoadU32(rec + k));
+                fprintf(stderr, "\nAYAGUN gun=%08X:", gun);
+                if (PE_RangeIsRam(gun, 0x20u)) for (unsigned k = 0; k < 0x20u; k += 4u) fprintf(stderr, " %08X", PE_LoadU32(gun + k));
+                fprintf(stderr, "\n");
+            }
+            lt = tok; lb = b;
+        }
+        if (pf && PE_LoadU32(0x800A77F0u) != last_p0) {
+            last_p0 = PE_LoadU32(0x800A77F0u);
+            fprintf(pf, "P0CHANGE persist0=%08X story=%08X token=%08X\n", last_p0,
+                    PE_LoadU32(0x800A7918u), PE_LoadU32(0x8009D280u));
+        }
+    }
     pe_addr_t task;
     pe_addr_t actor;
     pe_addr_t pc;
@@ -1330,6 +1424,7 @@ static void pe_17018_run(void)
     unsigned int kind;
     int again;
     int first_fetch;
+    uint32_t written[16];
 
     for (;;) {
         task = PE_LoadU32(GA_D_8009D300);
@@ -1380,8 +1475,11 @@ static void pe_17018_run(void)
             kinds = word >> 17;
             imm_base = pc + 8u;
             PE_StoreU32(GA_D_8009CE00, imm_base + argc * 4u);
-            for (i = 0; i < 16u; i++)
+            vmframe_audit_pre(op);
+            for (i = 0; i < 16u; i++) {
                 PE_StoreU32(GA_VM_FRAME + i * 4u, 0u);
+                written[i] = 0u;
+            }
             for (i = 0; i < argc; i++) {
                 kind = kinds & 7u;
                 if (kind < 5u) {
@@ -1399,6 +1497,7 @@ static void pe_17018_run(void)
                     else
                         decoded = GA_D_800B6A80 + imm * 4u;
                     PE_StoreU32(GA_VM_FRAME + i * 4u, decoded);
+                    written[i] = decoded;
                 }
                 kinds >>= 3;
                 if (i == 4u)
@@ -1407,6 +1506,22 @@ static void pe_17018_run(void)
             g_pe_17018_opcode_pc = pc;
             again = pe_17018_dispatch(PE_LoadU32(GA_D_800910A0 + op * 4u),
                                       GA_VM_FRAME);
+            vmframe_audit_post(op, written);
+            {
+                /* day1 diagnostics: PE_VM_TRACE=path logs every field-VM opcode
+                 * (actor key, pc, op, handler, first 3 operands, result). Off by default. */
+                static FILE *vt; static int vt_init;
+                if (!vt_init) { const char *p = getenv("PE_VM_TRACE"); vt_init = 1; if (p && *p) vt = fopen(p, "w"); }
+                if (vt) {
+                    uint32_t o[4];
+                    for (unsigned k = 0; k < 4u; k++)
+                        o[k] = (k < argc && PE_RangeIsRam(written[k], 4u)) ? PE_LoadU32(written[k]) : 0xDEADu;
+                    fprintf(vt, "vm tok=%08X key=%02X/%02X anim=%02X pc=%08X op=%03X fn=%08X ops=%X,%X,%X,%X at=%X,%X,%X,%X ret=%d\n",
+                            PE_LoadU32(0x8009D280u), PE_LoadU8(actor + 0xCu), PE_LoadU8(actor + 0xDu),
+                            PE_LoadU8(actor + 0xEu), pc, op, PE_LoadU32(GA_D_800910A0 + op * 4u),
+                            o[0], o[1], o[2], o[3], written[0], written[1], written[2], written[3], again);
+                }
+            }
             if (again)
                 task = PE_LoadU32(GA_D_8009D300);
         }

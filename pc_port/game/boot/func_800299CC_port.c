@@ -397,3 +397,221 @@ void func_800299CC_damage_entry_cut(void)
     func_800299CC_player_animation();
     func_8002A7F8_join_cut();
 }
+
+/* ── func_800299CC: complete battle tick, line-for-line from the matched
+ * src/func_800299CC.c (audit items 1-3).  Replaces the composed cuts
+ * (consume / after_consume / mode_switch / damage_entry) at the 355E8 call
+ * site: restores the D_8009D1AC & 0x300 -> func_8003495C call, the
+ * D_8009D23C script-command pair, the D_8009D235 -> func_80033430 call and
+ * the full mode-3 body (item 0x12 consume, rec+0x56/+0x66 countdowns, enemy
+ * walk).  func_80025EE8 is the complete port func_80025EE8_attack_cut. */
+extern int func_80067CBC(void);
+void func_8001A680(pe_addr_t body, unsigned int id);   /* decomp_hand/absent_lo_actor_port.c */
+extern int func_8006DF50(int a0, int a1, int a2, int a3, int a4);
+extern int func_8006DE80(int a0, int a1, short a2, short a3, short a4);
+extern void func_8002B0E8(void);
+extern void func_8002B29C(void);
+extern void func_8002B94C(void);
+extern void func_8002F0B0(void);
+extern void func_8002BC90(void);
+extern void func_8002D1F0(void);
+extern void func_8002DC58(void);
+extern void func_80034DE0(void);
+extern void func_80033A40(void);
+extern void func_80033430(void);
+extern void func_8003495C(void);
+extern void func_80021DE0(void);
+extern void func_800236E8(void);
+extern void func_80020F18(void);
+extern void func_80043240(int a0);
+extern void func_800866A4(unsigned int a0, unsigned int a1);
+extern void func_8005C174(int32_t battle);
+extern int32_t func_8002156C(void);
+
+#define BT_REC()   PE_LoadU32(GA_D_8009D278)
+#define BT_AYA()   PE_LoadU32(GA_D_8009D254)
+#define BT_MODE()  PE_LoadU32(GA_D_8009D28C)
+
+static void bt_colour(pe_addr_t base, unsigned slot, uint8_t r, uint8_t g, uint8_t b)
+{
+    PE_StoreU8(base + slot + 0u, r); PE_StoreU8(base + slot + 1u, g); PE_StoreU8(base + slot + 2u, b);
+}
+
+/* for (e = D_8009D20C; e; e = e->next) if (e != D_8009D254 && e->f0) func_80027D14(e); */
+static void bt_enemy_walk(void)
+{
+    pe_addr_t e;
+    for (e = PE_LoadU32(GA_D_8009D20C); e != 0u; e = PE_LoadU32(e + 4u)) {
+        if (e != BT_AYA() && PE_LoadU32(e) != 0u)
+            func_80027D14(e);
+        if (PE_Port_ShouldStop()) return;
+    }
+}
+
+void func_800299CC(void)
+{
+    uint32_t s = 1u;
+    pe_addr_t rec, aya;
+
+    if (PE_LoadU32(BT_REC() + 0x4Cu) & 0x80000u) {
+        if (BT_MODE() == 6u) { PE_StoreU8(GA_D_8009CE7C, 6u); PE_StoreU32(GA_D_8009D28C, 0u); }
+    }
+    if (!(PE_LoadU32(BT_REC() + 0x4Cu) & 0x80000u)) {
+        if (PE_LoadU8(GA_D_8009CE7C) == 6u) { PE_StoreU8(GA_D_8009CE7C, 0u); PE_StoreU32(GA_D_8009D28C, 6u); }
+    }
+    PE_StoreU32(GA_D_8009D230, 0u);
+    PE_StoreU32(GA_D_8009D278, PE_LoadU32(BT_AYA()));
+    PE_StoreU16(0x8009D2A4u, (uint16_t)func_8005C498(0x800A76D8u));
+    if (BT_MODE() == 0u && PE_LoadU8(GA_D_8009D244) != 0u) {
+        rec = BT_REC();
+        if (PE_LoadU16(rec + 0x10u) >= 9000u) {
+            PE_StoreU16(rec + 0x10u, 9000u);
+            if (PE_LoadU8(0x8009D288u) == 0u) {
+                func_80071A64(PE_LoadU32(0x8009D250u));
+                if (PE_LoadU32(0x800B0E08u) != 0u)
+                    (void)func_8006DF50((int)PE_LoadU32(0x800B0E08u), 0x454, 0, 0x80, 0x7F);
+                PE_StoreU8(0x8009D288u, 1u);
+            }
+            if (!(PE_LoadU32(BT_REC() + 0x4Cu) & 0x2000u) && (int8_t)PE_LoadU8(0x8009D2A0u) != 0) {
+                uint32_t ph = PE_LoadU32(0x8009D250u) & 3u;
+                pe_addr_t g4 = 0x800B00E8u + PE_LoadU32(0x8009CDDCu) * 36u;
+                pe_addr_t p28 = 0x800B6928u + PE_LoadU32(0x8009CDDCu) * 28u;
+                if (ph == 0u) {
+                    bt_colour(g4, 4u, 0, 0x46, 0x82);   bt_colour(g4, 12u, 0x9F, 0xFF, 0xF9);
+                    bt_colour(g4, 20u, 0, 0x46, 0x82);  bt_colour(g4, 28u, 0x9F, 0xFF, 0xF9);
+                    bt_colour(p28, 4u, 0x9F, 0xFF, 0xF9);
+                } else if (ph == 1u || ph == 3u) {
+                    bt_colour(g4, 4u, 0x50, 0xA3, 0xBE);  bt_colour(g4, 12u, 0x50, 0xA3, 0xBE);
+                    bt_colour(g4, 20u, 0x50, 0xA3, 0xBE); bt_colour(g4, 28u, 0x50, 0xA3, 0xBE);
+                    bt_colour(p28, 4u, 0x50, 0xA3, 0xBE);
+                } else {
+                    bt_colour(g4, 4u, 0x9F, 0xFF, 0xF9); bt_colour(g4, 12u, 0, 0x46, 0x82);
+                    bt_colour(g4, 20u, 0x9F, 0xFF, 0xF9); bt_colour(g4, 28u, 0, 0x46, 0x82);
+                    bt_colour(p28, 4u, 0, 0x46, 0x82);
+                }
+                if ((int8_t)func_80021054() == 0) {
+                    int k = 0;
+                    uint32_t pad = PE_LoadU32(0x8009D1F4u);
+                    if (pad & 0x200u) {
+                        PE_StoreU8(0x8009D1F0u, 0u);
+                        k = 1;
+                    } else if (pad & 0x80u) {
+                        k = 1;
+                        PE_StoreU8(0x8009D1F0u, 1u);
+                        func_8005C174(1);
+                        (void)func_80067CBC();
+                    }
+                    if (k) {
+                        func_800866A4(0u, 0xFFu);
+                        PE_StoreU32(GA_D_8009D28C, 1u);
+                        PE_StoreU32(0x8009D290u, 0u);
+                        D_8009D1A0 |= 4u;
+                        s = 0u;
+                        PE_StoreU8(0x8009D2B0u, (uint8_t)(int8_t)func_8002156C());
+                        func_80020F18();
+                        func_80043240((int8_t)PE_LoadU8(0x8009D2B0u) != 0 ? 0 : 1);
+                    }
+                }
+            }
+        }
+        if ((int8_t)func_80021054() > 0) {
+            if (!(PE_LoadU32(BT_REC() + 0x4Cu) & 0x4000u) || (D_8009D1A0 & 0x100u)) {
+                func_80021DE0();
+                s = 2u;
+            }
+            if (PE_LoadU8(GA_D_8009D294) != 0u)
+                func_800236E8();
+        }
+        if (PE_LoadU32(0x8009D1ACu) & 0x300u)
+            func_8003495C();
+        func_8001D340(s);
+        if (PE_Port_ShouldStop()) return;
+        bt_enemy_walk();
+        if (PE_Port_ShouldStop()) return;
+        if (PE_LoadU8(0x8009D23Cu) != 0u) {
+            (void)func_8006F6D4(PE_LoadU32(0x8009D2FCu), 0u, 1u, 0x800B8A90u, 0u, 0u);
+            (void)func_8006F6D4(PE_LoadU32(0x8009D2FCu), 0u, 0u, 1u, 0u, 0u);
+            PE_StoreU8(0x8009D23Cu, 0u);
+        }
+        if (PE_LoadU8(0x8009D235u) != 0u)
+            func_80033430();
+        aya = BT_AYA();
+        if (PE_LoadU8(aya + 0x0Fu) == PE_LoadU16(aya + 0x1Au) && PE_LoadU8(aya + 0x0Eu) < 4u) {
+            if (PE_LoadU16(0x8009D298u) == 0u) {
+                func_8001A680(aya, PE_LoadU8(BT_REC() + 0x12u));
+                if (!(PE_LoadU8(0x800B0CE6u) & 1u) && (int8_t)func_80021054() == 0 && BT_MODE() == 0u &&
+                    (PE_LoadU32(PE_LoadU32(BT_REC() + 0x68u) + 0x10u) & 0x8000u) &&
+                    PE_LoadU32(0x8009D1D0u) != 0u) {
+                    func_800306E0(PE_LoadU32(0x8009D1D0u));
+                    PE_StoreU32(0x8009D1D0u, 0u);
+                }
+            } else {
+                if (PE_LoadU16(0x8009D298u) >= 2u)
+                    PE_StoreU32(aya + 0x98u, PE_LoadU32(aya + 0x98u) | 0x100u);
+                PE_StoreU16(0x8009D298u, 0u);
+                func_8001A680(aya, PE_LoadU8(0x8009D29Au));
+                PE_StoreU32(aya + 0x14u, PE_LoadU32(0x8009D29Cu));
+                PE_StoreU32(aya + 0x18u, PE_LoadU32(0x8009D29Cu) - 0x10000u);
+            }
+        }
+        aya = BT_AYA();
+        if (PE_LoadU8(aya + 0x0Eu) == 0x0Du && !(PE_LoadU8(0x800B0CE6u) & 1u)) {
+            PE_StoreU8(BT_REC() + 0x12u, 4u);
+            if (PE_LoadU32(aya + 0x98u) & 0x100u) {
+                (void)func_8006DE80(0x453, 0, (short)PE_LoadU16(aya + 0x2Au),
+                                    (short)PE_LoadU16(aya + 0x2Eu), (short)PE_LoadU16(aya + 0x32u));
+                PE_StoreU32(aya + 0x98u, PE_LoadU32(aya + 0x98u) & ~0x100u);
+            }
+            if (PE_LoadU8(aya + 0x0Fu) == PE_LoadU16(aya + 0x1Au)) {
+                func_8001A680(aya, PE_LoadU8(BT_REC() + 0x12u));
+                PE_StoreU32(0x8009D2E8u, PE_LoadU32(0x8009D2E8u) & ~1u);
+            }
+        }
+        PE_StoreU32(0x8009D1E8u, PE_LoadU32(0x8009D1E8u) + 1u);
+    } else if (BT_MODE() == 1u) {
+        int8_t next = func_80025EE8_attack_cut();
+        PE_StoreU32(GA_D_8009D28C, (uint32_t)(int32_t)next);
+        if (next == 0) D_8009D1A0 &= ~4u;
+    } else if (BT_MODE() == 2u) {
+        func_8002B0E8();
+    } else if (BT_MODE() == 3u) {
+        rec = BT_REC();
+        if (PE_LoadU32(rec + 0x4Cu) & 0x800u) {
+            if ((uint8_t)func_8002AA98())
+                PE_StoreU32(BT_REC() + 0x4Cu, PE_LoadU32(BT_REC() + 0x4Cu) & ~0x800u);
+        } else if (func_80053E6C(0x12)) {
+            if ((uint8_t)func_8002AA98())
+                (void)func_8005409C(0x12);
+        } else {
+            func_8002B29C();
+        }
+        rec = BT_REC();
+        if (PE_LoadU8(rec + 0x56u) != 0u) {
+            func_80032B0C(0u, rec + 0x50u);
+            PE_StoreU8(BT_REC() + 0x56u, (uint8_t)(PE_LoadU8(BT_REC() + 0x56u) - 1u));
+        }
+        rec = BT_REC();
+        if (PE_LoadU8(rec + 0x66u) != 0u) {
+            func_80032B0C(0u, rec + 0x60u);
+            PE_StoreU8(BT_REC() + 0x66u, (uint8_t)(PE_LoadU8(BT_REC() + 0x66u) - 1u));
+        }
+        bt_enemy_walk();
+    } else if (BT_MODE() == 4u) {
+        func_8002B94C();
+    } else if (BT_MODE() == 5u) {
+        func_8002F0B0();
+    } else if (BT_MODE() == 6u) {
+        func_8002BC90();
+    } else if (BT_MODE() == 7u) {
+        func_8002D1F0();
+    } else if (BT_MODE() == 8u) {
+        func_8002DC58();
+    }
+    if (PE_Port_ShouldStop()) return;
+    if (PE_LoadU8(0x8009D1CEu) != 0u && BT_MODE() == 0u)
+        func_80034DE0();
+    if (PE_LoadU8(GA_D_8009D244) != 0u)
+        func_80033A40();
+    if ((int16_t)PE_LoadU16(0x8009D2A4u) != 0)
+        (void)func_80067CBC();
+}

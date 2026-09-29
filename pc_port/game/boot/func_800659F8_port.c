@@ -76,29 +76,11 @@ static void sew3_rec56_bit(pe_addr_t rec, uint32_t on, uint8_t bit)
     PE_StoreU8(rec, on ? (uint8_t)(flags | bit) : (uint8_t)(flags & (uint8_t)~bit));
 }
 
-int func_80067678(uint32_t index, uint32_t on)
-{
-    sew3_rec56_bit(sew3_rec56(index), on, 2u);
-    return 0;
-}
+/* func_80067678: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80067678_port.c (src/func_80067678.c); hand port retired (audit batch, port3). */
 
-int func_800676CC(uint32_t index, uint32_t on, uint32_t a2, uint32_t a3)
-{
-    pe_addr_t rec = sew3_rec56(index);
-    sew3_rec56_bit(rec, on, 4u);
-    PE_StoreU16(rec + 0x1Cu, (uint16_t)(a2 >> 8));
-    PE_StoreU16(rec + 0x1Eu, (uint16_t)(a3 >> 8));
-    return 0;
-}
+/* func_800676CC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800676CC_port.c (src/func_800676CC.c); hand port retired (audit batch, port3). */
 
-int func_80067730(uint32_t index, uint32_t on, uint32_t a2, uint32_t a3)
-{
-    pe_addr_t rec = sew3_rec56(index);
-    sew3_rec56_bit(rec, on, 8u);
-    PE_StoreU16(rec + 0x1Cu, (uint16_t)((0x10000u - a2) >> 8));
-    PE_StoreU16(rec + 0x1Eu, (uint16_t)((0x10000u - a3) >> 8));
-    return 0;
-}
+/* func_80067730: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80067730_port.c (src/func_80067730.c); hand port retired (audit batch, port3). */
 
 /* func_800375B4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800375B4_port.c (src/func_800375B4.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 /* func_8003746C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8003746C_port.c (src/func_8003746C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

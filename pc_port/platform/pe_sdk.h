@@ -166,6 +166,9 @@ void PE_Irq_GetSource0BiosState(PeIrqSource0BiosState *out);
  * Never returns -1 at boot (event classes used never exhaust). */
 int  PE_Event_Open(uint32_t cls, uint32_t spec, uint32_t mode, pe_addr_t handler);
 int  PE_Event_Enable(int handle);
+int  PE_Event_Disable(int handle);
+int  PE_Event_Close(int handle);
+int  PE_Event_UnDeliver(uint32_t cls, uint32_t spec);
 int  PE_Event_SpuDmaEnabled(void);
 int  PE_Event_DeliverSpuDma(void);
 int  PE_Event_ConsumeSpuDma(int handle);

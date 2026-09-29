@@ -62,8 +62,11 @@ void func_8005C174(int32_t battle)
     func_800438EC();func_800525EC();
 }
 
-/* Main menu Items, Escape and return handling. The remaining pages keep
- * their original dispatch boundaries until their own callbacks are native. */
+void func_80052E30(uint32_t a0);
+int func_80053F20(int a0);
+int func_80053F90(int a0);
+void func_80048918(int a0, int a1, int a2);
+/* Main menu dispatch (src/func_80043DA4.c): all nine commands. */
 int func_80043DA4(pe_addr_t window,uint32_t event)
 {
     if (event&0x10000u) {
@@ -85,14 +88,25 @@ int func_80043DA4(pe_addr_t window,uint32_t event)
         else if (command==4) func_800512AC(8,0u);
         else if (command==5) func_8004AD9C(list);
         else if (command==6) func_80046DFC(list,0u);
-        else {
-            /* Commands 7/8 (func_80048918) keep their original dispatch
-             * boundaries until their own callbacks are native. */
-            static const char *const pages[]={"func_80044174","func_80046ABC",
-                "func_80045EE4","func_80045EE4","func_800512AC",
-                "func_8004AD9C","func_80046DFC","func_80048918","func_80048918"};
-            Bootstrap_ReturnVoid(pages[command],"func_80043DA4");
-            PE_Port_RequestStop(PE_PORT_STOP_UNRESOLVED_BOUNDARY);return 1;
+        else if (command==7) {
+            /* Audit item 28: src/func_80043DA4.c case 7 (status page). */
+            PE_StoreU32(0x8009CF1Cu,1u);
+            func_80052E30(0u);
+            PE_StoreU32(0x800A1888u,(uint32_t)(func_80053F20(14)?999:func_80053F20(12)));
+            PE_StoreU32(0x800A188Cu,(uint32_t)(func_80053F20(15)?999:func_80053F20(13)));
+            if (PE_LoadU32(0x8009CF0Cu)) {
+                PE_StoreU32(0x800A1890u,(uint32_t)(func_80053F90(14)?999:func_80053F90(12)));
+                PE_StoreU32(0x800A1894u,(uint32_t)(func_80053F90(15)?999:func_80053F90(13)));
+            } else {
+                PE_StoreU32(0x800A1894u,0u);PE_StoreU32(0x800A1890u,0u);
+            }
+            func_80048918(830,-1,-1);
+            PE_StoreU32(0x8009CEF8u,0u);
+        } else {
+            /* case 8 */
+            PE_StoreU32(0x8009CF30u,1u);
+            func_80048918(894,-1,-1);
+            PE_StoreU32(0x8009CEF8u,0u);
         }
         func_800525EC();return 1;
     }

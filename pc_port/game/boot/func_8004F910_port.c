@@ -3,6 +3,7 @@
 #include "psx_compat.h"
 #include "pe_port_compat.h"
 #include "game_port.h"
+#include "pe_guestcode.h"
 #include <stdio.h>
 
 void func_8005F354(pe_addr_t text,int32_t width)
@@ -81,6 +82,13 @@ int func_8004D030(pe_addr_t window,uint32_t event)
             else if (callback==0x80042910u) func_80042910();
             else if (callback==0x80042928u) {
                 unsigned epoch=PE_Port_StopEpoch();func_80042928();
+                if(PE_Port_StopEpoch()!=epoch)return 1;
+            }
+            else if (PE_GuestCode_Resolve(callback)) {
+                /* Retail jalr through D_8009CFFC: other code pointers (e.g.
+                 * 80042228 after "File loaded") via the guest-code registry. */
+                unsigned epoch=PE_Port_StopEpoch();
+                (void)PE_GuestCall("func_8004D030",callback,0u,0u,0u,0u,0u);
                 if(PE_Port_StopEpoch()!=epoch)return 1;
             }
             else {

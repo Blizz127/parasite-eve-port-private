@@ -44,6 +44,8 @@
  */
 #include "psx_compat.h"
 #include "pe_port_compat.h"
+#include <stdio.h>
+#include <stdlib.h>
 #include "game_port.h"
 #include "pe_sdk.h"
 
@@ -267,38 +269,74 @@ static void pe_walk_digital_apply(pe_addr_t actor, uint32_t speed)
  * 206 words 0x8007136C..0x800716A4, SHA-256 below in oracle.
  * Analog (BE9A0&0xF000==0x7000) is not this cut.
  */
+int32_t func_80079FB4(int32_t a0, int32_t a1);   /* generated TU */
+void func_8001A680(pe_addr_t body, unsigned int id);   /* decomp_hand/absent_lo_actor_port.c */
 void func_8007136C(pe_addr_t actor, pe_addr_t codep)
 {
-    uint32_t speed;
-    uint32_t scaled;
+    /* Audit item 18: line-for-line src/func_8007136C.c, including the
+     * analog-stick path (pad type D_800BE9A0 & 0xF000 == 0x7000) and the
+     * D_8009D2E8 & 0x10 heading adjust.  `v` (a stack VEC in retail) lives in
+     * GA_WALK_VEL; like retail, a digital frame with no direction bits leaves
+     * it as it was. */
+    int32_t sp = 0x168000, d, ang, r, a;
+    uint32_t f, g;
     pe_addr_t rec;
-    uint32_t word;
-    uint32_t code;
 
-    speed = 0x168000u;
-    if ((D_8009D1A0 & 2u) != 0u) {
+    if (D_8009D1A0 & 2u) {
         rec = PE_LoadU32(actor);
-        word = PE_LoadU32(rec + 0x4Cu);
-        if ((word & 0xC0u) == 0x40u)
-            speed = 0xB4000u;
-        else if ((word & 0x100u) != 0u)
-            speed = 0x21C000u;
-        code = PE_LoadU8(rec + 0x13u);
-        if (PE_LoadU32(codep) != code) {
-            func_8001A680_command_cut(actor, code);
-            PE_StoreU32(codep, code);
+        g = PE_LoadU32(rec + 0x4Cu);
+        if ((g & 0xC0u) == 0x40u) sp = 0xB4000;
+        else if (g & 0x100u) sp = 0x21C000;
+        if (PE_LoadU32(codep) != PE_LoadU8(PE_LoadU32(actor) + 0x13u)) {
+            func_8001A680(actor, PE_LoadU8(PE_LoadU32(actor) + 0x13u));
+            PE_StoreU32(codep, PE_LoadU8(PE_LoadU32(actor) + 0x13u));
         }
-    } else {
-        code = PE_LoadU32(codep);
-        if (code != 0x17u) {
-            func_8001A680_command_cut(actor, 0x17u);
-            PE_StoreU32(codep, 0x17u);
-        }
+    } else if (PE_LoadU32(codep) != 0x17u) {
+        func_8001A680(actor, 0x17u);
+        PE_StoreU32(codep, 0x17u);
     }
-    scaled = func_8003708C(speed, PE_LoadU32(actor + 0x20u));
-    scaled = func_8003708C(scaled,
-                           (uint32_t)PE_LoadU16(actor + 0x26u) << 4);
-    pe_walk_digital_apply(actor, scaled);
+    sp = (int32_t)func_8003708C((uint32_t)sp, PE_LoadU32(actor + 0x20u));
+    sp = (int32_t)func_8003708C((uint32_t)sp, (uint32_t)PE_LoadU16(actor + 0x26u) << 4);
+    if ((PE_LoadU16(GA_D_800BE9A0) & 0xF000u) == 0x7000u) {
+        ang = func_80079FB4((int32_t)PE_LoadU8(0x800BE9A7u) - 0x80, (int32_t)PE_LoadU8(0x800BE9A6u) - 0x80) - 0x400;
+        if (ang < 0) ang += 0x1000;
+        PE_StoreU16(actor + 0x3Au, (uint16_t)(PE_LoadU16(0x800BD022u) + (uint32_t)ang));
+        d = func_80077CF4(ang);
+        sp = -sp;
+        PE_StoreU32(GA_WALK_VEL + 0u, func_8003708C((uint32_t)sp, (uint32_t)d << 4));
+        PE_StoreU32(GA_WALK_VEL + 4u, 0u);
+        PE_StoreU32(GA_WALK_VEL + 8u, func_8003708C((uint32_t)sp, (uint32_t)func_80077DC4(ang) << 4));
+    } else {
+        d = (int32_t)func_8003708C((uint32_t)sp, 0xB504u);
+        f = PE_LoadU32(GA_D_8009D26C);
+        a = PE_LoadU16(GA_D_800BD020);
+        PE_StoreU16(actor + 0x3Au, (uint16_t)a);
+#define WV(x, z) (PE_StoreU32(GA_WALK_VEL, (uint32_t)(x)), PE_StoreU32(GA_WALK_VEL + 4u, 0u), \
+                  PE_StoreU32(GA_WALK_VEL + 8u, (uint32_t)(z)))
+        if (f & 8u) {
+            if (f & 0x40u)      { PE_StoreU16(actor + 0x3Au, (uint16_t)(a + 0x600)); WV(-d, d); }
+            else if (f & 0x10u) { PE_StoreU16(actor + 0x3Au, (uint16_t)(a + 0xA00)); WV(d, d); }
+            else                { PE_StoreU16(actor + 0x3Au, (uint16_t)(a + 0x800)); WV(0, sp); }
+        } else if (f & 0x20u) {
+            if (f & 0x40u)      { PE_StoreU16(actor + 0x3Au, (uint16_t)(a + 0x200)); WV(-d, -d); }
+            else if (f & 0x10u) { PE_StoreU16(actor + 0x3Au, (uint16_t)(a + 0xE00)); WV(d, -d); }
+            else                { PE_StoreU16(actor + 0x3Au, (uint16_t)a); WV(0, -sp); }
+        } else if (f & 0x40u)   { PE_StoreU16(actor + 0x3Au, (uint16_t)(a + 0x400)); WV(-sp, 0); }
+        else if (f & 0x10u)     { PE_StoreU16(actor + 0x3Au, (uint16_t)(a + 0xC00)); WV(sp, 0); }
+#undef WV
+    }
+    r = (int16_t)PE_LoadU16(actor + 0x3Au);
+    if (PE_LoadU32(GA_D_8009D254) != 0u && (PE_LoadU32(GA_D_8009D2E8) & 0x10u)) {
+        r += 0x800;
+        r += (int32_t)((PE_LoadU32(PE_LoadU32(PE_LoadU32(GA_D_8009D254)) + 0x4Cu) >> 7) & 0xC00u);
+    }
+    r &= 0xFFF;
+    PE_StoreU16(actor + 0x3Au, (uint16_t)r);
+    func_80078934(GA_D_800BD000, GA_WALK_VEL, actor + 0x68u);
+    if (PE_LoadU32(GA_D_8009D2E8) & 0x10u) {
+        PE_StoreU16(actor + 0x3Au, (uint16_t)((0x1000u - PE_LoadU16(actor + 0x3Au)) & 0xFFFu));
+        PE_StoreU32(actor + 0x68u, (uint32_t)-(int32_t)PE_LoadU32(actor + 0x68u));
+    }
 }
 
 /*
@@ -503,6 +541,31 @@ static void pe_35558_body(void)
         }
         else if (fn == GA_VT_35C84)
             func_80035C84(actor);
+        else if (fn != 0u) {
+            /* Retail 3558C jalr's any nonzero +0x190. Report each unported
+             * handler once (day1: date-NPC contact investigation). */
+            static pe_addr_t seen[16]; static unsigned nseen;
+            unsigned k;
+            for (k = 0; k < nseen && seen[k] != fn; k++) {}
+            if (k == nseen && nseen < 16u) {
+                seen[nseen++] = fn;
+                fprintf(stderr, "[ACTOR] unported +0x190 handler %08X actor=%08X key=%02X/%02X token=%08X (skipped)\n",
+                        fn, actor, PE_LoadU8(actor + 0xCu), PE_LoadU8(actor + 0xDu), PE_LoadU32(0x8009D280u));
+            }
+        }
+        if (getenv("PE_CONTACT_TRACE") && PE_LoadU8(actor + 0xCu) == 2u && PE_LoadU8(actor + 0xDu) == 0u) {
+            static uint32_t last_sig;
+            uint32_t sig = PE_LoadU32(actor + 0x98u) ^ PE_LoadU32(actor + 0xA4u) ^ PE_LoadU32(actor + 0x228u)
+                         ^ (PE_LoadU32(actor + 0x230u) << 3) ^ PE_LoadU32(actor + 0x1A0u);
+            if (sig != last_sig) {
+                last_sig = sig;
+                fprintf(stderr, "CONTACT date actor=%08X tok=%08X f190=%08X f1A0=%08X f98=%08X fA4=%08X c228=%04X,%04X,%04X r230=%04X f26=%04X f1AC=%08X\n",
+                        actor, PE_LoadU32(0x8009D280u), fn, PE_LoadU32(actor + 0x1A0u), PE_LoadU32(actor + 0x98u),
+                        PE_LoadU32(actor + 0xA4u), PE_LoadU16(actor + 0x228u), PE_LoadU16(actor + 0x22Au),
+                        PE_LoadU16(actor + 0x22Cu), PE_LoadU16(actor + 0x230u), PE_LoadU16(actor + 0x26u),
+                        PE_LoadU32(actor + 0x1ACu));
+            }
+        }
         actor = PE_LoadU32(actor + 4u);
     }
 
@@ -513,13 +576,18 @@ static void pe_35558_body(void)
     /* Retail 355E8 updates battle state after actor callbacks and before
      * floor resolution and model projection (damage can change poses). */
     if (D_8009D1A0 & 2u) {
-        func_800299CC_consume_cut();
-        func_800299CC_after_consume_cut();
-        if (PE_LoadU32(0x8009D28Cu) != 0u ||
-            PE_LoadU8(0x8009D244u) == 0u)
-            func_800299CC_mode_switch_cut();
-        else
-            func_800299CC_damage_entry_cut();
+        static int legacy = -1;   /* PE_BATTLE_TICK_LEGACY=1: old cuts, A/B diagnostics only */
+        if (legacy < 0) legacy = getenv("PE_BATTLE_TICK_LEGACY") != NULL;
+        if (!legacy) {
+            func_800299CC();   /* complete battle tick (src/func_800299CC.c) */
+        } else {
+            func_800299CC_consume_cut();
+            func_800299CC_after_consume_cut();
+            if (PE_LoadU32(0x8009D28Cu) != 0u || PE_LoadU8(0x8009D244u) == 0u)
+                func_800299CC_mode_switch_cut();
+            else
+                func_800299CC_damage_entry_cut();
+        }
     } else {
         PE_FieldMenuFrame();
         if (PE_Port_ShouldStop()) return;

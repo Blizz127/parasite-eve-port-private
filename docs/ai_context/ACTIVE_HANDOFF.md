@@ -1,3 +1,35 @@
+## UPDATE 2026-09-29: port checkpoint — retail battle tick, Game Over, audit fixes (commits 9306661c..)
+
+Gate on the committed tree: native suite `Results: 1596 run, 1596 passed` (build/tmp/commit-suite.log, fresh build of the frozen tree); full route `REGRESS PASS until=day1_end_80 frame=67058` (build/lanes/port/rr_go.log, port3; day1 bt-route3 same frame). Commits: gfx renderer prims, fmv movie-audio/MDEC, audio pause + script sound keys, opt-in cheats, and this one (battle tick `func_800299CC`/`func_80024A3C`/mode 3 as matched C; Game Over field + battle side verified vs the emulator oracle; audit items 16–20, 27–29; effect-module inits; route anchors + sewer HP lock (harness-only)). Known divergences: 19 open (`docs/port/KNOWN_DIVERGENCES.md`). Next: floor shadows + DMA2 at-issue snapshot (gfx), Aya's gun, model shading, memory-card saves, audio sweep, hand-port switch-over batches; release gate unchanged.
+
+## UPDATE 2026-09-28: gfx lane — effect particles drew as streaks/dots (effect module inits)
+
+Root cause: the hand port of `func_8006914C` (`pc_port/game/boot/func_80029810_port.c`)
+omitted retail's state-0 effect-module init calls (`src/func_8006914C.c`:
+`h = D_800942E0[i]; if (h && *h) (*h)();` for modules 0..7, 0x55 and each
+room-exported module 8..0x54). Module 0x55 = `0x800E13D4` -> `func_800D4860`
+never ran, so `func_800CECAC` never filled the effect texpage table
+`D_800E2850` (observed `0000 0000 0000 0000`) and every `func_800CEE20`
+sprite / ribbon / fan used texpage 0 = the framebuffer at VRAM (0,0).
+Fixed: `func_8006914C_module_inits()` calls them through `PE_GuestCall`
+(unresolved inits log one `[DAY1_SHIM]` line; none fired on the Day-1 stage).
+After the fix `D_800E2850 = 001E 001D 009E 009D` (GetTPage of (0x380,0x100)/(0x340,0x100)).
+Evidence: stage room A80002C8 (M0005 Eve encounter), route frames 10640–10680
+vs the owner's retail video part 1 @ 9:58 (598 s): the ring of soft orange
+glow balls matches; green sparkles (part 1 @ 9:45–9:50) are small dots, not
+long streaks. Rat fight A80011C8 (route 18900–19170, part 1 @ 15:53) renders.
+Also: GP0 decoder completes textured rects of every size and 15bpp, and
+polylines (48h/58h, 5xxx5xxx terminator; OT validator uses the new
+`PE_GPU_GP0_StreamPacketWords`); `PE_GuestCode_Resolve` treats identical-bytes
+fingerprint matches across room tables as one match (the 8-byte return-0
+stubs `8018F4F8`/`8018FF34` were "not ported"). New tests
+`pc_port/tests/test_gpu_prims.h` (GFX1_*). Debug aids (env, off by default):
+`PE_GPU_PRIM_LOG=<path>[:first[:last]]`, `PE_ROUTE_SHOT_RANGE=<dir>:first:last:step`.
+Open (not fixed): no floor shadows under characters in the port (no
+semi-transparent shadow primitives are emitted at all; retail and the oracle
+show them) and Aya's gun model is not drawn (muzzle flash is). See the gfx
+lane report.
+
 ## UPDATE 2026-09-28: HEAD scrubbed of retail data (pre history rewrite)
 
 `tools/analysis/retail_data_guard.py` v5 also catches bare hex (objdump words, byte dumps, CSV raw_hex) and images/audio under docs/; `--strict` → `OK: 20209 file(s), no retail byte runs` with an empty baseline. 58 oracle scripts read retail words from the disc via `pc_port/tools/pe_exe_words.py` (outputs byte-identical before/after); 187 docs/comments had retail hex replaced by addresses + mnemonics (`xxxxxxxx` / `<N bytes, sha1 …>`); 3 vendored khasinski tables became externs (PROVENANCE.md notes it); 82 game-frame PNGs removed from git (local copies in build/evidence-screenshots/). Suite with disc 1590/1590. PENDING: 11 test headers + test_native.c still hold retail **pointer** tables (allowlisted `addr:` under "PENDING" in retail_data_guard_allow.txt) — move to disc reads before the history rewrite. Owner call open: decoded game script text in docs. History rewrite plan: build/lanes/hist/plan.md (waits for BFM's rewrite).

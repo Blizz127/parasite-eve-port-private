@@ -123,10 +123,13 @@ int func_80019F04(pe_addr_t arg0)
  * handlerId +0x0E, handlerCount +0x0F, value/value2 +0x14/+0x18, flags
  * +0x98, link +0x18C, handler +0x1B0; D_800B0E98 rows are 0xC0 bytes of
  * 32-bit handler addresses; the body list head is D_8009D20C[0]. */
+void pe_anim_set_log(const char *who, pe_addr_t actor, unsigned int command, void *caller);
 void func_8001A680(pe_addr_t body, unsigned int id)
 {
     pe_addr_t h;
     pe_addr_t b;
+
+    pe_anim_set_log("1A680h", body, id, __builtin_return_address(0));
 
     h = PE_LoadU32(0x800B0E98u + (uint32_t)PE_LoadU8(body + 0x0Cu) * 0xC0u +
                    (uint32_t)(unsigned short)id * 4u);

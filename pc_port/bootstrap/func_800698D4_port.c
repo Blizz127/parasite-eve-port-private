@@ -103,7 +103,7 @@ int func_800698D4(void)
 
     D_800B0DCD = 0;
     s0 = func_8007F72C();
-    if (s0 != 1) return s0;
+    if (s0 != 1) return 1;   /* audit item 19: retail returns 1 (src/func_800698D4.c) */
     if (func_8007F778() != 0) return 1;
 
     r = func_80082314();

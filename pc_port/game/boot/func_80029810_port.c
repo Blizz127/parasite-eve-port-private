@@ -8,8 +8,10 @@
  */
 #include "psx_compat.h"
 #include "pe_port_compat.h"
+#include "pe_gpu.h"
 #include "game_port.h"
 #include "pe_sdk.h"
+#include "pe_guestcode.h"
 
 #define GA_RECORD_P       0x8009D278u
 #define GA_ACTOR_P        0x8009D254u
@@ -215,31 +217,28 @@ static uint8_t pe_command_frame_count(pe_addr_t resource)
     return PE_LoadU8(resource + 2u);
 }
 
+/* day1 diagnostics: PE_ANIM_SET_LOG=path logs every anim (actor+0xE) set by
+ * 1A680/1A784 with actor key, old/new anim and the host caller address
+ * (resolve with addr2line -f -e <binary>). Read-only; off by default. */
+void pe_anim_set_log(const char *who, pe_addr_t actor, unsigned int command, void *caller)
+{
+    static FILE *f; static int init;
+    if (!init) { const char *p = getenv("PE_ANIM_SET_LOG"); init = 1; if (p && *p) f = fopen(p, "w"); }
+    if (!f) return;
+    PeGpuState st; PE_GPU_GetState(&st);
+    fprintf(f, "vbl=%u %s actor=%08X key=%02X/%02X old=%02X new=%02X token=%08X caller=pe_anim_set_log%+ld\n",
+            st.vsync_count, who, actor, PE_LoadU8(actor + 0xCu), PE_LoadU8(actor + 0xDu),
+            PE_LoadU8(actor + 0xEu), command & 0xFFu, PE_LoadU32(0x8009D280u),
+            (long)((char *)caller - (char *)(void *)pe_anim_set_log));
+    fflush(f);
+}
+
+/* Audit item 4: identical to the matched func_8001A680 (same D_800B0E98 row
+ * lookup, stores and 0x200000-child cascade); kept as a name for callers. */
+void func_8001A680(pe_addr_t body, unsigned int id);   /* decomp_hand/absent_lo_actor_port.c */
 void func_8001A680_command_cut(pe_addr_t actor, unsigned int command)
 {
-    unsigned int type;
-    pe_addr_t resource;
-    unsigned int flags;
-
-    type = PE_LoadU8(actor + 0x0Cu);
-    resource = PE_LoadU32(GA_COMMAND_TABLE + type * 192u
-                          + (command & 0xFFFFu) * 4u);
-    PE_StoreU8(actor + 0x0Eu, (uint8_t)command);
-    PE_StoreU32(actor + 0x14u, 0u);
-    PE_StoreU32(actor + 0x18u, 0u);
-    PE_StoreU32(actor + 0x1B0u, resource);
-    flags = PE_LoadU32(actor + 0x98u) & ~0x200u;
-    PE_StoreU32(actor + 0x98u, flags);
-    PE_StoreU8(actor + 0x0Fu,
-               (uint8_t)((pe_command_frame_count(resource) - 1u) & 0xFFu));
-    if (PE_LoadU32(actor+0x98u)&0x100000u) {
-        pe_addr_t child=PE_LoadU32(0x8009D20Cu);
-        while (child) {
-            if (PE_LoadU32(child+0x18Cu)==actor && (PE_LoadU32(child+0x98u)&0x200000u))
-                func_8001A680_command_cut(child,command&0xFFFFu);
-            child=PE_LoadU32(child+4u);
-        }
-    }
+    func_8001A680(actor, command);
 }
 
 /* 1A784..1A890: select a clip without restarting it when unchanged,
@@ -249,6 +248,7 @@ void func_8001A784(pe_addr_t actor, unsigned int command)
     pe_addr_t child;
     uint32_t flags;
     if (PE_LoadU8(actor + 0xEu) != (command & 0xFFFFu)) {
+        pe_anim_set_log("1A784", actor, command, __builtin_return_address(0));
         unsigned int type = PE_LoadU8(actor + 0xCu);
         pe_addr_t resource;
         /* Unlike 1A680, this local reset must not restart descendants.
@@ -287,6 +287,39 @@ int32_t func_8006A318(pe_addr_t actor)
         current += PE_LoadU8(actor + 0xFu) + 1;
     else if (speed < 0 && previous < current)
         current -= PE_LoadU8(actor + 0xFu) + 1;
+    {
+        /* audio2 diagnostics: PE_AUDIO_ANIM_LOG=path logs, per actor tick
+         * with registered room triggers, the actor key and frame window. */
+        static FILE *al;
+        static int al_init;
+        if (!al_init) {
+            const char *p = getenv("PE_AUDIO_ANIM_LOG");
+            al_init = 1;
+            if (p && *p) al = fopen(p, "w");
+        }
+        {
+            static unsigned last_n = 0xFFFFu;
+            unsigned n = PE_LoadU8(0x800B0CE9u);
+            if (al && n != last_n) {
+                last_n = n;
+                for (unsigned k = 0; k < 4u + n; k++) {
+                    pe_addr_t r = 0x80094488u + k * 8u;
+                    fprintf(al, "REC %u: key=%02X/%02X anim=%02X frame=%u snd=%X/%X\n", k,
+                            PE_LoadU8(r), PE_LoadU8(r + 1u), PE_LoadU8(r + 2u),
+                            PE_LoadU8(r + 3u), PE_LoadU16(r + 4u), PE_LoadU16(r + 6u));
+                }
+            }
+        }
+        if (al && PE_LoadU8(0x800B0CE9u)) {
+            PeGpuState st;
+            PE_GPU_GetState(&st);
+            fprintf(al, "vbl=%u actor=%08X key=%02X/%02X anim=%02X win=%d..%d dir=%d aya=%d d1a0=%X cd8=%X n=%u\n",
+                    st.vsync_count, actor, PE_LoadU8(actor + 0xCu), PE_LoadU8(actor + 0xDu),
+                    PE_LoadU8(actor + 0xEu), previous, current, speed,
+                    actor == PE_LoadU32(0x8009D254u), PE_LoadU32(0x8009D1A0u),
+                    PE_LoadU32(0x800B0CD8u), PE_LoadU8(0x800B0CE9u));
+        }
+    }
     for (i = 0; i < 4u + PE_LoadU8(0x800B0CE9u); ++i) {
         pe_addr_t record = 0x80094488u + i * 8u;
         int32_t frame;
@@ -302,6 +335,18 @@ int32_t func_8006A318(pe_addr_t actor)
         if (!((speed > 0 && previous <= frame && frame < current) ||
               (speed < 0 && current < frame && frame <= previous))) continue;
         sound = PE_LoadU16(record + 4u + PE_LoadU8(0x800B0CEAu) * 2u);
+        {
+            /* day1 diagnostics: PE_ANIM_SFX_LOG=path logs each anim-keyed sound fire. */
+            static FILE *sf; static int sf_init;
+            if (!sf_init) { const char *p = getenv("PE_ANIM_SFX_LOG"); sf_init = 1; if (p && *p) sf = fopen(p, "w"); }
+            if (sf) {
+                PeGpuState st; PE_GPU_GetState(&st);
+                fprintf(sf, "vbl=%u FIRE rec=%u actor=%08X key=%02X/%02X anim=%02X frame=%d snd=%X token=%08X\n",
+                        st.vsync_count, i, actor, PE_LoadU8(actor + 0xCu), PE_LoadU8(actor + 0xDu),
+                        PE_LoadU8(actor + 0xEu), frame, sound, PE_LoadU32(0x8009D280u));
+                fflush(sf);
+            }
+        }
         if (sound)
             func_8006DCE4(sound, 0u,
                 (int16_t)PE_LoadU16(actor + 0x2Au),
@@ -784,87 +829,138 @@ static int func_8006D60C_state33(void)
     return 0;
 }
 
-int func_8006D60C(int a0)
+void func_800864CC(void);
+int func_8006D60C(int arg)
 {
-    unsigned int f2;
-    unsigned int hops;
-
-    f2 = PE_LoadU8(GA_OVERLAY + 0xF2u);
-    if (f2 >= 0x41u)
-        return 0;
-    for (hops = 0; hops < 16u; hops++) {
-        if (f2 == 0u) {
-            if (a0 != 0) {
-                func_8006D60C_state0_a0eq1_cut();
-                f2 = 0x2Cu;
+    /* Audit item 17: line-for-line src/func_8006D60C.c (sound bank / music
+     * change state machine): restores the 0x451/0x452 SFX pair, the
+     * D_8009D18C / D_8009D190 timer latches, func_80086C5C / func_800864CC /
+     * func_80086FF8 / func_80087024 calls, and the D_8009D188 argument of
+     * the 0x31 state.  Loops within the call like the retail goto. */
+    const pe_addr_t s = GA_OVERLAY;
+#define S_FLAGS() PE_LoadU32(s)
+#define S_STATE(v) PE_StoreU8(s + 0xF2u, (uint8_t)(v))
+#define D188() (int32_t)PE_LoadU32(0x8009D188u)
+    int32_t d;
+    for (;;) {
+        switch (PE_LoadU8(s + 0xF2u)) {
+        case 0:
+            PE_StoreU32(0x8009D188u, 0u);
+            func_80087024();
+            if (arg != 0) {
+                if (!(PE_LoadU32(0x800B0CD8u) & 0x400000u) && PE_LoadU32(0x800B0E08u) != 0u) {
+                    (void)func_8006DF50((int)PE_LoadU32(0x800B0E08u), 0x451, 0, 0x80, 0x7F);
+                    if (PE_LoadU32(0x800B0E08u) != 0u)
+                        (void)func_8006DF50((int)PE_LoadU32(0x800B0E08u), 0x452, 0, 0x80, 0x7F);
+                }
+                S_STATE(0x2Cu);
                 continue;
             }
-            func_8006D60C_state0_common();
-            PE_StoreU8(GA_OVERLAY + 0xF2u, 0x2Du);
-            f2 = 0x2Du;
+            if (S_FLAGS() & 4u) {
+                PE_StoreU32(0x8009D18Cu, PE_LoadU32(0x8009CDA4u));
+                func_80086C5C(0, 0x3C, 0);
+            }
+            S_STATE(0x2Du);
             continue;
-        }
-        if (f2 == 0x2Cu) {
-            func_8006D60C_state2C_cut();
-            f2 = 0x2Eu;
+        case 0x2C:
+            if ((int8_t)PE_LoadU8(s + 0xE0u) != (int8_t)PE_LoadU8(s + 0xDCu)) {
+                if (S_FLAGS() & 0x40u) {
+                    PE_StoreU32(0x8009D18Cu, PE_LoadU32(0x8009CDA4u));
+                    func_80086C5C(0, 0x3C, 0);
+                }
+                PE_StoreU32(s, S_FLAGS() | 4u);
+            }
+            S_STATE(0x2Eu);
             continue;
-        }
-        if (f2 == 0x2Eu) {
-            if (func_8006D078() == 1)
+        case 0x2E:
+            if (func_8006D078() == 1) return 1;
+            if ((S_FLAGS() & 4u) && (S_FLAGS() & 0x40u)) {
+                d = 0x3C - ((int32_t)PE_LoadU32(0x8009CDA4u) - (int32_t)PE_LoadU32(0x8009D18Cu));
+                PE_StoreU32(0x8009D190u, (uint32_t)d);
+                if (d >= 9) { PE_StoreU32(0x8009D190u, 8u); func_80086C5C(0, 0x10, 0); }
+                else if (d < 0) PE_StoreU32(0x8009D190u, 0u);
+            }
+            S_STATE(0x3Fu);
+            continue;
+        case 0x3F:
+            if (!(S_FLAGS() & 4u)) { S_STATE(0x30u); continue; }
+            if (S_FLAGS() & 0x40u) {
+                if ((int32_t)PE_LoadU32(0x8009D190u) > 0) {
+                    PE_StoreU32(0x8009D190u, PE_LoadU32(0x8009D190u) - 1u);
+                    return 1;
+                }
+                func_800864CC();
+                func_80086FF8();
+            }
+            S_STATE(0x2Fu);
+            continue;
+        case 0x2F:
+            if (func_8006CDA4(0, (int8_t)PE_LoadU8(s + 0xE1u), 0, PE_LoadU32(s + 0x194u), 0x21, 0) == 1)
                 return 1;
-            func_8006D60C_after_6d078_cut();
-            f2 = PE_LoadU8(GA_OVERLAY + 0xF2u);
+            S_STATE(0x30u);
             continue;
-        }
-        if (f2 == 0x3Fu) {
-            (void)func_8006D60C_state3F_cut();
-            f2 = PE_LoadU8(GA_OVERLAY + 0xF2u);
-            if (f2 == 0x3Fu)
+        case 0x30:
+            (void)func_80086464(PE_LoadU32(s + 0x124u));
+            func_80086C1C(0, 0x7F);
+            S_STATE(0u);
+            return 0;
+        case 0x2D:
+            if (D188() < 2) {
+                if (PE_LoadU8(s + 0xEAu + (uint32_t)D188()) != 0u) { S_STATE(0x31u); continue; }
+                PE_StoreU32(0x8009D188u, (uint32_t)(D188() + 1));
+            }
+            S_STATE(0x32u);
+            continue;
+        case 0x31:
+            if (func_8006CDA4(2, PE_LoadU8(s + 0xEAu + (uint32_t)D188()), D188(), PE_LoadU32(s + 0x194u),
+                              0x21, 0) == 1)
                 return 1;
+            S_STATE(0x2Du);
+            PE_StoreU32(0x8009D188u, (uint32_t)(D188() + 1));
             continue;
-        }
-        if (f2 == 0x2Fu) {
-            if (func_8006D60C_state2F_cut() == 1)
+        case 0x32:
+            if ((int16_t)PE_LoadU16(s + 0xE8u) != -1) {
+                if (func_8006CDA4(1, (int16_t)PE_LoadU16(s + 0xE8u), 0, PE_LoadU32(s + 0x194u), 0x21, 0) == 1)
+                    return 1;
+            }
+            if (S_FLAGS() & 4u) {
+                d = 0x3C - ((int32_t)PE_LoadU32(0x8009CDA4u) - (int32_t)PE_LoadU32(0x8009D18Cu));
+                PE_StoreU32(0x8009D190u, (uint32_t)d);
+                if (d >= 9) { PE_StoreU32(0x8009D190u, 8u); func_80086C5C(0, 0x10, 0); }
+                else if (d < 0) PE_StoreU32(0x8009D190u, 0u);
+            }
+            S_STATE(0x40u);
+            continue;
+        case 0x40:
+            if (S_FLAGS() & 4u) {
+                if ((int32_t)PE_LoadU32(0x8009D190u) > 0) {
+                    PE_StoreU32(0x8009D190u, PE_LoadU32(0x8009D190u) - 1u);
+                    return 1;
+                }
+                func_80086FF8();
+                if (S_FLAGS() & 0x40u) {
+                    PE_StoreU32(s, S_FLAGS() & ~0x40u);
+                    S_STATE(0x3Eu);
+                    continue;
+                }
+            }
+            S_STATE(0u);
+            PE_StoreU32(s, S_FLAGS() & ~4u);
+            return 0;
+        case 0x3E:
+            if (func_8006CDA4(0, (int8_t)PE_LoadU8(s + 0xDAu), 0, PE_LoadU32(s + 0x194u), 0x21, 0) == 1)
                 return 1;
-            f2 = PE_LoadU8(GA_OVERLAY + 0xF2u);
+            S_STATE(0x33u);
             continue;
+        case 0x33:
+            return func_8006D60C_state33();
+        default:
+            return 0;
         }
-        if (f2 == 0x30u)
-            return func_8006D60C_state30_cut();
-        if (f2 == 0x2Du) {
-            (void)func_8006D60C_state2D_cut();
-            f2 = PE_LoadU8(GA_OVERLAY + 0xF2u);
-            continue;
-        }
-        if (f2 == 0x31u) {
-            if (func_8006D60C_state31_cut() == 1)
-                return 1;
-            f2 = PE_LoadU8(GA_OVERLAY + 0xF2u);
-            continue;
-        }
-        if (f2 == 0x32u) {
-            if (func_8006D60C_state32_cut() == 1)
-                return 1;
-            f2 = PE_LoadU8(GA_OVERLAY + 0xF2u);
-            continue;
-        }
-        if (f2 == 0x40u) {
-            int result=func_8006D60C_state40_cut();
-            if (result!=-1) return result;
-            f2=PE_LoadU8(GA_OVERLAY+0xF2u);
-            continue;
-        }
-        if (f2 == 0x3Eu) {
-            if (func_8006CDA4(0,(int8_t)PE_LoadU8(GA_OVERLAY+0xDAu),0,
-                    PE_LoadU32(GA_OVERLAY+0x194u),0x21,0)==1) return 1;
-            PE_StoreU8(GA_OVERLAY+0xF2u,0x33u);
-            f2=0x33u;
-            continue;
-        }
-        if (f2 == 0x33u) return func_8006D60C_state33();
-        return 0;
     }
-    return 1;
+#undef S_FLAGS
+#undef S_STATE
+#undef D188
 }
 
 int func_800144FC_state38_cut(void)
@@ -942,6 +1038,62 @@ static void func_8006914C_state0_tables(void)
  * a0==0 and bit 1 set uses the same overlay&8 arm as a0!=0.
  * 2CEE0 needs that v0=0 (plus s1!=0) to reach 2CF24. Does not sb 0x3A.
  */
+/* 691D0..692F8 (src/func_8006914C.c): after the slot tables, run each
+ * effect module's init (descriptor word 0) for modules 0..7, module 0x55
+ * and every room-exported module 8..0x54: `h = D_800942E0[i];
+ * if (h && *h) (*h)();`.  Module 0x55 is 0x800E13D4 -> func_800D4860,
+ * which fills the effect texpage table D_800E2850 (func_800CECAC), the
+ * D_800F32D4.. resource pointers and uploads the effect texture; without
+ * it every effect sprite samples texpage 0 (the framebuffer).
+ * An init with no native implementation is logged once and skipped. */
+static void func_8006914C_module_init(pe_addr_t table, unsigned int code)
+{
+    pe_addr_t descriptor, fn;
+    if (!table || !PE_RangeIsRam(table + code * 4u, 4u)) return;
+    descriptor = PE_LoadU32(table + code * 4u);
+    if (!descriptor || !PE_RangeIsRam(descriptor, 4u)) return;
+    fn = PE_LoadU32(descriptor);
+    if (!fn) return;
+    if (PE_GuestCode_Resolve(fn)) {
+        (void)PE_GuestCall("@8006914C:module-init", fn, 0u, 0, 0, 0, 0);
+        return;
+    }
+    /* Resident code `jr ra; move v0,zero` (e.g. m0018i module 0x45 init
+     * 8018EFF4, whose room is not split) is a complete `return 0`. */
+    if (PE_RangeIsRam(fn, 8u) && PE_LoadU32(fn) == 0x03E00008u &&
+        PE_LoadU32(fn + 4u) == 0x00001021u)
+        return;
+    {
+        static pe_addr_t seen[16]; static unsigned n;
+        unsigned k;
+        for (k = 0; k < n && seen[k] != fn; k++) {}
+        if (k == n && n < 16u) {
+            seen[n++] = fn;
+            fprintf(stderr, "[DAY1_SHIM] func_8006914C: module %02X init %08X not ported; skipped\n",
+                    code, (unsigned)fn);
+        }
+    }
+}
+
+static void func_8006914C_module_inits(void)
+{
+    pe_addr_t table = PE_LoadU32(0x800942E0u), b0, h0, e0;
+    uint32_t span;
+    unsigned int i;
+    for (i = 0; i < 8u; i++) func_8006914C_module_init(table, i);
+    func_8006914C_module_init(table, 0x55u);
+    b0 = PE_LoadU32(GA_OVERLAY + 0x18Cu);
+    if (!b0 || !PE_RangeIsRam(b0, 8u)) return;
+    h0 = b0 + PE_LoadU32(b0 + 4u);
+    if (!PE_RangeIsRam(h0, 8u)) return;
+    span = PE_LoadU32(h0 + 4u);
+    e0 = b0 + (span & 0x3FFFFFu);
+    for (i = 0; i < (span >> 22); i++) {
+        unsigned int code = PE_LoadU8(e0 + i * 12u + 7u);
+        if (code - 8u < 0x4Du) func_8006914C_module_init(table, code);
+    }
+}
+
 int func_8006914C(int a0)
 {
     unsigned int ef;
@@ -954,6 +1106,7 @@ int func_8006914C(int a0)
     if (ef == 0u) {
         if ((D_8009D1A0 & 0x80u) == 0u) {
             func_8006914C_state0_tables();
+            func_8006914C_module_inits();
             word = PE_LoadU32(GA_OVERLAY);
             PE_StoreU32(GA_OVERLAY, word | 8u);
             D_8009D1A0 |= 0x80u;
@@ -1225,50 +1378,57 @@ int func_8006D078_state2B_cut(void)
 
 int func_8006D078(void)
 {
-    unsigned int f3;
-    unsigned int hops;
+    /* Audit item 20: line-for-line src/func_8006D078.c.  The state machine
+     * loops within one call (goto loop) instead of returning a frame early. */
+    const pe_addr_t s = 0x800B0CD8u;
+    pe_addr_t h = PE_LoadU32(0x800B0E64u);
+    pe_addr_t dir = h + PE_LoadU32(h + 4u);
+    pe_addr_t tab = h + (PE_LoadU32(dir + 0x24u) & 0x3FFFFFu);
+    pe_addr_t e;
 
-    f3 = PE_LoadU8(GA_OVERLAY + 0xF3u);
-    if (f3 >= 44u)
-        return 0;
-    for (hops = 0; hops < 64u; hops++) {
-        if (f3 == 0u) {
-            func_8006D078_state0_cut();
-            f3 = 0x28u;
-        }
-        if (f3 == 0x28u) {
-            if (func_8006CDA4(1, 1, 0, PE_LoadU32(GA_OVERLAY + 0x194u),
-                              0x21, 0) == 1)
-                return 1;
-            if (PE_LoadU8(GA_OVERLAY + 0x10u) >= 2u) {
-                PE_StoreU8(GA_OVERLAY + 0xF3u, 0x29u);
-                return 1;
-            }
-            PE_StoreU8(GA_OVERLAY + 0xF3u, 0x2Au);
-            f3 = 0x2Au;
+    for (;;) {
+        switch (PE_LoadU8(s + 0xF3u)) {
+        case 0:
+            PE_StoreU32(0x8009CDCCu, 0u);
+            PE_StoreU8(s + 0xF3u, 0x28u);
             continue;
-        }
-        if (f3 == 0x29u) {
-            if (func_8006CDA4(1, (int)PE_LoadU8(GA_OVERLAY + 0x10u), 0,
-                              PE_LoadU32(GA_OVERLAY + 0x194u), 0x21, 0) == 1)
+        case 0x28:
+            if (func_8006CDA4(1, 1, 0, PE_LoadU32(s + 0x194u), 0x21, 0) == 1)
                 return 1;
-            PE_StoreU8(GA_OVERLAY + 0xF3u, 0x2Au);
-            f3 = 0x2Au;
-            continue;
-        }
-        if (f3 == 0x2Au) {
-            if (func_8006D078_state2A_cut() == 0)
-                return 0;
-            f3 = PE_LoadU8(GA_OVERLAY + 0xF3u);
-            if (f3 == 0x2Au)
+            if (PE_LoadU8(s + 0x10u) < 2u) {
+                PE_StoreU8(s + 0xF3u, 0x2Au);
                 continue;
+            }
+            PE_StoreU8(s + 0xF3u, 0x29u);
+            return 1;
+        case 0x29:
+            if (func_8006CDA4(1, (int)PE_LoadU8(s + 0x10u), 0, PE_LoadU32(s + 0x194u), 0x21, 0) == 1)
+                return 1;
+            PE_StoreU8(s + 0xF3u, 0x2Au);
             continue;
+        case 0x2A:
+            if ((int32_t)PE_LoadU32(0x8009CDCCu) < (int32_t)(PE_LoadU32(dir + 0x24u) >> 22)) {
+                pe_addr_t p = (PE_LoadU32(0x8009CDCCu) << 3) + tab;
+                if (!(PE_LoadU8(p + 3u) & 0x10u) || PE_LoadU16(p + 4u) < 2u)
+                    PE_StoreU32(0x8009CDCCu, PE_LoadU32(0x8009CDCCu) + 1u);
+                else
+                    PE_StoreU8(s + 0xF3u, 0x2Bu);
+                continue;
+            }
+            PE_StoreU8(s + 0xF3u, 0u);
+            return 0;
+        case 0x2B:
+            e = (PE_LoadU32(0x8009CDCCu) << 3) + tab;
+            if (func_8006CDA4(3, (int)PE_LoadU16(e + 4u), (int)PE_LoadU16(e + 6u),
+                              PE_LoadU32(s + 0x194u), 0x21, 0) == 1)
+                return 1;
+            PE_StoreU8(s + 0xF3u, 0x2Au);
+            PE_StoreU32(0x8009CDCCu, PE_LoadU32(0x8009CDCCu) + 1u);
+            continue;
+        default:
+            return 0;
         }
-        if (f3 == 0x2Bu)
-            return func_8006D078_state2B_cut();
-        return 0;
     }
-    return 1;
 }
 
 #define GA_XA_TABLE  0x8009317Cu

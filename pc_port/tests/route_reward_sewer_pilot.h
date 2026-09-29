@@ -372,6 +372,24 @@ static uint16_t RouteRewardSewerPilot(uint16_t mask)
      * The recorded supply suffix is Cross/idle, so leaving it in control
      * parks Aya on the alligator's charge line. */
     if (m34 && g_route_m34_shim) return RouteM34Shim();
+    /* Diagnostic (harness-only, env PE_ROUTE_BUMP_DATE=1): in the plaza
+     * (A8000148, field mode 9, no menu) walk Aya into the date NPC (02/00)
+     * to exercise the contact-reaction path (shove walk + grunt). */
+    if (GA_TOKEN==0xA8000148u && getenv("PE_ROUTE_BUMP_DATE") &&
+        !(PE_LoadU32(0x8009D1A0u)&6u)) {
+        pe_addr_t aya=PE_LoadU32(0x8009D254u), date=0, p;
+        for (p=PE_LoadU32(0x8009D20Cu); p; p=PE_LoadU32(p+4u))
+            if (PE_LoadU8(p+12u)==2u && PE_LoadU8(p+13u)==0u) { date=p; break; }
+        if (aya && date) {
+            int ax=(int32_t)PE_LoadU32(aya+40u)>>16, az=(int32_t)PE_LoadU32(aya+48u)>>16;
+            int dx=((int32_t)PE_LoadU32(date+40u)>>16)-ax, dz=((int32_t)PE_LoadU32(date+48u)>>16)-az;
+            static int bump_log;
+            if (g_frame-bump_log>=30) { bump_log=g_frame;
+                fprintf(stderr,"BUMP %d aya=%d,%d date_d=%d,%d fA4=%08X anim=%02X\n",g_frame,ax,az,dx,dz,
+                        PE_LoadU32(date+0xA4u),PE_LoadU8(date+0xEu)); }
+            return RouteM34ShimMove(ax,az,dx,dz,0);
+        }
+    }
     /* A8064448 = M34 phase 2 (sewer tunnel), entered after the tail breaks (m34f @64370). */
     if (g_route_battle_shim && (GA_TOKEN==0xA80021C8u || GA_TOKEN==0xA8064448u) && (PE_LoadU32(0x8009D1A0u)&2u))
         return RouteBattleShim();
@@ -1070,6 +1088,10 @@ static uint16_t RouteRewardSewerPilot(uint16_t mask)
                         tx=ax;tz=az;
                     }
                 } else if (rec && PE_LoadU16(0x800C0E50u)==7u &&
+                           /* 09-28: only heal when hurt. With the sewer HP lock Aya
+                            * arrives at full HP and the game refuses Medicine,
+                            * so the Items/Use loop never finished (bt-route2 @77850). */
+                           hp < PE_LoadU16(rec+28u) &&
                            !PE_LoadU8(0x8009CE3Cu) &&
                            /* Arm only on the clear patch — not az<2000 anywhere.
                             * Stale transition coords and the upper door both
@@ -1078,7 +1100,7 @@ static uint16_t RouteRewardSewerPilot(uint16_t mask)
                     heal_start=g_frame;tx=ax;tz=az;
                     fprintf(stderr,"LOOT_PILOT_HEAL %d hp=%u at=%u\n",
                             g_frame,hp,(unsigned)PE_LoadU16(rec+16u));
-                } else if (rec && PE_LoadU16(0x800C0E50u)==7u) {
+                } else if (rec && PE_LoadU16(0x800C0E50u)==7u && hp < PE_LoadU16(rec+28u)) {
                     /* Walk to a clear m31 patch, then open Items/Use.
                      * supply16: from door spawn (751,2502) a direct aim at
                      * (0,1000) held only Down into the alcove wall — pad=FFBF

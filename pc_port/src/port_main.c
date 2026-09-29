@@ -5,6 +5,7 @@
  * Direct-clear shortcut requires explicit --direct-clear-test flag.
  */
 
+#include "pe_gpu.h"
 #include "host_audio.h"
 #include "pe_audio_driver.h"
 #include "pe_spu.h"
@@ -23,6 +24,7 @@
 #include "pe_route_pad.h"
 #include "pe_port_compat.h"
 #include "pe_guest_ram.h"
+#include "pe_plat/cheats.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -270,6 +272,19 @@ static int RouteHandOverReady(void)
 static const struct { uint32_t token; int frame; } kRouteBattleAnchors[] = {
 #include "route_battle_anchors.h"
 };
+/* Room-entry anchors: {token, nth entry, recorded route-clock frame}. A battle
+ * that ends faster/slower (e.g. a battle-code swap) shifts the room entry after
+ * it; re-anchoring on each entry keeps the recorded field pads aligned. */
+static const struct { uint32_t token; int nth; int frame; } kRouteRoomAnchors[] = {
+#include "route_room_anchors.h"
+};
+/* Battle-end anchors: the recorded pads after a battle are field walking, so
+ * they are keyed to the battle's END (D1A0&2 1->0), not its start. A battle
+ * that ends earlier (e.g. a crit from the matched battle tick's RNG, port3
+ * 09-28: M0013I ends ~184 frames early) would otherwise desync them. */
+static const struct { uint32_t token; int nth; int frame; } kRouteBattleEndAnchors[] = {
+#include "route_battle_end_anchors.h"
+};
 static int g_pad_offset;
 static int RoutePadClock(void)
 {
@@ -278,6 +293,29 @@ static int RoutePadClock(void)
     static unsigned used;          /* bitmask of consumed anchors */
     uint32_t b;
     if (init < 0) init = !getenv("PE_ROUTE_NO_ANCHOR");
+    if (init) {
+        static uint32_t last_tok;
+        static struct { uint32_t tok; int n; } cnt[64]; static unsigned ncnt;
+        uint32_t tok = (uint32_t)D_8009D280;
+        if (tok != last_tok) {
+            unsigned k; int nth = 0;
+            last_tok = tok;
+            for (k = 0; k < ncnt && cnt[k].tok != tok; k++) {}
+            if (k == ncnt && ncnt < 64u) { cnt[ncnt].tok = tok; cnt[ncnt].n = 0; ncnt++; }
+            if (k < ncnt) nth = cnt[k].n++;
+            for (unsigned i = 0; i < sizeof(kRouteRoomAnchors)/sizeof(kRouteRoomAnchors[0]); i++) {
+                if (kRouteRoomAnchors[i].token == tok && kRouteRoomAnchors[i].nth == nth &&
+                    abs(g_frame - kRouteRoomAnchors[i].frame - g_pad_offset) < 900) {
+                    int o = g_frame - kRouteRoomAnchors[i].frame;
+                    if (o != g_pad_offset)
+                        fprintf(stderr, "[ROUTE] anchor room token=%08X nth=%d recorded=%d actual=%d offset=%d\n",
+                                (unsigned)tok, nth, kRouteRoomAnchors[i].frame, g_frame, o);
+                    g_pad_offset = o;
+                    break;
+                }
+            }
+        }
+    }
     b = PE_LoadU32(0x8009D1A0u) & 0x2u;
     if (init && b && !last_b) {
         uint32_t tok = (uint32_t)D_8009D280;
@@ -288,6 +326,23 @@ static int RoutePadClock(void)
                 g_pad_offset = g_frame - kRouteBattleAnchors[i].frame;
                 fprintf(stderr, "[ROUTE] anchor battle token=%08X recorded=%d actual=%d offset=%d\n",
                         (unsigned)tok, kRouteBattleAnchors[i].frame, g_frame, g_pad_offset);
+                break;
+            }
+        }
+    }
+    if (init && !b && last_b) {
+        static struct { uint32_t tok; int n; } ec[32]; static unsigned nec;
+        uint32_t tok = (uint32_t)D_8009D280; unsigned k; int nth = 0;
+        for (k = 0; k < nec && ec[k].tok != tok; k++) {}
+        if (k == nec && nec < 32u) { ec[nec].tok = tok; ec[nec].n = 0; nec++; }
+        if (k < nec) nth = ec[k].n++;
+        for (unsigned i = 0; i < sizeof(kRouteBattleEndAnchors)/sizeof(kRouteBattleEndAnchors[0]); i++) {
+            if (kRouteBattleEndAnchors[i].token == tok && kRouteBattleEndAnchors[i].nth == nth &&
+                abs(g_frame - kRouteBattleEndAnchors[i].frame - g_pad_offset) < 900) {
+                int o = g_frame - kRouteBattleEndAnchors[i].frame;
+                fprintf(stderr, "[ROUTE] anchor battle-end token=%08X nth=%d recorded=%d actual=%d offset=%d\n",
+                        (unsigned)tok, nth, kRouteBattleEndAnchors[i].frame, g_frame, o);
+                g_pad_offset = o;
                 break;
             }
         }
@@ -303,7 +358,48 @@ static uint16_t RoutePadSource(void)
 
     g_route_frame = g_frame;
     if (RouteHandOverReady()) return HostWindow_PadRaw();
+    /* PE_ROUTE_PLAY_MOVIES: no buttons while a movie shows (a held
+     * route button would skip it). */
+    if (getenv("PE_ROUTE_PLAY_MOVIES") && PE_LoadU8(0x800B0DBAu) != 0u)
+        return 0xFFFFu;
     rf = RoutePadClock();
+    /* Harness-only (--route-pad; PE_ROUTE_BATTLE_NO_SHIM=1 disables): HP lock in
+     * the three sewer fights. Under the retail battle tick enemies act as in
+     * retail and the autopilot can lose (bt-route 09-28: Aya died in M0032I at
+     * 60250 after entering at 28 HP). The sewer pilot still moves/attacks. */
+    if (g_route_battle_shim && (PE_LoadU32(0x8009D1A0u) & 2u) &&
+        (D_8009D280 == 0xA80023C8u || D_8009D280 == 0xA8002448u || D_8009D280 == 0xA8003148u)) {
+        pe_addr_t rec = PE_LoadU32(0x8009D278u);
+        if (rec) {
+            unsigned mx = PE_LoadU16(rec + 28u);
+            if (mx && PE_LoadU16(rec + 12u) < mx) PE_StoreU16(rec + 12u, (uint16_t)mx);
+        }
+    }
+    {
+        /* Diagnostic (harness-only): PE_FORCE_DEATH_TOKEN=<hex token> sets Aya's
+         * HP to 0 once when a battle is live in that room, to exercise the
+         * death -> Game Over path. */
+        static int done; const char *ft = getenv("PE_FORCE_DEATH_TOKEN");
+        if (ft && !done && (uint32_t)D_8009D280 == (uint32_t)strtoul(ft, NULL, 16) &&
+            (PE_LoadU32(0x8009D1A0u) & 2u) && PE_LoadU32(0x8009D28Cu) == 0u) {
+            pe_addr_t rec = PE_LoadU32(0x8009D278u);
+            if (rec && PE_LoadU16(rec + 12u)) {
+                PE_StoreU16(rec + 12u, 0u); done = 1;
+                fprintf(stderr, "[ROUTE] FORCE_DEATH frame=%d token=%08X\n", g_frame, (unsigned)D_8009D280);
+            }
+        }
+    }
+    if (getenv("PE_ROUTE_FORCE_P0_2") && D_8009D280 == 0xA8000148u && !(PE_LoadU32(0x800A77F0u) & 2u)) {
+        PE_StoreU32(0x800A77F0u, PE_LoadU32(0x800A77F0u) | 2u);   /* diagnostic only */
+        fprintf(stderr, "FORCE persist[0]|=2 at frame %d\n", g_frame);
+    }
+    if (getenv("PE_ROUTE_REAL_NAME_ENTRY") && (PE_LoadU32(0x800B0CD8u) & 0x1000u)) {
+        /* Diagnostic: accept the default name in the real name-entry menu. */
+        static int ne_log;
+        if (g_frame - ne_log >= 60) { ne_log = g_frame;
+            fprintf(stderr, "NAME_ENTRY %d cd8=%08X focus=%08X\n", g_frame, PE_LoadU32(0x800B0CD8u), PE_LoadU32(0x8009D15Cu)); }
+        return (g_frame % 40) == 3 ? 0xFFF7u : (g_frame % 40) == 23 ? 0xBFFFu : 0xFFFFu;
+    }
     mask=PeRoutePad_Mask(&g_route_pad,rf);
     for (unsigned i=0;i<g_pad_sequence_count && rf>=g_pad_sequence[i].frame;i++)
         mask=g_pad_sequence[i].mask;
@@ -342,10 +438,33 @@ static uint16_t RoutePadSource(void)
  * the sewer/M34 pilot sees frame 0 forever and cannot time inputs. */
 static void PresentHook_BlitWindow(void)
 {
+    pe_plat_cheats_frame();   /* opt-in cheat console (pe_plat/cheats.h); no-op while all off */
     if (g_opts.route_pad) {
+        /* fmv2 harness aid, PE_ROUTE_PLAY_MOVIES=1 only: the route pad
+         * schedule was recorded with --skip-movie, so hold the route
+         * clock while a field movie owns the display (D_800B0DBA != 0:
+         * func_801216C4 set, func_80121A00 restore clears it).  The
+         * movies then play for real without shifting the pad script. */
+        static int play_movies = -1;
+        if (play_movies < 0) play_movies = getenv("PE_ROUTE_PLAY_MOVIES") != NULL;
+        if (play_movies && PE_LoadU8(0x800B0DBAu) != 0u)
+            return;
         g_frame++;
         RecordSewerVictory();
         RouteAmmoTrace();
+        {   /* PE_ACTOR_TRACE=TT:II: log that actor's anim (+0xE) and x/z every 15 frames. */
+            const char *at = getenv("PE_ACTOR_TRACE");
+            if (at && g_frame % 15 == 0) {
+                unsigned t = (unsigned)strtoul(at, NULL, 16), id = (unsigned)strtoul(strchr(at, ':') ? strchr(at, ':') + 1 : "0", NULL, 16);
+                pe_addr_t a;
+                for (a = PE_LoadU32(0x8009D20Cu); a; a = PE_LoadU32(a + 4u))
+                    if (PE_LoadU8(a + 0xCu) == t && PE_LoadU8(a + 0xDu) == id) {
+                        fprintf(stderr, "ACT frame=%d token=%08X anim=%02X pos=%d,%d\n", g_frame, (unsigned)D_8009D280,
+                                PE_LoadU8(a + 0xEu), (int32_t)PE_LoadU32(a + 0x28u) >> 16, (int32_t)PE_LoadU32(a + 0x30u) >> 16);
+                        break;
+                    }
+            }
+        }
         {
             /* PE_ROUTE_SHOT_DIR=<dir>: write <dir>/<frame>_<token>.ppm on every
              * room change (+120 frames, so the room is drawn) during a route run. */
@@ -354,12 +473,43 @@ static void PresentHook_BlitWindow(void)
             if (dir == (const char *)1) dir = getenv("PE_ROUTE_SHOT_DIR");
             if (dir) {
                 if ((uint32_t)D_8009D280 != shot_tok) { shot_tok = (uint32_t)D_8009D280; shot_at = g_frame + 120; }
+                {
+                    /* PE_ROUTE_SHOT_EVERY=N: also shoot every N frames while in A9400048. */
+                    const char *ev = getenv("PE_ROUTE_SHOT_EVERY");
+                    int n = ev ? atoi(ev) : 0;
+                    if (n > 0 && (uint32_t)D_8009D280 == 0xA9400048u && g_frame > 100 && g_frame % n == 0)
+                        shot_at = g_frame;
+                    {   /* PE_ROUTE_SHOT_FROM/TO: also shoot every N frames in a frame window. */
+                        const char *fr = getenv("PE_ROUTE_SHOT_FROM"), *to = getenv("PE_ROUTE_SHOT_TO");
+                        if (n > 0 && fr && to && g_frame >= atoi(fr) && g_frame <= atoi(to) && g_frame % n == 0)
+                            shot_at = g_frame;
+                    }
+                }
                 if (g_frame == shot_at) {
                     char path[512];
                     snprintf(path, sizeof path, "%s/%06d_%08X.ppm", dir, g_frame, (unsigned)shot_tok);
                     if (HostFB_WritePPM(path) == 0) fprintf(stderr, "[ROUTE] shot %s\n", path);
                 }
             }
+        }
+        {
+            /* gfx debug aids (off unless set):
+             * PE_ROUTE_SHOT_RANGE=<dir>:first:last:step writes <dir>/f<frame>.ppm
+             * for every step-th frame in [first,last]; PE_GPU_PRIM_LOG (pe_gpu.c)
+             * gates its per-primitive log on this frame counter. */
+            static int init, first, last, step = 1; static char rdir[400];
+            if (!init) {
+                const char *e = getenv("PE_ROUTE_SHOT_RANGE"); init = 1;
+                if (e && sscanf(e, "%399[^:]:%d:%d:%d", rdir, &first, &last, &step) >= 3) {
+                    if (step < 1) step = 1;
+                } else rdir[0] = 0;
+            }
+            if (rdir[0] && g_frame >= first && g_frame <= last && (g_frame - first) % step == 0) {
+                char path[512];
+                snprintf(path, sizeof path, "%s/f%06d.ppm", rdir, g_frame);
+                (void)HostFB_WritePPM(path);
+            }
+            PE_GPU_PrimLogFrame(g_frame);
         }
         {
             static uint32_t last_tok = 0xFFFFFFFFu, last_story = 0xFFFFFFFFu;
@@ -378,7 +528,8 @@ static void PresentHook_BlitWindow(void)
     if (g_opts.headless)
         return;
     if (HostWindow_Pace()) {PE_Port_RequestStop(PE_PORT_STOP_HOST_QUIT);return;}
-    HostWindow_Blit(HostFB_GetPixels(), PE_PORT_FB_WIDTH, PE_PORT_FB_HEIGHT);
+    HostWindow_Blit(pe_plat_cheats_overlay(HostFB_GetPixels(), PE_PORT_FB_WIDTH, PE_PORT_FB_HEIGHT),
+                    PE_PORT_FB_WIDTH, PE_PORT_FB_HEIGHT);
     (void)HostWindow_Poll();
 }
 
@@ -856,6 +1007,7 @@ int main(int argc, char **argv) {
         return rc;
     }
 
+    pe_plat_cheats_init();   /* PE_CHEATS=0 hard-disables */
     int use_window = !g_opts.headless;
     if (use_window) {
         const char *dpy = getenv("DISPLAY") ? getenv("DISPLAY") : ":10.0";
@@ -870,6 +1022,9 @@ int main(int argc, char **argv) {
         }
     }
 
+    /* PE_CHEAT_KEYS (scripted cheat keys) needs the present hook headless too. */
+    if (g_opts.headless && getenv("PE_CHEAT_KEYS"))
+        PE_Port_SetPresentHook(PresentHook_BlitWindow);
     /* Autopilot-only aids (M34 HP lock etc.) are test-harness only: they may
      * be armed solely by --route-pad.  A normal start must never see them. */
     if (!g_opts.route_pad) {
@@ -896,8 +1051,13 @@ int main(int argc, char **argv) {
         if (g_route_m34_shim)
             fprintf(stderr, "[ROUTE_SHIM] M34 HP lock + simple tail controller enabled "
                             "(PE_ROUTE_M34_NO_SHIM=1 disables; see DAY1_FIDELITY_GAPS.md)\n");
+        /* PE_ROUTE_PLAY_MOVIES=1 (fmv2 harness aid) keeps this skip for
+         * the boot/title but lets field opcode 0x35 play its movie; the
+         * present hook holds the route clock while one is showing. */
         PE_Port_SetSkipMovie(1);
-        PE_Port_SetSkipOpeningMenu(1);
+        /* PE_ROUTE_REAL_NAME_ENTRY=1: run the original name-entry handshake
+         * instead of the HOST_ADAPTED skip (diagnostic). */
+        PE_Port_SetSkipOpeningMenu(getenv("PE_ROUTE_REAL_NAME_ENTRY") ? 0 : 1);
         PE_Port_SetPadSource(RoutePadSource);
         /* Headless runs never open a window; still need the present hook so
          * g_frame (and therefore the pilot) advances with HostFB presents. */

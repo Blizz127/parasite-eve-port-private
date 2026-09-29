@@ -384,8 +384,15 @@ int func_801909B4(void)
     func_80073A44(0);
     func_80073A44(0);
 
-    if (PE_Port_SkipMovie()) {
-        /* HOST_ADAPTED: skip logo fade, FMV001, and title. */
+    static int pe_title_entries;
+    pe_title_entries++;
+    /* PE_SKIP_MOVIE_ONCE (diagnostic): skip only the cold-boot title, so a
+     * later entry (game over -> title) runs the real overlay. */
+    if (PE_Port_SkipMovie() && !(getenv("PE_SKIP_MOVIE_ONCE") && pe_title_entries > 1)) {
+        /* HOST_ADAPTED: skip logo fade, FMV001, and title. The real first
+         * pass marks the once-per-power-on logos as shown (D_8009D1BC=1);
+         * do the same so a later title entry (game over) skips them. */
+        PE_StoreU32(0x8009D1BCu, 1u);
         Stub_Record("func_801909B4_skip_movie_new_game", "HOST_ADAPTED");
         Trace_Direct("skip_movie_new_game_selector");
         return FinishTitleMenu(1);

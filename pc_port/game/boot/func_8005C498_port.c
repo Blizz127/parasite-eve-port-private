@@ -5,6 +5,7 @@
 #include "pe_port_compat.h"
 #include "pe_sdk.h"
 #include "game_port.h"
+#include "pe_guestcode.h"
 #include <stdio.h>
 
 static void menu_boundary(const char *name)
@@ -67,8 +68,14 @@ void func_80042B6C(void)
     case 0x8005C488u:func_8005C488();break;
     case 0x80062F9Cu:func_80062F9C();break;
     default:
-        fprintf(stderr,"[MENU] Unported delayed callback %08X\n",callback);
-        menu_boundary("func_80042B6C_callback");return;
+        /* Retail jalr: any other code pointer resolves through the verified
+         * guest-code registry (e.g. 800504F4, the save-menu write step). */
+        if (!PE_GuestCode_Resolve(callback)) {
+            fprintf(stderr,"[MENU] Unported delayed callback %08X\n",callback);
+            menu_boundary("func_80042B6C_callback");return;
+        }
+        (void)PE_GuestCall("func_80042B6C",callback,0u,0u,0u,0u,0u);
+        if (PE_Port_ShouldStop()) return;
     }
     PE_StoreU32(0x800A1870u,0u);PE_StoreU32(0x800A1874u,0u);
 }

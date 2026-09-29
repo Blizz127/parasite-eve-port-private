@@ -36,28 +36,7 @@ void func_80046EAC(uint32_t arranged)
     }
 }
 
-void func_80047040(uint32_t index)
-{
-    uint32_t mode=PE_LoadU32(0x8009CFB8u);
-    index+=PE_LoadU8(0x800922B8u+mode);
-    if (mode==1u) {
-        func_8005E8A4(0,2);func_8005EB64(PE_LoadU8(0x800922BCu+index));
-        func_8005E8A4(18,2);func_8005EB64(34u);func_8005E8A4(12,-2);
-        func_8005EB64(PE_LoadU8(0x800922C4u+index));
-        if (!PE_LoadU32(0x8009CFB8u)) {
-            func_8005E8A4(18,2);func_8005EB64(34u);func_8005E8A4(12,-2);
-            func_8005EB64(PE_LoadU8(0x800922CCu+index));
-        }
-    } else {
-        func_8005EB64(PE_LoadU8(0x800922BCu+index));func_8005EB64(104u);
-        func_8005E8A4(18,4);func_8005EB64(34u);func_8005E8A4(12,-4);
-        func_8005EB64(PE_LoadU8(0x800922C4u+index));func_8005EB64(104u);
-        if (!PE_LoadU32(0x8009CFB8u)) {
-            func_8005E8A4(18,4);func_8005EB64(34u);func_8005E8A4(12,-4);
-            func_8005EB64(PE_LoadU8(0x800922CCu+index));func_8005EB64(104u);
-        }
-    }
-}
+/* func_80047040: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80047040_port.c (src/func_80047040.c); hand port retired (audit batch, port3). */
 
 /* func_800471BC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800471BC_port.c (src/func_800471BC.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 /* func_8004732C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8004732C_port.c (src/func_8004732C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

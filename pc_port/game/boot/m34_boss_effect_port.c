@@ -658,3 +658,206 @@ void PE_M0348iEffectF240(pe_addr_t a0, pe_addr_t a2)
     PE_StoreU16(0x80192E3Au, 0x80u);
     PE_StoreU8(0x80192E36u, 0x0u);
 }
+
+/* ── M34 phase 2 (m0348i) effect-VM callbacks, round 2 ─────────────────────
+ * Line-for-line from src/overlays/room_m0348i/func_{801923B0,8018F568,
+ * 801918E8,80191E1C,80190D88}.c.  EXE helpers with matched C but no
+ * pc_port definition are translated file-locally below (src/func_800C2B50.c,
+ * src/func_800C2B68.c, src/func_800C3134.c).  Stack locals whose address is
+ * passed to a callee live in the scratch window PE_M0348I_STACK. */
+#define PE_M0348I_STACK 0x801FF480u   /* +0x00 MATRIX m, +0x20 VECTOR v, +0x30 VECTOR s */
+
+int func_800C6800(pe_addr_t a0, pe_addr_t a1, pe_addr_t a2);
+void func_800C2EAC(unsigned int a0);
+int func_800C2FF0(unsigned char arg0, unsigned char arg1);
+void func_800C3098(int32_t colors);
+void func_800C3238(unsigned blend);
+void func_800C42A4(pe_addr_t style, pe_addr_t matrix, unsigned billboard);
+void func_800C4E50(pe_addr_t r);
+pe_addr_t func_800C2B10(int arg0);
+pe_addr_t func_80078CC4(pe_addr_t matrix, pe_addr_t scale);
+pe_addr_t func_80071A44(pe_addr_t dst, int32_t fillbyte, int32_t len);
+int func_800C6C18(pe_addr_t a0);
+
+/* src/func_800C2B50.c: return D_800E2248[0x1C]; */
+static pe_addr_t m0348i_c2b50(void) { return PE_LoadU32(PE_LoadU32(0x800E2248u) + 0x70u); }
+/* src/func_800C2B68.c: (D_800E2248->value & 0xFFFF0000) == 0x01010000 */
+static int m0348i_c2b68(void) { return (PE_LoadU32(PE_LoadU32(0x800E2248u) + 4u) & 0xFFFF0000u) == 0x01010000u; }
+/* src/func_800C3134.c: colour-ramp lookup (4-byte keys: rgb + duration). */
+static void m0348i_c3134(pe_addr_t a0, uint32_t a1, pe_addr_t a2)
+{
+    uint32_t acc = 0;
+    pe_addr_t p = a0;
+    for (;;) {
+        uint32_t d = PE_LoadU8(p + 3u);
+        pe_addr_t next;
+        acc += d;
+        next = p + 4u;
+        if (a1 < acc) {
+            uint32_t t = ((acc - a1) << 12) / d;
+            uint32_t u = 0x1000u - t;
+            uint32_t m0 = u * PE_LoadU8(p + 4u), m1 = t * PE_LoadU8(p + 0u);
+            uint32_t m2 = u * PE_LoadU8(p + 5u), m3 = t * PE_LoadU8(p + 1u);
+            uint32_t m4 = u * PE_LoadU8(p + 6u), m5 = t * PE_LoadU8(p + 2u);
+            PE_StoreU8(a2 + 0u, (uint8_t)((m0 + m1) >> 12));
+            PE_StoreU8(a2 + 1u, (uint8_t)((m2 + m3) >> 12));
+            PE_StoreU8(a2 + 2u, (uint8_t)((m4 + m5) >> 12));
+            return;
+        }
+        if (PE_LoadU8(p + 7u) != 0xFFu) { p = next; continue; }
+        PE_StoreU8(a2 + 0u, PE_LoadU8(p + 4u));
+        PE_StoreU8(a2 + 1u, PE_LoadU8(p + 5u));
+        PE_StoreU8(a2 + 2u, PE_LoadU8(p + 6u));
+        return;
+    }
+}
+static void m0348i_copy_words(pe_addr_t dst, pe_addr_t src, unsigned n)
+{
+    uint32_t w[16];
+    for (unsigned i = 0; i < n; i++) w[i] = PE_LoadU32(src + i * 4u);
+    for (unsigned i = 0; i < n; i++) PE_StoreU32(dst + i * 4u, w[i]);
+}
+#define S16AT_(a) ((int32_t)(int16_t)PE_LoadU16(a))
+
+/* func_801923B0: draw up to 8 flare sprites. */
+static void m0348i_801923B0(pe_addr_t a2)
+{
+    const pe_addr_t m = PE_M0348I_STACK, v = PE_M0348I_STACK + 0x20u, s = PE_M0348I_STACK + 0x30u;
+    pe_addr_t x = m0348i_c2b50();
+    unsigned i;
+    func_800C2EAC(PE_LoadU8(x + 0x44u));
+    (void)func_800C2FF0(0x20, 0x20);
+    func_800C3098(0x10);
+    func_800C3238(2);
+    for (i = 0; i < 8u; i++) {
+        if (PE_LoadU8(a2 + i + 0xB4u) != 0) {
+            PE_StoreU16(m + 0x10u, 0x1000); PE_StoreU16(m + 0x08u, 0x1000); PE_StoreU16(m + 0x00u, 0x1000);
+            PE_StoreU32(m + 0x1Cu, 0); PE_StoreU32(m + 0x18u, 0); PE_StoreU32(m + 0x14u, 0);
+            PE_StoreU16(m + 0x0Eu, 0); PE_StoreU16(m + 0x0Cu, 0); PE_StoreU16(m + 0x0Au, 0);
+            PE_StoreU16(m + 0x06u, 0); PE_StoreU16(m + 0x04u, 0); PE_StoreU16(m + 0x02u, 0);
+            (void)func_80071A44(v, 0, 0x10);
+            PE_StoreU32(v + 0u, (uint32_t)S16AT_(a2 + i * 2u + 0x84u));
+            PE_StoreU32(v + 4u, (uint32_t)S16AT_(a2 + i * 2u + 0x84u));
+            PE_StoreU32(v + 8u, 0x1000u);
+            m0348i_copy_words(s, v, 4u);
+            (void)func_80078CC4(m, s);
+            PE_StoreU16(0x80192E3Au, PE_LoadU16(a2 + i * 2u + 0x94u));
+            PE_StoreU32(m + 0x14u, (uint32_t)S16AT_(a2 + i * 8u + 4u));
+            PE_StoreU32(m + 0x18u, (uint32_t)S16AT_(a2 + i * 8u + 6u));
+            PE_StoreU32(m + 0x1Cu, (uint32_t)S16AT_(a2 + i * 8u + 8u));
+            m0348i_c3134(0x801929E8u, (uint32_t)S16AT_(a2 + i * 2u + 0xA4u), 0x80192E30u);
+            func_800C42A4(0x80192E30u, m, 1u);
+        }
+    }
+}
+
+/* func_8018F568: reload timer; retire the record when the scene flag is set. */
+static void m0348i_8018F568(pe_addr_t a0, pe_addr_t a1, pe_addr_t t)
+{
+    if (PE_LoadU16(t + 0x4Au))
+        PE_StoreU16(t + 0x4Au, (uint16_t)(PE_LoadU16(t + 0x4Au) - 1u));
+    if ((int16_t)PE_LoadU16(t + 0x4Cu) == 1) {
+        PE_StoreU16(t + 0x4Cu, 0);
+        if (PE_LoadU16(t + 0x4Au) == 0) {
+            PE_StoreU16(t + 0x4Au, PE_LoadU16(t + 0x48u));
+            (void)func_800C6C18(a0);   /* retail also passes u in a1; the leaf takes one */
+        }
+    }
+    if (m0348i_c2b68() == 1)
+        PE_StoreU8(a1 + 1u, 2u);
+}
+
+/* func_801918E8: two ribbon emitters (D_80192E80 / D_80192E98 blocks). */
+static void m0348i_801918E8(pe_addr_t a2)
+{
+    pe_addr_t x = m0348i_c2b50();
+    const pe_addr_t b = 0x80192E8Cu;
+    const pe_addr_t p = 0x80192C00u;
+    m0348i_copy_words(a2, PE_LoadU32(PE_LoadU32(x) + 0x238u) + 0xA0u, 8u);
+    PE_StoreU16(a2 + 0x30u, 0x4B0u);
+    PE_StoreU16(a2 + 0x34u, 0xFFu);
+    PE_StoreU16(b, 0x10u);
+    PE_StoreU16(0x80192E92u, (uint16_t)-0x1F4);
+    PE_StoreU16(0x80192E94u, 0x80u);
+    PE_StoreU8(0x80192E88u, 0xFAu); PE_StoreU8(0x80192E89u, 0xFAu); PE_StoreU8(0x80192E8Au, 0x78u);
+    PE_StoreU8(0x80192E84u, 0); PE_StoreU8(0x80192E85u, 0); PE_StoreU8(0x80192E86u, 0);
+    PE_StoreU16(0x80192E8Eu, 0xC80u);
+    PE_StoreU16(0x80192E90u, 0x578u);
+    PE_StoreU32(b - 0xCu, p);
+    func_800C4E50(b - 0xCu);
+    PE_StoreU16(0x80192EA4u, 0x10u);
+    PE_StoreU16(0x80192EAAu, (uint16_t)-0x1F4);
+    PE_StoreU16(0x80192EACu, 0x80u);
+    PE_StoreU8(0x80192EA0u, 0xFFu); PE_StoreU8(0x80192EA1u, 0xFFu); PE_StoreU8(0x80192EA2u, 0xFFu);
+    PE_StoreU8(0x80192E9Cu, 0xFAu); PE_StoreU8(0x80192E9Du, 0xFAu); PE_StoreU8(0x80192E9Eu, 0x78u);
+    PE_StoreU16(0x80192EA8u, 0);
+    PE_StoreU16(0x80192EA6u, 0x578u);
+    PE_StoreU32(b + 0xCu, p + 0x100u);
+    func_800C4E50(b + 0xCu);
+}
+
+/* func_80191E1C: four random-sized glow particles. */
+static void m0348i_80191E1C(pe_addr_t o)
+{
+    static const uint8_t col[4][3][2] = {   /* (offset, value) in source order */
+        {{0x20,0x9F},{0x21,0x8A},{0x22,0x89}}, {{0x21,0x4C},{0x20,0x40},{0x22,6}},
+        {{0x20,0x12},{0x21,0x20},{0x22,0x40}}, {{0x20,0x9F},{0x21,0x62},{0x22,0x89}}};
+    pe_addr_t x = m0348i_c2b50();
+    unsigned i, k;
+    m0348i_copy_words(o, x + 4u, 8u);
+    for (i = 0; i < 4u; i++) {
+        uint32_t t = func_80071A54() % 40u + 10u;
+        (void)func_80071A54();
+        PE_StoreU16(o + i * 8u + 0x32u, (uint16_t)-200);
+        PE_StoreU16(o + i * 8u + 0x34u, (uint16_t)-200);
+        PE_StoreU16(o + i * 8u + 0x50u, (uint16_t)(0u - (t >> 1)));
+        PE_StoreU16(o + i * 8u + 0x52u, (uint16_t)(0u - (t >> 1)));
+        PE_StoreU16(o + i * 8u + 0x30u, 0);
+        PE_StoreU16(o + i * 2u + 0x70u, (uint16_t)(t << 6));
+        PE_StoreU16(o + i * 2u + 0x78u, 0xA0u);
+        for (k = 0; k < 3u; k++)
+            PE_StoreU8(o + i * 4u + col[i][k][0], col[i][k][1]);
+    }
+}
+
+/* func_80190D88: 16-segment trail seeded from the scene block. */
+static void m0348i_80190D88(pe_addr_t o, pe_addr_t p)
+{
+    pe_addr_t r = m0348i_c2b50();
+    unsigned i;
+    m0348i_copy_words(p + 0x160u, r + 4u, 8u);
+    PE_StoreU16(p + 0x180u, (uint16_t)PE_LoadU32(func_800C2B10(1)));
+    PE_StoreU16(p + 0x182u, (uint16_t)PE_LoadU32(func_800C2B28(8)));
+    PE_StoreU16(p + 0x184u, 0);
+    for (i = 0; i < 16u; i++) {
+        PE_StoreU16(p + 0x60u + i * 8u + 0u, 0);
+        PE_StoreU16(p + 0x60u + i * 8u + 2u, (uint16_t)-300);
+        PE_StoreU16(p + 0x60u + i * 8u + 4u, (uint16_t)(i * 120u));
+        PE_StoreU16(p + 0xE0u + i * 8u + 0u, 0);
+        PE_StoreU16(p + 0xE0u + i * 8u + 2u, 0);
+        PE_StoreU16(p + 0xE0u + i * 8u + 4u, 0);
+        PE_StoreU16(p + 0x40u + i * 2u, 2048u);
+        PE_StoreU16(p + 0x20u + i * 2u, (uint16_t)(96u - i * 3u));
+        PE_StoreU8(p + i, 1u);
+    }
+    (void)func_800C6800(o, 1389u, p + 0x60u);
+}
+
+/* Weapon/effect-VM dispatch (PE_WeaponCallback): 1 = handled. */
+int PE_M0348iEffectChild(pe_addr_t fn, pe_addr_t slot, pe_addr_t rec, pe_addr_t data)
+{
+    if (!PE_M0348iEffectOverlay()) return 0;
+    switch (fn) {
+    case 0x801923B0u: m0348i_801923B0(data); return 1;
+    case 0x8018F568u: m0348i_8018F568(slot, rec, data); return 1;
+    case 0x801918E8u: m0348i_801918E8(data); return 1;
+    case 0x80191E1Cu: m0348i_80191E1C(data); return 1;
+    case 0x80190D88u: m0348i_80190D88(slot, data); return 1;
+    case 0x80192388u:   /* func_80192388: p->w0 = 0; p->flags[0..7] = 0 (+0xB4) */
+        PE_StoreU32(data, 0);
+        for (unsigned i = 0; i < 8u; i++) PE_StoreU8(data + 0xB4u + i, 0);
+        return 1;
+    case 0x8018F560u: return 1;   /* func_8018F560: empty leaf */
+    default: return 0;
+    }
+}

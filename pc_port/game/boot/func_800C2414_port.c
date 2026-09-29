@@ -50,6 +50,7 @@ void PE_WeaponCallback(pe_addr_t fn,pe_addr_t slot,pe_addr_t rec,pe_addr_t data)
     (void)slot;
     if(PE_M34BossEffectOverlay() && PE_M34BossEffectChild(fn,slot,rec,data))return;
     if(fn==0x8018F240u && PE_M0348iEffectOverlay()) { PE_M0348iEffectF240(slot,data); return; }
+    if(PE_M0348iEffectChild(fn,slot,rec,data)) return;
     switch (fn) {
     case 0x800CE1FCu:func_800CE1FC();return;
     case 0x800CE2B4u:func_800CE2B4((int)slot,(int)rec,data);return; /* retail a0/a1/a2 */

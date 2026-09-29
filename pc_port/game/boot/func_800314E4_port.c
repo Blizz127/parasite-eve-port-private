@@ -81,18 +81,7 @@ void func_8003205C(void)
     }
 }
 
-void func_800323C8(int8_t mode)
-{
-    pe_addr_t sprite=0x8009E930u+(uint32_t)PE_LoadU32(0x8009CDDCu)*28u, anchor=command_anchor();
-    uint32_t offset=(uint32_t)(int32_t)mode*2u;
-    PE_StoreU8(sprite+12u,PE_LoadU8(0x80010DFCu+offset));
-    PE_StoreU8(sprite+13u,PE_LoadU8(0x80010DFDu+offset));
-    PE_StoreU16(sprite+16u,PE_LoadU8(0x80010E10u+offset));
-    PE_StoreU16(sprite+18u,PE_LoadU8(0x80010E11u+offset));
-    panel_xy(sprite,PE_LoadU16(anchor)+PE_LoadU8(0x80010E24u+offset),
-        PE_LoadU16(anchor+2u)+PE_LoadU8(0x80010E25u+offset));
-    func_80077AC4(command_ot()+16u,sprite-8u);
-}
+/* func_800323C8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800323C8_port.c (src/func_800323C8.c); hand port retired (audit batch, port3). */
 
 void func_800325DC(void)
 {

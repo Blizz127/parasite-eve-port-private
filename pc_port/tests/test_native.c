@@ -1533,7 +1533,7 @@ static void test_B54KV_gpu_textured_rectangle_wrap_clip_and_fence(void)
         0x5550u, 0x5551u, 0x5552u, 0x5553u,
         0x5554u, 0x5555u, 0x5556u, 0x5557u
     };
-    PeGpuState before, after;
+    PeGpuState after;
     TEST("B54KV_gpu_textured_rectangle_wrap_clip_and_fence");
     ResetTestState();
 
@@ -1561,25 +1561,15 @@ static void test_B54KV_gpu_textured_rectangle_wrap_clip_and_fence(void)
            B54KR_PixelIs(1u, 40u, 0x0888u),
            "signed coordinate clipping or texture progression differs");
 
-    ASSERT(PE_GPU_WriteGP0(0xE1000101u),
-           "cannot select unsupported 15bpp mode for negative control");
-    PE_GPU_GetState(&before);
-    ASSERT(!PE_GPU_WriteGP0(0x64404040u),
-           "unsupported 15bpp rectangle entered the parser");
+    /* GFX1: 15bpp rectangles are executable (psx-spx); formerly a
+     * negative control.  Page 1 (x 64) direct texel 0x2222, raw. */
+    ASSERT(PE_GPU_WriteGP0(0xE1000101u) &&
+           B54KV_WriteRectangle(0x65404040u, 0x001E00C8u,
+                                0x00000000u, 0x00010001u) &&
+           B54KR_PixelIs(200u, 30u, 0x2222u),
+           "15bpp raw rectangle samples the direct texel");
     PE_GPU_GetState(&after);
-    ASSERT(after.gp0_state == PE_GPU_GP0_IDLE &&
-           after.rectangle_count == before.rectangle_count &&
-           after.rectangle_command == before.rectangle_command &&
-           after.rectangle_position == before.rectangle_position &&
-           after.rectangle_uv_clut == before.rectangle_uv_clut &&
-           after.rectangle_size == before.rectangle_size,
-           "unsupported depth mutated parser or rectangle telemetry");
-    ASSERT(!PE_GPU_WriteGP0(0x65404040u),
-           "unsupported depth must also reject the raw texture variant");
-    PE_GPU_GetState(&after);
-    ASSERT(after.gp0_state == PE_GPU_GP0_IDLE &&
-           after.rectangle_count == before.rectangle_count,
-           "unsupported raw texture depth mutated parser state");
+    ASSERT(after.gp0_state == PE_GPU_GP0_IDLE, "15bpp rectangle leaves the parser idle");
     PASS();
 }
 
@@ -7249,9 +7239,11 @@ static void test_BTL5_6C5BC_bit1_advances_without_clear(void) {
     ASSERT(func_8006C5BC() == 1, "EE12 → 13");
     ASSERT(PE_LoadU8(0x800B0CD8u + 0xEEu) == 13u, "EE=13");
     ASSERT((PE_LoadU8(0x800B0CD8u + 0x0Eu) & 3u) != 0u, "EE12 does not clear");
-    ASSERT(func_8006C5BC() == 1, "EE13 returns 1");
-    ASSERT((PE_LoadU8(0x800B0CD8u + 0x0Eu) & 3u) == 0u, "6CC2C andi 0xFC");
-    ASSERT(PE_LoadU8(0x800B0CD8u + 0xEEu) == 0u, "+0xEE zeroed");
+    /* src/func_8006C5BC.c case 0xD: no Aya (D_8009D254 == 0) -> return
+     * !(flags & 2), state stays 13, no andi 0xFC (audit item 16). */
+    ASSERT(func_8006C5BC() == 1, "EE13 without Aya returns !(flags&2)");
+    ASSERT((PE_LoadU8(0x800B0CD8u + 0x0Eu) & 3u) != 0u, "no andi while Aya is absent");
+    ASSERT(PE_LoadU8(0x800B0CD8u + 0xEEu) == 13u, "+0xEE stays 13");
     ASSERT(PE_LoadU32(0x8009D28Cu) == 0u, "mode stays 0");
     PASS();
 }
@@ -7276,8 +7268,8 @@ static void test_BTL6_ee13_prefix_rebinds_without_clear(void) {
            "EE13 rebinds slot 4");
     ASSERT(PE_LoadU8(0x800B0CD8u + 0x10u) == 0u, "+0x10 zeroed");
     ASSERT(PE_LoadU32(0x800B0CD8u + 0x134u) == 0u, "+0x134 zeroed");
-    ASSERT((PE_LoadU8(0x800B0CD8u + 0x0Eu) & 3u) == 0u, "6CC2C andi 0xFC");
-    ASSERT(PE_LoadU8(0x800B0CD8u + 0xEEu) == 0u, "+0xEE zeroed");
+    ASSERT((PE_LoadU8(0x800B0CD8u + 0x0Eu) & 3u) != 0u, "no Aya: no andi 0xFC (src case 0xD)");
+    ASSERT(PE_LoadU8(0x800B0CD8u + 0xEEu) == 13u, "no Aya: +0xEE stays 13");
     ASSERT(PE_LoadU32(0x8009D28Cu) == 0u, "mode stays 0");
 
     PE_StoreU8(0x800B0CD8u + 0x0Eu, 3u);
@@ -7731,7 +7723,7 @@ static void test_BTL6_6CC2C_epilogue_opens_3B(void) {
     PE_StoreU8(0x800B0CD8u + 0x0Eu, 0x83u);
     PE_StoreU8(0x800B0CD8u + 0xEEu, 13u);
     ASSERT(func_800144FC_state3B_cut() == 0, "0x3B parks before epilogue");
-    ASSERT(func_8006C5BC() == 1, "EE13 epilogue returns 1");
+    func_8006C5BC_ee13_epilogue_cut();   /* the 6CC2C epilogue itself (Aya absent here) */
     ASSERT((PE_LoadU8(0x800B0CD8u + 0x0Eu) & 3u) == 0u, "andi 0xFC");
     ASSERT((PE_LoadU8(0x800B0CD8u + 0x0Eu) & 0xFCu) == 0x80u, "high bits kept");
     ASSERT(PE_LoadU8(0x800B0CD8u + 0xEEu) == 0u, "+0xEE zeroed");
@@ -11037,7 +11029,9 @@ static void test_BTL49_13C34_and_143B0(void) {
     PE_StoreU16(self + 0x3Au, 0u);
     PE_StoreU16(task + 8u, 0u);
     PE_StoreU32(imm2, 0x100u);
-    ASSERT(func_80013C34(args) == 1, "step v0=1");
+    /* Unfinished turn: retail rewinds the pc, sets delay 1 and YIELDS
+     * (src/func_80013C34.c returns 0 on this path). */
+    ASSERT(func_80013C34(args) == 0, "step v0=0 (yield, src/func_80013C34.c)");
     ASSERT(PE_LoadU16(self + 0x3Au) == 0x100u, "step 0x100");
     ASSERT(PE_LoadU32(0x8009CE00u) == 0x80105000u, "rewind 0x14");
     ASSERT(PE_LoadU32(task + 0x10u) == 1u, "delay 1");
@@ -14231,6 +14225,7 @@ static void test_BTL110_21de0_arms_d294(void)
 
     TEST("BTL110_21de0_arms_d294");
     ResetTestState();
+    PE_StoreU32(0x800B0CD8u, PE_LoadU32(0x800B0CD8u) | 0x10000u); /* handler overlay already resident: no CD load in 6F39C */
     PE_StoreU32(0x8009D254u, aya);
     PE_StoreU32(0x8009D278u, rec);
     PE_StoreU32(rec + 0x68u, weapon);
@@ -14566,6 +14561,7 @@ static void test_BTL114_24a3c_case9_sets_ce54(void)
 
     TEST("BTL114_24a3c_case9_sets_ce54");
     ResetTestState();
+    PE_StoreU32(0x800B0CD8u, PE_LoadU32(0x800B0CD8u) | 0x10000u); /* handler overlay already resident: no CD load in 6F39C */
     PE_StoreU32(0x8009D254u, aya);
     PE_StoreU32(0x8009D278u, rec);
     PE_StoreU32(rec + 0x4Cu, 0x80000u);
@@ -14611,6 +14607,7 @@ static void test_BTL114_ce54_then_236e8(void)
 
     TEST("BTL114_ce54_then_236e8");
     ResetTestState();
+    PE_StoreU32(0x800B0CD8u, PE_LoadU32(0x800B0CD8u) | 0x10000u); /* handler overlay already resident: no CD load in 6F39C */
     BTL_SeedDamageTextPackets();
     PE_StoreU16(rec+0x1Eu,37u); PE_StoreU8(0x8009D2B0u,1u);
     ASSERT(func_80019D24() == 1, "4D4");
@@ -14668,6 +14665,7 @@ static void test_BTL114_d25c_case0_1(void)
 
     TEST("BTL114_d25c_case0_1");
     ResetTestState();
+    PE_StoreU32(0x800B0CD8u, PE_LoadU32(0x800B0CD8u) | 0x10000u); /* handler overlay already resident: no CD load in 6F39C */
     PE_StoreU32(0x800942E4u, 0x80150000u); /* Empty original effect pool. */
     PE_StoreU32(0x8009D254u, aya);
     ASSERT(PE_LoadU8(0x8009D25Cu) == 0u, "D25C starts 0");
@@ -14690,6 +14688,7 @@ static void test_BTL114_d25c_case2_3(void)
 
     TEST("BTL114_d25c_case2_3");
     ResetTestState();
+    PE_StoreU32(0x800B0CD8u, PE_LoadU32(0x800B0CD8u) | 0x10000u); /* handler overlay already resident: no CD load in 6F39C */
     PE_StoreU32(0x800942E4u, 0x80150000u); /* Empty original effect pool. */
     PE_StoreU32(0x8009D254u, aya);
     PE_StoreU8(aya + 0x0Cu, 0u);
@@ -14757,6 +14756,7 @@ static void test_BTL115_case4_waits_16(void)
 
     TEST("BTL115_case4_waits_16");
     ResetTestState();
+    PE_StoreU32(0x800B0CD8u, PE_LoadU32(0x800B0CD8u) | 0x10000u); /* handler overlay already resident: no CD load in 6F39C */
     PE_StoreU32(0x8009D254u, aya);
     PE_StoreU32(0x8009D20Cu, enemy);
     PE_StoreU32(enemy, ebody);
@@ -14780,6 +14780,7 @@ static void test_BTL115_case6_waits_252(void)
 
     TEST("BTL115_case6_waits_252");
     ResetTestState();
+    PE_StoreU32(0x800B0CD8u, PE_LoadU32(0x800B0CD8u) | 0x10000u); /* handler overlay already resident: no CD load in 6F39C */
     PE_StoreU32(0x8009D254u, aya);
     pe_btl114_bind_cmds(aya, res);
     PE_StoreU8(0x8009D25Cu, 6u);
@@ -14804,6 +14805,7 @@ static void test_BTL115_cases4_to_9_ce54(void)
 
     TEST("BTL115_cases4_to_9_ce54");
     ResetTestState();
+    PE_StoreU32(0x800B0CD8u, PE_LoadU32(0x800B0CD8u) | 0x10000u); /* handler overlay already resident: no CD load in 6F39C */
     PE_StoreU32(0x8009D254u, aya);
     PE_StoreU32(0x8009D278u, rec);
     PE_StoreU32(rec + 0x4Cu, 0x80000u);
@@ -14849,6 +14851,7 @@ static void test_BTL115_prefix_blocks_case6(void)
 
     TEST("BTL115_prefix_blocks_case6");
     ResetTestState();
+    PE_StoreU32(0x800B0CD8u, PE_LoadU32(0x800B0CD8u) | 0x10000u); /* handler overlay already resident: no CD load in 6F39C */
     PE_StoreU32(0x800942E4u, 0x80150000u); /* Empty original effect pool. */
     PE_StoreU32(0x8009D254u, aya);
     pe_btl114_bind_cmds(aya, res);
@@ -14876,6 +14879,7 @@ static void test_BTL116_6c1cc_default_and_block(void)
 
     TEST("BTL116_6c1cc_default_and_block");
     ResetTestState();
+    PE_StoreU32(0x800B0CD8u, PE_LoadU32(0x800B0CD8u) | 0x10000u); /* handler overlay already resident: no CD load in 6F39C */
     PE_StoreU32(0x8009D254u, aya);
     pe_btl114_bind_cmds(aya, res);
     ASSERT(func_8006C1CC(1) == 0, "ED==0");
@@ -14924,6 +14928,7 @@ static void test_BTL116_22394_tid406_then_ce54(void)
 
     TEST("BTL116_22394_tid406_then_ce54");
     ResetTestState();
+    PE_StoreU32(0x800B0CD8u, PE_LoadU32(0x800B0CD8u) | 0x10000u); /* handler overlay already resident: no CD load in 6F39C */
     D_8009D1A0=2u; /* Battle command execution, not field PE. */
     PE_StoreU32(0x8009D254u, aya);
     PE_StoreU32(0x8009D278u, rec);
@@ -15012,6 +15017,7 @@ static void test_BTL119_case2_after_ed32_bank(void)
 
     TEST("BTL119_case2_after_ed32_bank");
     ResetTestState();
+    PE_StoreU32(0x800B0CD8u, PE_LoadU32(0x800B0CD8u) | 0x10000u); /* handler overlay already resident: no CD load in 6F39C */
     PE_StoreU32(0x8009D254u, aya);
     pe_btl114_bind_cmds(aya, res);
     PE_StoreU8(0x800B0CE2u, 11u);
@@ -15121,6 +15127,7 @@ static void test_BTL120_prefix_fades_via_35558(void)
 
     TEST("BTL120_prefix_fades_via_35558");
     ResetTestState();
+    PE_StoreU32(0x800B0CD8u, PE_LoadU32(0x800B0CD8u) | 0x10000u); /* handler overlay already resident: no CD load in 6F39C */
     PE_StoreU32(0x800942E4u, 0x80150000u); /* Empty original effect pool. */
     PE_StoreU32(0x8009D254u, aya);
     pe_btl114_bind_cmds(aya, res);
@@ -34005,7 +34012,7 @@ static void test_B53B_gp1_subset_and_parser_reset(void)
            "GP1 reset subset state mismatch");
     ASSERT(!PE_GPU_WriteGP1(0x03000000u) &&
            !PE_GPU_WriteGP1(0x04000001u) &&
-           !PE_GPU_WriteGP0(0x48000000u),
+           !PE_GPU_WriteGP0(0x1F000000u),   /* GP0(1Fh) IRQ: not modelled (48h polylines now are) */
            "unsupported GP0/GP1 command silently succeeded");
     PASS();
 }
@@ -35649,6 +35656,7 @@ static void test_ATK3_retail_attack_initialization(void)
 #include "test_m34_projectile.h"
 #include "test_m34_children.h"
 #include "test_pe_plat.h"
+#include "test_cheats.h"
 #include "test_actor_contact.h"
 #include "test_clear_image.h"
 #include "test_script_sound.h"
@@ -36984,6 +36992,8 @@ static void test_POLY1_gpu_shared_edge_and_texture(void)
     ASSERT(state.gp0_state == PE_GPU_GP0_IDLE && state.polygon_count == 3u, "complete polygon parser");
     PASS();
 }
+
+#include "test_gpu_prims.h"
 
 static void test_DRAW1_polygon_submission(void)
 {
@@ -40595,6 +40605,7 @@ int main(void)
     test_STG4_battle_sound_upload_dispatch();
     test_STG2_background_controller_frames();
     test_POLY1_gpu_shared_edge_and_texture();
+    test_GFX1_gp0_primitives();
     test_DRAW1_polygon_submission();
     test_PROJ1_mesh_batches_and_saturation();
     test_POS1_model_anchors_and_script_sync();
@@ -40842,6 +40853,7 @@ int main(void)
     test_HANDHI_all();
     test_PORTABSENT_all();
     test_PLAT_all();   /* step P0: pe_plat adapters (test_pe_plat.h) */
+    test_CHEATS_all(); /* opt-in cheat console (test_cheats.h) */
 
     /* Guard tests (4 tests) */
     test_no_emulator_process();

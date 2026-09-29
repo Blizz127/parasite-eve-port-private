@@ -48,6 +48,8 @@ set(PLATFORM_SRCS
     platform/func_80071A24_port.c
     platform/func_800719E4_port.c
     platform/pe_guest_image.c
+    platform/plat_mods.c
+    platform/plat_cheats.c
 )
 
 set(BOOTSTRAP_SRCS
@@ -227,6 +229,7 @@ set(GAME_SRCS
     game/boot/func_80038D1C_port.c
     game/boot/func_8006E6A8_port.c
     game/boot/func_8006E7E8_port.c
+    game/boot/func_8006F044_port.c
     game/boot/func_8006E498_port.c
     game/boot/func_8006A9E4_port.c
     game/boot/func_8005B890_port.c

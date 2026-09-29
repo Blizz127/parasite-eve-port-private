@@ -12,7 +12,7 @@
  * D300+0x18, step at +0x14, and sets task+8 bit 0x20.
  * desired = (0x1400 - ratan2(dZ,dX)) & 0xFFF. Steps
  * D2F0+0x3A by at most the step. If not yet facing,
- * CE00 -= 0x14 and D300+0x10 = 1 (retry next visit).
+ * CE00 -= 0x14 and D300+0x10 = 1, return 0 (retry next visit).
  *
  * Live type-2 fork 0x6B0: (0,0,0x400) toward type 0.
  */
@@ -118,7 +118,11 @@ int func_80013C34(pe_addr_t args)
     if (heading != desired) {
         PE_StoreU32(GA_D_8009CE00, PE_LoadU32(GA_D_8009CE00) - 0x14u);
         PE_StoreU32(task + 0x10u, 1u);
-        return 1;
+        /* Retail yields here (src/func_80013C34.c: `return 0`). Returning 1
+         * re-ran the rewound opcode in the same tick, so every turn-toward
+         * finished in one frame and the script's anim-01 walk window collapsed
+         * (date actor 02/00 in M0001I: anim 01->00 in one tick, no EA 406 steps). */
+        return 0;
     }
     PE_StoreU16(task + 8u, (uint16_t)(PE_LoadU16(task + 8u) & 0xFFDFu));
     return 1;

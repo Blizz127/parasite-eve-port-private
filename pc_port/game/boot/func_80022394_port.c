@@ -21,15 +21,7 @@ static unsigned pe_action_effect_active(void)
     return (unsigned)PE_LoadU8(pe_action_ram(p))-1u<2u;
 }
 
-void func_80020D50(void)
-{
-    pe_addr_t aya;
-    if ((int16_t)PE_LoadU16(pe_action_record()+12u)<=0) return;
-    aya=pe_action_aya();PE_StoreU32(aya+104u,0u);PE_StoreU32(aya+108u,0u);PE_StoreU32(aya+112u,0u);
-    func_8001A680_command_cut(aya,18u);PE_StoreU8(0x8009CE30u,0u);
-    pe_action_flags(pe_action_record()+76u,0u,8192u);pe_action_flags(pe_action_aya()+152u,256u,0u);
-    func_80021D4C();
-}
+/* func_80020D50: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80020D50_port.c (src/func_80020D50.c); hand port retired (audit batch, port3). */
 
 void func_80022394(void)
 {

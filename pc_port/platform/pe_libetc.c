@@ -309,6 +309,43 @@ int PE_Event_Enable(int handle)
     return 1;
 }
 
+/* BIOS B(0Dh) DisableEvent / B(09h) CloseEvent / B(20h) UnDeliverEvent host
+ * shims (retail syscall stubs 857F4 / 857E4 / 85804). The real BIOS returns 1.
+ * Sys_Shutdown's 85744 polls DisableEvent/CloseEvent on the RCNT2 audio event
+ * until they return nonzero; the old boundary stubs returned 0 and hung the
+ * game-over path (day1 09-28). Disabling/closing the audio event stops the
+ * native audio tick; the next Open/Enable re-arms it. */
+int PE_Event_Disable(int handle)
+{
+    if (g_spu_event_handle && handle == g_spu_event_handle)
+        g_spu_event_enabled = 0;
+    if (g_audio_event_handle && handle == g_audio_event_handle)
+        g_audio_event_enabled = 0;
+    return 1;
+}
+
+int PE_Event_Close(int handle)
+{
+    if (g_spu_event_handle && handle == g_spu_event_handle) {
+        g_spu_event_handle = 0; g_spu_event_enabled = 0; g_spu_event_delivered = 0;
+    }
+    if (g_audio_event_handle && handle == g_audio_event_handle) {
+        g_audio_event_handle = 0; g_audio_event_enabled = 0;
+    }
+    return 1;
+}
+
+int PE_Event_UnDeliver(uint32_t cls, uint32_t spec)
+{
+    if (cls == 0xF0000009u && spec == 0x20u)
+        g_spu_event_delivered = 0;
+    return 1;
+}
+
+int func_800857F4(int handle) { return PE_Event_Disable(handle); }          /* B(0Dh) */
+int func_800857E4(int handle) { return PE_Event_Close(handle); }            /* B(09h) */
+int func_80085804(uint32_t cls, uint32_t spec) { return PE_Event_UnDeliver(cls, spec); } /* B(20h) */
+
 int PE_Event_SpuDmaEnabled(void)
 {
     return g_spu_event_handle && g_spu_event_enabled;

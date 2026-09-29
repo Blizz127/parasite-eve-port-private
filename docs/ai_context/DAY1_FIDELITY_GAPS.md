@@ -182,7 +182,7 @@ code. A human player with a real pad is unaffected.
 | --- | --- |
 | What | `RouteBattleShim()`: during the M0023I rehearsal battle (token `A80021C8`, `D1A0&2`), Aya's HP is locked to max, the aid keeps 300..600u from the nearest enemy, presses Cross every 8f and, in mode 1, Crosses the default target. |
 | Why | The replayed pads for this fight drifted with port changes: the 09-22 binary wins it, while the 09-28 02:18 build resets to New Game. |
-| Scope | Rooms `A80021C8` (M0023I) and `A8064448` (M34 phase 2, sewer tunnel). |
+| Scope | Rooms `A80021C8` (M0023I) and `A8064448` (M34 phase 2, sewer tunnel): HP lock + auto-fight. Sewer fights `A80023C8`/`A8002448`/`A8003148`: HP lock only (the sewer pilot plays; added 09-28 after the retail battle tick made the autopilot lose M0032I). |
 | Restore | `PE_ROUTE_BATTLE_NO_SHIM=1` (replayed pads). The route counts as green only once a run in which Eve's flash (`PE_M0023I_Flash`) fires passes. |
 
 ---
@@ -213,3 +213,24 @@ Bisect (`build/lanes/port/NOTES.md`, "port3"): b04c438e passes `--until eve1_vic
 | Ported instead of shimmed | m0348i `func_8018F06C` (init), `func_8018F0C4` (callback), `func_8018F128` (update) and `func_8018F1B4` (cleanup), from the matched `src/overlays/room_m0348i/*.c`, in `m34_boss_effect_port.c` (`PE_M0348iEffect*`, gated on the resident m0348i words). |
 | Accuracy cost | A skipped effect is not drawn (visual only). Its effect-bytecode side effects (sounds, child effects) do not run. |
 | Restore | `g_pe_strict_effect_stack = 1` restores the explicit boundary + stop. `SEW12_m0013i_command_callback` checks strict mode. |
+
+## Player cheats (opt-in, lane port, 2026-09-28)
+
+An opt-in testing/cheat console on the mods layer (`pc_port/include/pe_plat/cheats.h`,
+`pc_port/platform/plat_cheats.c`; it runs from the mods `FRAME_TICK` event).
+Everything is **off by default**. With all cheats off it writes no guest state and
+the frame is presented unmodified (`test_CHEATS_all_off_identity`). `PE_CHEATS=0`
+hard-disables it. The screen shows "CHEATS" whenever any cheat is active.
+
+| Key | Cheat | Mechanism |
+| --- | --- | --- |
+| F1 | help overlay | host-side text only |
+| F2 | god mode | Aya HP (`*0x8009D278` +0x0C) held at max (+0x1C) every frame, the same mechanism as the harness HP lock but gated by this toggle |
+| F3 | infinite ammo + full Parasite Energy | loaded rounds (weapon record +0x0C low 10 bits) and reserves (`0x800A1E6E+k*32`) restored to their highest seen value; PE (`**0x8009D254` +0x08) := max (+0x28) |
+| F4 | instant win | every live enemy's HP (`*(actor)+0x10`) := 0 during a battle; the game's own death/victory/reward path then runs |
+| F5 | area kit | scans the loaded room scripts (0x80180000..0x801F0000) for field op 0xA7 (give item) with a key-item id 0x100..0x17F and adds each id not owned with the game's own `func_80053D2C`. No retail tables are committed. Items given by other areas' scripts, and door checks that test story flags rather than items, are not covered |
+| F6 | fast-forward toggle (unchanged) | |
+| F7 | fast-forward speed | cycles max / 2x / 4x / 8x (a fixed N-x speed paces one wall frame per N emulated VBlanks) |
+| F8 | warp menu | Up/Down + Enter: sets `persist[74]` to the checkpoint's story value and transfers through the field VM's own `room_transfer` (`func_80017BB4`, op 0x31), only while not in a battle or transfer. Only the story word is set; other per-room flags and inventory are whatever the save/run already has |
+
+Scripted keys for headless tests: `PE_CHEAT_KEYS="frame:KEY,..."`.

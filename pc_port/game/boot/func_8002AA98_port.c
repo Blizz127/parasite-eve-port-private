@@ -90,7 +90,7 @@ int func_8002AA98(void)
     return 0;
 }
 
-static void func_8002B29C_case0(void)
+__attribute__((unused)) static void func_8002B29C_case0(void)
 {
     pe_addr_t aya;
     pe_addr_t actor;
@@ -161,7 +161,7 @@ static void func_8002B29C_case0(void)
 }
 
 /* 2B29C[1] CE70!=60 walk: remaining actors get +0x98 bit 0x10. */
-static void func_8002B29C_flag10_walk(void)
+__attribute__((unused)) static void func_8002B29C_flag10_walk(void)
 {
     pe_addr_t aya;
     pe_addr_t actor;
@@ -192,7 +192,7 @@ static void func_8002B29C_flag10_walk(void)
  * sb 0 gp+0x57C / +0x530, Aya+0x194 = D_800915E0,
  * D1A0 &= ~2, D2E8 &= ~0x10, B0CE6 |= 2.
  */
-static void func_800295E4_tail_cut(void)
+__attribute__((unused)) static void func_800295E4_tail_cut(void)
 {
     pe_addr_t aya;
     uint32_t v;
@@ -210,12 +210,28 @@ static void func_800295E4_tail_cut(void)
 }
 
 /*
- * 6A25C dest restore. Sound/CD jals (81268 / 86F34 / 86FF8 /
- * 87024 / 85744 / 38D0C / 39970) stay fail-closed.
+ * 6A25C Sys_Shutdown / game-over destination (src/func_8006A25C.c).
+ * day1 09-28: the sound/CD calls were dropped ("fail-closed"), so the audio
+ * was never stopped/reset on game over. Now all calls run, in retail order.
  */
+void func_80081268(void);
+void func_80086F34(int);
+void func_80086FF8(void);
+void func_80087024(void);
+void func_80085744(void);
+int func_80038D0C(void);
+int func_80039970(void);
 void func_8006A25C(void)
 {
     uint32_t old;
+
+    func_80081268();
+    func_80086F34(0);
+    func_80086FF8();
+    func_80087024();
+    func_80085744();
+    if (func_80038D0C() & 0xFF)
+        func_80039970();
 
     /* D280 is host-owned for 1220C/3F3C4; guest word is the
      * PE_Load view. Retail has one location — write both. */
@@ -228,7 +244,7 @@ void func_8006A25C(void)
     PE_StoreU32(GA_D_800B0CD8, PE_LoadU32(GA_D_800B0CD8) | 0x100u);
 }
 
-static void func_8002B29C_case1(void)
+__attribute__((unused)) static void func_8002B29C_case1(void)
 {
     uint8_t timer;
 
@@ -265,7 +281,7 @@ static void func_8002B29C_case1(void)
                (uint8_t)(PE_LoadU8(GA_D_8009CE74) + 1u));
 }
 
-static void func_8002B29C_timer_advance(uint8_t next_timer)
+__attribute__((unused)) static void func_8002B29C_timer_advance(uint8_t next_timer)
 {
     uint8_t timer;
 
@@ -279,58 +295,171 @@ static void func_8002B29C_timer_advance(uint8_t next_timer)
                (uint8_t)(PE_LoadU8(GA_D_8009CE74) + 1u));
 }
 
+int func_80067B40(unsigned int a0);
+void func_8001A680(pe_addr_t body, unsigned int id);   /* decomp_hand/absent_lo_actor_port.c */
 void func_8002B29C(void)
 {
-    uint8_t phase;
-    pe_addr_t aya;
+    /* Line-for-line from src/func_8002B29C.c (Game Over presentation:
+     * remaining-actor cleanup, sound fade, the D_800BE9F0 caption quad's
+     * open / rise / hold / fade phases, then 295E4 + mode -1 + 6A25C).
+     * Ent: f0 +0, next +4, fE +0xE, fF +0xF, f68/6C/70, f98 +0x98,
+     * sub +0x1B4, f250 +0x250, f252 +0x252.  Rec: f5/f6 signed, fAF +0xAF.
+     * PolyFT4 is 40 bytes: r0 +4, g0 +5, b0 +6, x0/y0 +8, x1/y1 +0x10,
+     * x2/y2 +0x18, x3/y3 +0x20.  Retail reads o->f0->f5 before testing
+     * f0 for null (a KUSEG read of low RAM); PE_Load maps it the same. */
+#define E_F98(o) ((o) + 0x98u)
+#define OR32(a, v) PE_StoreU32((a), PE_LoadU32(a) | (v))
+#define OR16(a, v) PE_StoreU16((a), (uint16_t)(PE_LoadU16(a) | (v)))
+#define QUAD() (0x800BE9F0u + (pe_addr_t)PE_LoadU32(0x8009CDDCu) * 40u)
+#define SETXY(p, x0, y0, x1, y1, x2, y2, x3, y3) do { \
+        PE_StoreU16((p) + 0x08u, (uint16_t)(x0)); PE_StoreU16((p) + 0x0Au, (uint16_t)(y0)); \
+        PE_StoreU16((p) + 0x10u, (uint16_t)(x1)); PE_StoreU16((p) + 0x12u, (uint16_t)(y1)); \
+        PE_StoreU16((p) + 0x18u, (uint16_t)(x2)); PE_StoreU16((p) + 0x1Au, (uint16_t)(y2)); \
+        PE_StoreU16((p) + 0x20u, (uint16_t)(x3)); PE_StoreU16((p) + 0x22u, (uint16_t)(y3)); } while (0)
+#define SETRGB(p, c) do { PE_StoreU8((p) + 4u, (uint8_t)(c)); PE_StoreU8((p) + 5u, (uint8_t)(c)); \
+        PE_StoreU8((p) + 6u, (uint8_t)(c)); } while (0)
+    pe_addr_t e, o, p;
+    uint8_t t;
+    unsigned int h;
 
-    phase = PE_LoadU8(GA_D_8009CE74);
-    if (phase >= 6u)
-        return;
-    if (phase == 0u) {
-        func_8002B29C_case0();
-        return;
-    }
-    if (phase == 1u) {
-        func_8002B29C_case1();
-        return;
-    }
-    if (phase == 2u) {
-        func_8002B29C_timer_advance(80u);
-        return;
-    }
-    if (phase == 3u) {
-        /* Retail 2B78C..2B7E8 starts both fades before phase 4 waits
-         * for their busy bytes. Advancing only the timer stranded a
-         * naturally defeated Aya with +0x252 still set. */
-        if (!PE_LoadU8(GA_D_8009CE70)) {
-            aya = PE_LoadU32(GA_D_8009D254);
-            func_8003C5D8(aya + 0x1B4u, 60);
-            PE_StoreU16(aya + 0x250u, PE_LoadU16(aya + 0x250u) | 2u);
-            func_8003C5D8(0x800B0CECu, 60);
-            PE_StoreU16(0x800B0D88u, PE_LoadU16(0x800B0D88u) | 2u);
+    switch (PE_LoadU8(GA_D_8009CE74)) {
+    case 0:
+        e = PE_LoadU32(GA_D_8009D254);
+        if (PE_LoadU8(e + 0x0Eu) != 0x13u) {
+            func_8001A680(e, 0x13u);
+            e = PE_LoadU32(GA_D_8009D254);
         }
-        func_8002B29C_timer_advance(60u);
-        return;
-    }
-    if (phase == 4u) {
-        aya = PE_LoadU32(GA_D_8009D254);
-        if ((aya == 0u || PE_LoadU8(aya + 0x252u) == 0u) &&
-            PE_LoadU8(GA_D_800B0D8A) == 0u) {
-            PE_StoreU8(GA_D_8009CE74, 5u);
-            return;
+        if (PE_LoadU8(e + 0x0Fu) != PE_LoadU16(e + 0x16u)) {
+            PE_StoreU32(E_F98(e), PE_LoadU32(E_F98(e)) & ~0x100u);
+            break;
+        }
+        for (o = PE_LoadU32(GA_D_8009D20C); o != 0u; o = PE_LoadU32(o + 4u)) {
+            pe_addr_t r = PE_LoadU32(o);
+            if (o == PE_LoadU32(GA_D_8009D254))
+                continue;
+            if ((int8_t)PE_LoadU8(r + 5u) == 1)
+                continue;
+            if (r == 0u && (PE_LoadU32(E_F98(o)) & 0x40u))
+                continue;
+            OR16(o + 0x250u, 2u);
+            OR32(E_F98(o), 0x1000u);
+            if (r != 0u) {
+                func_8001A680(o, (uint16_t)(int16_t)(int8_t)PE_LoadU8(r + 6u));
+                r = PE_LoadU32(o);
+                if ((PE_LoadU32(E_F98(o)) & 0x40000000u) && PE_LoadU8(r + 0xAFu) == 0u) {
+                    OR32(E_F98(o), 0x10u);
+                    PE_StoreU32(o, 0u);
+                }
+            }
+            PE_StoreU32(o + 0x68u, 0u);
+            PE_StoreU32(o + 0x6Cu, 0u);
+            PE_StoreU32(o + 0x70u, 0u);
+        }
+        func_800293F4(0);
+        e = PE_LoadU32(GA_D_8009D254);
+        PE_StoreU8(GA_D_8009CE70, 0x46u);
+        PE_StoreU8(GA_D_8009CE74, (uint8_t)(PE_LoadU8(GA_D_8009CE74) + 1u));
+        OR32(E_F98(e), 0x100u);
+        break;
+    case 1:
+        if (PE_LoadU8(GA_D_8009CE70) == 0x3Cu) {
+            (void)func_80067B40(0x3Cu);
+            func_80086C5C(0, 0x3C, 0);
+            for (o = PE_LoadU32(GA_D_8009D20C); o != 0u; o = PE_LoadU32(o + 4u)) {
+                pe_addr_t r = PE_LoadU32(o);
+                if (o == PE_LoadU32(GA_D_8009D254))
+                    continue;
+                if ((int8_t)PE_LoadU8(r + 5u) == 1)
+                    continue;
+                if (r == 0u && (PE_LoadU32(E_F98(o)) & 0x40u))
+                    continue;
+                func_8003C5D8(o + 0x1B4u, 0x3C);
+            }
+        } else {
+            for (o = PE_LoadU32(GA_D_8009D20C); o != 0u; o = PE_LoadU32(o + 4u)) {
+                if (o == PE_LoadU32(GA_D_8009D254))
+                    continue;
+                if (PE_LoadU32(o) == 0u && (PE_LoadU32(E_F98(o)) & 0x40u))
+                    continue;
+                if (PE_LoadU8(o + 0x252u) != 0u)
+                    continue;
+                OR32(E_F98(o), 0x10u);
+            }
+        }
+        if (PE_LoadU8(GA_D_8009CE70) != 0u) {
+            PE_StoreU8(GA_D_8009CE70, (uint8_t)(PE_LoadU8(GA_D_8009CE70) - 1u));
+            break;
+        }
+        func_800703F4();
+        func_800866A4(0u, 0xFFu);
+        PE_StoreU8(GA_D_8009CE70, 0x1Eu);
+        PE_StoreU8(GA_D_8009CE74, (uint8_t)(PE_LoadU8(GA_D_8009CE74) + 1u));
+        break;
+    case 2: {
+        int c;
+        t = PE_LoadU8(GA_D_8009CE70);
+        c = 0x78 - t * 4;
+        p = QUAD();
+        SETRGB(p, c);
+        SETXY(p, 0x64 - t * 4, 0x7A, (0x64 - t * 4) + (0x78 + t * 8), 0x7A,
+              0x64 - t * 4, 0x7C, (0x64 - t * 4) + (0x78 + t * 8), 0x7C);
+        if (t != 0u) {
+            PE_StoreU8(GA_D_8009CE70, (uint8_t)(t - 1u));
+            break;
+        }
+        PE_StoreU8(GA_D_8009CE70, 0x50u);
+        PE_StoreU8(GA_D_8009CE74, (uint8_t)(PE_LoadU8(GA_D_8009CE74) + 1u));
+        break; }
+    case 3:
+        t = PE_LoadU8(GA_D_8009CE70);
+        p = QUAD();
+        if (t >= 0x1Au) {
+            int y;
+            h = ((unsigned int)func_80077DC4((t - 0x10) << 4) * 11u) >> 11;
+            h &= 0xFFu;
+            y = 0x7A - (int)h;
+            SETXY(p, 0x64, y, 0x64 + 0x78, y, 0x64, 0x7C, 0x64 + 0x78, 0x7C);
+        } else {
+            SETXY(p, 0x64, 0x64, 0x64 + 0x78, 0x64, 0x64, 0x7C, 0x64 + 0x78, 0x7C);
+        }
+        if (PE_LoadU8(GA_D_8009CE70) != 0u) {
+            PE_StoreU8(GA_D_8009CE70, (uint8_t)(PE_LoadU8(GA_D_8009CE70) - 1u));
+            break;
+        }
+        func_8003C5D8(PE_LoadU32(GA_D_8009D254) + 0x1B4u, 0x3C);
+        OR16(PE_LoadU32(GA_D_8009D254) + 0x250u, 2u);
+        func_8003C5D8(0x800B0B38u + 0x1B4u, 0x3C);
+        PE_StoreU8(GA_D_8009CE70, 0x3Cu);
+        OR16(0x800B0B38u + 0x250u, 2u);
+        PE_StoreU8(GA_D_8009CE74, (uint8_t)(PE_LoadU8(GA_D_8009CE74) + 1u));
+        break;
+    case 4:
+        if (PE_LoadU8(PE_LoadU32(GA_D_8009D254) + 0x252u) == 0u &&
+            PE_LoadU8(0x800B0B38u + 0x252u) == 0u) {
+            PE_StoreU8(GA_D_8009CE74, (uint8_t)(PE_LoadU8(GA_D_8009CE74) + 1u));
+            break;
         }
         {
-            uint8_t timer = PE_LoadU8(GA_D_8009CE70);
-            if (timer != 0u)
-                PE_StoreU8(GA_D_8009CE70, (uint8_t)(timer - 1u));
+            int c5 = PE_LoadU8(GA_D_8009CE70) * 2;
+            p = QUAD();
+            SETXY(p, 0x64, 0x64, 0x64 + 0x78, 0x64, 0x64, 0x64 + 0x18, 0x64 + 0x78, 0x64 + 0x18);
+            SETRGB(p, c5);
         }
-        return;
+        PE_StoreU8(GA_D_8009CE70, (uint8_t)(PE_LoadU8(GA_D_8009CE70) - 1u));
+        break;
+    case 5:
+        func_800295E4();
+        PE_StoreU32(GA_D_8009D28C, 0xFFFFFFFFu);
+        func_8006A25C();
+        break;
     }
-    /* phase 5: 2B8E8 jal 295E4; sw -1 mode; jal 6A25C */
-    func_800295E4_tail_cut();
-    PE_StoreU32(GA_D_8009D28C, 0xFFFFFFFFu);
-    func_8006A25C();
+    func_80077AC4(PE_LoadU32(0x800B0E38u + (pe_addr_t)PE_LoadU32(0x8009CDDCu) * 4u) + 0x10u, QUAD());
+#undef E_F98
+#undef OR32
+#undef OR16
+#undef QUAD
+#undef SETXY
+#undef SETRGB
 }
 
 /*

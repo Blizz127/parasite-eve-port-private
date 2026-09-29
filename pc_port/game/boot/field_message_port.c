@@ -225,59 +225,151 @@ void func_8004BCE8(int32_t arg0)
 }
 
 /* ---- func_8005D2B4: message-system query/mutate dispatcher -------------- */
-int func_8005D2B4(int32_t cmd, int32_t a, int32_t b)
+/* Audit item 27: the complete 21-command dispatcher, line-for-line from
+ * src/func_8005D2B4.c (inventory capacity, slot counts, item/key-item
+ * removal, counters).  D_800C0E00 layout: +0x06/+0x08 halfwords, +0x0B/+0x0C
+ * bytes, list[50] shorts @+0x48, items[128] x 0x20 @+0xAC (b4 +4, hA +0xA),
+ * keys[100] shorts @+0x10B8.  The leaf pins arg2 in $a1 ($5), so the
+ * one-argument calls to func_8005C688 / func_80042CC4 pass arg2 as a1. */
+unsigned int func_80052F70(void);
+int func_80051E58(void);
+int func_8005C688(int min_b, int min_c);
+int32_t func_80057D30(int32_t index);
+int func_8005CAEC(void);
+void func_8005DE88(void);
+void func_80048918(int a0, int a1, int a2);
+void func_8004C594(void);
+void func_80042CC4(int a0, int a1);
+void func_80042EDC(void);
+void func_80042F20(void);
+void func_80053128(void);
+void func_8004D288(void);
+void func_8005CCA4(void);
+void func_8005D020(void);
+#define GM_PL        0x800C0E00u
+#define GM_LIST      (GM_PL + 0x48u)
+#define GM_ITEMS     (GM_PL + 0xACu)
+#define GM_KEYS      (GM_PL + 0x10B8u)
+#define GM_INV       0x8009D048u     /* short *D_8009D048 */
+#define GM_INV_N     0x8009D050u     /* int D_8009D050 */
+
+static void gm_select_carried(void)
 {
-    unsigned index = (unsigned)(cmd - GM_CMD_BASE);
+    PE_StoreU32(GM_INV, GM_LIST);
+    PE_StoreU32(GM_INV_N, func_80052F70());
+    PE_StoreU32(0x8009D058u, 0x8009D05Cu);
+    PE_StoreU32(0x8009D064u, 2u);
+}
 
-    if (index >= 21u) return 0;   /* retail `sltiu 0x15` miss */
+int func_8005D2B4(int32_t cmd, int32_t arg, int32_t arg2)
+{
+    pe_addr_t p, base, end;
+    int32_t n, k;
+    uint16_t v;
 
-    switch (index) {
-    case 0x00: /* .L8005D2F0 — unported: cursor table reset/rebuild */
-        return gm_arm_guard(index, (unsigned)cmd);
-    case 0x01: /* .L8005D358 — unported: clamped accumulator */
-        return gm_arm_guard(index, (unsigned)cmd);
-    case 0x02: /* .L8005D39C — unported: glyph index lookup */
-        return gm_arm_guard(index, (unsigned)cmd);
-    case 0x03: /* .L8005D44C — unported: scroll pair store */
-        return gm_arm_guard(index, (unsigned)cmd);
-    case 0x04: /* .L8005D45C — unported: func_8005C688 subsystem */
-        return gm_arm_guard(index, (unsigned)cmd);
-    case 0x05: /* .L8005D46C — unported: clamp + table rebuild */
-        return gm_arm_guard(index, (unsigned)cmd);
-    case 0x06: /* .L8005D4B0 — unported: D_800C0E08 read */
-        return gm_arm_guard(index, (unsigned)cmd);
-    case 0x07: /* .L8005D4C0 — D_800C0E06 halfword read (cmd 0x453) */
-        return (int32_t)PE_LoadU16(GM_D_800C0E06);
-    case 0x08: /* .L8005D4D0 — func_800515C0(a) (cmd 0x454) */
-        func_800515C0((uint32_t)a);
+    switch (cmd) {
+    case 1100:
+        gm_select_carried();
+        arg = 0;
+        base = PE_LoadU32(GM_INV);
+        end = base + PE_LoadU32(GM_INV_N) * 2u;
+        for (p = base; p < end; p += 2u) arg += PE_LoadU16(p) != 0u;
+        return arg;
+    case 1101: {
+        int32_t s = (int32_t)PE_LoadU8(0x800C0E0Cu) + func_80051E58();
+        return s < 51 ? (int32_t)PE_LoadU8(0x800C0E0Cu) + func_80051E58() : 50;
+    }
+    case 1102:
+        k = (int32_t)PE_LoadU32(0x8009D03Cu);
+        arg2 = 0;
+        if (arg >= k && arg < k + 3) {
+            arg2 = PE_LoadU16(0x800A1E64u + (uint32_t)(arg - k) * 0x20u + 0xAu);
+        } else {
+            base = PE_LoadU32(GM_INV);
+            end = base + PE_LoadU32(GM_INV_N) * 2u;
+            for (p = base; p < end; p += 2u) {
+                int32_t id;
+                v = PE_LoadU16(p);
+                id = ((uint32_t)(v - 0x100u) < 0x80u)
+                         ? (int32_t)PE_LoadU8(GM_ITEMS + (uint32_t)((int16_t)v - 0x100) * 0x20u + 4u)
+                         : (int32_t)(int16_t)v;
+                arg2 += id == arg;
+            }
+        }
+        return arg2;
+    case 1103:
+        PE_StoreU32(0x8009D0CCu, (uint32_t)arg);
+        PE_StoreU32(0x8009D0D0u, (uint32_t)arg2);
         return 0;
-    case 0x09: /* .L8005D4E0 — unported: func_800515F8(NULL) */
-        return gm_arm_guard(index, (unsigned)cmd);
-    case 0x0A: /* .L8005D4F0 — func_800515F8(out); return *out (cmd 0x456) */
-        func_800515F8(GM_TEMP_OUT);
+    case 1104:
+        return func_8005C688(arg, arg2);
+    case 1105:
+        PE_StoreU8(0x800C0E0Cu, (uint8_t)(arg < 51 ? arg : 50));
+        if (PE_LoadU32(GM_INV) == GM_LIST)
+            PE_StoreU32(GM_INV_N, func_80052F70());
+        return 0;
+    case 1106:
+        return PE_LoadU16(GM_PL + 8u);
+    case 1107:
+        return PE_LoadU16(GM_PL + 6u);
+    case 1108:
+        (void)func_800515C0((uint32_t)arg);
+        return 0;
+    case 1109:
+        return func_800515F8(0u);
+    case 1110:
+        (void)func_800515F8(GM_TEMP_OUT);
         return (int32_t)PE_LoadU32(GM_TEMP_OUT);
-    case 0x0B: /* .L8005D504 — func_80051684(a) (cmd 0x457) */
-        func_80051684((uint32_t)a);
+    case 1111:
+        (void)func_80051684((uint32_t)arg);
         return 0;
-    case 0x0C: /* .L8005D514 — unported: signed index search */
-        return gm_arm_guard(index, (unsigned)cmd);
-    case 0x0D: /* .L8005D5B8 — unported: teardown sequence */
-        return gm_arm_guard(index, (unsigned)cmd);
-    case 0x0E: /* .L8005D5E8 — unported: func_80042CC4 */
-        return gm_arm_guard(index, (unsigned)cmd);
-    case 0x0F: /* .L8005D5F8 — unported: func_80042EDC */
-        return gm_arm_guard(index, (unsigned)cmd);
-    case 0x10: /* .L8005D608 — unported: func_80042F20 */
-        return gm_arm_guard(index, (unsigned)cmd);
-    case 0x11: /* .L8005D618 — unported: func_80053128 */
-        return gm_arm_guard(index, (unsigned)cmd);
-    case 0x12: /* .L8005D668 — func_8004BCE8(a) (cmd 0x45E) */
-        func_8004BCE8(a);
+    case 1112:
+        gm_select_carried();
+        base = PE_LoadU32(GM_INV);
+        end = base + PE_LoadU32(GM_INV_N) * 2u;
+        for (p = base; p < end; p += 2u)
+            if ((int32_t)(int16_t)PE_LoadU16(p) == arg) break;
+        n = (p < end) ? (int32_t)((p - base) / 2u) : -1;
+        if (n < 0) return n;
+        (void)func_80057D30(n);
         return 0;
-    case 0x13: /* .L8005D678 — unported: short-table search/clear */
-        return gm_arm_guard(index, (unsigned)cmd);
-    case 0x14: /* .L8005D6D4 — unported: func_8005D020 */
-        return gm_arm_guard(index, (unsigned)cmd);
+    case 1113:
+        (void)func_8005CAEC();
+        func_8005DE88();
+        func_80048918(0, -3, -1);
+        func_8004C594();
+        return 0;
+    case 1114:
+        func_80042CC4(arg, arg2);
+        return 0;
+    case 1115:
+        func_80042EDC();
+        return 0;
+    case 1116:
+        func_80042F20();
+        return 0;
+    case 1117:
+        func_80053128();
+        PE_StoreU8(0x800B0CE5u, 1u);
+        func_8004D288();
+        PE_StoreU8(GM_PL + 0xBu, (uint8_t)((uint32_t)PE_LoadU8(GM_PL + 0xBu) + 1u >= 100u
+                                           ? 99u : (uint32_t)PE_LoadU8(GM_PL + 0xBu) + 1u));
+        func_8005CCA4();
+        return 0;
+    case 1118:
+        func_8004BCE8(arg);
+        return 0;
+    case 1119: {   /* remove_key */
+        pe_addr_t s;
+        for (s = GM_KEYS; s < GM_KEYS + 200u; s += 2u)
+            if ((int32_t)(int16_t)PE_LoadU16(s) == arg) break;
+        n = s >= GM_KEYS + 200u;
+        if (!n) PE_StoreU16(s, 0u);
+        return n;
+    }
+    case 1120:
+        func_8005D020();
+        return 0;
     }
     return 0;
 }

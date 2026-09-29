@@ -176,8 +176,14 @@ int func_8006CC68(void)
         PE_StoreU16(0x800B0D16u, 0x12u);
     }
 
+    /* Full src/func_8006CC68.c tail: pose walk, 3AC90, and 3AF14 while
+     * a battle runs or Aya's model fade (+0x252) is busy.  The overlay
+     * model at +0x14 is D_800B0B38.sub (2B29C/2AA98 fade it out). */
     func_800661A4();
-    func_8003A088_mode0_empty_cut(GA_OVERLAY + 0x14u);
+    func_8003A088_mode0_walk_cut(GA_OVERLAY + 0x14u);
+    func_8003AC90(GA_OVERLAY + 0x14u, 0x800B89F8u);
+    if ((D_8009D1A0 & 2u) != 0u || PE_LoadU8(PE_LoadU32(GA_D254) + 0x252u) != 0u)
+        (void)func_8003AF14(GA_OVERLAY + 0x14u, 0x800B89F8u);
     func_800661CC();
     return 0;
 }
@@ -292,8 +298,24 @@ int func_8006C5BC(void)
             return 1;
         }
         if (ee == 13u) {
-            (void)func_8006C5BC_ee13_prefix_cut();
-            func_8006C5BC_ee13_epilogue_cut();
+            /* Audit item 16: full src/func_8006C5BC.c case 0xD. */
+            const pe_addr_t buf = 0x801FF470u;   /* stack local `buf` (scratch) */
+            pe_addr_t tex = func_8006C5BC_ee13_prefix_cut();
+            if (PE_LoadU32(GA_D254) == 0u)
+                return (PE_LoadU32(GA_OVERLAY) & 2u) == 0u;   /* state stays 13 */
+            (void)func_8003D050(GA_OVERLAY + 0x14u, tex, PE_LoadU32(GA_OVERLAY + 0x15Cu),
+                                0x2C0, 0x80, 0, 0x1C2, 0, buf, 1);
+            if (PE_LoadU32(GA_OVERLAY + 0x38u) == 0u && PE_LoadU32(GA_D254) != 0u) {
+                PE_StoreU32(GA_OVERLAY + 0x38u, PE_LoadU32(GA_D254) + 0x1B4u);
+                PE_StoreU16(GA_OVERLAY + 0x3Cu, 3u);
+                PE_StoreU16(GA_OVERLAY + 0x3Eu, 0x12u);
+            }
+            PE_StoreU8(GA_OVERLAY + 0x9Cu, 0x80u);
+            PE_StoreU8(GA_OVERLAY + 0x9Du, 0x0Cu);
+            PE_StoreU8(GA_OVERLAY + 0x9Eu, 0x18u);
+            func_8006698C(GA_OVERLAY + 0x14u);
+            func_8003D834(GA_OVERLAY + 0x14u, 0u, 0, 0x800BEA40u);
+            func_8006C5BC_ee13_epilogue_cut();   /* state = 0, bE &= 0xFC */
             return 1;
         }
         return 1;

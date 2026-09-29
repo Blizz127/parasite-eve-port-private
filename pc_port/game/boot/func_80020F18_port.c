@@ -83,20 +83,7 @@ int32_t func_8006FC18(uint32_t index, pe_addr_t owner, uint32_t force)
     return 0;
 }
 
-int32_t func_80070064(void)
-{
-    unsigned index;
-    int32_t result=0;
-    for (index=0;index<11;index++) {
-        pe_addr_t slot=effect_slot(index);
-        uint32_t code=PE_LoadU8(slot+1u);
-        if (code>=8u && (uint32_t)(code-0x55u)>=30u) continue;
-        result=func_8006FC18(index,PE_LoadU32(0x8009D254u),1u);
-        if (result) return result;
-        clear_effect_slot(effect_slot(index));
-    }
-    return result;
-}
+/* func_80070064: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80070064_port.c (src/func_80070064.c); hand port retired (audit batch, port3). */
 
 /* 6FE14 releases every effect owned by an actor, across both pools. The
  * second clear is present in retail even when 6FC18 ignored a dormant slot. */

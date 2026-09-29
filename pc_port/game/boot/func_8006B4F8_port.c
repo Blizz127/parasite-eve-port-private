@@ -62,6 +62,8 @@ extern int func_8006E1C0(pe_addr_t entry, pe_addr_t base);
 extern int func_80072714(void);
 extern void func_800726C4(void);
 extern void func_80072724(void);
+extern int func_8006CDA4(int a0, int a1, int a2, pe_addr_t a3, int stack_len,
+                         int stack_flag);
 
 /* func_8006E2D0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8006E2D0_port.c (src/func_8006E2D0.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
@@ -207,6 +209,127 @@ static void pe_6b4f8_e1c0_loop(pe_addr_t base)
  * cut. Live Watch 0x31 token 0xA80663C8 is M0367I table[366]
  * rel=0x15050 packed=0x04E0AA21 (33+170+78).
  */
+/*
+ * audio2 lane — 6B4F8 sound tail, ported from src/func_8006B4F8.c (the
+ * matched C; ROM 0x8006BA08..0x8006BD68) after the chunk-2 publish:
+ *   hdr+0x2C  e[3]&0x20 entries set Aya's footstep sound ids
+ *             (D_8009448C[row][e[7]], odd ids -> rows 1/3, even -> 0/2)
+ *   hdr+0x30  e[3]&0x10 entries set st+0xE0/+0xE1/+0x124
+ *   hdr+0x24  8-byte entries: the room SFX banks (e[3]&0x20; slot H(e,6)
+ *             0/1 -> st+0xEA/+0xEB) and the music id (st+0xE8), then
+ *             6CDA4(2,EA,0,...) / 6CDA4(2,EB,1,...) / 6CDA4(1,E8,0,...)
+ *             for whatever changed (blocking, as retail passes 1).
+ * Without it no room ever loaded its SFX bank into SPU RAM: field SFX
+ * (footsteps, voices, impacts) were silent or played unrelated boot
+ * samples, and Aya's footstep records kept sound id 0.
+ */
+static void pe_6b4f8_sound_tail(void)
+{
+    pe_addr_t st = GA_OVERLAY;
+    pe_addr_t p = PE_LoadU32(st + 0x18Cu);
+    pe_addr_t h, ent;
+    uint32_t w, i, flags = 0u;
+    static FILE *lg;
+    static int lg_init;
+
+    if (!lg_init) {
+        const char *e = getenv("PE_AUDIO_ROOMSND_LOG");
+        lg_init = 1;
+        if (e && *e) lg = fopen(e, "w");
+    }
+    if (p < 0x80000000u)
+        return;
+    h = p + PE_LoadU32(p + 4u);
+
+    w = PE_LoadU32(h + 0x2Cu);
+    if (w & 0xFFC00000u) {
+        ent = p + (w & MASK_22);
+        for (i = 0; i < (w >> 22); i++) {
+            pe_addr_t e = ent + i * 0xCu;
+            if (PE_LoadU8(e + 3u) & 0x20u) {
+                uint32_t t = PE_LoadU16(e + 0xAu);
+                uint32_t col = PE_LoadU8(e + 7u);
+                /* unsigned short D_8009448C[4][4] */
+                if (t & 1u) {
+                    PE_StoreU16(0x8009448Cu + 1u * 8u + col * 2u, (uint16_t)t);
+                    PE_StoreU16(0x8009448Cu + 3u * 8u + col * 2u, (uint16_t)t);
+                } else {
+                    PE_StoreU16(0x8009448Cu + 0u * 8u + col * 2u, (uint16_t)t);
+                    PE_StoreU16(0x8009448Cu + 2u * 8u + col * 2u, (uint16_t)t);
+                }
+                if (lg) fprintf(lg, "footstep id=%X col=%u\n", t, col);
+            }
+        }
+    }
+    w = PE_LoadU32(h + 0x30u);
+    if (w & 0xFFC00000u) {
+        ent = p + (w & MASK_22);
+        for (i = 0; i < (w >> 22); i++) {
+            pe_addr_t e = ent + i * 0xCu;
+            if (PE_LoadU8(e + 3u) & 0x10u) {
+                PE_StoreU8(st + 0xE0u, (uint8_t)PE_LoadU16(e + 0xAu));
+                PE_StoreU8(st + 0xE1u, PE_LoadU8(e + 8u));
+                PE_StoreU32(st + 0x124u, PE_LoadU32(st + 0x18Cu) +
+                            (PE_LoadU32(e + 4u) & MASK_24));
+                if (lg) fprintf(lg, "hdr30 E0=%X E1=%X\n", PE_LoadU16(e + 0xAu), PE_LoadU8(e + 8u));
+            }
+        }
+    }
+    w = PE_LoadU32(h + 0x24u);
+    if (w & 0xFFC00000u) {
+        ent = p + (w & MASK_22);
+        for (i = 0; i < (w >> 22); i++) {
+            pe_addr_t e = ent + i * 8u;
+            uint32_t f3 = PE_LoadU8(e + 3u);
+            if (f3 & 0x10u)
+                continue;
+            if (f3 & 0x20u) {
+                uint32_t slot = PE_LoadU16(e + 6u);
+                if (slot == 0u) {
+                    flags |= 0x10u;
+                    if ((uint32_t)PE_LoadU8(st + 0xEAu) != PE_LoadU16(e + 4u)) {
+                        flags |= 1u;
+                        PE_StoreU8(st + 0xEAu, PE_LoadU8(e + 4u));
+                    }
+                } else if (slot == 1u) {
+                    flags |= 0x20u;
+                    if ((uint32_t)PE_LoadU8(st + 0xEBu) != PE_LoadU16(e + 4u)) {
+                        flags |= 2u;
+                        PE_StoreU8(st + 0xEBu, PE_LoadU8(e + 4u));
+                    }
+                }
+            } else {
+                uint16_t v = PE_LoadU16(e + 4u);
+                flags |= 0x40u;
+                /* retail: *(short *)(st+0xE8) != v, int promotion */
+                if ((int32_t)(int16_t)PE_LoadU16(st + 0xE8u) != (int32_t)v) {
+                    flags |= 4u;
+                    PE_StoreU16(st + 0xE8u, v);
+                }
+            }
+        }
+    }
+    if (lg) {
+        fprintf(lg, "banks flags=%02X EA=%u EB=%u E8=%d\n", flags,
+                PE_LoadU8(st + 0xEAu), PE_LoadU8(st + 0xEBu),
+                (int)(int16_t)PE_LoadU16(st + 0xE8u));
+        fflush(lg);
+    }
+    if ((flags & 1u) && PE_LoadU8(st + 0xEAu) != 0u)
+        (void)func_8006CDA4(2, PE_LoadU8(st + 0xEAu), 0, PE_LoadU32(st + 0x194u), 0x21, 1);
+    else if (!(flags & 0x10u))
+        PE_StoreU8(st + 0xEAu, 0u);
+    if ((flags & 2u) && PE_LoadU8(st + 0xEBu) != 0u)
+        (void)func_8006CDA4(2, PE_LoadU8(st + 0xEBu), 1, PE_LoadU32(st + 0x194u), 0x21, 1);
+    else if (!(flags & 0x20u))
+        PE_StoreU8(st + 0xEBu, 0u);
+    if ((flags & 4u) && (int16_t)PE_LoadU16(st + 0xE8u) != -1)
+        (void)func_8006CDA4(1, (int16_t)PE_LoadU16(st + 0xE8u), 0,
+                            PE_LoadU32(st + 0x194u), 0x21, 1);
+    else if (!(flags & 0x40u))
+        PE_StoreU16(st + 0xE8u, 0xFFFFu);
+}
+
 int func_8006B4F8_dest_load_cut(uint32_t token)
 {
     int idx;
@@ -253,6 +376,7 @@ int func_8006B4F8_dest_load_cut(uint32_t token)
     func_800726C4();
     func_80072724();
     func_8006B4F8_12574_publish_cut();
+    pe_6b4f8_sound_tail();
     return 1;
 }
 

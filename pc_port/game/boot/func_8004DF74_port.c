@@ -81,6 +81,8 @@ static pe_addr_t selected_inventory_help(int32_t index,uint32_t source)
     return inventory_description(func_8005332C(index));
 }
 
+int func_800404A8(void);
+int func_8003FFBC(void);
 void func_8004C608(pe_addr_t window)
 {
     pe_addr_t focused=func_80062CC4(),text=0u;uint32_t id,index;
@@ -135,6 +137,22 @@ void func_8004C608(pe_addr_t window)
     case 49:text=func_8005DD3C(index+66u);break;
     case 50:text=func_8005DD3C(PE_LoadU8(0x8009234Cu+
         (PE_LoadU32(0x8009CF0Cu)==1u && index==2u?4u:index)));break;
+    case 36:   /* audit item 29: memory-card help (src/func_8004C608.c) */
+        if (func_800404A8()) {
+            func_8005E8A4(6,5);func_8005F5B8(0x4Cu);func_8005E8A4(0,0x10);func_8005F5B8(0x4Du);break;
+        }
+        text=func_8005DC4C((func_80042770(0)||func_80042770(1))?0x4Fu:0x4Eu);break;
+    case 37:case 38:
+        if (PE_LoadU32(0x8009CF50u)) {
+            if (PE_LoadU32(0x8009CFF8u)) {
+                func_8005EB58(0);func_8005E8A4(6,5);func_8005F5B8(0x58u);func_8005E8A4(0,0x10);
+                func_8005F5B8(0x59u);break;
+            }
+            text=func_8005DC4C(0x5Cu);break;
+        }
+        text=func_8005DC4C(func_8003FFBC()?0x57u:0x5Bu);break;
+    case 39:
+        func_8005EB58(0);func_8005E8A4(6,5);func_8005F5B8(0x50u);func_8005E8A4(0,0x10);func_8005F5B8(0x51u);break;
     case 56:func_8005EB58(0u);text=func_8005DD3C(68u);break;
     case 58:text=func_8005DD3C(index+53u);break;
     case 59:text=func_8005DD3C(index+(PE_LoadU32(0x8009CF0Cu)==2u?77u:75u));break;

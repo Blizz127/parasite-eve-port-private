@@ -117,7 +117,7 @@ extern pe_addr_t func_800755F0(pe_addr_t env);
  * generic MoveImage path and display setup. B54K-T enters overlay-local
  * func_80190660 and reaches its first DrawPrim call at retail 0x80190860. */
 extern int func_8006ECEC(void);
-static inline void func_8006F044(void)   { Bootstrap_ReturnVoid("func_8006F044", "func_8001220C"); }
+void func_8006F044(void);   /* game/boot/func_8006F044_port.c (matched C port) */
 static inline void func_80069B08(int d)  { Bootstrap_ReturnVoid("func_80069B08", "func_8001220C"); (void)d; }
 /* func_8003F3C4 / func_80066B60 / func_80068E24 are REAL native ports
  * (game/boot/func_8003F3C4_port.c, func_80066B60_port.c,

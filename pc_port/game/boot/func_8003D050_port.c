@@ -292,3 +292,147 @@ void func_8003D834(pe_addr_t dest, pe_addr_t clip, int a2, pe_addr_t bea40)
     word = PE_LoadU32(GA_9CDDC) ^ 1u;
     PE_StoreU32(GA_9CDDC, word);
 }
+
+/* ── func_8003D050: complete model binder, line-for-line from the matched
+ * src/func_8003D050.c (audit item 16 needs it for func_8006C5BC state 13).
+ * Obj (o): f0 model, f4 part table (12 B), f8 verts (8 B), fC norms (4 B),
+ * f10 faces, f14/f18/f1C/f20 section pointers, f54 prim base, f80/f84 part
+ * matrix lists, f2C..f32 rotation, f34 matrix.  Model (m = f0): nParts +2,
+ * nVerts +6, n4a/n4b/n3a/n3b +8/+A/+C/+E, f14 +0x14, f18 +0x18, f1A +0x1A.
+ * The existing named cuts above remain for their current callers. */
+static void d050_prim_pair(pe_addr_t *pp, uint8_t code3, uint8_t code7, uint8_t alt7,
+                           uint8_t face3, uint8_t match, uint32_t stride)
+{
+    for (int k = 0; k < 2; k++) {
+        PE_StoreU8(*pp + 3u, code3);
+        PE_StoreU8(*pp + 7u, face3 == match ? alt7 : code7);
+        *pp += stride;
+    }
+}
+
+int func_8003D050(pe_addr_t o, pe_addr_t c, pe_addr_t p0, short a3, short a4, short a5, short a6,
+                  short a7, pe_addr_t out, int flag)
+{
+    pe_addr_t m, p, f, q, r, s;
+    int i, j, n = 0;
+    uint32_t n4a, n4b, n3a, n3b;
+
+    PE_StoreU32(o + 0x00u, c);
+    m = c;
+    c += 0x1Cu;
+    PE_StoreU32(o + 0x04u, c);
+    c += (uint32_t)PE_LoadU8(m + 2u) * 12u;
+    PE_StoreU32(o + 0x08u, c);
+    c += (uint32_t)PE_LoadU16(m + 6u) * 8u;
+    PE_StoreU32(o + 0x0Cu, c);
+    c += (uint32_t)PE_LoadU16(m + 6u) * 4u;
+    p = p0;
+    PE_StoreU32(o + 0x54u, p);
+    PE_StoreU16(o + 0xBAu, (uint16_t)flag);
+    PE_StoreU32(o + 0x10u, c);
+    f = c;
+    n4a = PE_LoadU16(m + 8u); n4b = PE_LoadU16(m + 0xAu);
+    n3a = PE_LoadU16(m + 0xCu); n3b = PE_LoadU16(m + 0xEu);
+    if (flag != 0) {
+        for (i = 0; (uint32_t)i < n4a; i++, f += 12u)
+            d050_prim_pair(&p, 0xC, 0x3C, 0x3E, PE_LoadU8(f + 3u), 0xB, 0x34u);
+        for (i = 0; (uint32_t)i < n4b; i++, f += 12u)
+            d050_prim_pair(&p, 9, 0x34, 0x36, PE_LoadU8(f + 3u), 0x10, 0x28u);
+        for (i = 0; (uint32_t)i < n3a; i++, f += 12u)
+            d050_prim_pair(&p, 8, 0x38, 0x3A, PE_LoadU8(f + 3u), 0x15, 0x24u);
+        for (i = 0; (uint32_t)i < n3b; i++, f += 12u)
+            d050_prim_pair(&p, 6, 0x30, 0x32, PE_LoadU8(f + 3u), 0x1A, 0x1Cu);
+    } else {
+        f = c + (n4a + n4b + n3a + n3b) * 12u;
+    }
+    c = f;
+    PE_StoreU32(o + 0x14u, c);
+    c += 0x10u;
+    PE_StoreU32(o + 0x18u, c);
+    c += (uint32_t)PE_LoadU8(m + 2u) * 16u;
+    PE_StoreU32(o + 0x1Cu, c);
+    c += 8u;
+    PE_StoreU32(o + 0x20u, c);
+    {
+        uint32_t k = PE_LoadU16(m + 0x18u) >> 2;
+        c += ((PE_LoadU16(m + 0x18u) & 3u) > 0u) ? (k + 1u) * 4u : k * 4u;
+    }
+    if (flag != 0) {
+        PE_StoreU32(out, c);
+        q = PE_LoadU32(o + 0x54u);
+        for (i = 0; (uint32_t)i < n4a; i++) {
+            s = c;
+            for (j = 0; j < 2; j++) {
+                PE_StoreU8(q + 0x0Cu, PE_LoadU8(s + 0u)); PE_StoreU8(q + 0x0Du, PE_LoadU8(s + 1u));
+                PE_StoreU8(q + 0x18u, PE_LoadU8(s + 4u)); PE_StoreU8(q + 0x19u, PE_LoadU8(s + 5u));
+                PE_StoreU8(q + 0x24u, PE_LoadU8(s + 8u)); PE_StoreU8(q + 0x25u, PE_LoadU8(s + 9u));
+                PE_StoreU8(q + 0x30u, PE_LoadU8(s + 0xCu)); PE_StoreU8(q + 0x31u, PE_LoadU8(s + 0xDu));
+                PE_StoreU16(q + 0x0Eu, PE_LoadU16(s + 2u));
+                PE_StoreU16(q + 0x1Au, PE_LoadU16(s + 6u));
+                q += 0x34u;
+            }
+            c += 0x10u;
+        }
+        for (i = 0; (uint32_t)i < n4b; i++) {
+            s = c;
+            for (j = 0; j < 2; j++) {
+                PE_StoreU8(q + 0x0Cu, PE_LoadU8(s + 0u)); PE_StoreU8(q + 0x0Du, PE_LoadU8(s + 1u));
+                PE_StoreU8(q + 0x18u, PE_LoadU8(s + 4u)); PE_StoreU8(q + 0x19u, PE_LoadU8(s + 5u));
+                PE_StoreU8(q + 0x24u, PE_LoadU8(s + 8u)); PE_StoreU8(q + 0x25u, PE_LoadU8(s + 9u));
+                PE_StoreU16(q + 0x0Eu, PE_LoadU16(s + 2u));
+                PE_StoreU16(q + 0x1Au, PE_LoadU16(s + 6u));
+                q += 0x28u;
+            }
+            c += 0xCu;
+        }
+        if (a7 > 0)
+            func_8003D94C(o, a3, a4, a5, a6);
+    }
+    PE_StoreU16(o + 0x70u, PE_LoadU16(PE_LoadU32(o + 0x14u) + 6u));
+    PE_StoreU16(o + 0x72u, PE_LoadU16(PE_LoadU32(o + 0x1Cu) + 6u));
+    r = p;
+    PE_StoreU32(o + 0x80u, r);
+    for (i = 0; (uint32_t)i < PE_LoadU8(PE_LoadU32(o) + 2u); i++) {
+        if (PE_LoadU8(PE_LoadU32(o + 4u) + (uint32_t)i * 12u + 4u) == 1u) {
+            pe_addr_t b = PE_LoadU32(o + 0x18u) + (uint32_t)i * 16u;
+            if ((int16_t)PE_LoadU16(b + 0xEu) >= 0) {
+                PE_StoreU16(r + 8u, PE_LoadU16(b + 6u));
+                PE_StoreU16(r + 10u, PE_LoadU16(b + 0xEu));
+                PE_StoreU16(r + 6u, (uint16_t)i);
+                r += 0xCu;
+            }
+        } else {
+            n++;
+        }
+    }
+    PE_StoreU32(o + 0x84u, r);
+    for (i = 0; (uint32_t)i < PE_LoadU8(PE_LoadU32(o) + 2u); i++, r += 0x20u) {
+        PE_StoreU16(r + 0x0u, 0x1000u); PE_StoreU16(r + 0x2u, 0); PE_StoreU16(r + 0x4u, 0);
+        PE_StoreU16(r + 0x6u, 0); PE_StoreU16(r + 0x8u, 0x1000u); PE_StoreU16(r + 0xAu, 0);
+        PE_StoreU16(r + 0xCu, 0); PE_StoreU16(r + 0xEu, 0); PE_StoreU16(r + 0x10u, 0x1000u);
+        PE_StoreU32(r + 0x14u, 0); PE_StoreU32(r + 0x18u, 0); PE_StoreU32(r + 0x1Cu, 0);
+    }
+    PE_StoreU16(PE_LoadU32(o) + 0x14u, 0);
+    PE_StoreU16(o + 0x2Cu, 0); PE_StoreU16(o + 0x2Eu, 0); PE_StoreU16(o + 0x30u, 0);
+    PE_StoreU16(o + 0x32u, 1u);
+    PE_StoreU16(o + 0x2Cu, 0); PE_StoreU16(o + 0x2Eu, 0); PE_StoreU16(o + 0x30u, 0);
+    func_800794C4(o + 0x2Cu, o + 0x34u);
+    PE_StoreU8(o + 0x8Cu, 0xFFu);
+    func_8003C5D8(o, 0x32);
+    PE_StoreU8(o + 0x90u, 0x80u); PE_StoreU8(o + 0x91u, 0x80u); PE_StoreU8(o + 0x92u, 0x80u);
+    PE_StoreU8(o + 0x9Eu, 1u);
+    PE_StoreU16(o + 0x9Cu, 0);
+    PE_StoreU16(o + 0x28u, 0);
+    PE_StoreU32(o + 0x24u, 0);
+    PE_StoreU16(o + 0x2Au, 0);
+    PE_StoreU8(o + 0x9Fu, (uint8_t)PE_LoadU32(0x8009CDDCu));
+    PE_StoreU16(PE_LoadU32(o) + 0x1Au, (uint16_t)(PE_LoadU16(PE_LoadU32(o) + 6u) - (uint32_t)n));
+    PE_StoreU16(o + 0x6Eu, (uint16_t)(PE_LoadU16(PE_LoadU32(o + 0x1Cu) + 2u) +
+                                      (uint32_t)((int32_t)(int16_t)PE_LoadU16(o + 0x72u) >> 4)));
+    for (i = 0; i < 2; i++) {
+        PE_StoreU8(o + 0xA6u + (uint32_t)i * 8u, 0);
+        PE_StoreU8(o + 0xA7u + (uint32_t)i * 8u, 0);
+    }
+    PE_StoreU32(o + 0xB0u, 0u);
+    return 1;
+}

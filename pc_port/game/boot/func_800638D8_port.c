@@ -175,6 +175,7 @@ void func_800634D4(pe_addr_t node,pe_addr_t draw,int32_t row,uint32_t dim)
         if (predicate) {
             if (predicate==0x8004FC3Cu) enabled=(uint32_t)func_8004FC3C((int32_t)index++);
             else if (predicate==0x8004FDA4u) enabled=(uint32_t)func_8004FDA4(index++);
+            else if (predicate==0x8004FE58u) enabled=(uint32_t)func_8004FE58((int32_t)index++);  /* save-menu slot */
             else {
                 fprintf(stderr,"[MENU] Unported cell predicate %08X index %u\n",predicate,index);
                 Bootstrap_ReturnVoid("PE_MenuCellEnabled","menu cell predicate");

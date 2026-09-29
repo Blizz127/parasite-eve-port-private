@@ -476,6 +476,7 @@ int PE_M0348iEffectCallback(pe_addr_t o);  /* room_m0348i func_8018F0C4 */
 int PE_M0348iEffectUpdate(pe_addr_t o);    /* room_m0348i func_8018F128 */
 int PE_M0348iEffectCleanup(pe_addr_t o);   /* room_m0348i func_8018F1B4 */
 void PE_M0348iEffectF240(pe_addr_t slot, pe_addr_t data); /* room_m0348i func_8018F240 */
+int PE_M0348iEffectChild(pe_addr_t fn, pe_addr_t slot, pe_addr_t rec, pe_addr_t data); /* m0348i VM callbacks */
 int PE_M34BossEffectCommand(pe_addr_t slot,uint32_t mode,uint32_t index,uint32_t value,uint32_t extra0,uint32_t extra1);
 void PE_M34StackField(int begin);
 void PE_M34StackActor(pe_addr_t actor);
@@ -582,6 +583,7 @@ extern void func_800258CC(int8_t mode);
 extern void func_80026600(pe_addr_t target);
 extern void func_80026CF0_attack_cut(void);
 extern int8_t func_80025EE8_attack_cut(void);
+void func_800299CC(void);   /* battle tick, func_800299CC_port.c (src/func_800299CC.c) */
 extern void func_80021128(void);
 extern int func_80030584(pe_addr_t pe_a0, pe_addr_t pe_a1);
 extern void func_80022D7C(pe_addr_t target);
@@ -891,6 +893,7 @@ void func_80062CD0(int a0);
 void func_8004298C(int a0, int a1);
 void func_80042A10(void);
 int func_8004FDA4(uint32_t index);
+int func_8004FE58(int a0);   /* decomp_hand/absent_lo_menu_port.c: save-slot cell predicate */
 void func_80050C08(int arg0);
 /* Per-cell draw of the field-menu list (generated decomp port, 0x80050C50);
  * reached only through func_8004FF30 -> func_800638D8. */
@@ -984,6 +987,8 @@ extern void func_8003CEF8(pe_addr_t dest, int mode);
 extern void func_8003B708(pe_addr_t dest, int bank);
 extern void func_8003C0B4(pe_addr_t dest, int level, uint32_t red, uint32_t green, uint32_t blue);
 extern void func_8003C5D8(pe_addr_t pe_state, short scale);
+int func_8003D050(pe_addr_t o, pe_addr_t c, pe_addr_t p0, short a3, short a4, short a5, short a6,
+                  short a7, pe_addr_t out, int flag);   /* func_8003D050_port.c (src/func_8003D050.c) */
 extern int func_8003C818(pe_addr_t dest);
 extern void func_8003B144(pe_addr_t dest);
 extern int func_8003AF14(pe_addr_t dest, pe_addr_t scratch);
