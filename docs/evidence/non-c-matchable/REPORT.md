@@ -1,5 +1,108 @@
 # Non-C-matchable split-asm spans — classification
 
+## Refresh 2026-09-29 (2243 C / 143 asm): classifier revision + manifest regeneration
+
+Plan `42b65e87c391` (the `func_80035558` gate). Commands:
+
+```
+python3 tools/analysis/route_coverage.py --no-history --top 20   # before  -> build/lanes/m348/nm/route_before.txt
+python3 tools/analysis/nonmatchable_spans.py --json > docs/evidence/non-c-matchable/MANIFEST.json
+python3 tools/analysis/route_coverage.py --no-history --top 25   # after   -> build/lanes/m348/nm/route_after.txt
+```
+
+### Why the classifier changed
+
+1. **COP2 ops are no longer non-C evidence.** The retired `handwritten-gte-wrapper`
+   rule assumed cc1 cannot emit COP2 and that no matched leaf contains a COP op.
+   Both are false now: Psy-Q `inline_c.h` GTE macros are inline `asm` inside C,
+   95 matched EXE leaves carry them (`inline GTE/asm`), and `func_800E051C` /
+   `func_80035558` were in that very bucket before they were matched
+   (`LINK_EXACT`, full EXE gate). The disassembler's `/* handwritten instruction */`
+   flag is emitted for the macros too. COP-bearing spans without integer-side
+   evidence are now reported as informational **`gte-inline`** (liftable).
+2. **New counted class `handwritten-integer`** with per-span `reasons` in the
+   JSON: trapping `add`/`addi`/`sub`; `$ra` in a GPR or at a non-`$sp` address;
+   BIOS vector call (`li $t2,0xA0/B0/C0` + `jr`/`jalr $t2`); COP0; ALU writes to
+   `$sp`/`$gp`; saves below `$sp+0x10` in a call-bearing body; a branch into
+   another span. cc1 emits none of these. (`$fp` writes are excluded: cc1 uses
+   `$fp` as `$s8`.)
+
+### Totals (222 split spans)
+
+| class | spans | words |
+|---|---:|---:|
+| alignment-filler | 105 | 105 |
+| gte-inline | 40 | 13188 |
+| handwritten-integer | 22 | 731 |
+| handwritten-jr-t2 | 53 | 163 |
+
+`handwritten-cop` and `handwritten-syscall` are now empty (their members were
+matched as inline-asm leaves). Counted non-C = `handwritten-integer` +
+`handwritten-jr-t2`; `alignment-filler` is layout; `gte-inline` is liftable work.
+
+### `handwritten-integer` members
+
+| span | words | reasons |
+|---|---:|---|
+| `func_80070DD0` | 13 | trapping-arith, ra-outside-stack |
+| `func_80072534` | 42 | trapping-arith, ra-outside-stack, sets-sp-gp |
+| `func_800725DC` | 28 | save-in-arg-area |
+| `func_8007264C` | 26 | save-in-arg-area |
+| `func_80077F7C` | 32 | ra-outside-stack, cop0 |
+| `func_80078004` | 33 | trapping-arith |
+| `func_80078094` | 35 | trapping-arith |
+| `func_80078120` | 5 | cross-span-branch |
+| `func_80078134` | 24 | ra-outside-stack |
+| `func_80078194` | 48 | trapping-arith |
+| `func_80078254` | 58 | ra-outside-stack |
+| `func_800787D4` | 88 | trapping-arith |
+| `func_80078A94` | 41 | trapping-arith, ra-outside-stack |
+| `func_80078B38` | 41 | trapping-arith, ra-outside-stack |
+| `func_8007A134` | 43 | ra-outside-stack, bios-vector-call |
+| `func_8007A1E0` | 12 | ra-outside-stack, cop0 |
+| `func_8007E22C` | 28 | trapping-arith, ra-outside-stack, bios-vector-call |
+| `func_8007E2A4` | 26 | trapping-arith, ra-outside-stack, bios-vector-call |
+| `func_8007E334` | 15 | bios-vector-call |
+| `func_8007E3DC` | 37 | ra-outside-stack, bios-vector-call |
+| `func_8007E470` | 28 | ra-outside-stack, bios-vector-call |
+| `func_8007E514` | 28 | ra-outside-stack, bios-vector-call |
+
+### Manifest diff (old = 2026-09-28 file, new = this regeneration)
+
+Full list: `build/lanes/m348/nm/manifest_diff.txt` (lane-local).
+
+| change | entries |
+|---|---:|
+| removed: span is now matched C in `disc1.yaml` | 87 (61 gte-wrapper, 22 handwritten-cop, 2 handwritten-syscall, 2 gte-inline) |
+| removed: split artefact (`func_800D004C` 0x6DC, now a 1-word `[0xC084C, asm]` row + `func_800D0050`) | 1 |
+| path renames only (same class; asm files re-split since the old manifest) | 36 |
+| reclassified gte-wrapper → gte-inline (inline_c.h C bodies) | 39 |
+| reclassified gte-wrapper → handwritten-integer | 5 |
+| reclassified gte-inline → handwritten-integer (`func_80078004`, `func_80078094`, `func_80077F7C`) | 3 |
+| added: alignment-filler (new 1-nop spans from carving) | 72 |
+| added: handwritten-integer (previously unclassified) | 14 |
+| added: gte-inline | 1 |
+
+### Route effect
+
+```
+before: plan=42b65e87c39126eefde7d9da38d81bf8f4260ef15175aec8f207224db3a6fff2 disc=1 funcs=1499/1573 c_words=118064 nonc_funcs=64 nonc_words=4475 asm_funcs=10 asm_words=308 asm_words_unknown=0 native_c=760/1573 native_c_words=1453 nonmatchable=present tierA=1331 tierB=248 tierB_unresolved=0
+after:  plan=42b65e87c39126eefde7d9da38d81bf8f4260ef15175aec8f207224db3a6fff2 disc=1 funcs=1499/1573 c_words=118064 nonc_funcs=60 nonc_words=592 asm_funcs=14 asm_words=4191 asm_words_unknown=0 native_c=760/1573 native_c_words=1453 nonmatchable=present tierA=1331 tierB=248 tierB_unresolved=0
+```
+
+All ten former route "remaining" functions are now counted `handwritten-integer`
+(`func_80078004`, `func_80078134`, `func_800725DC`, `func_8007A134`,
+`func_8007E3DC`, `func_80077F7C`, `func_8007E470`, `func_8007264C`,
+`func_8007E334`, `func_80072534`). "Real remaining asm" does **not** fall to 0:
+it is now **14 functions / 4191 words**, because 13 route bodies that the old
+rule wrongly counted as non-C (`handwritten-gte-wrapper`) are ordinary C with
+inline GTE macros and are back in the matching queue (`func_800CEE20`,
+`func_800D0728`, `func_800D27FC`, `func_800D1DEC`, `func_800D0E88`,
+`func_800D2370`, `func_800DD9E4`, `func_800DA1FC`, `func_800D9A8C`,
+`func_800C71E4`, `func_8006DFA8`, `func_8001AE40`, `func_80068014`), plus the
+1-word split artefact `func_800D004C` (the `[0xC084C, asm]` / `[0xC0850, asm]`
+rows split one function's prologue from its body; merging the rows fixes it).
+
 ## Refresh 2026-09-25 (2018 C / 230 asm)
 
 Command: `python3 tools/analysis/nonmatchable_spans.py` on the split after the

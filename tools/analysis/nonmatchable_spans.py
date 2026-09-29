@@ -38,29 +38,31 @@ Recognised classes (positive per-span instruction evidence required):
     a hand-written GTE primitive with no integer code to lift (e.g. the
     ``ctc2`` primitive pairs at ``func_800661A4``/``func_800661CC``).
 
-``handwritten-gte-wrapper``
-    A span that contains contiguous runs (>=3) of raw GTE macro ops — any of
-    the COP2 transfer ops (``cfc2``/``ctc2``/``mfc2``/``mtc2``/``lwc2``/
-    ``swc2``) or the Psy-Q/libgte command ops (``mvmva``/``rtps``/``rtpt``/
-    ``nclip``/``avsz3``/``avsz4``/``sqr``/``op``/``gpf``/``gpl``/``intpl``/…),
-    or a body with *no* conditional branch and *no* call that still contains a
-    COP op.  ``cc1`` cannot emit any COP2 instruction from C: every one of the
-    2419 COP ops in this bucket is flagged ``/* handwritten instruction */``
-    (or is a GTE command op with no C spelling).  Empirically, **0 of the 670
-    matched C leaves contains a single COP op**.  So the GTE macro cannot come
-    from C and the span is not C-matchable as a unit.
+``handwritten-gte-wrapper`` (retired 2026-09-29; no longer assigned)
+    Formerly: any span with a contiguous run (>=3) of COP2/GTE ops, a GTE
+    command op, or a branch/call-free body with a COP op. That premise ("cc1
+    cannot emit COP2 from C, 0 matched leaves contain a COP op") no longer
+    holds: Psy-Q ``inline_c.h`` GTE macros are inline ``asm`` inside C, and the
+    EXE now has 95 matched leaves carrying them (``inline GTE/asm``), including
+    ``func_800E051C`` and ``func_80035558`` which were in this very bucket.
+    The ``/* handwritten instruction */`` flag the disassembler puts on COP2
+    transfers is emitted for those macros too, so it is not evidence either.
 
-    Counted in the non-C-matchable total *for the span*: the embedded GTE
-    sequence is handwritten, while the surrounding integer code may still be
-    liftable (the honest end-state is a C body plus an asm-side GTE
-    primitive, or an ACCEPTED-RESIDUAL disposition).
+``handwritten-integer``
+    Positive integer-side evidence of hand-written Psy-Q SDK / BIOS assembly
+    (see ``handwritten_integer_reasons``; the JSON carries the per-span
+    ``reasons``): trapping ``add``/``addi``/``sub``; ``$ra`` held in a GPR or
+    stored to / reloaded from a non-``$sp`` address; a BIOS vector call
+    (``li $t2,0xA0/0xB0/0xC0`` + ``jr``/``jalr $t2``); COP0 ``mfc0``/``mtc0``;
+    an ALU write to ``$sp``/``$gp``; callee-saved/``$ra`` stores below
+    ``$sp+0x10`` in a call-bearing body (no o32 argument home area); a branch
+    into another span. cc1 2.7.2/2.8.1 emits none of these.
 
 ``gte-inline`` (reported only, NOT counted as non-matchable)
-    A span that contains a COP op only as an isolated pair (max contiguous run
-    < 3) inside otherwise clean, branch/call-bearing integer code — i.e. the
-    span is dominated by ordinary liftable C and the one GTE primitive is a
-    localised island.  Reported for visibility, excluded from the honest
-    non-C-matchable total.
+    A span containing COP2/GTE ops but no ``handwritten-integer`` signature:
+    ordinary compiled C around Psy-Q ``inline_c.h`` macros. Liftable (write the
+    C with the macros as inline ``asm``); reported for visibility, excluded
+    from the honest non-C-matchable total.
 
 Usage:
   python3 tools/analysis/nonmatchable_spans.py            # counts
@@ -126,13 +128,16 @@ def parse_spans():
                 i += 1
                 continue
             name, size = m.group(1), int(m.group(2), 16)
-            ops, labels = [], []
+            ops, labels, local_labels = [], [], []
             j = i + 1
             while j < len(lines):
                 if END_RE.match(lines[j]):
                     break
                 if LABEL_RE.match(lines[j]):
                     labels.append(LABEL_RE.match(lines[j]).group(1))
+                lm = re.match(r"^\s*(\.L[0-9A-Fa-f]+):", lines[j])
+                if lm:
+                    local_labels.append(lm.group(1))
                 im = INSN_RE.match(lines[j])
                 if im:
                     ops.append(_op(im.group(4)))
@@ -144,6 +149,7 @@ def parse_spans():
                 "file_off": int(vm.group(1), 16) if vm else None,
                 "vram": int(vm.group(2), 16) if vm else None,
                 "size": size, "labels": labels, "ops": ops,
+                "local_labels": local_labels,
                 # the comment immediately preceding glabel, used by the
                 # disassembler to flag handwritten and filler spans
                 "lead": " ".join(lines[max(0, i - 4):i]).lower(),
@@ -181,6 +187,74 @@ def _max_gte_run(ops) -> int:
     return best
 
 
+# cc1 (2.7.2 / 2.8.1 / cdk) never emits these; each is positive per-span
+# evidence of Psy-Q SDK / BIOS assembly written by hand (``handwritten-integer``).
+BIOS_VECTORS = ("0xA0", "0xB0", "0xC0")
+TRAPPING_ARITH = frozenset(("add", "addi", "sub"))
+COP0_OPS = frozenset(("mfc0", "mtc0", "rfe"))
+BRANCH_LABEL_RE = re.compile(r"(\.L[0-9A-Fa-f]+)\s*$")
+
+
+def handwritten_integer_reasons(span) -> list[str]:
+    """Signatures of hand-written integer assembly that no C source reproduces.
+
+    * ``trapping-arith``: ``add``/``addi``/``sub`` (cc1 only emits the
+      non-trapping ``addu``/``addiu``/``subu``).
+    * ``ra-outside-stack``: ``$ra`` copied into a GPR or stored to / reloaded
+      from a non-``$sp`` address (cc1 saves ``$ra`` only at ``N($sp)``).
+    * ``bios-vector-call``: ``addiu $t2,$zero,0xA0|0xB0|0xC0`` followed by
+      ``jr``/``jalr $t2`` (BIOS table call; cc1 calls through ``jal``/``jalr``
+      with the target in a register it chose, never a BIOS vector literal).
+    * ``cop0``: ``mfc0``/``mtc0``/``rfe`` (no C construct).
+    * ``sets-sp-gp``: an ALU write to ``$sp``/``$gp`` other than the
+      ``addiu $sp,$sp,N`` frame adjust (runtime entry point).
+    * ``save-in-arg-area``: a call-bearing body that stores a callee-saved
+      register or ``$ra`` below ``$sp+0x10`` (o32 cc1 always reserves the
+      16-byte outgoing-argument home area in non-leaf frames).
+    * ``cross-span-branch``: a branch whose target label is not inside the
+      span (a shared tail entered from another function's body).
+    """
+    ops = [o for o in span["ops"] if o and o != ".data"]
+    mn = [_mn(o) for o in ops]
+    labels = set(span.get("local_labels", ()))
+    reasons = []
+    if any(m in TRAPPING_ARITH for m in mn):
+        reasons.append("trapping-arith")
+    if any(re.match(r"(addu|or) \$\w+, (\$ra, \$zero|\$zero, \$ra)$", o)
+           for o in ops) or any(
+            re.match(r"(sw|lw) \$ra, .*\(\$(?!sp\))\w+\)$", o) for o in ops):
+        reasons.append("ra-outside-stack")
+    for i, o in enumerate(ops):
+        if any(o == f"addiu $t2, $zero, {v}" for v in BIOS_VECTORS) and any(
+                x in ("jr $t2", "jalr $t2") for x in ops[i + 1:i + 4]):
+            reasons.append("bios-vector-call")
+            break
+    if any(m in COP0_OPS for m in mn):
+        reasons.append("cop0")
+    for o in ops:
+        # `$fp` is excluded on purpose: cc1 allocates it as the ordinary
+        # callee-saved `$s8`. Only ALU writes count (not branches/stores).
+        m = re.match(r"(\w+) \$(sp|gp), ", o)
+        if m and m.group(1) not in COND_OPS \
+                and not m.group(1).startswith(("s", "l")) \
+                and not re.match(r"addiu \$sp, \$sp, -?0x[0-9A-Fa-f]+$", o):
+            reasons.append("sets-sp-gp")
+            break
+    if any(m in CALL_OPS for m in mn):
+        for o in ops:
+            m = re.match(r"sw \$(s[0-8]|ra|fp), (0x[0-9A-Fa-f]+|\d+)\(\$sp\)$", o)
+            if m and int(m.group(2), 0) < 0x10:
+                reasons.append("save-in-arg-area")
+                break
+    for o in ops:
+        if _mn(o) in COND_OPS:
+            m = BRANCH_LABEL_RE.search(o)
+            if m and m.group(1) not in labels:
+                reasons.append("cross-span-branch")
+                break
+    return reasons
+
+
 def classify(span) -> str | None:
     ops = span["ops"]
     body = [o for o in ops if o and o != ".data"]
@@ -195,6 +269,8 @@ def classify(span) -> str | None:
     # so any span that contains one at all is not C-matchable.
     if "syscall" in mn:
         return "handwritten-syscall"
+    if handwritten_integer_reasons(span):
+        return "handwritten-integer"
     cop = [m for m in mn if m in COP_OPS]
     # A span whose *entire* body is COP2 ops plus `jr`/`nop` is a hand-written
     # GTE primitive: there is no integer C code to lift at all.
@@ -202,19 +278,14 @@ def classify(span) -> str | None:
     if cop and nonop and all(m in cop for m in nonop):
         return "handwritten-cop"
     if cop:
-        # A GTE *command* op (`rtps`/`rtpt`/`mvmva`/…) and a long contiguous COP
-        # run are both Psy-Q/libgte macro expansion: no C construct emits a COP2
-        # op, so a span carrying one is not C-matchable as a unit. A lone COP2
-        # register-transfer pair (`mtc2`/`mfc2`/`lwc2`/`swc2`) inside
-        # branch/call-bearing integer code is the only shape worth lifting: the
-        # body is dominated by ordinary C and the transfer is a localised island
-        # (reported as `gte-inline`, informational, not counted as non-C).
-        run = _max_gte_run(ops)
-        cmd = any(m in GTE_CMD for m in mn)
-        has_cond = any(m in COND_OPS for m in mn)
-        has_call = any(m in CALL_OPS for m in mn)
-        if cmd or run >= GTE_RUN_THRESHOLD or not (has_cond or has_call):
-            return "handwritten-gte-wrapper"
+        # COP2 ops alone are NOT non-C evidence: Psy-Q `inline_c.h` macro
+        # bodies (gte_SetRotMatrix/ldv0/rtps/CompMatrix/...) are matched C here
+        # (e.g. func_800E051C and func_80035558, both formerly counted as
+        # `handwritten-gte-wrapper`, are LINK_EXACT with inline-asm macros).
+        # A span with COP ops but no hand-written integer signature (above) is
+        # therefore reported as `gte-inline`: informational, still liftable,
+        # NOT counted as non-C. (The `handwritten-gte-wrapper` class is kept
+        # in the vocabulary for consumers but no longer assigned.)
         return "gte-inline"
     return None
 
@@ -240,8 +311,10 @@ def main(argv=None) -> int:
             "counts": {k: len(v) for k, v in sorted(classes.items())},
             "words": {k: sum(s["size"] // 4 for s in v)
                       for k, v in sorted(classes.items())},
-            "spans": {k: [{"name": s["name"], "vram": f"0x{s['vram']:08X}",
-                           "size": f"0x{s['size']:X}", "file": s["file"]}
+            "spans": {k: [dict({"name": s["name"], "vram": f"0x{s['vram']:08X}",
+                                "size": f"0x{s['size']:X}", "file": s["file"]},
+                               **({"reasons": handwritten_integer_reasons(s)}
+                                  if k == "handwritten-integer" else {}))
                           for s in v] for k, v in sorted(classes.items())
                       if k != "gte-inline"},
             # `gte-inline` spans merely *contain* an isolated GTE op; the bulk
