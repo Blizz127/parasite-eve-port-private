@@ -87,8 +87,55 @@ int PE_SpuDma_InstallIrq(pe_addr_t handler)
     return 1;
 }
 
+/* Audio diagnostics: PE_AUDIO_DMA_LOG=path logs every SPU DMA request
+ * (accepted or rejected) and the copy, with a source checksum at issue and
+ * at copy time (a mismatch means the guest reused the buffer first). */
+static FILE *dma_log(void)
+{
+    static FILE *f;
+    static int init;
+    if (!init) {
+        const char *p = getenv("PE_AUDIO_DMA_LOG");
+        init = 1;
+        if (p && *p) f = fopen(p, "w");
+    }
+    return f;
+}
+
+static uint32_t dma_sum(pe_addr_t src, uint32_t n)
+{
+    uint32_t h = 2166136261u;
+    if (!PE_RangeIsRam(src, n)) return 0;
+    const uint8_t *b = PE_TranslateConst(src, n);
+    for (uint32_t i = 0; i < n; i++) h = (h ^ b[i]) * 16777619u;
+    return h;
+}
+
+static uint32_t g_dma_issue_sum;
+static int SpuDma_BeginChecked(pe_addr_t source, uint32_t destination,
+                               uint32_t requested_size, pe_addr_t callback);
+
 int PE_SpuDma_Begin(pe_addr_t source, uint32_t destination,
                     uint32_t requested_size, pe_addr_t callback)
+{
+    uint32_t dma_size;
+    int ok = SpuDma_BeginChecked(source, destination, requested_size, callback);
+    FILE *f = dma_log();
+    if (f) {
+        dma_size = 0;
+        (void)RoundDmaSize(requested_size, &dma_size);
+        g_dma_issue_sum = ok ? dma_sum(source, dma_size) : 0;
+        fprintf(f, "BEGIN %s src=%08X dst=%05X req=%X size=%X cb=%08X irq=%d/%08X pending=%d sum=%08X\n",
+                ok ? "ok" : "REJECT", source, destination, requested_size,
+                dma_size, callback, g_dma.irq_installed, g_dma.irq_handler,
+                ok ? 0 : g_dma.pending, g_dma_issue_sum);
+        fflush(f);
+    }
+    return ok;
+}
+
+static int SpuDma_BeginChecked(pe_addr_t source, uint32_t destination,
+                               uint32_t requested_size, pe_addr_t callback)
 {
     uint32_t dma_size;
 
@@ -132,6 +179,13 @@ int PE_SpuDma_Service(void)
 
     if (!g_dma.pending) return 0;
 
+    if (dma_log()) {
+        uint32_t now = dma_sum(g_dma.source, g_dma.dma_size);
+        fprintf(dma_log(), "COPY src=%08X dst=%05X size=%X sum=%08X%s\n",
+                g_dma.source, g_dma.destination, g_dma.dma_size, now,
+                now != g_dma_issue_sum ? " SOURCE-CHANGED-SINCE-ISSUE" : "");
+        fflush(dma_log());
+    }
     if (g_dma.dma_size != 0) {
         first_size = PE_SPU_RAM_SIZE - g_dma.destination;
         if (first_size > g_dma.dma_size) first_size = g_dma.dma_size;

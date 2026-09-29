@@ -45,6 +45,7 @@
 #include "psx_compat.h"
 #include "pe_port_compat.h"
 #include "game_port.h"
+#include "pe_sdk.h"
 
 #define GA_D_800BE9A2 0x800BE9A2u
 #define GA_D_800BCEA8 0x800BCEA8u
@@ -114,13 +115,31 @@ void func_800696F0(void)
         PE_StoreU32(0x800E1044u + i * 4u, 0u);
 }
 
+/* func_8006A0E8 — full retail body (src/func_8006A0E8.c, audio2 lane).
+ * Called every field tick after the draw.  On the pause-entry frame
+ * (D1A0 bit 0x10, set by the Start toggle above) it draws the pause
+ * overlay through the current draw env and sends AKAO command 0x99
+ * (func_800867E4(0): pause music + SFX); on the pause-exit frame (bit
+ * 0x20) it sends 0x98 (func_8008682C(0): resume).  The earlier cut
+ * stopped before both, so music and effects kept playing while paused. */
+extern void func_800867E4(int a0);
+extern void func_8008682C(int a0);
 void func_8006A0E8(void)
 {
-    if ((PE_LoadU32(0x800B0CD8u) & 0x200u) != 0u)
-        return;
-    if ((D_8009D1A0 & 0x10u) == 0u)
-        return;
-    /* PutDrawEnv / SetDrawArea body is not this cut. */
+    const pe_addr_t base = 0x800B0CD8u;
+    if ((PE_LoadU32(base) & 0x200u) == 0u && (D_8009D1A0 & 0x10u) != 0u) {
+        uint32_t idx = PE_LoadU32(0x8009CDDCu) * 0x5Cu;
+        PE_StoreU8(0x800BCDE0u + idx, 0u);
+        PE_StoreU8(0x800BCDDFu + idx, 1u);
+        (void)func_80075424(0x800BCDC8u + idx);
+        (void)func_80075358(base + 0x114u);
+        (void)func_80075358(base + 0x104u);
+        PE_StoreU8(0x800BCDE0u + idx, 1u);
+        PE_StoreU8(0x800BCDDFu + idx, 0u);
+        func_800867E4(0);
+    }
+    if ((D_8009D1A0 & 0x20u) != 0u)
+        func_8008682C(0);
 }
 
 /* Original E01BC..E0808: effect walk, animation/fade, projected FT4. */

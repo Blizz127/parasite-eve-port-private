@@ -213,3 +213,106 @@ The dev box was CPU-starved (load average 50 on 12 cores), so both runs fell bel
 Simulator, owner case modelled: 2 VBlanks' worth of samples per 59.94 Hz present gave 564 clicks (old path). Pacing 1 VBlank per 59.94 Hz frame gives 0 overflows and 0 clicks.
 
 **Movie skip.** When XA stops, `PE_Spu_CdInputStop` (added by the fmv lane in `pe_spu.c`, semantics agreed) flushes the XA jitter buffer with the 64-frame fade. host_audio needs no call: it holds at most about 100 ms and fades a starve.
+
+### audio2: New Game movie bug (owner, build c744fab6)
+
+Symptom: on New Game, a loud noise burst, then a cut straight to the Aya-and-date car arrival, with the movie's music playing on.
+
+**Cause.** Every field movie resolved to id 0. The script VM's host stand-in frame `GA_VM_FRAME` sat at 0x80120F80 in `func_80017018_port.c`, inside the 0x80120D00 movie-overlay window. Opcode 0x35 (`func_80014E30`) loads the overlay and only then reads `**args`. So New Game played FMV000 (the SQUARE logo, 150 frames) instead of FMV002 (the Carnegie Hall opening, 1021 frames).
+
+That explains all three symptoms:
+- **Noise burst:** FMV000's XA is correctly decoded but very loud on the disc (shift 2–3): RMS 13.6k, 673 clipped samples over 2 s.
+- **Cut:** the logo lasts 5 s, then the scene starts.
+- **Music played on:** FMV002's partly AKAO-sequenced score, started for the movie, continued into the scene.
+
+The frame was moved to 0x801FF400 (the list to 0x801FF460) in the shared tree by another lane.
+
+**Evidence** (fixed tree, scripted skip-FMV001 → New Game; `PE_FMV_LOG`, `PE_AUDIO_PACE_LOG`):
+- `movie id=2 name=\FMV1\FMV002.STR;1`. The stream runs from LBA 103206 and closes at 113427 (file end 113438): 1021/1021 frames, 0 dropped, 1277 XA sectors, 0 CD underruns.
+- Windowed run (stand-in X11 + real-time fake Pulse): the same 1021/1021 frames to the file end.
+  - Wall time was 263.5 s because this box managed 16.1 VBlanks/s (max 23.6). The pacer never waited. On a real PC it should be 68.1 s.
+- XA stops at the close. The CD/XA frames mixed per 60 VBlanks are 44100 during the movie, 40489 in the window with the close (≈18 ms past the close VBlank, 64-frame fade included), and 0 afterwards.
+  - After the close only the SPU voices' release/reverb tail remains (peak 786 → 351 at +1 s → 2 at +3 s), with no key-ons.
+- After the movie the screen shows the correct Carnegie Hall scene.
+- The shipped build with the same script opens LBA 101705 (FMV000): the bug.
+- The pacer, the CD-input stop and the jitter buffer were not involved.
+
+### audio2: field SFX (no footsteps, no grunt, loud bangs)
+
+**Cause.** The port's room loader (`func_8006B4F8_port.c`, a partial cut marked "6CDA4 tail is not this cut") never ran the sound tail of retail `func_8006B4F8` (`src/func_8006B4F8.c`). That tail reads three tables from the room file header:
+- hdr+0x24: the room SFX banks `st+0xEA`/`+0xEB` and the music id `st+0xE8`, loaded with `func_8006CDA4(2|1, …, blocking)`.
+- hdr+0x2C: Aya's footstep sound ids into `D_8009448C[row][col]`.
+- hdr+0x30: `st+0xE0`/`+0xE1`/`+0x124`.
+
+What followed:
+- No room SFX bank was ever uploaded. `PE_AUDIO_DMA_LOG` showed 51 SPU DMAs, all at boot, none after New Game; SPU 0x50540–0x75220 was never written.
+- Room SFX keyed on boot samples. For example, the lobby footsteps played SPU 0x06CB0: the "loud bangs".
+- Aya's footstep records kept sound id 0: no footsteps.
+
+**Fix.** `pe_6b4f8_sound_tail()`, ported from the matched C, runs at the end of `func_8006B4F8_dest_load_cut`. Diagnostic: `PE_AUDIO_ROOMSND_LOG`.
+
+**Evidence** (`--route-pad`, headless; retail reference is the owner's Day-1 video):
+- Banks load per room, e.g. 0x84 → SPU 0x68000 and 0x83 → 0x6A000; 12 room loads over the route.
+- Aya's records get 3FE/3F6 and 3FF/3F7.
+- Plaza walk: before, 0 SFX; after, footsteps every 0.63–0.70 s. Retail 316.02–317.35 s shows them.
+- Loudness, calibrated on FMV002 XA (port RMS 4687, video 1926, ×0.41):
+  - plaza footstep high-pass energy 144–197, against retail's 145–208;
+  - lobby RMS 180–217, against retail's 143–265.
+- Route regression (12000 frames): same end state, 20 battle edges, 0 faults; music and battle levels unchanged; KON 3255 → 3801.
+- Native suite: `Results: 1590 run, 1590 passed, 0 failed, 0 skipped`.
+
+**Remaining (animation, not audio).** The date's step triggers (EA 406: actor 02/00, anim 0x01) never match, because the port's date walks with anim 0x0B (arrival) and 0x04 (plaza). His retail footsteps at 260.06/260.66 s and the interleaved 0.33 s plaza cadence are therefore still missing.
+
+### audio2: pause does not stop audio
+
+**Retail behaviour** (`src/func_8003F3C4.c`, `src/func_8006A0E8.c`):
+- Start in the field tick toggles `D_8009D1A0` bit 0 and sets bit 0x10 (pause entered) or 0x20 (pause left) for one frame. While paused the tick only calls `VSync(2)`.
+- Every tick then calls `func_8006A0E8`. On 0x10 it draws the pause overlay through the draw env and sends AKAO command **0x99** (`func_800867E4(0)`); on 0x20 it sends **0x98** (`func_8008682C(0)`).
+- Battles run in the same field tick.
+
+**Cause.** The port's `func_8006A0E8` (in `func_8003F3C4_port.c`) was a stub ("PutDrawEnv / SetDrawArea body is not this cut"), so neither command was sent. The AKAO tick runs from the emulated root counter whatever the game's pause state (as on retail), and it kept sequencing.
+- Evidence: tracing `func_8008CBA8` showed no command at the pause.
+- A `HostFB_VSync` backtrace while paused showed `func_8003F3C4 → VSync(2)`.
+
+**Fix.** The full retail body is ported (overlay draw plus 0x99 / 0x98).
+
+**Evidence.** Windowed real-time run: stand-in X11 injecting Start (`build/lanes/audio2/fakex`), real-time stand-in Pulse, `--route-pad --hand-over-at 10400`, paused mid-battle (first Eve fight).
+- Key-ons per 60 VBlanks: 20–41 before, **0** during the pause (VBlanks 21240–21480), again from 21540.
+- Mix RMS: 4–5k before; after the last key-on (352.31 s) it decays through each voice's ADSR release and the reverb tail: 1.4k at +0.2 s, 500 at +0.6 s, 100 at +1.1 s, near 0 by +2 s. This is the retail driver's 0x99 handling (retail driver bytes in the interpreter).
+- On unpause (0x98) the music resumes where it left off: RMS 2656 in the first 50 ms, 6248 after 1 s.
+- Route regression (12000 frames, no pause): same end state, 20 battle edges, 0 faults.
+- The port has no host-level pause on focus loss (`FocusOut` only releases held keys). A host-side freeze with no emulated VBlanks drains host_audio's ~100 ms queue with a 64-frame fade.
+
+### audio2: sound audit items 9–14, sirens, Eve 2 vocals, Day-1 sweep (in progress)
+
+**Item 9 — FIXED.** `func_80015DAC_default_cut` silently dropped 23 retail EA keys: 100, 101, 208–216, 302, 304, 306–313, 408, 410. All are now ported 1:1 from `src/func_80015DAC.c`; 408 shares case 200's music-start body.
+- Seen on the Day-1 route (fixed build, `PE_AUDIO_EA_LOG`): **EA408 at route frame 15300, room A80004C8, loads bank 66 and starts music 57.** It was dropped before, so that room's music never started.
+- Also seen: EA100/101 (AKAO pause/resume, variant 1) just before the Eve 2 battle.
+
+**Item 10 — done** (pause; see above).
+
+**Item 11 — FIXED.** `func_8006F044` was a `psx_compat.h` boundary stub. It is now `game/boot/func_8006F044_port.c`, a port of the matched C:
+- resets the six `B0DB2..7` bytes and clears the `B0CD8` 0xF0 bits;
+- sends AKAO 0xF0 (stop all);
+- reloads the two resident blocks (`D_8009315E`/`D_80093166` → `D_8001160C`/`D_80011610`).
+
+**Item 12 — low impact, open.** SpuSetCommonAttr runs (main 0x3FFF, CD 0x7FFF). Still collapsed:
+- `func_800862F4` per voice (zero attributes, the power-on state);
+- `func_8008CB54(4)` + `func_80085A64(1)` (boot reverb type 4 plus enable).
+Each song's reverb set-up by the interpreted driver overrides this.
+
+**Items 13/14 — native tick only.** `func_8008A92C`/`8A750` and the `func_8008CA84` callback copies are reached only from the native AKAO opcode handlers (`decomp_hand/seq_ops_hi_port.c`). The shipping path interprets retail bytes.
+
+**Sirens — no gap.** Retail has none audible:
+- part 1 @ 12:20–13:20 (ambulance/cops outside Carnegie Hall): mostly digital silence, with short event sounds only;
+- part 2 @ 14:35–15:45 (reporter, "Sorry I'm late, Aya"): RMS 17–140 with fully silent stretches, and no sustained or sweeping tone;
+- part 2 @ 15:50+ (the car ride): a steady low (<300 Hz) engine drone.
+
+**Opera aria — no gap.** The in-engine opera performance (part 1 @ ~5:30–7:00) is FMV003's XA. With movies playing (`PE_ROUTE_PLAY_MOVIES=1`), FMV003 streams with the game's ATV (0x98 → 0x88) and 2358 XA sectors by route frame 12500. `--route-pad`'s skip-movie is why route runs are silent there.
+
+**Eve 2 vocals — open.**
+- Same song for Eve 1 and Eve 2 (song 0x25, `AKAO 25 00`, 22 channels).
+- Eve 2's type-3 bank 130 (disc LBA 8287, 23 sectors) adds distinct looping samples at SPU 0x54070/0x571C0 (descriptors 2/3). Bank 129 maps descriptors 2..5 to one sample, 0x50C80, which never keys.
+- The port keys the bank-130 choir samples **once** per fight (5–10 s in, ~5 s sustain), both in a short fight and in a 100 s fight.
+- Verified identical to retail: the song bytes, the bank upload/relocation (`func_80087428`), the SFX/command producers, and the driver (retail bytes).
+- Needs a retail timestamp where the choir is heard, or an AKAO channel decode of song 0x25.

@@ -305,6 +305,25 @@ static void key_on(int n)
     /* first block is decoded without an end-of-block transition */
     voice_decode_block(v, n);
     PE_Spu_EnvelopeKeyOn(&v->env, r[4], r[5]);
+    {
+        /* PE_AUDIO_VOICE_LOG=path: one line per key-on (diagnostics). */
+        static FILE *vl;
+        static int init;
+        if (!init) {
+            const char *p = getenv("PE_AUDIO_VOICE_LOG");
+            init = 1;
+            if (p && *p) vl = fopen(p, "w");
+        }
+        if (vl) {
+            const uint8_t *b = ram() + (v->cur_addr & (PE_SPU_RAM_SIZE - 16u));
+            const uint8_t *b2 = ram() + ((v->cur_addr + 16u) & (PE_SPU_RAM_SIZE - 16u));
+            fprintf(vl, "%.3f v%02d addr=%05X pitch=%04X adsr=%04X/%04X vol=%04X/%04X "
+                    "blk0=%02X%02X blk1=%02X%02X%02X%02X eon=%d\n",
+                    (double)S.stats.rendered_frames / PE_SPU_RATE, n, v->cur_addr,
+                    r[2], r[4], r[5], r[0], r[1], b[0], b[1], b2[0], b2[1], b2[2], b2[3],
+                    (int)(((S.reg[0x198 / 2] | ((uint32_t)S.reg[0x19A / 2] << 16)) >> n) & 1u));
+        }
+    }
     S.endx &= ~(1u << n);
 }
 
@@ -605,6 +624,7 @@ void PE_Spu_Render(int16_t *out, int frames)
         if (S.cd_live == 2 && !S.cd_play) S.stats.cd_underrun_frames++;
         if (S.cd_play || S.cd_tail) {
             int32_t cl, cr;
+            S.stats.cd_frames_mixed++;
             if (S.cd_play) {
                 S.cd_live = 1;
                 cl = S.cd[S.cd_r * 2u];

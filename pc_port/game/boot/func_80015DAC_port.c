@@ -29,8 +29,29 @@
  */
 #include "psx_compat.h"
 #include "pe_port_compat.h"
+#include "pe_gpu.h"
 
 extern void func_80087024(void);
+extern void func_800867E4(int);
+extern void func_8008682C(int);
+extern void func_80086DAC(int);
+extern void func_80086DE4(int, int);
+extern void func_80086E24(int, int, int);
+extern void func_80086E70(int);
+extern void func_80086EA8(int, int);
+extern void func_80086EE8(int, int, int);
+extern void func_80086F34(int);
+extern void func_80086F6C(int, int);
+extern void func_80086FAC(int, int, int);
+extern void func_80086874(int);
+extern void func_80086A80(int, int, int, int);
+extern void func_800869AC(int);
+extern void func_800869E4(int, int);
+extern void func_80086B60(int, int, int);
+extern void func_80086BB8(int, int, int, int);
+extern void func_80086AE4(int);
+extern void func_80086B1C(int, int);
+extern void func_800867B0(int);
 
 #define GA_EA_TABLE   0x800101B0u
 #define GA_EA_NOP     0x800168F4u
@@ -43,7 +64,12 @@ extern void func_80087024(void);
 #define GA_D_800B0DFC 0x800B0DFCu
 #define GA_D_800B0E00 0x800B0E00u
 #define GA_D_8009D300 0x8009D300u
-#define GA_EA_SLOT    0x80120FC0u
+/* Host stand-in for the retail stack locals (loader slot at +0, op-409
+ * CD gains at +4..+7).  It used to be 0x80120FC0, inside the 0x80120D00
+ * overlay load window; now in the port stack-scratch block
+ * 0x801FF400..0x801FF4EF next to the field-VM arg frame
+ * (func_80017018_port.c, audited with PE_VMFRAME_AUDIT=1). */
+#define GA_EA_SLOT    0x801FF4B0u
 
 static uint32_t ea_value(pe_addr_t args,unsigned index)
 {return PE_LoadU32(PE_LoadU32(args+index*4u));}
@@ -233,8 +259,72 @@ int func_80015DAC_default_cut(pe_addr_t args)
     pe_addr_t target;
 
     key = PE_LoadU32(PE_LoadU32(args));
+    {
+        /* audio2 diagnostics: PE_AUDIO_EA_LOG=path logs every EA key with
+         * its first operands; keys that reach the silent fall-through are
+         * marked DROPPED. */
+        static FILE *ea_log;
+        static int ea_init;
+        if (!ea_init) {
+            const char *p = getenv("PE_AUDIO_EA_LOG");
+            ea_init = 1;
+            if (p && *p) ea_log = fopen(p, "w");
+        }
+        if (ea_log) {
+            uint32_t i2 = key - 100u;
+            pe_addr_t tg = i2 < 311u ? PE_LoadU32(GA_EA_TABLE + i2 * 4u) : 0u;
+            int handled = key==200u||key==203u||key==201u||key==204u||(key>=205u&&key<=207u)||
+                key==301u||key==303u||key==305u||key==314u||key==300u||(key>=350u&&key<=353u)||
+                key==217u||key==401u||key==402u||key==405u||key==409u||key==406u||key==407u||
+                key==100u||key==101u||(key>=208u&&key<=216u)||key==302u||key==304u||
+                (key>=306u&&key<=313u)||key==408u||key==410u||
+                i2>=311u||tg==GA_EA_NOP||tg==GA_EA_190;
+            PeGpuState st;
+            PE_GPU_GetState(&st);
+            uint32_t op[4];
+            for (unsigned k = 0; k < 4u; k++) {
+                pe_addr_t pp = PE_RangeIsRam(args + (k + 1u) * 4u, 4u) ?
+                               PE_LoadU32(args + (k + 1u) * 4u) : 0u;
+                op[k] = PE_RangeIsRam(pp, 4u) ? PE_LoadU32(pp) : 0xDEADu;
+            }
+            fprintf(ea_log, "vbl=%u EA %u (table %08X) ops %X %X %X %X%s\n",
+                    st.vsync_count, key, tg, op[0], op[1], op[2], op[3],
+                    handled ? "" : "  DROPPED");
+            fflush(ea_log);
+        }
+    }
     if (key==200u || key==203u)
         return ea_music_start(args,key);
+    /* audio2 lane: the remaining retail EA keys (src/func_80015DAC.c),
+     * which the earlier cut dropped at the silent fall-through below.
+     * 408 shares case 200's body (a second music-start label). */
+    if (key==408u)
+        return ea_music_start(args,200u);
+    switch (key) {
+    case 100u: func_800867E4((int)ea_value(args,1)); return 1;   /* AKAO pause  */
+    case 101u: func_8008682C((int)ea_value(args,1)); return 1;   /* AKAO resume */
+    case 208u: func_80086DAC((int)ea_value(args,1)); return 1;
+    case 209u: func_80086DE4((int)(ea_value(args,1)*2u),(int)ea_value(args,2)); return 1;
+    case 210u: func_80086E24((int)(ea_value(args,1)*2u),(int)ea_value(args,2),(int)ea_value(args,3)); return 1;
+    case 211u: func_80086E70((int)ea_value(args,1)); return 1;
+    case 212u: func_80086EA8((int)(ea_value(args,1)*2u),(int)ea_value(args,2)); return 1;
+    case 213u: func_80086EE8((int)(ea_value(args,1)*2u),(int)ea_value(args,2),(int)ea_value(args,3)); return 1;
+    case 214u: func_80086F34((int)ea_value(args,1)); return 1;
+    case 215u: func_80086F6C((int)(ea_value(args,1)*2u),(int)ea_value(args,2)); return 1;
+    case 216u: func_80086FAC((int)(ea_value(args,1)*2u),(int)ea_value(args,2),(int)ea_value(args,3)); return 1;
+    case 302u: (void)func_800868F0(ea_value(args,1),ea_value(args,2),ea_value(args,3)); return 1;
+    case 304u: func_80086874((int)ea_value(args,1)); return 1;
+    case 306u: (void)func_80086A28(ea_value(args,1),ea_value(args,2),ea_value(args,3)); return 1;
+    case 307u: func_80086A80((int)ea_value(args,1),(int)ea_value(args,2),(int)(ea_value(args,3)*8u),(int)ea_value(args,4)); return 1;
+    case 308u: func_800869AC((int)ea_value(args,1)); return 1;
+    case 309u: func_800869E4((int)(ea_value(args,1)*2u),(int)ea_value(args,2)); return 1;
+    case 310u: func_80086B60((int)ea_value(args,1),(int)ea_value(args,2),(int)ea_value(args,3)); return 1;
+    case 311u: func_80086BB8((int)ea_value(args,1),(int)ea_value(args,2),(int)(ea_value(args,3)*2u),(int)ea_value(args,4)); return 1;
+    case 312u: func_80086AE4((int)ea_value(args,1)); return 1;
+    case 313u: func_80086B1C((int)(ea_value(args,1)*2u),(int)ea_value(args,2)); return 1;
+    case 410u: func_800867B0((int)ea_value(args,1)); return 1;
+    default: break;
+    }
     if (key==201u)
         return ea_music_stop(args);
     if (key==204u) {

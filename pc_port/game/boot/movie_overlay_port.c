@@ -366,6 +366,11 @@ int func_80121C04(int id)
         }
     }
     PE_StoreU32(0x80122414u,PE_LoadU32(0x801223FCu));
+    if(getenv("PE_FMV_LOG"))
+        fprintf(stderr,"[FMV] movie id=%u name=%s rec: +4=%02X +6(end)=%d +8=%04X +A=%04X +C=%04X +E=%04X +10=%04X\n",
+                selector,name,PE_LoadU8(record+4u),(int)(int16_t)PE_LoadU16(record+6u),
+                PE_LoadU16(record+8u),PE_LoadU16(record+0xAu),PE_LoadU16(record+0xCu),
+                PE_LoadU16(record+0xEu),PE_LoadU16(record+0x10u));
     bank_word=PE_LoadU32(0x8009CDDCu);
     x=PE_LoadU16(record+0xAu);
     start=PE_LoadU16(record+0xCu);

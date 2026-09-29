@@ -446,6 +446,7 @@ static uint32_t seq_mask(int i)
     return PE_LoadU32(c + (uint32_t)i * 0x68u + 4u);
 }
 
+static uint32_t seq_mask(int i);
 static PeVBlankPacer g_vblank_pacer;
 
 void PE_AudioDriver_SetVBlankPacer(PeVBlankPacer pacer) { g_vblank_pacer = pacer; }
@@ -454,14 +455,14 @@ static void pace_log(void)
 {
     static FILE *f;
     static int init;
-    static uint64_t n, last_kon;
+    static uint64_t n, last_kon, last_cd;
     static int last_presented;
     if (!init) {
         const char *p = getenv("PE_AUDIO_PACE_LOG");
         init = 1;
         if (p && *p) {
             f = fopen(p, "w");
-            if (f) fprintf(f, "# vblank presents_in_last_60 kon_in_last_60 ticks wall_s\n");
+            if (f) fprintf(f, "# vblank presents_in_last_60 kon_in_last_60 ticks wall_s cd_frames_in_last_60\n");
         }
     }
     if (!f || ++n % 60u) return;
@@ -472,11 +473,14 @@ static void pace_log(void)
         HostFB_GetState(NULL, NULL, &presented, NULL);
         struct timespec ts;
         clock_gettime(CLOCK_MONOTONIC, &ts);
-        fprintf(f, "%llu %d %llu %llu %.3f\n", (unsigned long long)n,
+        fprintf(f, "%llu %d %llu %llu %.3f %llu seq0=%06X seq1=%06X\n", (unsigned long long)n,
                 presented - last_presented,
                 (unsigned long long)(sp.kon_events - last_kon),
                 (unsigned long long)D.st.ticks,
-                (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9);
+                (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9,
+                (unsigned long long)(sp.cd_frames_mixed - last_cd),
+                seq_mask(0), seq_mask(1));
+        last_cd = sp.cd_frames_mixed;
         fflush(f);
         last_presented = presented;
         last_kon = sp.kon_events;

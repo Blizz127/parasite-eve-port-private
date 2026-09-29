@@ -101,6 +101,7 @@ typedef struct {
     uint64_t cd_underruns;      /* CD/XA queue ran dry mid-stream */
     uint64_t cd_underrun_frames;
     uint64_t cd_overflow_frames;/* CD/XA frames dropped (queue full) */
+    uint64_t cd_frames_mixed;   /* output frames with CD/XA input (incl. fades) */
 } PeSpuStats;
 void PE_Spu_GetStats(PeSpuStats *out);
 /* Optional KON trace callback (voice mask, start address). */
