@@ -12,6 +12,7 @@
 
 #include "pe_spu.h"
 #include "pe_spu_dma.h"
+#include "pe_mmio.h"
 
 static const PePlatAudioOutput *plat_audio_out;
 static int plat_audio_prev_active = -1;
@@ -115,4 +116,9 @@ void pe_plat_audio_stats(PePlatAudioStats *out)
     out->mixed_frames = s.rendered_frames;
     out->voices_active = s.voices_active;
     out->cd_underruns = s.cd_underruns;
+}
+
+void pe_plat_audio_commit_registers(void)
+{
+    PE_MMIO_Commit();   /* host-pointer register writes (pe_mmio.h) */
 }

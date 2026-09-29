@@ -98,22 +98,7 @@ void func_80042D40(void)
     PE_StoreU8(0x800BCDE3u,(uint8_t)value);PE_StoreU8(0x800BCDE2u,(uint8_t)value);PE_StoreU8(0x800BCDE1u,(uint8_t)value);
 }
 
-void func_80042F44(void)
-{
-    switch (PE_LoadU32(0x8009CED8u)) {
-    case 1:PE_StoreU32(0x8009CED8u,2u);break;
-    case 2:PE_StoreU32(0x8009CED8u,3u);break;
-    case 3: {
-        RECT rect={0,480,256,(int16_t)PE_LoadU32(0x8009CEDCu)};
-        (void)func_800750CC(&rect,D_800B0E50);
-        if (!PE_Port_ShouldStop()) PE_StoreU32(0x8009CED8u,4u);
-        break;
-    }
-    case 4:case 6:PE_StoreU32(0x8009CED8u,5u);break;
-    case 5:PE_StoreU32(0x8009CED8u,6u);func_80042D40();break;
-    default:break;
-    }
-}
+/* func_80042F44: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80042F44_port.c (src/func_80042F44.c); hand port retired (port3 switch-over N). */
 
 void func_8005E788(int32_t wait)
 {

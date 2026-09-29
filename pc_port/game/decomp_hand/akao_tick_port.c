@@ -801,7 +801,7 @@ void func_8008DB7C(void)
  * 0x801FF000..0x801FFFFF (host scratch windows, retail stack) is excluded:
  * the interpreter runs on a private stack outside guest RAM. */
 #include <string.h>
-#include "pe_mmio.h"
+#include "pe_plat/audio.h"
 extern uint32_t PE_AudioDriver_CallGuest(uint32_t entry, uint32_t a0, uint32_t a1,
                                          uint32_t a2, uint32_t a3, int *ok)
     __attribute__((weak));
@@ -821,14 +821,14 @@ int PE_AkaoVerify_Tick(void)
         const char *e = getenv("PE_AKAO_VERIFY");
         mode = e ? atoi(e) : 0;
     }
-    if (mode == 2) { func_8008DB7C(); PE_MMIO_Commit(); return 1; }
+    if (mode == 2) { func_8008DB7C(); pe_plat_audio_commit_registers(); return 1; }
     if (mode != 1 || !PE_AudioDriver_CallGuest) return 0;
     if (!snap) {
         snap = (uint8_t *)malloc(0x200000u);
         ra = (uint8_t *)malloc(0x200000u);
         if (!snap || !ra) abort();
     }
-    PE_MMIO_Commit();
+    pe_plat_audio_commit_registers();
     ram = (uint8_t *)PE_Translate(0x80000000u, 0x200000u);
     memcpy(snap, ram, 0x200000u);
     for (i = 0; i < 256u; i++) spu_s[i] = PE_SpuRegister_LoadU16(i * 2u);
@@ -838,7 +838,7 @@ int PE_AkaoVerify_Tick(void)
     memcpy(ram, snap, 0x200000u);
     for (i = 0; i < 256u; i++) PE_SpuRegister_StoreU16(i * 2u, spu_s[i]);
     func_8008DB7C();
-    PE_MMIO_Commit();   /* flush host-pointer SPU writes (pe_mmio.h) */
+    pe_plat_audio_commit_registers();   /* flush host-pointer SPU writes */
     ticks++;
     if (!ok) {
         faults++;

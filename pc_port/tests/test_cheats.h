@@ -107,7 +107,31 @@ static void test_CHEATS_toggles(void)
     cheat_press(PE_CHEAT_KEY_F7); ASSERT(pe_plat_cheats_ff_multiplier() == 4, "F7 -> 4x");
     cheat_press(PE_CHEAT_KEY_F7); ASSERT(pe_plat_cheats_ff_multiplier() == 8, "F7 -> 8x");
     cheat_press(PE_CHEAT_KEY_F7); ASSERT(pe_plat_cheats_ff_multiplier() == 0, "F7 -> max");
-    /* F8 warp: menu consumes arrows/Enter; transfer waits for the field */
+    /* F8 warp: refused outside the field room loop (func_8001220C dispatch) */
+    {
+        static const uint32_t not_field[] = { 0u, 0xA9400048u /* title menu / attract */,
+                                              0xAA108448u /* New Game init */, 0xA8000048u };
+        for (unsigned n = 0; n < sizeof(not_field) / sizeof(not_field[0]); n++) {
+            PE_StoreU32(0x8009D280u, not_field[n]);
+            PE_StoreU32(0x8009D1C4u, not_field[n]);
+            PE_StoreU32(0x800A7918u, 0x08u);
+            PE_StoreU8(0x800B0DBAu, n == 1 ? 2u : 0u); /* attract movie on the title */
+            cheat_press(PE_CHEAT_KEY_F8);                /* pick FIELD START (cursor stays at 0) */
+            cheat_press(PE_CHEAT_KEY_ENTER);
+            pe_plat_cheats_apply();
+            ASSERT(PE_LoadU32(0x8009D280u) == not_field[n], "warp outside the field: token untouched");
+            ASSERT(PE_LoadU32(0x800A7918u) == 0x08u, "warp outside the field: story untouched");
+            ASSERT(!(PE_LoadU32(0x8009D1A0u) & 0x2000u), "warp outside the field: no transfer requested");
+            pe_plat_cheats_get_state(&s);
+            ASSERT(s.warps == 0 && !s.menu, "refused warp is not counted");
+        }
+        /* picked on the title, then New Game -> prologue -> field: never carried over */
+        PE_StoreU8(0x800B0DBAu, 0u);
+        PE_StoreU32(0x8009D280u, 0xA8000148u);
+        PE_StoreU32(0x8009D1C4u, 0xA8000148u);
+        pe_plat_cheats_apply();
+        ASSERT(PE_LoadU32(0x8009D280u) == 0xA8000148u, "refused pick is dropped, not deferred into the field");
+    }
     ASSERT(!pe_plat_cheats_key(PE_CHEAT_KEY_ENTER, 1), "Enter goes to the game while the menu is closed");
     cheat_press(PE_CHEAT_KEY_F8);
     ASSERT(pe_plat_cheats_menu_open(), "F8 opens the warp menu");
@@ -116,8 +140,20 @@ static void test_CHEATS_toggles(void)
     (void)pe_plat_cheats_key(PE_CHEAT_KEY_ENTER, 0);
     PE_StoreU32(0x8009D1A0u, 2u);
     pe_plat_cheats_apply();
-    ASSERT(PE_LoadU32(0x8009D280u) == 0u, "warp waits while a battle runs");
+    ASSERT(PE_LoadU32(0x8009D280u) == 0xA8000148u, "warp waits while a battle runs");
     PE_StoreU32(0x8009D1A0u, 0u);
+    PE_StoreU32(0x8009D280u, 0xA80830C8u);         /* New Game prologue room */
+    PE_StoreU32(0x8009D1C4u, 0xA80830C8u);
+    PE_StoreU8(0x800B0DBAu, 2u);                   /* field movie decoding (FMV002) */
+    pe_plat_cheats_apply();
+    ASSERT(PE_LoadU32(0x8009D280u) == 0xA80830C8u, "warp waits while a field movie owns the overlay");
+    PE_StoreU8(0x800B0DBAu, 0u);
+    pe_plat_cheats_apply();
+    ASSERT(PE_LoadU32(0x8009D280u) == 0xA80830C8u, "warp waits for the prologue to hand over");
+    PE_StoreU32(0x8009D280u, 0xA8000148u);         /* room change in flight */
+    pe_plat_cheats_apply();
+    ASSERT(PE_LoadU32(0x8009D280u) == 0xA8000148u, "warp waits while D_8009D1C4 != D_8009D280");
+    PE_StoreU32(0x8009D1C4u, 0xA8000148u);
     pe_plat_cheats_apply();
     ASSERT(PE_LoadU32(0x8009D280u) == 0xA80021C8u, "warp latches the Eve 1 room token (room_transfer)");
     ASSERT(PE_LoadU32(0x800A7918u) == 0x5Bu, "warp sets the checkpoint story word");

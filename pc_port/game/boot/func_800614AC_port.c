@@ -17,34 +17,4 @@
 #define GA_614AC_SOURCE 0x8009D14Cu /* retail $gp + 0x3DC */
 #define GA_614AC_RESULT 0x8009D150u /* retail $gp + 0x3E0 */
 
-int func_800614AC(int a0)
-{
-    uint32_t packed = (uint32_t)a0 & 0x00FFFFFFu;
-    int32_t high = (int32_t)((uint32_t)a0 >> 16) & 0xFF;
-    int32_t middle = ((int32_t)((uint32_t)a0 >> 8)) & 0xFF;
-    int32_t low = (int32_t)(uint32_t)a0 & 0xFF;
-    int32_t high_middle = (high + middle) >> 1;
-    int32_t high_low = (high + low) >> 1;
-    int32_t middle_low = (middle + low) >> 1;
-    uint32_t upper;
-    uint32_t result;
-
-    PE_StoreU32(GA_614AC_SOURCE, packed);
-
-    if (high_middle < 0x100)
-        upper = (uint32_t)high_middle;
-    else
-        upper = 0xFFu;
-    if (high_low < 0x100)
-        upper |= (uint32_t)high_low << 8;
-    else
-        upper |= 0xFF00u;
-    if (middle_low < 0x100)
-        result = (uint32_t)middle_low << 16;
-    else
-        result = 0x00FF0000u;
-
-    result |= upper;
-    PE_StoreU32(GA_614AC_RESULT, result);
-    return (int)result;
-}
+/* func_800614AC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800614AC_port.c (src/func_800614AC.c); hand port retired (port3 switch-over A1). */

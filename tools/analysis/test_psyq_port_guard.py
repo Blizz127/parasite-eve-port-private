@@ -131,6 +131,32 @@ class GuardTest(unittest.TestCase):
         self.assertEqual(self.guard("--strict")[0], 0)
 
     @unittest.skipUnless(shutil.which("cc") and shutil.which("nm"), "needs cc + nm")
+    def test_ignored_vendor_tree_skipped_only_under_third_party(self):
+        import subprocess
+        if subprocess.run(["git", "init", "-q", str(self.d)], capture_output=True).returncode:
+            self.skipTest("git unavailable")
+        (self.d / ".gitignore").write_text("pc_port/third_party/vendor/\npc_port/game/decomp/\n")
+        vendor = self.tree / "third_party" / "vendor"
+        vendor.mkdir(parents=True)
+        body = "void func_80070000(void)\n{\n}\n"
+        (vendor / "x.c").write_text(body)
+        rc, out = self.guard("--strict")
+        self.assertEqual(rc, 0, out)            # ignored vendor tree: not scanned
+        cwd = os.getcwd()
+        try:                                    # relative --tree (the CLI form)
+            os.chdir(self.d)
+            args = ["--tree", "pc_port", "--classification", str(self.cls), "--ranges", str(self.ranges),
+                    "--allowlist", str(self.allow), "--exe", str(self.exe), "--strict"]
+            buf = io.StringIO()
+            with redirect_stdout(buf), redirect_stderr(io.StringIO()):
+                self.assertEqual(g.run(args), 0, buf.getvalue())
+        finally:
+            os.chdir(cwd)
+        (self.tree / "game/decomp/func_80070000_port.c").write_text(body)
+        rc, out = self.guard("--strict")
+        self.assertEqual(rc, 1, out)            # ignored generated TU: still scanned
+        self.assertIn("game/decomp/func_80070000_port.c", out)
+
     def test_binary_symbol_and_table_bytes(self):
         src = self.d / "o.c"
         body = ", ".join(str(v) for v in self.table)

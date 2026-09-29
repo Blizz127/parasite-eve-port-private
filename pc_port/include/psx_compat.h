@@ -305,7 +305,7 @@ extern void func_80052C6C(void);
 extern int  func_8005BCBC(pe_addr_t a0);
 extern int  func_8005D6F4(void);
 extern pe_addr_t func_8005DC4C(uint32_t idx);
-extern int  func_80052594(pe_addr_t src);
+extern void func_80052594(pe_addr_t src);  /* retail $v0 unread at every call site (port3 A1) */
 extern pe_addr_t func_8005DB8C(int idx);
 extern pe_addr_t func_8005DBAC(int arg);
 extern void func_8005B91C(int32_t table_number, int32_t key,

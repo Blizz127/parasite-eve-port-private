@@ -26,9 +26,9 @@ static void test_DAY1_transition_sound(void)
             for (unsigned i=0;i<6u;i++)
                 ASSERT(PE_LoadU32(0x1F800200u+i*4u)==0xABCD0000u+i,"temporary scratchpad restored");
         } else if (DAY1_ts_cases[k].entry==0x800868F0u)
-            ASSERT(func_800868F0(args[0],args[1],args[2])==0,"volume producer result");
+            func_800868F0(args[0],args[1],args[2]);   /* void: retail $v0 unread (port3 A1) */
         else
-            ASSERT(func_80086A28(args[0],args[1],args[2])==0,"pan producer result");
+            func_80086A28(args[0],args[1],args[2]);
         hash=hit_camera_hash(DAY1_ts_ranges,sizeof(DAY1_ts_ranges)/sizeof(DAY1_ts_ranges[0]));
         if (hash!=DAY1_ts_cases[k].queued)
             fprintf(stderr,"transition sound %u queued %016llX/%016llX\n",k,

@@ -66,11 +66,7 @@ void func_80056FB8(void)
         func_800534E4(record,name);
     }
 }
-void func_800453E8(pe_addr_t window)
-{
-    (void)window;func_8005E8A4(60,18);func_8005EB64(PE_LoadU32(0x8009CFACu)+77u);
-    func_8005E8A4(-56,-14);func_80056FB8();
-}
+/* func_800453E8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800453E8_port.c (src/func_800453E8.c); hand port retired (port3 switch-over L). */
 
 /* func_800452C0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800452C0_port.c (src/func_800452C0.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 

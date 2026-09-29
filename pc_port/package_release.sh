@@ -26,6 +26,9 @@
 #                      (default: build/lanes/lead/limits_r3.txt if present)
 #   PE_OUTPUT_DIR      output dir (default: build/release; must be git-ignored)
 #   PE_SKIP_DATA_SCAN  1 = skip the no-game-data retail-byte scan (debug only)
+#   PE_ALLOW_UNOPTIMISED 1 = package a binary whose CMakeCache.txt build type is
+#                      not Release/RelWithDebInfo/MinSizeRel (debug only; such a
+#                      build cannot play movies in real time)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -47,6 +50,18 @@ die() { echo "ERROR: $*" >&2; exit 1; }
 file -b "$BINARY" | grep -q 'ELF 64-bit LSB.*x86-64' || die "not a linux x86-64 ELF: $BINARY"
 [[ "$SOURCE_COMMIT" =~ ^[0-9a-f]{7,40}$ ]] || die "PE_SOURCE_COMMIT must be a hex commit id"
 git check-ignore -q "$OUT_DIR" 2>/dev/null || die "output dir is not git-ignored: $OUT_DIR"
+
+# --- build type (the r4b tarball shipped an empty CMAKE_BUILD_TYPE, i.e. an
+# unoptimised binary, and FMV playback ran at ~1/3 speed). ------------------
+CACHE="$(dirname "$BINARY")/CMakeCache.txt"
+if [[ -f "$CACHE" ]]; then
+    BTYPE="$(sed -n 's/^CMAKE_BUILD_TYPE:[A-Z]*=//p' "$CACHE")"
+    case "$BTYPE" in
+        Release|RelWithDebInfo|MinSizeRel) ;;
+        *) [[ "${PE_ALLOW_UNOPTIMISED:-0}" == 1 ]] ||
+           die "binary was built with CMAKE_BUILD_TYPE='$BTYPE' ($CACHE); rebuild with scripts/build_pc_port.sh (Release by default)" ;;
+    esac
+fi
 
 # --- library check (Task 3 contract, enforced here so a bad build cannot
 # ship): only glibc-family libraries may be required at link time. ---------

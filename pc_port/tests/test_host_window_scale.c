@@ -65,14 +65,14 @@ static void check_case(const char *name, int ww, int wh, int fb_w, int fb_h,
               "%s: top-left content pixel BGR=%u,%u,%u want 1,1,1 (source 0,0)", name, p0[0], p0[1], p0[2]);
     }
     /* The last content pixel samples source (sx,sy) via the same
-     * nearest-neighbor truncating division HostWindow_ScaleBGRA uses;
+     * centre-sampled nearest neighbour HostWindow_ScaleBGRA uses;
      * that only lands exactly on (fb_w-1,fb_h-1) when the content rect
      * is an exact (integer-ratio) multiple of the source, which is not
      * the case when e.g. downscaling to a non-divisor size. */
     {
         const uint8_t *pn = out + ((size_t)(exp_y0 + exp_h - 1) * ww + (exp_x0 + exp_w - 1)) * 4u;
-        int sx = (int)((int64_t)(exp_w - 1) * fb_w / exp_w);
-        int sy = (int)((int64_t)(exp_h - 1) * fb_h / exp_h);
+        int sx = HostWindow_NearestIndex(exp_w - 1, HostWindow_NearestStep(fb_w, exp_w));
+        int sy = HostWindow_NearestIndex(exp_h - 1, HostWindow_NearestStep(fb_h, exp_h));
         uint8_t expect_b = (uint8_t)((sx ^ sy) + 1);
         uint8_t expect_g = (uint8_t)(sy + 1);
         uint8_t expect_r = (uint8_t)(sx + 1);
@@ -87,8 +87,29 @@ static void check_case(const char *name, int ww, int wh, int fb_w, int fb_h,
            g_fail ? "FAIL" : "ok");
 }
 
+/* An integer scale k maps destination pixel i to source i/k exactly (so
+ * --scale N windows show the same pixels as plain truncating division),
+ * and every mapping stays inside the source. */
+static void check_mapping(void)
+{
+    static const int sizes[][2] = {{320,960},{320,1600},{240,720},{240,1200},
+                                   {320,2133},{240,1600},{320,1066},{320,160}};
+    for (size_t n = 0; n < sizeof(sizes) / sizeof(sizes[0]); n++) {
+        int src = sizes[n][0], dst = sizes[n][1], k = dst % src == 0 ? dst / src : 0;
+        int32_t step = HostWindow_NearestStep(src, dst);
+        for (int i = 0; i < dst; i++) {
+            int s = HostWindow_NearestIndex(i, step);
+            CHECK(s >= 0 && s < src, "map %d->%d: index %d -> %d out of range", src, dst, i, s);
+            if (k) CHECK(s == i / k, "map %d->%d: integer scale index %d -> %d want %d", src, dst, i, s, i / k);
+        }
+    }
+    printf("  nearest mapping: in range, integer scales exact: %s\n", g_fail ? "FAIL" : "ok");
+}
+
 int main(void)
 {
+    check_mapping();
+
     /* Exact same aspect, no scale change: no borders. */
     check_case("exact-320x240", 320, 240, 320, 240, 320, 240, 0, 0);
 
@@ -103,6 +124,8 @@ int main(void)
      * pillarboxed (black bars left/right). */
     check_case("wide-800x300", 800, 300, 320, 240, 400, 300, 200, 0);
     check_case("wide-1920x1080", 1920, 1080, 320, 240, 1440, 1080, 240, 0);
+    check_case("wide-1920x1200", 1920, 1200, 320, 240, 1600, 1200, 160, 0);
+    check_case("wide-2560x1600", 2560, 1600, 320, 240, 2133, 1600, 213, 0);
 
     /* Narrower-than-4:3 window (e.g. a portrait/rotated handheld or a
      * squeezed gamescope surface): width-limited, letterboxed (black bars

@@ -93,20 +93,6 @@ int32_t func_80086608(pe_addr_t sound, uint32_t key, uint32_t pan, uint32_t volu
 
 /* Original 868F0..86948 / 86A28..86A80: update an existing effect's
  * volume/pan. The different handle masks are intentional retail behavior. */
-int func_800868F0(uint32_t handle, uint32_t group, uint32_t volume)
-{
-    PE_StoreU32(0x800BCD80u, 0xA0u);
-    PE_StoreU32(0x800BCD84u, handle & 0xFFFFu);
-    PE_StoreU32(0x800BCD88u, group & 0xFFFFFFu);
-    PE_StoreU32(0x800BCD8Cu, volume & 0x7Fu);
-    return func_8008CBA8();
-}
+/* func_800868F0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800868F0_port.c (src/func_800868F0.c); hand port retired (port3 switch-over A1). */
 
-int func_80086A28(uint32_t handle, uint32_t group, uint32_t pan)
-{
-    PE_StoreU32(0x800BCD80u, 0xA2u);
-    PE_StoreU32(0x800BCD84u, handle & 0x3FFu);
-    PE_StoreU32(0x800BCD88u, group & 0xFFFFFFu);
-    PE_StoreU32(0x800BCD8Cu, pan & 0xFFu);
-    return func_8008CBA8();
-}
+/* func_80086A28: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80086A28_port.c (src/func_80086A28.c); hand port retired (port3 switch-over A1). */

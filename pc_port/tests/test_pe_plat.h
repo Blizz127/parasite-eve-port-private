@@ -2,8 +2,9 @@
  * Step P0 — pe_plat interface adapters (docs/ARCHITECTURE-PORT.md).
  *
  * One small test per adapter over its in-house backend.  The adapters are
- * compiled into this test TU directly (they are not yet in a CMake source
- * list; game call sites move onto them in later steps).  The host-bound
+ * compiled into this test TU directly (plat_mods/plat_cheats/plat_timing/
+ * plat_audio are also in PLATFORM_SRCS; the test TU's definitions satisfy
+ * the archive references, so those members are not pulled twice).  The host-bound
  * sinks (plat_audio_host.c, plat_input_host_pad.c) need host_audio.c /
  * host_pad.c and are not linked here.  All data is synthetic.
  */

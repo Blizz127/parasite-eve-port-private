@@ -192,8 +192,20 @@ static void try_open(const char *path)
     if (!slot) return;
     fd = open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
     if (fd < 0) {
-        if (errno == EACCES)
-            fprintf(stderr, "[PAD] %s: permission denied (controller ignored)\n", path);
+        if (errno == EACCES) {
+            /* The device list is rescanned periodically; say it once per
+             * device path, not on every rescan. */
+            static char denied[HOST_PAD_MAX_DEVICES * 2][64];
+            static int ndenied;
+            int seen = 0;
+            for (int i = 0; i < ndenied; i++)
+                if (strncmp(denied[i], path, sizeof(denied[i])) == 0) { seen = 1; break; }
+            if (!seen) {
+                fprintf(stderr, "[PAD] %s: permission denied (controller ignored)\n", path);
+                if (ndenied < (int)(sizeof(denied) / sizeof(denied[0])))
+                    snprintf(denied[ndenied++], sizeof(denied[0]), "%s", path);
+            }
+        }
         return;
     }
     HostPad_DeviceDefaults(&slot->dev);

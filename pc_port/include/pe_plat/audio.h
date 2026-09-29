@@ -73,6 +73,12 @@ int  pe_plat_audio_open_host_output(int want_device);
 
 void pe_plat_audio_stats(PePlatAudioStats *out);
 
+/* Apply voice/register writes the game made through direct pointers into
+ * the sound device's register block.  Those writes are held until the next
+ * device access; callers that snapshot or compare the device state (the
+ * PE_AKAO_VERIFY differential) flush them first. */
+void pe_plat_audio_commit_registers(void);
+
 #ifdef __cplusplus
 }
 #endif

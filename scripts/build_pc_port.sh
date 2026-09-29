@@ -31,11 +31,18 @@
 #   scripts/build_pc_port.sh --no-tests      # stop after the build
 #   scripts/build_pc_port.sh --build-dir DIR # default: pc_port/build
 #   scripts/build_pc_port.sh --no-guard      # skip the retail-data guard
+#   scripts/build_pc_port.sh --build-type T  # CMAKE_BUILD_TYPE (default: Release)
 #
 # Environment:
 #   CMAKE   — path to a cmake binary (otherwise resolved from PATH, then from
 #             the known fallbacks below)
 #   JOBS    — parallel build jobs (default: nproc)
+#
+# The default build type is Release because this is the binary that ships:
+# an unoptimised (empty CMAKE_BUILD_TYPE) build is too slow to run a movie
+# in real time (FMV002 at 2560x1600 took 222.6 s for its 68.1 s; see
+# docs/port/KNOWN_DIVERGENCES.md, host display row).  Pass --build-type ""
+# for the old unoptimised configuration, or Debug for a debugger build.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -49,6 +56,7 @@ BUILD_DIR="$ROOT/pc_port/build"
 RUN_TESTS=1
 CLEAN=0
 RUN_GUARD=1
+BUILD_TYPE=Release
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -56,7 +64,8 @@ while [[ $# -gt 0 ]]; do
         --no-tests)   RUN_TESTS=0; shift ;;
         --no-guard)   RUN_GUARD=0; shift ;;
         --build-dir)  BUILD_DIR="$2"; shift 2 ;;
-        -h|--help)    sed -n '2,32p' "${BASH_SOURCE[0]}"; exit 0 ;;
+        --build-type) BUILD_TYPE="$2"; shift 2 ;;
+        -h|--help)    sed -n '2,45p' "${BASH_SOURCE[0]}"; exit 0 ;;
         *) echo "ERROR: unknown argument '$1' (see --help)." >&2; exit 1 ;;
     esac
 done
@@ -191,7 +200,7 @@ fi
 
 echo
 echo "-- [3/5] configuring"
-"$CMAKE_BIN" -S "$ROOT/pc_port" -B "$BUILD_DIR"
+"$CMAKE_BIN" -S "$ROOT/pc_port" -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE="$BUILD_TYPE"
 
 # ── 4. build ─────────────────────────────────────────────────────────────
 echo

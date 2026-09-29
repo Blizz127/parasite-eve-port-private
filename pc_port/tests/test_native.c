@@ -121,7 +121,7 @@ extern int func_8006EC08(void);
 extern int func_80053D2C(int arg);
 extern void func_80042C78(void);
 extern void func_80042CC4(int a0, int a1);
-extern int func_800614AC(int a0);
+extern void func_800614AC(int a0);
 extern void func_80051CC4(void);
 extern int func_80013300(pe_addr_t args);
 extern int func_800144FC(pe_addr_t args);
@@ -22975,25 +22975,28 @@ static void test_5DC4C_5D6F4_integration(void) {
 
 /* Seed a source string at a guest address outside the bzero range. */
 #define B27_SRC   0x800C2100u
+/* func_80052594 is void (matched C; retail $v0 unread at every call site,
+ * port3 A1): the count it leaves in $v0 is the byte it stores at B27_COUNT. */
+#define B27_RUN() (func_80052594(B27_SRC), (int)PE_LoadU8(B27_COUNT))
 
 static void B27_SeedString(pe_addr_t base, const uint8_t *data, int len) {
     for (int i = 0; i < len; i++)
         PE_StoreU8(base + (pe_addr_t)i, data[i]);
 }
 
-/* True signature: one argument ($a0 = source pointer), returns int
- * (byte count 0-8). */
+/* True signature: one argument ($a0 = source pointer), void; the byte count
+ * (0-8) is stored at D_8009169D. */
 static void test_52594_signature(void) {
     TEST("52594_signature");
     ResetTestState();
     /* Terminator-only source: returns 0, writes nothing. */
     PE_StoreU8(B27_SRC, 0xFFu);
-    ASSERT(func_80052594(B27_SRC) == 0, "terminator-only returns 0");
+    ASSERT(B27_RUN() == 0, "terminator-only returns 0");
     /* 3-byte string (2 data + terminator): returns 2. */
     PE_StoreU8(B27_SRC + 0u, 0x41u);
     PE_StoreU8(B27_SRC + 1u, 0x42u);
     PE_StoreU8(B27_SRC + 2u, 0xFFu);
-    ASSERT(func_80052594(B27_SRC) == 2, "2 data bytes + terminator returns 2");
+    ASSERT(B27_RUN() == 2, "2 data bytes + terminator returns 2");
     PASS();
 }
 
@@ -23005,7 +23008,7 @@ static void test_52594_terminator_at_start(void) {
     for (int i = 0; i < 8; i++)
         PE_StoreU8(B27_BUF + (pe_addr_t)i, 0xA5u);
     PE_StoreU8(B27_SRC, 0xFFu);
-    ASSERT(func_80052594(B27_SRC) == 0, "zero bytes copied");
+    ASSERT(B27_RUN() == 0, "zero bytes copied");
     ASSERT(PE_LoadU8(B27_COUNT) == 0u, "count = 0");
     for (int i = 0; i < 8; i++)
         ASSERT(PE_LoadU8(B27_BUF + (pe_addr_t)i) == 0xA5u,
@@ -23019,7 +23022,7 @@ static void test_52594_full_buffer(void) {
     ResetTestState();
     const uint8_t data[9] = {0x41,0x42,0x43,0x44,0x45,0x46,0x47,0x48, 0xFFu};
     B27_SeedString(B27_SRC, data, 9);
-    ASSERT(func_80052594(B27_SRC) == 8, "full buffer returns 8");
+    ASSERT(B27_RUN() == 8, "full buffer returns 8");
     ASSERT(PE_LoadU8(B27_COUNT) == 8u, "count = 8");
     for (int i = 0; i < 8; i++)
         ASSERT(PE_LoadU8(B27_BUF + (pe_addr_t)i) == data[i],
@@ -23033,7 +23036,7 @@ static void test_52594_partial_copy(void) {
     ResetTestState();
     const uint8_t data[5] = {0x50, 0x45, 0x31, 0xFFu, 0xA5u};
     B27_SeedString(B27_SRC, data, 5);
-    ASSERT(func_80052594(B27_SRC) == 3, "3 bytes before terminator");
+    ASSERT(B27_RUN() == 3, "3 bytes before terminator");
     ASSERT(PE_LoadU8(B27_COUNT) == 3u, "count = 3");
     ASSERT(PE_LoadU8(B27_BUF + 0u) == 0x50u, "byte 0");
     ASSERT(PE_LoadU8(B27_BUF + 1u) == 0x45u, "byte 1");
@@ -23052,7 +23055,7 @@ static void test_52594_seven_bytes(void) {
     for (int i = 0; i < 7; i++) data[i] = (uint8_t)(0x30 + i);
     data[7] = 0xFFu;
     B27_SeedString(B27_SRC, data, 8);
-    ASSERT(func_80052594(B27_SRC) == 7, "7 bytes copied");
+    ASSERT(B27_RUN() == 7, "7 bytes copied");
     ASSERT(PE_LoadU8(B27_COUNT) == 7u, "count = 7");
     for (int i = 0; i < 7; i++)
         ASSERT(PE_LoadU8(B27_BUF + (pe_addr_t)i) == data[i], "byte match");
@@ -23091,9 +23094,9 @@ static void test_52594_idempotent(void) {
     ResetTestState();
     const uint8_t data[4] = {0x41, 0x42, 0x43, 0xFFu};
     B27_SeedString(B27_SRC, data, 4);
-    int r1 = func_80052594(B27_SRC);
-    int r2 = func_80052594(B27_SRC);
-    int r3 = func_80052594(B27_SRC);
+    int r1 = B27_RUN();
+    int r2 = B27_RUN();
+    int r3 = B27_RUN();
     ASSERT(r1 == 3 && r2 == 3 && r3 == 3, "repeated calls return same");
     ASSERT(PE_LoadU8(B27_COUNT) == 3u, "count stable");
     for (int i = 0; i < 3; i++)
@@ -23180,7 +23183,7 @@ static void test_52594_strict_not_stub(void) {
     PE_StoreU8(B27_SRC, 0x41u);
     PE_StoreU8(B27_SRC + 1u, 0xFFu);
     g_strict_stubs = 1;
-    ASSERT(func_80052594(B27_SRC) == 1, "strict-mode call must not abort");
+    ASSERT(B27_RUN() == 1, "strict-mode call must not abort");
     ASSERT(g_stub_count == 0, "no stub registration under strict");
     ASSERT(Bootstrap_InvocationCount() == 0, "no bootstrap invocation");
     g_strict_stubs = 0;
@@ -24343,7 +24346,7 @@ static void test_614AC_exact_contract_and_return(void) {
     unsigned int i;
     ResetTestState();
     for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
-        ASSERT((uint32_t)func_800614AC((int)cases[i][0]) == cases[i][1],
+        ASSERT((func_800614AC((int)cases[i][0]), PE_LoadU32(0x8009D150u)) == cases[i][1],
                "B32 packed-color return wrong");
         ASSERT(PE_LoadU32(0x8009D14Cu) == (cases[i][0] & 0x00FFFFFFu),
                "B32 source store wrong");
@@ -24359,7 +24362,7 @@ static void test_614AC_full_footprint_dirty_repeat_and_reset(void) {
     ResetTestState();
     for (a = PE_RAM_BASE; a < PE_RAM_END; a += 4u)
         PE_StoreU32(a, 0xA5A5A5A5u);
-    ASSERT((uint32_t)func_800614AC((int)0x12345678u) == 0x00675645u,
+    ASSERT((func_800614AC((int)0x12345678u), PE_LoadU32(0x8009D150u)) == 0x00675645u,
            "B32 canary call return wrong");
     for (a = PE_RAM_BASE; a < PE_RAM_END; a += 4u) {
         uint32_t want = 0xA5A5A5A5u;
@@ -24372,7 +24375,7 @@ static void test_614AC_full_footprint_dirty_repeat_and_reset(void) {
     }
     PE_StoreU32(0x8009D14Cu, 0xDEADBEEFu);
     PE_StoreU32(0x8009D150u, 0xCAFEBABEu);
-    ASSERT((uint32_t)func_800614AC((int)0x00404040u) == 0x00404040u,
+    ASSERT((func_800614AC((int)0x00404040u), PE_LoadU32(0x8009D150u)) == 0x00404040u,
            "B32 repeat return wrong");
     ASSERT(PE_LoadU32(0x8009D14Cu) == 0x00404040u &&
            PE_LoadU32(0x8009D150u) == 0x00404040u,
@@ -35699,6 +35702,7 @@ static void test_ATK3_retail_attack_initialization(void)
 #include "test_cheats.h"
 #include "test_split_brain.h"
 #include "test_glow_sprite.h"
+#include "test_v0_passthrough.h"
 #include "test_actor_contact.h"
 #include "test_clear_image.h"
 #include "test_script_sound.h"
@@ -40912,6 +40916,7 @@ int main(void)
     test_CHEATS_all(); /* opt-in cheat console (test_cheats.h) */
     test_SPLIT_all();  /* one guest authority per retail scalar (test_split_brain.h) */
     test_GLOW1_func_800E051C_packet();  /* matched-C packet check (test_glow_sprite.h) */
+    test_VPASS_all();  /* batch O: retail $v0 of func_80062A7C via func_80044E14 (test_v0_passthrough.h) */
 
     /* Guard tests (4 tests) */
     test_no_emulator_process();

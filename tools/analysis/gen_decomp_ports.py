@@ -96,8 +96,8 @@ Later additions (see docs/ai_context/PC_PORT_FROM_DECOMP.md §3):
       `pe_leaf_func_X` behind an exported thunk with the header signature
       (same-width casts: identity on the retail register value).
       E20b: the header may also carry extra TRAILING parameters the leaf
-      never takes (identical return type, exactly matching leading
-      parameters); the thunk drops them.
+      never takes (exactly matching leading parameters; identical return
+      type, or a `void` header over a 32-bit result); the thunk drops them.
   Unit tests: test_gen_decomp_ports.py.
 
 E13-E16 all describe the same underlying fact from different angles: a 32-bit
@@ -926,6 +926,8 @@ def analyze(name: str, src_text: str, matched: dict,
     for callee, args in call_args(stripped):
         if callee == name or callee not in proto:
             continue
+        if empty_callee_droppable(callee, args, proto):
+            continue        # E20f: render drops the literal arguments
         if arity(args) != proto[callee]:
             return {"eligible": False,
                     "reason": f"call arity {callee} {arity(args)}!={proto[callee]}"}
@@ -1218,6 +1220,7 @@ def analyze(name: str, src_text: str, matched: dict,
         "param_inner": hdr.group(2) if wrap else "",
         "ptr_ret": ptr_ret,
         "sign_adapt": sign_adapt,
+        "canon_sig": sigs.get(name),
         "header_params": hdr.group(2),
         "hostptr_args": sorted(hostptr_args),
         "rel_rewrites": rel_rewrites,
@@ -1240,6 +1243,14 @@ def neutralize_declarations(body: str, shimmed_data: set[str],
     unit).  Everything else (typedefs, structs, unrelated prototypes) stays
     byte-for-byte.
     """
+    # A file-scope prototype that shares its line with an earlier declaration
+    # (`extern int D_X; extern void func_Y(int a);`, src/func_80050308.c) is
+    # invisible to the line-anchored patterns below and would clash with the
+    # canonical host prototype: give it its own line (whitespace only).
+    body = re.sub(r"(?m)^([^\n{}]*;)[ \t]+(?=(?:extern[ \t]+)?[A-Za-z_][A-Za-z0-9_ \t\*]*?"
+                  r"\bfunc_[0-9A-Fa-f]{8}[ \t]*\([^\n;{]*?\)[ \t]*;[ \t]*$)",
+                  r"\1\n", body)
+
     def names_in(text: str) -> list[str]:
         return DATA_NAME_RE.findall(text)
 
@@ -1644,6 +1655,30 @@ def rewrite_code_addresses(text: str) -> str:
     return rewrite_call_args(text, arg)
 
 
+def rect_array_args(body: str, sigs: dict) -> str:
+    """A leaf-local `short NAME[4]` passed where the canonical host prototype
+    takes `RECT *` / `const RECT *` (LoadImage/StoreImage/ClearImage-style
+    callees): psx_compat.h's RECT is `{ short x, y, w, h; }`, the identical
+    4 x 16-bit layout, so the argument is cast to it explicitly."""
+    arrays = set(re.findall(r"\bshort\s+([A-Za-z_]\w*)\s*\[\s*4\s*\]", body))
+    if not arrays:
+        return body
+
+    def fix(c, i, a):
+        sig = sigs.get(c)
+        if not sig:
+            return None
+        params = [p for p in sig["params"] if p.strip() not in ("", "void")]
+        if i >= len(params):
+            return None
+        pt = _norm_type(_param_types([params[i]])[0])
+        name = a.strip()
+        if name in arrays and pt in ("RECT *", "const RECT *", "RECT*", "const RECT*"):
+            return f"({pt})" + name
+        return None
+    return rewrite_call_args(body, fix)
+
+
 def host_to_guest_args(body: str, plan: dict) -> str:
     """Arguments recorded by analyze() as host pointer locals passed where
     the callee takes a guest address: forward `PE_HostToGuest(p)`.  Also
@@ -1654,8 +1689,18 @@ def host_to_guest_args(body: str, plan: dict) -> str:
     want = {tuple(x) for x in plan.get("hostptr_args", [])}
     if not want:
         return body
-    return rewrite_call_args(
-        body, lambda c, i, a: f"PE_HostToGuest({a.strip()})" if (c, i) in want else None)
+
+    def wrap(c, i, a):
+        if (c, i) not in want:
+            return None
+        # (callee, index) is recorded from a host pointer local at ONE call
+        # site; another call of the same callee may pass a call result there
+        # (`f(t)` ... `f(g())`).  A call result is already a guest value
+        # (pointer-returning functions return pe_addr_t) -- never wrap it.
+        if re.match(r"\(*\s*func_[0-9A-Fa-f]{8}\s*\(", a.strip()):
+            return None
+        return f"PE_HostToGuest({a.strip()})"
+    return rewrite_call_args(body, wrap)
 
 
 def canonical_for(plan: dict, proto: dict[str, int]) -> set[str]:
@@ -1746,6 +1791,8 @@ def render(name: str, plan: dict, matched: dict, known_funcs: set[str],
     lines.append("")
     body = fix_argument_addresses(body, shimmed_data, plan["data_types"])
     body = host_to_guest_args(body, plan)
+    body = rect_array_args(body, _ADDR_SIGS)
+    body = empty_callee_args_drop(body, proto)
     if plan.get("ptr_ret"):
         body = rename_ptr_ret_definition(body, name)
         hp = plan["header_params"].strip()
@@ -1753,9 +1800,14 @@ def render(name: str, plan: dict, matched: dict, known_funcs: set[str],
             name, hp if hp else "void", param_call_names(hp), ptr_roots_expr(plan))
     elif plan.get("sign_adapt"):
         body = rename_definition(body, name, f"pe_leaf_{name}")
+        if plan["sign_adapt"]["ret"] == "void":
+            body = e20e_void_return_rewrite(body, name, _ADDR_SIGS)
         body += "\n" + signedness_thunk(name, plan["sign_adapt"])
     lines.append(body + "\n")
-    return canonical_guest_call_args("\n".join(lines) + "\n")
+    text = "\n".join(lines) + "\n"
+    if plan.get("ptr_ret"):
+        text = e20_over_export(text, name, plan.get("canon_sig"))
+    return canonical_guest_call_args(text)
 
 
 def param_base_type(decl: str, pname: str) -> str:
@@ -1920,12 +1972,15 @@ def signedness_adapter(leaf_ret: str, leaf_params: str, canon: dict):
     cp = _param_types(cparams)
     if lret == cret and lp == cp:
         return None
-    if (len(cp) > len(lp) and lret == cret and cp[:len(lp)] == lp):
+    if (len(cp) > len(lp) and cp[:len(lp)] == lp and
+            (lret == cret or (cret == "void" and lret in INT32_CLASS))):
         # E20b: the header carries extra TRAILING parameters the matched leaf
         # never takes (e.g. the field-VM `pe_addr_t args` handler form over a
         # `(void)` leaf).  Retail's callee ignores the extra argument
-        # registers, so dropping them is the identity.  Only with an
-        # identical return type and exactly matching leading parameters.
+        # registers, so dropping them is the identity.  Only with exactly
+        # matching leading parameters and an identical return type -- or, as
+        # E20 already allows, a `void` header discarding a 32-bit result
+        # (host callers cannot read a value the prototype does not return).
         return {"leaf_ret": lret, "ret": cret, "leaf_params": lp, "params": cp,
                 "dropped": len(cp) - len(lp)}
     if len(lp) != len(cp):
@@ -1952,6 +2007,86 @@ def rename_definition(body: str, name: str, new_name: str) -> str:
         new = re.sub(rf"\b{re.escape(name)}(?=\s*\()", new_name, new, count=1)
         return body[:m.start()] + new + body[m.end():]
     raise AssertionError(f"no definition header for {name}")
+
+
+# E20e: leaves whose result is PROVEN unobservable (no port caller reads it and
+# $v0 is dead after every retail call site), each with its evidence file.  For
+# these only, `return <call>;` where the callee's canonical prototype is `void`
+# becomes `<call>; return 0;` inside the static leaf.  Not a general rewrite.
+E20E_PROVEN = {
+    "func_800453E8": "docs/evidence/pc-port-switchover/E20e-func_800453E8.md",
+}
+
+
+# E20f: callees whose retail body is PROVEN empty (a bare `jr ra` + nop: no
+# argument-register, stack or memory read, no $v0 write), each with its
+# disassembly evidence.  A matched leaf may call one with arguments (retail
+# loads $a0 before the jal) while the canonical prototype takes none; only
+# integer-literal arguments are dropped, so nothing with a side effect is
+# lost.  Anything else still fails the call-arity check.
+EMPTY_CALLEES = {
+    "func_800527C0": "docs/evidence/pc-port-switchover/E20f-empty-callees.md",
+}
+_E20F_LITERAL_RE = re.compile(r"\s*-?(?:0[xX][0-9A-Fa-f]+|\d+)[uUlL]*\s*")
+
+
+def _split_top_args(args: str) -> list[str]:
+    out, depth, cur = [], 0, []
+    for ch in args:
+        if ch in "([":
+            depth += 1
+        elif ch in ")]":
+            depth -= 1
+        if ch == "," and depth == 0:
+            out.append("".join(cur)); cur = []
+        else:
+            cur.append(ch)
+    out.append("".join(cur))
+    return out
+
+
+def empty_callee_droppable(callee: str, args: str, proto: dict) -> bool:
+    return (callee in EMPTY_CALLEES and proto.get(callee) == 0 and arity(args) > 0
+            and all(_E20F_LITERAL_RE.fullmatch(a) for a in _split_top_args(args)))
+
+
+def empty_callee_args_drop(body: str, proto: dict) -> str:
+    """E20f rewrite: `func_800527C0(2)` -> `func_800527C0() /* E20f: ... */`."""
+    out, pos = [], 0
+    for m in CALL_HEAD_RE.finditer(body):
+        callee = m.group(1)
+        if m.start() < pos or callee not in EMPTY_CALLEES or is_declarator(body, m.start()):
+            continue
+        close = _balanced_end(body, m.end() - 1)
+        args = body[m.end():close - 1]
+        if not empty_callee_droppable(callee, args, proto):
+            continue
+        out.append(body[pos:m.start()])
+        out.append(f"{callee}() /* E20f: retail arg ({args.strip()}) unread; "
+                   f"{EMPTY_CALLEES[callee]} */")
+        pos = close
+    out.append(body[pos:])
+    return "".join(out)
+
+
+def e20e_void_return_rewrite(body: str, name: str, sigs: dict) -> str:
+    if name not in E20E_PROVEN:
+        return body
+    out, pos = [], 0
+    for m in re.finditer(r"\breturn\s+(func_[0-9A-Fa-f]{8})\s*\(", body):
+        callee = m.group(1)
+        if m.start() < pos or _norm_type(sigs.get(callee, {}).get("ret", "")) != "void":
+            continue
+        close = _balanced_end(body, m.end() - 1)
+        semi = re.match(r"\s*;", body[close:])
+        if not semi:
+            continue
+        call = body[m.start() + len("return"):close].strip()
+        out.append(body[pos:m.start()])
+        out.append(f"{call}; return 0; /* E20e: {E20E_PROVEN[name]} */")
+        pos = close + semi.end()
+    out.append(body[pos:])
+    return "".join(out)
 
 
 def signedness_thunk(name: str, ad: dict) -> str:
@@ -2274,6 +2409,8 @@ def render_wrapper(name: str, plan: dict, leaf: dict, report: Path,
     for pname, etype in vecs.items():
         body_only, why = argvec_rewrite(body_only, pname, etype)
         assert not why, (name, why)
+    body_only = rect_array_args(body_only, _ADDR_SIGS)
+    body_only = empty_callee_args_drop(body_only, proto)
 
     lines: list[str] = []
     lines.append(
@@ -2353,7 +2490,31 @@ def render_wrapper(name: str, plan: dict, leaf: dict, report: Path,
             name, ", ".join(sig_params) or "void",
             param_call_names(plan["param_inner"], pnames),
             ptr_roots_expr(plan, {p for p in pnames if p not in argvec_params(plan["param_inner"])})))
-    return canonical_guest_call_args("".join(lines))
+    return canonical_guest_call_args(
+        e20_over_export("".join(lines), name, plan.get("canon_sig")))
+
+
+def e20_over_export(text: str, name: str, canon: dict | None) -> str:
+    """E20 composed with the pointer adapters (class D).  The pointer-param
+    wrapper / pointer-return thunk export `name` with every pointer as
+    pe_addr_t; when that exported signature still differs from the canonical
+    header only in E20's terms (32-bit integer class, or a `void` header over
+    a 32-bit result), the export becomes the static `pe_leaf_<name>` behind an
+    E20 thunk.  Anything else is left unchanged (the compile gate judges)."""
+    if not canon:
+        return text
+    m = re.search(rf"(?m)^(?!static\b)([A-Za-z_][A-Za-z0-9_ \t\*]*?)\b{re.escape(name)}"
+                  rf"\s*\(([^;{{]*?)\)\s*\{{", text)
+    if not m:
+        return text
+    ad = signedness_adapter(m.group(1), m.group(2), canon)
+    if not isinstance(ad, dict) or ad.get("dropped"):
+        # Pure E20 only: an E20b trailing-parameter drop needs its per-leaf
+        # retail-disassembly proof and is never applied implicitly here.
+        return text
+    head = m.group(0)
+    new = "static " + re.sub(rf"\b{re.escape(name)}(?=\s*\()", f"pe_leaf_{name}", head, count=1)
+    return text[:m.start()] + new + text[m.end():] + "\n" + signedness_thunk(name, ad)
 
 
 def canonical_guest_call_args(text: str) -> str:

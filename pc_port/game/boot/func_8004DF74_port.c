@@ -48,21 +48,7 @@ void func_80053648(pe_addr_t record)
     func_800534E4(record,name);
 }
 
-void func_8004DF74(pe_addr_t node)
-{
-    pe_addr_t record=PE_LoadU32(0x8009D004u);uint32_t width,remaining,i;
-    (void)node;
-    if (record) {
-        func_8005E8A4(28,12);func_80053648(record);
-        record=PE_LoadU32(0x8009D004u);
-        width=func_8005F1A0(0x800C20A4u+(PE_LoadU8(record+6u)==9u?16u:0u))+20u;
-    } else {
-        func_8005E8A4(2,2);func_8005EB64(71u);func_8005E8A4(60,8);
-        func_8005F27C(func_8005BEE8());width=func_8005F1A0(func_8005BEE8());
-    }
-    func_8005E8A4((int32_t)width,12);remaining=(uint32_t)func_8005BF08();
-    for (i=0;i<remaining;i++) {func_80061A3C(9u,4u,0u);func_8005E8A4(11,0);}
-}
+/* func_8004DF74: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8004DF74_port.c (src/func_8004DF74.c); hand port retired (port3 switch-over K). */
 
 static pe_addr_t inventory_description(pe_addr_t record)
 {return record?func_8005DCEC(PE_LoadU8(record+4u)-1u):0u;}

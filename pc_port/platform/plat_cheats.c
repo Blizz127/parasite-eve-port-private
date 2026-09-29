@@ -35,7 +35,9 @@ extern int func_80017BB4(pe_addr_t a0) __attribute__((weak));
 #define GA_AYA_ACTOR   0x8009D254u
 #define GA_ENEMIES     0x8009E000u
 #define GA_D1A0        0x8009D1A0u
+#define GA_MOVIE       0x800B0DBAu   /* field movie active (func_801216C4 sets, func_80121A00 clears) */
 #define GA_TOKEN       0x8009D280u
+#define GA_ROOM_CUR    0x8009D1C4u   /* func_8003F3C4 loops while == D_8009D280 */
 #define GA_STORY       0x800A7918u
 #define GA_INV         0x8009D048u
 #define GA_INV_COUNT   0x8009D050u
@@ -266,12 +268,42 @@ int pe_plat_cheats_area_kit(uint32_t lo, uint32_t hi)
     return added;
 }
 
+/* The field state a warp may act in, from the main loop's own dispatch
+ * (func_8001220C, bootstrap/func_8001220C_port.c): D_8009D280 reaches the
+ * field room loop func_8003F3C4 unless it is the title state 0xA9400048
+ * (title overlay func_801909B4: menu and attract movies), the New Game init
+ * 0xAA108448, or 0xA8000048 (func_8019234C).  func_80017BB4 is a field-VM
+ * op; outside that loop it has no room loop to act on (a warp picked on the
+ * title latched story 0x5B into New Game init and froze it). */
+#define TOK_TITLE      0xA9400048u
+#define TOK_NEWGAME    0xAA108448u
+#define TOK_A8000048   0xA8000048u
+#define TOK_PROLOGUE   0xA80830C8u   /* New Game prologue room (FMV002) */
+
+static int in_field(uint32_t tok)
+{
+    return tok != 0u && tok != TOK_TITLE && tok != TOK_NEWGAME && tok != TOK_A8000048;
+}
+
+/* 1 = transfer requested, 0 = wait (field running but busy),
+ * -1 = no room_transfer linked, -2 = not in the field (refused). */
 static int warp_pass(int index)
 {
     const CheatWarp *w = &k_warps[index];
     uint32_t d1a0 = PE_LoadU32(GA_D1A0);
+    uint32_t tok = PE_LoadU32(GA_TOKEN);
     if (!func_80017BB4) return -1;
+    if (!in_field(tok)) return -2;
+    if (PE_LoadU32(GA_ROOM_CUR) != tok) return 0;        /* room change in flight */
     if (d1a0 & (2u | 0x2000u)) return 0;                 /* battle / transfer pending */
+    /* A field movie (New Game prologue FMV002 in A80830C8, field op 0x35)
+     * owns the display while D_800B0DBA != 0: the field tick keeps calling
+     * the movie overlay (func_80122040 reads its state at 0x801223F6..
+     * 0x801228FA).  A room transfer now loads the destination room over that
+     * overlay, and the next tick follows a garbage pointer (black screen /
+     * PE_LoadU32 fatal).  Wait for func_80121A00 to clear the flag, and let
+     * the prologue hand over to its first room before warping. */
+    if (PE_LoadU8(GA_MOVIE) || tok == TOK_PROLOGUE) return 0;
     PE_StoreU32(GA_STORY, w->story);
     PE_StoreU32(PE_CHEAT_STACK + 8u, w->token);
     PE_StoreU32(PE_CHEAT_STACK + 0u, PE_CHEAT_STACK + 8u);
@@ -305,8 +337,14 @@ void pe_plat_cheats_apply(void)
             snprintf(msg, sizeof msg, "WARP: %s", k_warps[C.pending_warp - 1].name);
             toast(msg);
             C.pending_warp = 0;
+        } else if (r == -2) {
+            /* Never carried across a mode change: the pick is dropped. */
+            toast("WARP: ONLY IN THE FIELD");
+            fprintf(stderr, "[CHEATS] warp refused: not in the field (token %08X)\n",
+                    PE_LoadU32(GA_TOKEN));
+            C.pending_warp = 0;
         } else if (r < 0) { toast("WARP UNAVAILABLE"); C.pending_warp = 0; }
-        /* r == 0: wait for the field (battle or transfer in progress) */
+        /* r == 0: wait (battle, room change or field movie in progress) */
     }
 }
 
@@ -315,6 +353,16 @@ void pe_plat_cheats_frame(void)
     if (!C.inited) pe_plat_cheats_init();
     if (!C.enabled) return;
     C.frames++;
+    {   /* Harness only: PE_WARP_TRACE=N logs the room loop every N presents
+         * (D_8009CDA4 = field ticks, D_8009CE00 = field VM cursor). */
+        static int every = -1;
+        if (every < 0) every = getenv("PE_WARP_TRACE") ? atoi(getenv("PE_WARP_TRACE")) : 0;
+        if (every > 0 && C.frames % every == 0)
+            fprintf(stderr, "[CHEATS] trace present=%d token=%08X cur=%08X story=%08X d1a0=%08X ticks=%u vm=%08X\n",
+                    C.frames, (unsigned)PE_LoadU32(GA_TOKEN), (unsigned)PE_LoadU32(GA_ROOM_CUR),
+                    (unsigned)PE_LoadU32(GA_STORY), (unsigned)PE_LoadU32(GA_D1A0),
+                    (unsigned)PE_LoadU32(0x8009CDA4u), (unsigned)PE_LoadU32(0x8009CE00u));
+    }
     while (C.iscript < C.nscript && C.script[C.iscript].frame <= C.frames) {
         pe_plat_cheats_key(C.script[C.iscript].key, 1);
         pe_plat_cheats_key(C.script[C.iscript].key, 0);

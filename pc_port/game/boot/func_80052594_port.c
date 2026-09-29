@@ -56,24 +56,4 @@
 #define GA_52594_COUNT 0x8009169Du  /* 1-byte count store */
 #define GA_52594_TERM  0xFFu        /* terminator byte */
 
-int func_80052594(pe_addr_t src)
-{
-    pe_addr_t dst = GA_52594_BUF;
-
-    /* Retail sltu guard: always true for 8-byte buffer, preserved
-     * structurally. */
-    if (dst < GA_52594_END) {
-        while (dst < GA_52594_END) {
-            uint8_t b = PE_LoadU8(src);
-            if (b == GA_52594_TERM)
-                break;
-            PE_StoreU8(dst, b);
-            dst++;
-            src++;  /* retail: bnez delay slot */
-        }
-    }
-
-    pe_addr_t count = dst - GA_52594_BUF;
-    PE_StoreU8(GA_52594_COUNT, (uint8_t)count);  /* retail: jr delay slot */
-    return (int)count;
-}
+/* func_80052594: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80052594_port.c (src/func_80052594.c); hand port retired (port3 switch-over A1). */

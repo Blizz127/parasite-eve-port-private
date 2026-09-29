@@ -45,5 +45,7 @@ const uint8_t *HostFB_GetPixels(void);
 void HostFB_GetState(int *vsync, int *drawsync, int *presented, int *mask);
 /* Display-only refresh after a VBlank scan-out (not a present). */
 void HostFB_SetScanoutHook(void (*hook)(void));
+/* Number of idle-VBlank scan-outs so far (diagnostics, PE_FRAME_TRACE). */
+uint32_t HostFB_ScanOutCount(void);
 
 #endif

@@ -831,6 +831,17 @@ class SignednessAdapterTests(unittest.TestCase):
         self.assertIn("void func_80001234(int pe_a0, pe_addr_t pe_a1)", thunk)
         self.assertIn("pe_leaf_func_80001234((int)pe_a0);", thunk)
 
+    def test_trailing_param_void_header_discards_int_result(self):
+        # E20b + E20's void-discards-int: `void f(pe_addr_t window)` over the
+        # matched `int f(void)` (func_800453E8).
+        canon = {"ret": "void", "params": ["pe_addr_t window"]}
+        ad = g.signedness_adapter("int ", "void", canon)
+        self.assertEqual(ad["dropped"], 1)
+        thunk = g.signedness_thunk("func_800453E8", ad)
+        self.assertIn("void func_800453E8(pe_addr_t pe_a0)", thunk)
+        self.assertIn("(void)pe_a0;", thunk)
+        self.assertIn("(void)pe_leaf_func_800453E8();", thunk)
+
     def test_trailing_param_with_int_over_void_return_rejected(self):
         # Kept out: header returns int over a void leaf (callers would read a
         # value retail never produced), even when only trailing params differ.
@@ -848,6 +859,135 @@ class SignednessAdapterTests(unittest.TestCase):
         out = g.rename_definition(body, "func_80001234", "pe_leaf_func_80001234")
         self.assertTrue(out.startswith("static int pe_leaf_func_80001234(int a0) {"))
         self.assertIn("return func_80001234(a0 - 1);", out)
+
+
+class NeutralizeSameLineDeclTests(unittest.TestCase):
+    """A canonical-callee prototype sharing a line with another declaration."""
+
+    def test_second_prototype_on_line_is_neutralized(self):
+        # src/func_80050308.c: `extern int D_8009CF18; extern void func_8005EB64(int a);`
+        body = ("extern int D_8009CF18; extern void func_8005EB64(int a);\n"
+                "void func_80050308(int a0){ func_8005EB64(a0+0x7C); }\n")
+        out = g.neutralize_declarations(body, {"D_8009CF18"}, set(), {"func_8005EB64"})
+        self.assertNotIn("extern void func_8005EB64(int a);", out)
+        self.assertIn("func_8005EB64(a0+0x7C)", out)   # the call site is untouched
+
+    def test_statement_after_declaration_not_split(self):
+        # only a trailing *prototype* is moved; a call statement is left alone
+        body = "int f(void) { int x; x = 1; return func_8005EB64(x); }\n"
+        self.assertEqual(g.neutralize_declarations(body, set(), set(), set()), body)
+
+
+class E20OverExportTests(unittest.TestCase):
+    """Class D: E20 composed with the pointer adapters' exported signature."""
+
+    def test_ptr_return_export_gets_e20_thunk(self):
+        # func_8005DADC: pointer-return adapter exports `pe_addr_t f(int a0)`,
+        # the canonical header is `pe_addr_t f(uint32_t index)`.
+        text = ("static unsigned char *pe_host_func_8005DADC(int a0) { return 0; }\n"
+                "pe_addr_t func_8005DADC(int a0)\n{\n    return PE_HostToGuest(pe_host_func_8005DADC(a0));\n}\n")
+        out = g.e20_over_export(text, "func_8005DADC",
+                                {"ret": "pe_addr_t", "params": ["uint32_t index"]})
+        self.assertIn("static pe_addr_t pe_leaf_func_8005DADC(int a0)", out)
+        self.assertIn("pe_addr_t func_8005DADC(uint32_t pe_a0)", out)
+        self.assertIn("return (pe_addr_t)pe_leaf_func_8005DADC((int)pe_a0);", out)
+
+    def test_non_e20_difference_left_alone(self):
+        text = "int func_80001234(pe_addr_t pe_arg0, int b)\n{\n    return 0;\n}\n"
+        canon = {"ret": "int", "params": ["pe_addr_t a", "unsigned char b"]}   # narrow: not E20
+        self.assertEqual(g.e20_over_export(text, "func_80001234", canon), text)
+
+    def test_trailing_param_drop_never_implicit(self):
+        # E20b needs a per-leaf disassembly proof: not applied through the export.
+        text = "int func_80001234(pe_addr_t pe_arg0)\n{\n    return 0;\n}\n"
+        canon = {"ret": "int", "params": ["pe_addr_t a", "uint32_t extra"]}
+        self.assertEqual(g.e20_over_export(text, "func_80001234", canon), text)
+
+    def test_no_canonical_header_left_alone(self):
+        text = "int func_80001234(pe_addr_t pe_arg0)\n{\n    return 0;\n}\n"
+        self.assertEqual(g.e20_over_export(text, "func_80001234", None), text)
+
+
+class E20eTests(unittest.TestCase):
+    """E20e: `return <void call>;` rewrite, only for proven leaves."""
+    SIGS = {"func_80056FB8": {"ret": "void", "params": ["void"]},
+            "func_80001111": {"ret": "int", "params": ["void"]}}
+
+    def test_proven_leaf_void_callee_rewritten(self):
+        body = "static int pe_leaf_func_800453E8(void) { f(); return func_80056FB8(); }"
+        out = g.e20e_void_return_rewrite(body, "func_800453E8", self.SIGS)
+        self.assertIn("func_80056FB8(); return 0;", out)
+        self.assertNotIn("return func_80056FB8()", out)
+
+    def test_unproven_leaf_untouched(self):
+        body = "static int pe_leaf_func_80012345(void) { return func_80056FB8(); }"
+        self.assertEqual(g.e20e_void_return_rewrite(body, "func_80012345", self.SIGS), body)
+
+    def test_non_void_callee_untouched(self):
+        body = "static int pe_leaf_func_800453E8(void) { return func_80001111(); }"
+        self.assertEqual(g.e20e_void_return_rewrite(body, "func_800453E8", self.SIGS), body)
+
+
+class E20fTests(unittest.TestCase):
+    """E20f: literal arguments to a proven-empty zero-parameter callee."""
+    PROTO = {"func_800527C0": 0, "func_80001111": 0, "func_80002222": 1}
+
+    def test_literal_args_dropped(self):
+        body = "void f(void) { func_800527C0(2); func_800527C0(0x1Fu); }"
+        out = g.empty_callee_args_drop(body, self.PROTO)
+        self.assertEqual(out.count("func_800527C0() /* E20f"), 2)
+        self.assertNotIn("func_800527C0(2)", out)
+        self.assertTrue(g.empty_callee_droppable("func_800527C0", "3", self.PROTO))
+
+    def test_non_literal_args_kept(self):
+        for args in ("i", "x + 1", "func_80001111()", "n++"):
+            body = f"void f(void) {{ func_800527C0({args}); }}"
+            self.assertEqual(g.empty_callee_args_drop(body, self.PROTO), body, args)
+            self.assertFalse(g.empty_callee_droppable("func_800527C0", args, self.PROTO))
+
+    def test_unlisted_or_nonempty_callee_kept(self):
+        body = "void f(void) { func_80001111(2); }"
+        self.assertEqual(g.empty_callee_args_drop(body, self.PROTO), body)
+        self.assertFalse(g.empty_callee_droppable("func_80001111", "2", self.PROTO))
+        # a listed callee whose canonical prototype takes arguments: not E20f
+        self.assertFalse(g.empty_callee_droppable("func_800527C0", "2", {"func_800527C0": 1}))
+
+    def test_declaration_and_bare_call_untouched(self):
+        body = "extern void func_800527C0(int);\nvoid f(void) { func_800527C0(); }"
+        self.assertEqual(g.empty_callee_args_drop(body, self.PROTO), body)
+
+
+class RectArrayArgTests(unittest.TestCase):
+    """A local `short NAME[4]` passed to a canonical RECT* parameter."""
+    SIGS = {"func_8007506C": {"ret": "int", "params": ["const RECT *rect", "pe_addr_t data"]},
+            "func_80001234": {"ret": "void", "params": ["pe_addr_t p"]}}
+
+    def test_short4_to_const_rect_cast(self):
+        body = "void f(void) { short buf[4]; buf[0] = 1; func_8007506C(buf, 0); }"
+        out = g.rect_array_args(body, self.SIGS)
+        self.assertIn("func_8007506C((const RECT*)buf, 0)", out)
+
+    def test_non_rect_param_untouched(self):
+        body = "void f(void) { short buf[4]; func_80001234(buf); }"
+        self.assertEqual(g.rect_array_args(body, self.SIGS), body)
+
+    def test_other_array_size_untouched(self):
+        body = "void f(void) { short buf[8]; func_8007506C(buf, 0); }"
+        self.assertEqual(g.rect_array_args(body, self.SIGS), body)
+
+
+class HostToGuestArgTests(unittest.TestCase):
+    """host_to_guest_args wraps host pointer locals, never call results."""
+
+    def test_call_result_at_recorded_index_not_wrapped(self):
+        # func_8004DF74: `func_8005F1A0(t)` records (func_8005F1A0, 0); the
+        # later `func_8005F1A0(func_8005BEE8())` passes a guest value.
+        body = ("x = func_8005F1A0(t) + 0x14;\n"
+                "x = func_8005F1A0(func_8005BEE8());\n")
+        out = g.host_to_guest_args(body, {"hostptr_args": [("func_8005F1A0", 0)]})
+        self.assertIn("func_8005F1A0(PE_HostToGuest(t))", out)
+        self.assertIn("func_8005F1A0(func_8005BEE8())", out)
+        self.assertNotIn("PE_HostToGuest(func_8005BEE8())", out)
 
 
 class HostTypedefTests(unittest.TestCase):

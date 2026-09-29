@@ -16,7 +16,7 @@ void func_8005F354(pe_addr_t text,int32_t width)
 /* func_8005F594: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8005F594_port.c (src/func_8005F594.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 /* func_80064C30: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80064C30_port.c (src/func_80064C30.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 void func_80064C54(uint32_t id) {func_80064C30(func_8005DC4C(id));}
-void func_80062A7C(uint32_t id) {func_8005F594(func_8005DC4C(id));}
+/* func_80062A7C: shortcut retired; line-by-line port of src/func_80062A7C.c (with the draw-state stack push/pop and retail $v0) in pc_port/game/decomp_hand/func_80044E14_port.c (port3 switch-over batch O). */
 
 pe_addr_t func_80053068(int32_t index)
 {
@@ -103,13 +103,7 @@ int func_8004D030(pe_addr_t window,uint32_t event)
     return 1;
 }
 
-void func_80044E14(pe_addr_t window)
-{
-    uint32_t index=PE_LoadU32(window+36u)-41u,extra;
-    func_8005E8A4(0,10);func_8005EB58(0u);func_8005F594(0x800A1980u+index*64u);
-    extra=PE_LoadU32(0x8009CFA0u+index*4u);
-    if (extra) {func_8005E8A4(0,14);func_80062A7C(extra);}
-}
+/* func_80044E14: moved to pc_port/game/decomp_hand/func_80044E14_port.c (src/func_80044E14.c with the retail $v0 of func_80062A7C; port3 switch-over batch O). */
 
 void func_80044F8C(void)
 {
@@ -162,31 +156,4 @@ void func_80045110(pe_addr_t window,uint32_t confirmed)
     }
 }
 
-int func_80044E98(pe_addr_t window,uint32_t event)
-{
-    pe_addr_t callback;uint32_t confirmed;
-    if (event&0x10000u) {
-        int32_t selected=func_80063428(func_80062A20(window,0u));
-        if ((uint32_t)selected>1u) return 1;
-        confirmed=selected==0;
-    } else if (event&64u) confirmed=0u;
-    else return 1;
-    func_80062F1C(window);if (PE_LoadU32(window+36u)==42u) func_80062CE4();
-    callback=PE_LoadU32(0x8009CFA8u);
-    if (callback) {
-        if (callback==0x80045110u) func_80045110(window,confirmed);
-        else if (callback==0x80046574u) func_80046574(window,confirmed);
-        else if (callback==0x80046DBCu) func_80046DBC(window,confirmed);
-        else if (callback==0x80050580u) {
-            unsigned epoch=PE_Port_StopEpoch();
-            func_80050580(window,confirmed);
-            if(PE_Port_StopEpoch()!=epoch)return 1;
-        }
-        else {
-            fprintf(stderr,"[MENU] Unported confirmation callback %08X\n",callback);
-            Bootstrap_ReturnVoid("PE_MenuConfirmationCallback","func_80044E98");
-            PE_Port_RequestStop(PE_PORT_STOP_UNRESOLVED_BOUNDARY);return 1;
-        }
-    }
-    if (confirmed) func_800525EC();else func_80052634();return 1;
-}
+/* func_80044E98: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80044E98_port.c (src/func_80044E98.c); hand port retired (port3 switch-over M). */

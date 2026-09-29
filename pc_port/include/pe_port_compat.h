@@ -321,7 +321,7 @@ void func_8005247C(void);
 /* Packed-colour lane helpers the equipment page reads/writes (D_8009D14C). */
 int func_8005E54C(void);
 int func_800614A0(void);
-int func_800614AC(int a0);
+void func_800614AC(int a0);  /* result stored to D_8009D150; retail $v0 unread (port3 A1) */
 /* Field-menu modal sub-page (0x8004AE1C case 3) window draw and its two
  * original font/sprite leaves. */
 void func_8004B5DC(pe_addr_t node);
@@ -707,8 +707,8 @@ extern pe_addr_t func_80190C1C(pe_addr_t parent, uint32_t index, uint32_t a2,
                             uint32_t a3, uint32_t a4, uint32_t a5, pe_addr_t resource);
 extern void func_80190D08(pe_addr_t object);
 extern void func_80191EFC(uint32_t handle, pe_addr_t position);
-extern int func_800868F0(uint32_t handle, uint32_t group, uint32_t volume);
-extern int func_80086A28(uint32_t handle, uint32_t group, uint32_t pan);
+extern void func_800868F0(uint32_t handle, uint32_t group, uint32_t volume);  /* retail $v0 unread (port3 A1) */
+extern void func_80086A28(uint32_t handle, uint32_t group, uint32_t pan);  /* retail $v0 unread (port3 A1) */
 extern void func_8019BF8C(pe_addr_t dest);
 extern void func_8019BD78(void);
 extern void func_80191C94(void);
@@ -1169,7 +1169,7 @@ void func_8004D024(int a0);
 void func_8004CDD4(pe_addr_t window);
 void func_8004CC50(uint32_t first,uint32_t second);
 int func_8004D030(pe_addr_t window,uint32_t event);
-void func_80044E14(pe_addr_t window);
+int func_80044E14(pe_addr_t window);  /* retail $v0 = func_80062A7C variant (batch O) */
 void func_80044F8C(void);
 void func_80062CE4(void);
 int32_t func_80058C4C(uint32_t categories);

@@ -8,7 +8,7 @@
  */
 #include "psx_compat.h"
 #include "pe_port_compat.h"
-#include "pe_gpu.h"
+#include "pe_plat/timing.h"
 #include "game_port.h"
 #include "pe_sdk.h"
 #include "pe_guestcode.h"
@@ -225,9 +225,8 @@ void pe_anim_set_log(const char *who, pe_addr_t actor, unsigned int command, voi
     static FILE *f; static int init;
     if (!init) { const char *p = getenv("PE_ANIM_SET_LOG"); init = 1; if (p && *p) f = fopen(p, "w"); }
     if (!f) return;
-    PeGpuState st; PE_GPU_GetState(&st);
     fprintf(f, "vbl=%u %s actor=%08X key=%02X/%02X old=%02X new=%02X token=%08X caller=pe_anim_set_log%+ld\n",
-            st.vsync_count, who, actor, PE_LoadU8(actor + 0xCu), PE_LoadU8(actor + 0xDu),
+            pe_plat_timing_vblank_count(), who, actor, PE_LoadU8(actor + 0xCu), PE_LoadU8(actor + 0xDu),
             PE_LoadU8(actor + 0xEu), command & 0xFFu, PE_LoadU32(0x8009D280u),
             (long)((char *)caller - (char *)(void *)pe_anim_set_log));
     fflush(f);
@@ -311,10 +310,8 @@ int32_t func_8006A318(pe_addr_t actor)
             }
         }
         if (al && PE_LoadU8(0x800B0CE9u)) {
-            PeGpuState st;
-            PE_GPU_GetState(&st);
             fprintf(al, "vbl=%u actor=%08X key=%02X/%02X anim=%02X win=%d..%d dir=%d aya=%d d1a0=%X cd8=%X n=%u\n",
-                    st.vsync_count, actor, PE_LoadU8(actor + 0xCu), PE_LoadU8(actor + 0xDu),
+                    pe_plat_timing_vblank_count(), actor, PE_LoadU8(actor + 0xCu), PE_LoadU8(actor + 0xDu),
                     PE_LoadU8(actor + 0xEu), previous, current, speed,
                     actor == PE_LoadU32(0x8009D254u), PE_LoadU32(0x8009D1A0u),
                     PE_LoadU32(0x800B0CD8u), PE_LoadU8(0x800B0CE9u));
@@ -340,9 +337,8 @@ int32_t func_8006A318(pe_addr_t actor)
             static FILE *sf; static int sf_init;
             if (!sf_init) { const char *p = getenv("PE_ANIM_SFX_LOG"); sf_init = 1; if (p && *p) sf = fopen(p, "w"); }
             if (sf) {
-                PeGpuState st; PE_GPU_GetState(&st);
                 fprintf(sf, "vbl=%u FIRE rec=%u actor=%08X key=%02X/%02X anim=%02X frame=%d snd=%X token=%08X\n",
-                        st.vsync_count, i, actor, PE_LoadU8(actor + 0xCu), PE_LoadU8(actor + 0xDu),
+                        pe_plat_timing_vblank_count(), i, actor, PE_LoadU8(actor + 0xCu), PE_LoadU8(actor + 0xDu),
                         PE_LoadU8(actor + 0xEu), frame, sound, PE_LoadU32(0x8009D280u));
                 fflush(sf);
             }

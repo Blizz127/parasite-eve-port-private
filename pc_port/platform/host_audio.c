@@ -376,6 +376,20 @@ int HostAudio_Open(int want_device)
 
 int HostAudio_DeviceOpen(void) { return g_device; }
 
+int HostAudio_QueueFrames(void)
+{
+#ifndef _WIN32
+    int n;
+    if (!g_device) return -1;
+    pthread_mutex_lock(&P.mu);
+    n = (int)P.n;
+    pthread_mutex_unlock(&P.mu);
+    return n;
+#else
+    return -1;
+#endif
+}
+
 void HostAudio_SetFastForward(int on)
 {
 #ifndef _WIN32

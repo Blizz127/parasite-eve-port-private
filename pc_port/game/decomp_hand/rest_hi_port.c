@@ -59,10 +59,4 @@ unsigned short func_80074774(int a0, int a1, int a2, int a3, int a4, int a5, int
 
 /* src/func_800CED3C.c: upload the 64x256 effect texture at (0x380, 0x100)
  * from D_800B0E18 (a0 == 0) or D_800B0E1C, and record a0 in D_800F34E4. */
-void func_800CED3C(int a0)
-{
-    RECT r = {0x380, 0x100, 0x40, 0x100};
-
-    (void)func_8007506C(&r, PE_LoadU32(a0 == 0 ? 0x800B0E18u : 0x800B0E1Cu));
-    PE_StoreU16(0x800F34E4u, (uint16_t)a0);
-}
+/* func_800CED3C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800CED3C_port.c (src/func_800CED3C.c); hand port retired (port3 switch-over N). */

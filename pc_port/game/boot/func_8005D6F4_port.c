@@ -109,7 +109,7 @@
 #include "pe_sdk.h"
 #include "pe_bootstrap.h"
 
-extern int func_800614AC(int a0);
+extern void func_800614AC(int a0);
 extern signed char func_8005E884(void);
 extern void func_8005E850(int a0, int a1);
 extern void func_80052790(int a0);
@@ -240,8 +240,7 @@ int func_8005D6F4(void)
      * the jal delay slot @0x8005D89C. */
     src = func_8005DC4C(30u);
     (void)cursor;                           /* retail residual $a1 */
-    r = func_80052594(src);  /* B27: REAL — copies to D_80091694 */
-    (void)r;                 /* retail discards return at this call site */
+    func_80052594(src);      /* B27: REAL — copies to D_80091694; retail discards $v0 */
 
     /* 12. func_8005CCA4() — REAL (B28) */
     func_8005CCA4();

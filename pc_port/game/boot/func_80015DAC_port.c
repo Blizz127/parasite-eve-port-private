@@ -29,7 +29,7 @@
  */
 #include "psx_compat.h"
 #include "pe_port_compat.h"
-#include "pe_gpu.h"
+#include "pe_plat/timing.h"
 
 extern void func_80087024(void);
 extern void func_800867E4(int);
@@ -279,8 +279,6 @@ int func_80015DAC_default_cut(pe_addr_t args)
                 key==100u||key==101u||(key>=208u&&key<=216u)||key==302u||key==304u||
                 (key>=306u&&key<=313u)||key==408u||key==410u||
                 i2>=311u||tg==GA_EA_NOP||tg==GA_EA_190;
-            PeGpuState st;
-            PE_GPU_GetState(&st);
             uint32_t op[4];
             for (unsigned k = 0; k < 4u; k++) {
                 pe_addr_t pp = PE_RangeIsRam(args + (k + 1u) * 4u, 4u) ?
@@ -288,7 +286,7 @@ int func_80015DAC_default_cut(pe_addr_t args)
                 op[k] = PE_RangeIsRam(pp, 4u) ? PE_LoadU32(pp) : 0xDEADu;
             }
             fprintf(ea_log, "vbl=%u EA %u (table %08X) ops %X %X %X %X%s\n",
-                    st.vsync_count, key, tg, op[0], op[1], op[2], op[3],
+                    pe_plat_timing_vblank_count(), key, tg, op[0], op[1], op[2], op[3],
                     handled ? "" : "  DROPPED");
             fflush(ea_log);
         }

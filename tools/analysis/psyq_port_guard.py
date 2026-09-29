@@ -122,9 +122,28 @@ def load_allow(path: Path) -> set[tuple[str, str, str]]:
     return out
 
 
+def _git_ignored(path: Path) -> bool:
+    path = path.resolve()        # `git -C dir` resolves a relative path against dir
+    try:
+        r = subprocess.run(["git", "-C", str(path.parent), "check-ignore", "-q", str(path)],
+                           capture_output=True)
+    except OSError:
+        return False
+    return r.returncode == 0
+
+
 def iter_sources(tree: Path):
+    """Source files of the tree.  A git-ignored vendor checkout directly under
+    a `third_party/` directory (fetched, never committed, e.g. PsyCross) is
+    skipped: it is not part of the committed tree or the build.  Only vendor
+    trees are exempt -- other git-ignored sources (the generated
+    game/decomp*/ TUs) ARE compiled and stay scanned -- and anything that is
+    ever linked in is still caught by the --binary checks (nm symbols and
+    table bytes)."""
     for root, dirs, files in os.walk(tree):
         dirs[:] = [d for d in dirs if d not in SKIP_DIRS and not d.startswith("build")]
+        if Path(root).name == "third_party":
+            dirs[:] = [d for d in dirs if not _git_ignored(Path(root) / d)]
         for fn in files:
             if fn.endswith(SRC_EXT):
                 yield Path(root) / fn

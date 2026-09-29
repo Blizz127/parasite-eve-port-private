@@ -251,6 +251,28 @@ call and `PE_DecompReturnSegment` re-applies a KUSEG/KSEG1 segment: with
 `0x8000006D`. With several roots the result stays KSEG0 (documented alias
 loss).
 
+### Host-pointer arithmetic cannot wrap (2026-09-29)
+
+The pointer adapters (E7b, ptr-ret and the E20 thunks over them) run the
+leaf's pointer arithmetic on host pointers into the guest-RAM buffer. That
+cannot reproduce retail's 32-bit address wrap. Take func_8005DADC:
+
+- it returns `&D_800A8030 - 8 + *D_800A8030 + a0*8`;
+- with `*D_800A8030 = 0x80120000`, retail's `addu` wraps to guest
+  `0x001C8028 + 8*a0`, a KUSEG mirror of RAM;
+- the host sum walks off the buffer instead, and `PE_HostToGuest` aborts
+  (B54I_gpu_leaves_and_wrappers).
+
+Rule: a leaf whose pointer arithmetic can leave guest RAM (a data-derived
+offset or index added to a symbol address) stays hand-ported, with
+`pe_addr_t` arithmetic, which wraps naturally. It stays hand-ported until
+the guest-memory (gm) backend lands. Two leaves were withdrawn from
+switch-over batch M for this reason:
+
+- func_8005DADC;
+- func_8006E514, a package lookup: `a0 + mem[a0 + 4] + 0x2C`, then
+  `a0 + (w & 0x3FFFFF)`, then `a0 + (entry & 0xFFFFFF)`.
+
 ### Bare data symbols inside parentheses (fixed 2026-09-23)
 
 `fix_argument_addresses` used to turn *every* bare `D_X` in a `(`/`,` context

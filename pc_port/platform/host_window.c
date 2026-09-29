@@ -13,6 +13,8 @@
 #include "pe_audio_driver.h"
 #include "game_port.h"
 #include "pe_plat/cheats.h"
+#include "pe_gpu.h"
+#include "pe_str_feed.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -75,6 +77,13 @@ typedef struct { int type; unsigned long serial; int send_event; void *display; 
 typedef union { int type; XConfigureEvent xconfigure; XAnyEvent xany; XKeyEvent xkey; XExposeEvent xexpose; XClientMessageEvent xclient; long pad[24]; } XEvent;
 
 typedef struct { void *ext_data; int depth, bits_per_pixel, scanline_pad; } XImage;
+typedef XID Pixmap;
+typedef XID Picture;
+typedef int XFixed;
+typedef struct { XFixed matrix[3][3]; } XTransform;
+typedef struct { unsigned short red, green, blue, alpha; } XRenderColor;
+#define PictStandardRGB24 1
+#define PictOpSrc 1
 
 /* ── Function pointers from libX11 ──────────────────────────────────── */
 static void *g_xlib = NULL;
@@ -103,6 +112,29 @@ static int   (*XDisplayWidth)(void *, int);
 static int   (*XDisplayHeight)(void *, int);
 static int   (*XChangeProperty)(void *, Window, Atom, Atom, int, int,
                                  const unsigned char *, int);
+static void *(*XDefaultVisual)(void *, int);
+static int   (*XDefaultDepth)(void *, int);
+static Pixmap (*XCreatePixmap)(void *, Drawable, unsigned, unsigned, unsigned);
+static int   (*XFreePixmap)(void *, Pixmap);
+static int   (*XFreeGC)(void *, GC);
+
+/* ── Optional libXrender: server-side scaling ─────────────────────────
+ * The 320x240 frame is uploaded once into a pixmap and the X server
+ * (Xorg/Xwayland/gamescope, usually on the GPU) scales it into the
+ * letterbox with a nearest filter, instead of the client scaling to the
+ * full panel and pushing ~16 MB per blit through the socket. */
+static void *g_xrender = NULL;
+static int   (*XRenderQueryExtension)(void *, int *, int *);
+static void *(*XRenderFindVisualFormat)(void *, const void *);
+static void *(*XRenderFindStandardFormat)(void *, int);
+static Picture (*XRenderCreatePicture)(void *, Drawable, const void *, unsigned long, const void *);
+static void  (*XRenderFreePicture)(void *, Picture);
+static void  (*XRenderSetPictureTransform)(void *, Picture, XTransform *);
+static void  (*XRenderSetPictureFilter)(void *, Picture, const char *, XFixed *, int);
+static void  (*XRenderComposite)(void *, int, Picture, Picture, Picture, int, int, int, int,
+                                 int, int, unsigned, unsigned);
+static void  (*XRenderFillRectangle)(void *, int, Picture, const XRenderColor *, int, int,
+                                     unsigned, unsigned);
 
 static void *g_dpy = NULL;
 static Window g_win = 0;
@@ -114,6 +146,19 @@ static int g_fb_w = 0, g_fb_h = 0;
 static Atom g_wm_delete = 0;
 static int g_close_requested = 0;
 static int g_fullscreen = 0;
+/* XRender path state (g_xr_on = 0: CPU scale of the full window). */
+static int g_xr_on;
+static Pixmap g_xr_pix;
+static GC g_xr_gc;
+static Picture g_xr_src, g_xr_dst;
+static XImage *g_xr_img;
+static uint8_t *g_xr_buf;
+static int g_xr_fb_w, g_xr_fb_h, g_xr_win_w, g_xr_win_h;
+/* Blit dedup: the last frame put on screen, and whether the window needs
+ * a redraw regardless (open, resize, Expose). */
+static uint8_t *g_last_rgb;
+static size_t g_last_size;
+static int g_blit_dirty;
 
 int g_host_window_open = 0;
 static uint16_t g_sony_held = 0;
@@ -128,6 +173,66 @@ static int g_vblank_paced;
 static void pace_vblank(void);
 static uint64_t g_last_vblank_ns;
 static char g_title[512];
+static int monotonic_ns(uint64_t *out);
+
+/* PE_FRAME_TRACE=1 (diagnostics, off by default): one [FTRACE] line per
+ * wall second with presents, emulated VBlanks, host busy time per VBlank
+ * (wall time outside the pacer's sleep, p50/p95/max), window blits and
+ * their cost, idle-VBlank scan-outs, FMV frames published and the audio
+ * device queue.  PE_FRAME_TRACE_MAX caps the line count (default 600). */
+#define FTRACE_SAMPLES 512
+static struct {
+    int on, max, lines;
+    uint64_t t0;
+    uint32_t vbl0, scan0, fmv0; int pres0;
+    uint32_t paced, blits, skipped;
+    uint64_t blit_ns, blit_max;
+    uint32_t n; uint64_t busy[FTRACE_SAMPLES];
+} g_ft;
+
+static void ftrace_init(void)
+{
+    const char *e = getenv("PE_FRAME_TRACE"), *m = getenv("PE_FRAME_TRACE_MAX");
+    memset(&g_ft, 0, sizeof(g_ft));
+    g_ft.on = e && *e && *e != '0';
+    g_ft.max = m && atoi(m) > 0 ? atoi(m) : 600;
+}
+
+static int ftrace_cmp(const void *a, const void *b)
+{
+    uint64_t x = *(const uint64_t *)a, y = *(const uint64_t *)b;
+    return x < y ? -1 : x > y;
+}
+
+static void ftrace_sample(uint64_t now)
+{
+    PeStrFeedStats fs;
+    int pres = 0;
+    uint32_t vbl = PE_GPU_VSyncQuery(), scan = HostFB_ScanOutCount();
+    HostFB_GetState(NULL, NULL, &pres, NULL);
+    PE_StrFeed_GetStats(&fs);
+    if (g_ft.t0 && now - g_ft.t0 >= UINT64_C(1000000000) && g_ft.lines < g_ft.max) {
+        double p50 = 0, p95 = 0, mx = 0;
+        if (g_ft.n) {
+            qsort(g_ft.busy, g_ft.n, sizeof(g_ft.busy[0]), ftrace_cmp);
+            p50 = g_ft.busy[g_ft.n / 2] / 1e6;
+            p95 = g_ft.busy[(g_ft.n * 95u) / 100u] / 1e6;
+            mx = g_ft.busy[g_ft.n - 1] / 1e6;
+        }
+        fprintf(stderr, "[FTRACE] %.3fs pres=%d vbl=%u paced=%u busy_ms p50=%.2f p95=%.2f max=%.2f "
+                "blits=%u skip=%u blit_ms=%.1f blit_max=%.2f scan=%u fmv=%u stream=%d aq=%d win=%dx%d\n",
+                (now - g_ft.t0) / 1e9, pres - g_ft.pres0, vbl - g_ft.vbl0, g_ft.paced, p50, p95, mx,
+                g_ft.blits, g_ft.skipped, g_ft.blit_ns / 1e6, g_ft.blit_max / 1e6,
+                scan - g_ft.scan0,
+                fs.frames_published >= g_ft.fmv0 ? fs.frames_published - g_ft.fmv0 : fs.frames_published, /* a new stream restarts the count */
+                PE_StrFeed_Active(),
+                HostAudio_QueueFrames(), g_win_w, g_win_h);
+        g_ft.lines++;
+    } else if (g_ft.t0 && now - g_ft.t0 < UINT64_C(1000000000)) return;
+    g_ft.t0 = now; g_ft.vbl0 = vbl; g_ft.scan0 = scan; g_ft.pres0 = pres;
+    g_ft.fmv0 = fs.frames_published;
+    g_ft.paced = g_ft.blits = g_ft.skipped = 0; g_ft.blit_ns = g_ft.blit_max = 0; g_ft.n = 0;
+}
 
 static void *xlib_sym(const char *name) {
     void *p = dlsym(g_xlib, name);
@@ -160,6 +265,105 @@ static void bind_all(void) {
     XDisplayWidth       = xlib_sym("XDisplayWidth");
     XDisplayHeight      = xlib_sym("XDisplayHeight");
     XChangeProperty     = xlib_sym("XChangeProperty");
+    XDefaultVisual      = xlib_sym("XDefaultVisual");
+    XDefaultDepth       = xlib_sym("XDefaultDepth");
+    XCreatePixmap       = xlib_sym("XCreatePixmap");
+    XFreePixmap         = xlib_sym("XFreePixmap");
+    XFreeGC             = xlib_sym("XFreeGC");
+}
+
+static void xr_release(void)
+{
+    if (g_xr_img) XDestroyImage(g_xr_img); /* owns g_xr_buf */
+    g_xr_img = NULL; g_xr_buf = NULL;
+    if (g_dpy) {
+        if (g_xr_src) XRenderFreePicture(g_dpy, g_xr_src);
+        if (g_xr_dst) XRenderFreePicture(g_dpy, g_xr_dst);
+        if (g_xr_pix) XFreePixmap(g_dpy, g_xr_pix);
+        if (g_xr_gc) XFreeGC(g_dpy, g_xr_gc);
+    }
+    g_xr_src = g_xr_dst = 0; g_xr_pix = 0; g_xr_gc = 0;
+    g_xr_on = 0; g_xr_win_w = g_xr_win_h = 0;
+}
+
+/* Bind libXrender and build the source pixmap/picture pair.  Any missing
+ * piece leaves g_xr_on = 0 and the CPU scaler in use.  PE_WINDOW_SCALER=cpu
+ * forces the CPU path. */
+static const char *g_xr_why = "";  /* why the CPU scaler is in use */
+
+static void xr_setup(int screen)
+{
+    const char *want = getenv("PE_WINDOW_SCALER");
+    int ev, er;
+    void *vis_fmt, *rgb_fmt;
+    uint8_t *buf;
+    if (want && strcmp(want, "cpu") == 0) { g_xr_why = " (PE_WINDOW_SCALER=cpu)"; return; }
+    if (XDefaultDepth(g_dpy, screen) != 24) { g_xr_why = " (screen depth is not 24)"; return; }
+    g_xrender = dlopen("libXrender.so.1", RTLD_LAZY);
+    if (!g_xrender) { g_xr_why = " (libXrender.so.1 not found)"; return; }
+    g_xr_why = " (XRender setup failed)";
+#define XR_BIND(f) if (!(*(void **)&f = dlsym(g_xrender, #f))) goto fail
+    XR_BIND(XRenderQueryExtension); XR_BIND(XRenderFindVisualFormat);
+    XR_BIND(XRenderFindStandardFormat); XR_BIND(XRenderCreatePicture);
+    XR_BIND(XRenderFreePicture); XR_BIND(XRenderSetPictureTransform);
+    XR_BIND(XRenderSetPictureFilter); XR_BIND(XRenderComposite);
+    XR_BIND(XRenderFillRectangle);
+#undef XR_BIND
+    if (!XRenderQueryExtension(g_dpy, &ev, &er)) { g_xr_why = " (no RENDER extension)"; goto fail; }
+    vis_fmt = XRenderFindVisualFormat(g_dpy, XDefaultVisual(g_dpy, screen));
+    rgb_fmt = XRenderFindStandardFormat(g_dpy, PictStandardRGB24);
+    if (!vis_fmt || !rgb_fmt) goto fail;
+    buf = calloc((size_t)g_fb_w * (size_t)g_fb_h, 4u);
+    if (!buf) goto fail;
+    g_xr_img = XCreateImage(g_dpy, NULL, 24, 2, 0, (char *)buf, g_fb_w, g_fb_h, 32, 0);
+    if (!g_xr_img) { free(buf); goto fail; }
+    g_xr_buf = buf; g_xr_fb_w = g_fb_w; g_xr_fb_h = g_fb_h;
+    g_xr_pix = XCreatePixmap(g_dpy, g_win, g_fb_w, g_fb_h, 24);
+    g_xr_gc = XCreateGC(g_dpy, g_xr_pix, 0, NULL);
+    g_xr_src = XRenderCreatePicture(g_dpy, g_xr_pix, rgb_fmt, 0, NULL);
+    g_xr_dst = XRenderCreatePicture(g_dpy, g_win, vis_fmt, 0, NULL);
+    if (!g_xr_pix || !g_xr_gc || !g_xr_src || !g_xr_dst) goto fail;
+    XRenderSetPictureFilter(g_dpy, g_xr_src, "nearest", NULL, 0);
+    g_xr_on = 1; g_xr_why = "";
+    return;
+fail:
+    xr_release(); /* libXrender stays loaded: HostWindow_Close unloads it */
+}
+
+/* Upload the frame and let the server scale it into the letterbox. */
+static void xr_blit(const uint8_t *rgb)
+{
+    int x0, y0, w, h, i;
+    if (g_win_w != g_xr_win_w || g_win_h != g_xr_win_h) {
+        XTransform t;
+        HostWindow_FitRect(g_win_w, g_win_h, g_xr_fb_w, g_xr_fb_h, &x0, &y0, &w, &h);
+        memset(&t, 0, sizeof(t));
+        /* destination -> source, the same 16.16 step the CPU scaler samples
+         * with (HostWindow_NearestIndex), so both paths are pixel-identical */
+        t.matrix[0][0] = HostWindow_NearestStep(g_xr_fb_w, w);
+        t.matrix[1][1] = HostWindow_NearestStep(g_xr_fb_h, h);
+        t.matrix[2][2] = 1 << 16;
+        XRenderSetPictureTransform(g_dpy, g_xr_src, &t);
+        g_xr_win_w = g_win_w; g_xr_win_h = g_win_h;
+    }
+    HostWindow_FitRect(g_win_w, g_win_h, g_xr_fb_w, g_xr_fb_h, &x0, &y0, &w, &h);
+    for (i = 0; i < g_xr_fb_w * g_xr_fb_h; i++) {
+        g_xr_buf[i * 4 + 0] = rgb[i * 3 + 2];
+        g_xr_buf[i * 4 + 1] = rgb[i * 3 + 1];
+        g_xr_buf[i * 4 + 2] = rgb[i * 3 + 0];
+        g_xr_buf[i * 4 + 3] = 0;
+    }
+    XPutImage(g_dpy, g_xr_pix, g_xr_gc, g_xr_img, 0, 0, 0, 0, g_xr_fb_w, g_xr_fb_h);
+    if (g_blit_dirty) {   /* black bars around the letterbox */
+        static const XRenderColor black = {0, 0, 0, 0xFFFF};
+        if (y0 > 0) XRenderFillRectangle(g_dpy, PictOpSrc, g_xr_dst, &black, 0, 0, g_win_w, y0);
+        if (y0 + h < g_win_h)
+            XRenderFillRectangle(g_dpy, PictOpSrc, g_xr_dst, &black, 0, y0 + h, g_win_w, g_win_h - y0 - h);
+        if (x0 > 0) XRenderFillRectangle(g_dpy, PictOpSrc, g_xr_dst, &black, 0, y0, x0, h);
+        if (x0 + w < g_win_w)
+            XRenderFillRectangle(g_dpy, PictOpSrc, g_xr_dst, &black, x0 + w, y0, g_win_w - x0 - w, h);
+    }
+    XRenderComposite(g_dpy, PictOpSrc, g_xr_src, 0, g_xr_dst, 0, 0, 0, 0, x0, y0, w, h);
 }
 
 /* Ask the window manager (or gamescope/Steam Game Mode) to make g_win
@@ -197,7 +401,13 @@ static void request_fullscreen(int mapped)
 static int resize_image(int width, int height)
 {
     if (width <= 0 || height <= 0) return 0;
+    if (g_xr_on) {   /* the server scales; no window-sized client buffer */
+        if (width != g_win_w || height != g_win_h) g_blit_dirty = 1;
+        g_win_w = width; g_win_h = height;
+        return 0;
+    }
     if (g_ximg && width == g_win_w && height == g_win_h) return 0;
+    g_blit_dirty = 1;
     uint8_t *buffer = calloc((size_t)width * (size_t)height, 4u);
     if (!buffer) return -1;
     XImage *image = XCreateImage(g_dpy, NULL, 24, 2, 0, (char *)buffer,
@@ -239,9 +449,10 @@ int HostWindow_Open(const char *display, int width, int height,
 
     g_win = XCreateSimpleWindow(g_dpy, root, g_fullscreen ? 0 : 200,
                                  g_fullscreen ? 0 : 200, g_win_w, g_win_h,
-                                 g_fullscreen ? 0 : 4, 0xFFFFFF, 0xFFFFFF);
+                                 g_fullscreen ? 0 : 4, 0xFFFFFF, 0x000000);
     g_fast_forward=0;g_speed_key_held=0;g_ff_active=0;g_pad_hotkeys=0;
     g_vblank_paced=0;g_last_vblank_ns=0;
+    ftrace_init();
     HostWindow_SetTitle(title);
     XSelectInput(g_dpy, g_win, ExposureMask | KeyPressMask | (1L<<1) | StructureNotifyMask | FocusChangeMask);
     g_wm_delete = XInternAtom(g_dpy, "WM_DELETE_WINDOW", 0);
@@ -251,7 +462,9 @@ int HostWindow_Open(const char *display, int width, int height,
     if (g_fullscreen) request_fullscreen(1); /* ClientMessage, after map */
 
     g_gc = XCreateGC(g_dpy, g_win, 0, NULL);
+    xr_setup(screen);
     if (resize_image(g_win_w, g_win_h) != 0) { HostWindow_Close(); return -1; }
+    g_blit_dirty = 1;
 
     g_close_requested = 0;
     g_sony_held = 0;
@@ -260,18 +473,45 @@ int HostWindow_Open(const char *display, int width, int height,
     PE_AudioDriver_SetVBlankPacer(pace_vblank);
 
     XFlush(g_dpy);
-    fprintf(stderr, "[WINDOW] %dx%d (fb %dx%d) on %s title='%s'%s\n",
+    fprintf(stderr, "[WINDOW] %dx%d (fb %dx%d) on %s title='%s'%s scaler=%s%s\n",
             g_win_w, g_win_h, g_fb_w, g_fb_h, display, title,
-            g_fullscreen ? " fullscreen" : "");
+            g_fullscreen ? " fullscreen" : "", g_xr_on ? "xrender" : "cpu", g_xr_why);
     return 0;
 }
 
 void HostWindow_Blit(const uint8_t *rgb, int fb_w, int fb_h)
 {
-    if (!g_ximg || !g_imgbuf || !rgb || fb_w <= 0 || fb_h <= 0) return;
-    HostWindow_ScaleBGRA(g_imgbuf, g_win_w, g_win_h, rgb, fb_w, fb_h);
-    XPutImage(g_dpy, g_win, g_gc, g_ximg, 0, 0, 0, 0, g_win_w, g_win_h);
+    uint64_t t0 = 0, t1;
+    size_t size = (size_t)fb_w * (size_t)fb_h * 3u;
+    if (!g_dpy || !rgb || fb_w <= 0 || fb_h <= 0) return;
+    if (!g_xr_on && (!g_ximg || !g_imgbuf)) return;
+    /* A present or scan-out that shows exactly the pixels already on
+     * screen (a movie's catch-up presents, the static pause frame
+     * rescanned every VBlank) changes nothing visible: skip it unless the
+     * window itself needs a redraw. */
+    if (!g_blit_dirty && g_last_rgb && g_last_size == size && memcmp(g_last_rgb, rgb, size) == 0) {
+        if (g_ft.on) g_ft.skipped++;
+        return;
+    }
+    if (g_ft.on) (void)monotonic_ns(&t0);
+    if (g_xr_on) {
+        if (fb_w != g_xr_fb_w || fb_h != g_xr_fb_h) return; /* fb is fixed 320x240 */
+        xr_blit(rgb);
+    } else {
+        HostWindow_ScaleBGRA(g_imgbuf, g_win_w, g_win_h, rgb, fb_w, fb_h);
+        XPutImage(g_dpy, g_win, g_gc, g_ximg, 0, 0, 0, 0, g_win_w, g_win_h);
+    }
     XFlush(g_dpy);
+    g_blit_dirty = 0;
+    if (g_last_size != size) {
+        uint8_t *p = realloc(g_last_rgb, size);
+        if (p) { g_last_rgb = p; g_last_size = size; }
+    }
+    if (g_last_size == size) memcpy(g_last_rgb, rgb, size);
+    if (g_ft.on && monotonic_ns(&t1)) {
+        g_ft.blits++; g_ft.blit_ns += t1 - t0;
+        if (t1 - t0 > g_ft.blit_max) g_ft.blit_max = t1 - t0;
+    }
 }
 
 void HostWindow_SetTitle(const char *title)
@@ -311,7 +551,8 @@ int HostWindow_Poll(void)
         XEvent ev;
         XNextEvent(g_dpy, &ev);
         if (ev.type == Expose) {
-            /* Redraw: blit current framebuffer again (caller does this) */
+            /* Redraw: the caller's next blit repaints (dedup bypassed). */
+            g_blit_dirty = 1;
         } else if (ev.type == ConfigureNotify) {
             if (resize_image(ev.xconfigure.width, ev.xconfigure.height) != 0) {
                 fprintf(stderr, "[WINDOW] resize allocation failed\n");
@@ -468,8 +709,16 @@ static void pace_vblank(void)
         if ((++n & 7u)==0u) (void)HostWindow_Poll();
         return;
     }
+    if (g_ft.on) {
+        uint64_t now;
+        if (monotonic_ns(&now)) {
+            if (g_last_vblank_ns && g_ft.n < FTRACE_SAMPLES) g_ft.busy[g_ft.n++] = now - g_last_vblank_ns;
+            g_ft.paced++;
+        }
+    }
     if (pace_one_frame()) PE_Port_RequestStop(PE_PORT_STOP_HOST_QUIT);
     (void)monotonic_ns(&g_last_vblank_ns);
+    if (g_ft.on) ftrace_sample(g_last_vblank_ns);
 }
 
 int HostWindow_Pace(void)
@@ -508,10 +757,15 @@ int HostWindow_Run(int milliseconds)
 void HostWindow_Close(void)
 {
     PE_AudioDriver_SetVBlankPacer(NULL);
+    xr_release();
+    free(g_last_rgb); g_last_rgb = NULL; g_last_size = 0;
     if (g_ximg) XDestroyImage(g_ximg);
     g_imgbuf = NULL; g_ximg = NULL;
     g_gc = 0; g_win = 0;
     if (g_dpy) { XCloseDisplay(g_dpy); g_dpy = NULL; }
+    /* libXrender hooks XCloseDisplay for its extension data: unload it
+     * only after the display is gone. */
+    if (g_xrender) { dlclose(g_xrender); g_xrender = NULL; }
     if (g_xlib) { dlclose(g_xlib); g_xlib = NULL; }
     g_host_window_open = 0;
     g_sony_held = 0;

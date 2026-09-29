@@ -44,6 +44,7 @@ static uint32_t fb_vsync_baseline = 0;   /* 0x8009457C, 16-bit scanline latch */
 static struct { int valid; uint32_t dw, top, dh; int rgb24; } fb_scan;
 static int  fb_idle_vblanks;
 static void (*fb_scanout_hook)(void);
+static uint32_t fb_scanouts;   /* idle-VBlank rescans (PE_FRAME_TRACE) */
 
 /* ── public API ───────────────────────────────────────────────────────── */
 
@@ -130,8 +131,11 @@ static void HostFB_ScanOutIdleVBlank(void)
     PE_GPU_GetState(&st);
     ScanDisplay(st.display_start & 1023u, (st.display_start >> 10) & 511u,
                 fb_scan.dw, fb_scan.top, fb_scan.dh, fb_scan.rgb24);
+    fb_scanouts++;
     if (fb_scanout_hook) fb_scanout_hook();
 }
+
+uint32_t HostFB_ScanOutCount(void) { return fb_scanouts; }
 
 void HostFB_PresentDispEnv(pe_addr_t env)
 {

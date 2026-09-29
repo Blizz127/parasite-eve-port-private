@@ -39,6 +39,9 @@ int  HostAudio_DeviceOpen(void);
  * frames are discarded), 0 resumes with a fade-in.  The WAV dump is
  * unaffected.  Safe to call every frame. */
 void HostAudio_SetFastForward(int on);
+/* Device queue depth in stereo frames (diagnostics, PE_FRAME_TRACE);
+ * -1 when no device is open. */
+int  HostAudio_QueueFrames(void);
 
 #ifdef __cplusplus
 }

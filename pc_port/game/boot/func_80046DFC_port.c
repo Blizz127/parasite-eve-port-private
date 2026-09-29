@@ -93,5 +93,4 @@ int func_800474D0(pe_addr_t window,uint32_t event)
 
 /* func_80050280: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80050280_port.c (src/func_80050280.c); hand port retired (port3 switch-over D). */
 
-void func_80050308(uint32_t index)
-{func_8005EB64(index+(PE_LoadU32(0x8009CF18u)?124u:127u));}
+/* func_80050308: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80050308_port.c (src/func_80050308.c); hand port retired (port3 switch-over M). */

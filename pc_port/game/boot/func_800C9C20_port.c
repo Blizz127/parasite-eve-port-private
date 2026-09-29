@@ -104,14 +104,7 @@ void func_800C42A4(pe_addr_t style,pe_addr_t matrix,unsigned billboard)
     if (billboard&255u) for (i=0;i<3;i++) PE_StoreU32(matrix+20u+i*4u,(uint32_t)m.t[i]);
 }
 
-void func_800CEDA8(int32_t texture)
-{
-    if ((int16_t)PE_LoadU16(0x800F34E4u)!=texture) {
-        RECT rect={896,256,64,256};
-        (void)func_8007506C(&rect,PE_LoadU32(texture?0x800B0E1Cu:0x800B0E18u));
-        PE_StoreU16(0x800F34E4u,(uint16_t)texture);
-    }
-}
+/* func_800CEDA8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800CEDA8_port.c (src/func_800CEDA8.c); hand port retired (port3 switch-over N). */
 
 static void pistol_rotate(pe_addr_t matrix,const int16_t in[3],int16_t out[3])
 {

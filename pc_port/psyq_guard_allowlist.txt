@@ -2,6 +2,9 @@
 # This file must only SHRINK. The goal state is an empty file and
 # `tools/analysis/psyq_port_guard.py --strict` passing.
 # kind<TAB>key<TAB>where   (kind: func=Psy-Q function, table=Psy-Q data table)
+# Rows ending in `# clean-room ...` are NOT Psy-Q code: our own host models
+# sit at the address of a retail BIOS trampoline (li t2,A0h/B0h; jr t2;
+# li t1,N), which the classifier flags as libapi/bios-stub.
 func	0x80036DC8	bin:parasite-eve-port
 func	0x80036DC8	bin:pe-native-tests
 func	0x80036DC8	pc_port/game/decomp/func_80036DC8_port.c
@@ -62,12 +65,39 @@ func	0x800725DC	pc_port/bootstrap/func_800725DC_port.c
 func	0x800726C4	bin:parasite-eve-port
 func	0x800726C4	bin:pe-native-tests
 func	0x800726C4	pc_port/platform/pe_libetc.c
+func	0x800726F4	bin:parasite-eve-port	# clean-room host model of BIOS B(0Bh) TestEvent -> PE_Event_Test; retail stub is only `li t2,B0h; jr t2; li t1,0Bh` (no Sony code/tables)
+func	0x800726F4	bin:pe-native-tests	# clean-room host model of BIOS B(0Bh) TestEvent -> PE_Event_Test; retail stub is only `li t2,B0h; jr t2; li t1,0Bh` (no Sony code/tables)
+func	0x800726F4	pc_port/platform/pe_bios_card.c	# clean-room host model of BIOS B(0Bh) TestEvent -> PE_Event_Test; retail stub is only `li t2,B0h; jr t2; li t1,0Bh` (no Sony code/tables)
 func	0x80072714	bin:parasite-eve-port
 func	0x80072714	bin:pe-native-tests
 func	0x80072714	pc_port/platform/pe_libetc.c
 func	0x80072724	bin:parasite-eve-port
 func	0x80072724	bin:pe-native-tests
 func	0x80072724	pc_port/platform/pe_libetc.c
+func	0x80072734	bin:parasite-eve-port	# clean-room host model of BIOS B(32h) open -> PE_Memcard_Open; retail stub is only `li t2,B0h; jr t2; li t1,32h` (no Sony code/tables)
+func	0x80072734	bin:pe-native-tests	# clean-room host model of BIOS B(32h) open -> PE_Memcard_Open; retail stub is only `li t2,B0h; jr t2; li t1,32h` (no Sony code/tables)
+func	0x80072734	pc_port/platform/pe_bios_card.c	# clean-room host model of BIOS B(32h) open -> PE_Memcard_Open; retail stub is only `li t2,B0h; jr t2; li t1,32h` (no Sony code/tables)
+func	0x80072744	bin:parasite-eve-port	# clean-room host model of BIOS B(33h) lseek -> PE_Memcard_Lseek; retail stub is only `li t2,B0h; jr t2; li t1,33h` (no Sony code/tables)
+func	0x80072744	bin:pe-native-tests	# clean-room host model of BIOS B(33h) lseek -> PE_Memcard_Lseek; retail stub is only `li t2,B0h; jr t2; li t1,33h` (no Sony code/tables)
+func	0x80072744	pc_port/platform/pe_bios_card.c	# clean-room host model of BIOS B(33h) lseek -> PE_Memcard_Lseek; retail stub is only `li t2,B0h; jr t2; li t1,33h` (no Sony code/tables)
+func	0x80072754	bin:parasite-eve-port	# clean-room host model of BIOS B(34h) read -> PE_Memcard_Read; retail stub is only `li t2,B0h; jr t2; li t1,34h` (no Sony code/tables)
+func	0x80072754	bin:pe-native-tests	# clean-room host model of BIOS B(34h) read -> PE_Memcard_Read; retail stub is only `li t2,B0h; jr t2; li t1,34h` (no Sony code/tables)
+func	0x80072754	pc_port/platform/pe_bios_card.c	# clean-room host model of BIOS B(34h) read -> PE_Memcard_Read; retail stub is only `li t2,B0h; jr t2; li t1,34h` (no Sony code/tables)
+func	0x80072764	bin:parasite-eve-port	# clean-room host model of BIOS B(35h) write -> PE_Memcard_Write; retail stub is only `li t2,B0h; jr t2; li t1,35h` (no Sony code/tables)
+func	0x80072764	bin:pe-native-tests	# clean-room host model of BIOS B(35h) write -> PE_Memcard_Write; retail stub is only `li t2,B0h; jr t2; li t1,35h` (no Sony code/tables)
+func	0x80072764	pc_port/platform/pe_bios_card.c	# clean-room host model of BIOS B(35h) write -> PE_Memcard_Write; retail stub is only `li t2,B0h; jr t2; li t1,35h` (no Sony code/tables)
+func	0x80072774	bin:parasite-eve-port	# clean-room host model of BIOS B(36h) close -> PE_Memcard_Close; retail stub is only `li t2,B0h; jr t2; li t1,36h` (no Sony code/tables)
+func	0x80072774	bin:pe-native-tests	# clean-room host model of BIOS B(36h) close -> PE_Memcard_Close; retail stub is only `li t2,B0h; jr t2; li t1,36h` (no Sony code/tables)
+func	0x80072774	pc_port/platform/pe_bios_card.c	# clean-room host model of BIOS B(36h) close -> PE_Memcard_Close; retail stub is only `li t2,B0h; jr t2; li t1,36h` (no Sony code/tables)
+func	0x80072784	bin:parasite-eve-port	# clean-room host model of BIOS B(41h) format -> PE_Memcard_Format; retail stub is only `li t2,B0h; jr t2; li t1,41h` (no Sony code/tables)
+func	0x80072784	bin:pe-native-tests	# clean-room host model of BIOS B(41h) format -> PE_Memcard_Format; retail stub is only `li t2,B0h; jr t2; li t1,41h` (no Sony code/tables)
+func	0x80072784	pc_port/platform/pe_bios_card.c	# clean-room host model of BIOS B(41h) format -> PE_Memcard_Format; retail stub is only `li t2,B0h; jr t2; li t1,41h` (no Sony code/tables)
+func	0x80072794	bin:parasite-eve-port	# clean-room host model of BIOS B(43h) nextfile -> PE_Memcard_NextFile; retail stub is only `li t2,B0h; jr t2; li t1,43h` (no Sony code/tables)
+func	0x80072794	bin:pe-native-tests	# clean-room host model of BIOS B(43h) nextfile -> PE_Memcard_NextFile; retail stub is only `li t2,B0h; jr t2; li t1,43h` (no Sony code/tables)
+func	0x80072794	pc_port/platform/pe_bios_card.c	# clean-room host model of BIOS B(43h) nextfile -> PE_Memcard_NextFile; retail stub is only `li t2,B0h; jr t2; li t1,43h` (no Sony code/tables)
+func	0x800727A4	bin:parasite-eve-port	# clean-room host model of BIOS B(45h) delete -> PE_Memcard_Delete; retail stub is only `li t2,B0h; jr t2; li t1,45h` (no Sony code/tables)
+func	0x800727A4	bin:pe-native-tests	# clean-room host model of BIOS B(45h) delete -> PE_Memcard_Delete; retail stub is only `li t2,B0h; jr t2; li t1,45h` (no Sony code/tables)
+func	0x800727A4	pc_port/platform/pe_bios_card.c	# clean-room host model of BIOS B(45h) delete -> PE_Memcard_Delete; retail stub is only `li t2,B0h; jr t2; li t1,45h` (no Sony code/tables)
 func	0x800727B4	bin:parasite-eve-port
 func	0x800727B4	bin:pe-native-tests
 func	0x800727B4	pc_port/game/decomp_hand/absent_sdk_port.c
@@ -90,8 +120,6 @@ func	0x800738D8	pc_port/game/decomp/func_800738D8_port.c
 func	0x800739C4	bin:parasite-eve-port
 func	0x800739C4	bin:pe-native-tests
 func	0x800739C4	pc_port/game/decomp/func_800739C4_port.c
-func	0x80073A44	bin:parasite-eve-port
-func	0x80073A44	bin:pe-native-tests
 func	0x80073A44	pc_port/include/psx_compat.h
 func	0x80073BBC	bin:parasite-eve-port
 func	0x80073BBC	bin:pe-native-tests
@@ -210,8 +238,6 @@ func	0x80074CB8	pc_port/game/decomp/func_80074CB8_port.c
 func	0x80074CC8	bin:parasite-eve-port
 func	0x80074CC8	bin:pe-native-tests
 func	0x80074CC8	pc_port/game/decomp/func_80074CC8_port.c
-func	0x80074D28	bin:parasite-eve-port
-func	0x80074D28	bin:pe-native-tests
 func	0x80074D28	pc_port/include/psx_compat.h
 func	0x80074DC0	bin:parasite-eve-port
 func	0x80074DC0	bin:pe-native-tests
@@ -529,8 +555,6 @@ func	0x80079E14	pc_port/game/boot/func_800C3B04_port.c
 func	0x80079FB4	bin:parasite-eve-port
 func	0x80079FB4	bin:pe-native-tests
 func	0x80079FB4	pc_port/game/decomp/func_80079FB4_port.c
-func	0x8007A244	bin:parasite-eve-port
-func	0x8007A244	bin:pe-native-tests
 func	0x8007A244	pc_port/game/boot/func_8007A214_port.c
 func	0x8007A2A4	bin:parasite-eve-port
 func	0x8007A2A4	bin:pe-native-tests
@@ -721,9 +745,21 @@ func	0x8007DCAC	pc_port/game/decomp/func_8007DCAC_port.c
 func	0x8007DD14	bin:parasite-eve-port
 func	0x8007DD14	bin:pe-native-tests
 func	0x8007DD14	pc_port/game/decomp/func_8007DD14_port.c
+func	0x8007DD44	bin:parasite-eve-port	# clean-room host model of BIOS A(ABh) _card_info -> PE_Memcard_CardInfoResult + event delivery; retail stub is only `li t2,A0h; jr t2; li t1,ABh` (no Sony code/tables)
+func	0x8007DD44	bin:pe-native-tests	# clean-room host model of BIOS A(ABh) _card_info -> PE_Memcard_CardInfoResult + event delivery; retail stub is only `li t2,A0h; jr t2; li t1,ABh` (no Sony code/tables)
+func	0x8007DD44	pc_port/platform/pe_bios_card.c	# clean-room host model of BIOS A(ABh) _card_info -> PE_Memcard_CardInfoResult + event delivery; retail stub is only `li t2,A0h; jr t2; li t1,ABh` (no Sony code/tables)
+func	0x8007DD54	bin:parasite-eve-port	# clean-room host model of BIOS A(ACh) _card_load -> PE_Memcard_CardLoadResult + event delivery; retail stub is only `li t2,A0h; jr t2; li t1,ACh` (no Sony code/tables)
+func	0x8007DD54	bin:pe-native-tests	# clean-room host model of BIOS A(ACh) _card_load -> PE_Memcard_CardLoadResult + event delivery; retail stub is only `li t2,A0h; jr t2; li t1,ACh` (no Sony code/tables)
+func	0x8007DD54	pc_port/platform/pe_bios_card.c	# clean-room host model of BIOS A(ACh) _card_load -> PE_Memcard_CardLoadResult + event delivery; retail stub is only `li t2,A0h; jr t2; li t1,ACh` (no Sony code/tables)
 func	0x8007DD74	bin:parasite-eve-port
 func	0x8007DD74	bin:pe-native-tests
 func	0x8007DD74	pc_port/game/decomp/func_8007DD74_port.c
+func	0x8007DDB4	bin:parasite-eve-port	# clean-room host model of BIOS B(4Eh) write_card_sector -> PE_Memcard_CardClearResult + event delivery; retail stub is only `li t2,B0h; jr t2; li t1,4Eh` (no Sony code/tables)
+func	0x8007DDB4	bin:pe-native-tests	# clean-room host model of BIOS B(4Eh) write_card_sector -> PE_Memcard_CardClearResult + event delivery; retail stub is only `li t2,B0h; jr t2; li t1,4Eh` (no Sony code/tables)
+func	0x8007DDB4	pc_port/platform/pe_bios_card.c	# clean-room host model of BIOS B(4Eh) write_card_sector -> PE_Memcard_CardClearResult + event delivery; retail stub is only `li t2,B0h; jr t2; li t1,4Eh` (no Sony code/tables)
+func	0x8007DDC4	bin:parasite-eve-port	# clean-room host model of BIOS B(50h) allow_new_card -> no-op; retail stub is only `li t2,B0h; jr t2; li t1,50h` (no Sony code/tables)
+func	0x8007DDC4	bin:pe-native-tests	# clean-room host model of BIOS B(50h) allow_new_card -> no-op; retail stub is only `li t2,B0h; jr t2; li t1,50h` (no Sony code/tables)
+func	0x8007DDC4	pc_port/platform/pe_bios_card.c	# clean-room host model of BIOS B(50h) allow_new_card -> no-op; retail stub is only `li t2,B0h; jr t2; li t1,50h` (no Sony code/tables)
 func	0x8007DDD4	bin:parasite-eve-port
 func	0x8007DDD4	bin:pe-native-tests
 func	0x8007DDD4	pc_port/game/decomp/func_8007DDD4_port.c
@@ -826,11 +862,7 @@ func	0x8007F7A8	pc_port/game/decomp/func_8007F7A8_port.c
 func	0x8007F7C8	bin:parasite-eve-port
 func	0x8007F7C8	bin:pe-native-tests
 func	0x8007F7C8	pc_port/game/decomp/func_8007F7C8_port.c
-func	0x8007F7E8	bin:parasite-eve-port
-func	0x8007F7E8	bin:pe-native-tests
 func	0x8007F7E8	pc_port/game/boot/cd_stream_port.c
-func	0x8007F88C	bin:parasite-eve-port
-func	0x8007F88C	bin:pe-native-tests
 func	0x8007F88C	pc_port/game/boot/cd_stream_port.c
 func	0x8007F960	bin:parasite-eve-port
 func	0x8007F960	bin:pe-native-tests
@@ -904,18 +936,12 @@ func	0x800800F4	pc_port/game/boot/cd_stream_port.c
 func	0x80080164	bin:parasite-eve-port
 func	0x80080164	bin:pe-native-tests
 func	0x80080164	pc_port/game/boot/cd_stream_port.c
-func	0x80080220	bin:parasite-eve-port
-func	0x80080220	bin:pe-native-tests
 func	0x80080220	pc_port/game/boot/cd_stream_port.c
 func	0x80080404	bin:parasite-eve-port
 func	0x80080404	bin:pe-native-tests
 func	0x80080404	pc_port/game/boot/cd_stream_port.c
 func	0x80080404	pc_port/game/decomp/func_80080404_port.c
-func	0x8008068C	bin:parasite-eve-port
-func	0x8008068C	bin:pe-native-tests
 func	0x8008068C	pc_port/game/boot/cd_stream_port.c
-func	0x80080778	bin:parasite-eve-port
-func	0x80080778	bin:pe-native-tests
 func	0x80080778	pc_port/game/boot/cd_stream_port.c
 func	0x8008080C	bin:parasite-eve-port
 func	0x8008080C	bin:pe-native-tests
@@ -1239,6 +1265,15 @@ func	0x80084FC4	pc_port/game/decomp_hand/rcnt2_port.c
 func	0x80084FE4	bin:parasite-eve-port
 func	0x80084FE4	bin:pe-native-tests
 func	0x80084FE4	pc_port/game/decomp_hand/rcnt2_port.c
+func	0x800857E4	bin:parasite-eve-port	# clean-room host model of BIOS B(09h) CloseEvent -> PE_Event_Close; retail stub is only `li t2,B0h; jr t2; li t1,09h` (no Sony code/tables)
+func	0x800857E4	bin:pe-native-tests	# clean-room host model of BIOS B(09h) CloseEvent -> PE_Event_Close; retail stub is only `li t2,B0h; jr t2; li t1,09h` (no Sony code/tables)
+func	0x800857E4	pc_port/platform/pe_libetc.c	# clean-room host model of BIOS B(09h) CloseEvent -> PE_Event_Close; retail stub is only `li t2,B0h; jr t2; li t1,09h` (no Sony code/tables)
+func	0x800857F4	bin:parasite-eve-port	# clean-room host model of BIOS B(0Dh) DisableEvent -> PE_Event_Disable; retail stub is only `li t2,B0h; jr t2; li t1,0Dh` (no Sony code/tables)
+func	0x800857F4	bin:pe-native-tests	# clean-room host model of BIOS B(0Dh) DisableEvent -> PE_Event_Disable; retail stub is only `li t2,B0h; jr t2; li t1,0Dh` (no Sony code/tables)
+func	0x800857F4	pc_port/platform/pe_libetc.c	# clean-room host model of BIOS B(0Dh) DisableEvent -> PE_Event_Disable; retail stub is only `li t2,B0h; jr t2; li t1,0Dh` (no Sony code/tables)
+func	0x80085804	bin:parasite-eve-port	# clean-room host model of BIOS B(20h) UnDeliverEvent -> PE_Event_UnDeliver; retail stub is only `li t2,B0h; jr t2; li t1,20h` (no Sony code/tables)
+func	0x80085804	bin:pe-native-tests	# clean-room host model of BIOS B(20h) UnDeliverEvent -> PE_Event_UnDeliver; retail stub is only `li t2,B0h; jr t2; li t1,20h` (no Sony code/tables)
+func	0x80085804	pc_port/platform/pe_libetc.c	# clean-room host model of BIOS B(20h) UnDeliverEvent -> PE_Event_UnDeliver; retail stub is only `li t2,B0h; jr t2; li t1,20h` (no Sony code/tables)
 func	0x80085814	bin:parasite-eve-port
 func	0x80085814	bin:pe-native-tests
 func	0x80085814	pc_port/game/decomp/func_80085814_port.c
@@ -1296,6 +1331,8 @@ func	0x80085F44	pc_port/game/decomp/func_80085F44_port.c
 func	0x80085F74	bin:parasite-eve-port
 func	0x80085F74	bin:pe-native-tests
 func	0x80085F74	pc_port/game/decomp/func_80085F74_port.c
+func	0x800862F4	bin:parasite-eve-port	# PENDING REPLACEMENT (KD #3, linked Psy-Q libs pending PsyCross): generated libspu SpuSetVoiceVolumeAttr TU linked via pe_stream.c func_80085290 reverb tail (0f979349); audio3 queue: clean-room voice-volume write on our SPU model
+func	0x800862F4	bin:pe-native-tests	# PENDING REPLACEMENT (KD #3, linked Psy-Q libs pending PsyCross): generated libspu SpuSetVoiceVolumeAttr TU linked via pe_stream.c func_80085290 reverb tail (0f979349); audio3 queue: clean-room voice-volume write on our SPU model
 func	0x800862F4	pc_port/game/decomp/func_800862F4_port.c
 func	0x80089EB8	bin:parasite-eve-port
 func	0x80089EB8	bin:pe-native-tests
@@ -1327,11 +1364,7 @@ func	0x8010C01C	pc_port/game/boot/func_8010BE3C_port.c
 func	0x8010C0D8	bin:parasite-eve-port
 func	0x8010C0D8	bin:pe-native-tests
 func	0x8010C0D8	pc_port/game/boot/func_8010BE3C_port.c
-func	0x8010C0FC	bin:parasite-eve-port
-func	0x8010C0FC	bin:pe-native-tests
 func	0x8010C0FC	pc_port/game/boot/func_8010BE3C_port.c
-func	0x8010C1EC	bin:parasite-eve-port
-func	0x8010C1EC	bin:pe-native-tests
 func	0x8010C1EC	pc_port/game/boot/func_8010BE3C_port.c
 func	0x8010C89C	bin:parasite-eve-port
 func	0x8010C89C	bin:pe-native-tests
@@ -1386,8 +1419,6 @@ include	pe_str_feed.h	pc_port/game/boot/cd_stream_port.c
 include	pe_str_feed.h	pc_port/game/boot/func_8007A214_port.c
 include	pe_str_feed.h	pc_port/game/boot/func_80081314_port.c
 include	pe_timer1.h	pc_port/game/decomp_hand/absent_sdk_port.c
-table	libgte_SQRT	bin:pe-native-tests
-table	libgte_ratan_tbl	bin:pe-native-tests
 table	libgte_ratan_tbl	pc_port/tests/retail_enemy_tick_cases.h
 table	libgte_ratan_tbl	pc_port/tests/retail_item_execution_cases.h
 table	libgte_ratan_tbl	pc_port/tests/retail_pe_action_cases.h
@@ -1395,9 +1426,3 @@ table	libgte_ratan_tbl	pc_port/tests/retail_player_animation_cases.h
 table	libgte_ratan_tbl	pc_port/tests/retail_player_tick_cases.h
 table	libgte_ratan_tbl	pc_port/tests/retail_port7_cases.h
 table	libgte_ratan_tbl	pc_port/tests/retail_recovery_item_cases.h
-table	libgte_ratan_tbl	pc_port/tests/retail_transition_path_cases.h
-table	libgte_rcossin_tbl	bin:pe-native-tests
-table	libgte_rsin_tbl	bin:pe-native-tests
-table	libgte_rsqrt_tbl	bin:pe-native-tests
-table	libpress_quant_block	bin:pe-native-tests
-table	libpress_scale_block	bin:pe-native-tests
