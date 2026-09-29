@@ -1,10 +1,10 @@
 {
-  "total_spans": 1695,
+  "total_spans": 1694,
   "counts": {
     "alignment-filler": 33,
     "gte-inline": 5,
     "handwritten-cop": 22,
-    "handwritten-gte-wrapper": 107,
+    "handwritten-gte-wrapper": 106,
     "handwritten-jr-t2": 53,
     "handwritten-syscall": 2
   },
@@ -12,7 +12,7 @@
     "alignment-filler": 33,
     "gte-inline": 192,
     "handwritten-cop": 123,
-    "handwritten-gte-wrapper": 19958,
+    "handwritten-gte-wrapper": 19771,
     "handwritten-jr-t2": 163,
     "handwritten-syscall": 8
   },
@@ -986,12 +986,6 @@
         "name": "func_800DE0A8",
         "vram": "0x800DE0A8",
         "size": "0x700",
-        "file": "asm/disc1/C5060.s"
-      },
-      {
-        "name": "func_800E051C",
-        "vram": "0x800E051C",
-        "size": "0x2EC",
         "file": "asm/disc1/C5060.s"
       }
     ],

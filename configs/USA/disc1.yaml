@@ -4817,5 +4817,7 @@ segments:
       - [0xD09BC, c, func_800E01BC]
       - [0xD0A6C, c, func_800E026C]
       - [0xD0BA0, c, func_800E03A0]
-      - [0xD0D1C, asm]
+      # park-effect glow sprite (POLY_FT4 from scratchpad params; inline GTE macros)
+      - [0xD0D1C, c, func_800E051C]
+      - [0xD1008, asm]
   - [0x1EE800]

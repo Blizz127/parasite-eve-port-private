@@ -1042,3 +1042,14 @@ reproducible; provenance is the plan SHA-256. Read the narrative in
 - **provably non-C-matchable**: 66 funcs, 5121 words (4.2%)
 - **real remaining asm**: 10 funcs, 308 words (0.3%)
 - non-C classes: handwritten-cop:22 handwritten-gte-wrapper:107 handwritten-jr-t2:53 handwritten-syscall:2
+
+### 2025-04-08T22:48:42Z
+
+- plan SHA-256: `93fe51ebc3fb8ace043c13064f80cbe71630c9e2adeb75ca300944396bd6cddc`
+- yaml SHA-256: `ad3a09fbc1e21d9e13bb253d524a209b7a84007cb5d2faaf1e234742d74dba56`
+- spans: 2242 c, 144 asm, 2 rodata
+- union (on-path): 1573 functions
+- **matched C**: 1498 funcs, 117605 words (95.7%)
+- **provably non-C-matchable**: 65 funcs, 4934 words (4.0%)
+- **real remaining asm**: 10 funcs, 308 words (0.3%)
+- non-C classes: handwritten-cop:22 handwritten-gte-wrapper:106 handwritten-jr-t2:53 handwritten-syscall:2

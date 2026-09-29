@@ -2581,6 +2581,7 @@
       "func_80070D6C"
     ],
     "era_o2_g0_expand_div": [
+      "func_800E051C",
       "func_8003C5D8",
       "func_8008BD08",
       "func_8008C18C",
