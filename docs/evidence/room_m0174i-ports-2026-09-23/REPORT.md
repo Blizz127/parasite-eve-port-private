@@ -94,3 +94,32 @@ Gate line from the last serial run after this YAML's last change (overlays2 pass
 $ scripts/exact_rebuild_overlay.sh room_m0174i
 EXACT_REBUILD_GATE[room_m0174i]=PASS plan=b90545056c3d5918ac01a4553a0d2d7746324f525ba1bef829795d21f2f72363 yaml=d653a36f0695a2f24898601796342e7203f511fc46b40315dc7f34dc3f94da5b spans=[93 c, 17 asm, 1 rodata, 2 bin] sha1_orig=b2f0329a9b0c1808f85437d846b4cc36bd9e6c01 sha1_cand=b2f0329a9b0c1808f85437d846b4cc36bd9e6c01 sha1=b2f0329a9b0c1808f85437d846b4cc36bd9e6c01
 ```
+
+## 2026-09-29: M34 phase-1 fire-breath / ember bodies (four inline-GTE ports)
+
+These are the masked-body twins of the four room_m0348i leaves matched in lane m348 (hand-written
+there, with Psy-Q `inline_c.h`-shaped GTE macros; see `docs/evidence/func-80190E98/`,
+`func-801914A0/`, `func-80191A98/`, `func-80191FE0/`). They were ported with
+`ROOM_LANE_DRY=1 python3 tools/analysis/room_lane/port.py m0174i room_m0348i` (dry run first,
+then copied). Every `func_`/`D_` token was remapped word by word, with no SKIP. All four carry
+the `inline GTE/asm` tag, so count them separately from plain C. They add 4 C spans in this
+room but no new distinct masked body (the bodies are already counted in room_m0348i).
+
+| offset | leaf | source | profile |
+| --- | --- | --- | --- |
+| 0x2FC8 | `func_80191FB0` | room_m0348i `func_80190E98` (beam) | era_o2_g0 |
+| 0x35D0 | `func_801925B8` | room_m0348i `func_801914A0` (beam segment update) | era_o2_g0 |
+| 0x3BC8 | `func_80192BB0` | room_m0348i `func_80191A98` (floor glow) | era_o2_g0 |
+| 0x4110 | `func_801930F8` | room_m0348i `func_80191FE0` (ember burst) | era_o2_g0 |
+
+Per leaf: `era_link_check.py --target room_m0174i` gave `LINK_EXACT` (0 mismatched words), and
+`disc1_preflight.py --target room_m0174i --deep --only <func>` printed
+`PASS (deep, 117 c / 1 asm / 1 rodata)`.
+
+```
+$ flock build/lanes/ovl.lock scripts/exact_rebuild_overlay.sh room_m0174i
+EXACT_REBUILD_GATE[room_m0174i]=PASS plan=821c685be78f15091ebacca6113c7dc55138563fc3acbf360935725e53c92ce2 yaml=d3552f7f0701c0b0c3a79a94207687912136462b10b5f846a38fcaf2d354eae5 spans=[117 c, 1 asm, 1 rodata, 2 bin] sha1_orig=b2f0329a9b0c1808f85437d846b4cc36bd9e6c01 sha1_cand=b2f0329a9b0c1808f85437d846b4cc36bd9e6c01 sha1=b2f0329a9b0c1808f85437d846b4cc36bd9e6c01
+```
+
+sha256: `room_m0174i.yaml` = `d3552f7f0701c0b0c3a79a94207687912136462b10b5f846a38fcaf2d354eae5`;
+`room_m0174i_build_profiles.json` = `867403f049a43dfedeb1ded388e957f9770441c4b58bd954b62bc9bd443ea749` (unchanged).
