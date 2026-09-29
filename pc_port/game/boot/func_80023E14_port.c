@@ -154,21 +154,7 @@ int32_t func_80054E4C(int32_t extra)
     return (int32_t)((uint32_t)count-used)>=extra;
 }
 
-void func_80054CF8(void)
-{
-    while ((int32_t)PE_LoadU32(0x8009D06Cu)>0) {
-        unsigned i;
-        for (i=0;i<D_8009D050;i++) if (!PE_LoadU16(D_8009D048+i*2u)) break;
-        if (i<D_8009D050) {
-            int32_t source=(int32_t)((uint32_t)item_capacity()-PE_LoadU32(0x8009D06Cu));
-            pe_addr_t from=D_8009D048+(uint32_t)source*2u;
-            PE_StoreU16(D_8009D048+i*2u,PE_LoadU16(from));PE_StoreU16(from,0u);
-            if ((int8_t)PE_LoadU8(0x800C0E20u)==source) PE_StoreU8(0x800C0E20u,(uint8_t)i);
-            else if ((int8_t)PE_LoadU8(0x800C0E22u)==source) PE_StoreU8(0x800C0E22u,(uint8_t)i);
-        }
-        PE_StoreU32(0x8009D06Cu,PE_LoadU32(0x8009D06Cu)-1u);
-    }
-}
+/* func_80054CF8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80054CF8_port.c (src/func_80054CF8.c); hand port retired (port3 switch-over H). */
 
 int32_t func_80057D30(int32_t index)
 {

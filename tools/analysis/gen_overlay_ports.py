@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -467,15 +468,77 @@ def fnv1a(data: bytes) -> int:
     return h
 
 
-def blob_path(ovl: str) -> Path | None:
+def main_checkout(root: Path) -> Path | None:
+    """The main checkout of the repository that `root` belongs to.
+
+    A git worktree shares its object store with the main checkout; its own
+    `build/` (git-ignored, where extracted blobs live) starts empty.  `git
+    rev-parse --git-common-dir` names the shared `.git` directory, whose parent
+    is the main checkout.  None when `root` is not in a git repository."""
+    try:
+        out = subprocess.run(["git", "-C", str(root), "rev-parse", "--git-common-dir"],
+                             capture_output=True, text=True, check=True).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    if not out:
+        return None
+    common = Path(out)
+    if not common.is_absolute():
+        common = root / common
+    return common.resolve().parent
+
+
+def blob_roots() -> list[Path]:
+    """Checkouts searched for extracted blobs: this one, then the main one."""
+    roots = [REPO_ROOT.resolve()]
+    main = main_checkout(REPO_ROOT)
+    if main is not None and main not in roots:
+        roots.append(main)
+    return roots
+
+
+def blob_path(ovl: str, roots: list[Path] | None = None) -> Path | None:
+    """The extracted retail blob of `ovl` (its config's `target_path`).
+
+    Looked up in this checkout first and then in the main checkout, so a git
+    worktree (whose git-ignored build/ has no extracted data) still finds the
+    blobs and the dispatch registry keeps its fingerprints."""
     text = (OVL_CONFIG_DIR / f"{ovl}.yaml").read_text(encoding="utf-8")
     m = re.search(r"^\s*target_path:\s*(\S+)", text, re.MULTILINE)
     if not m:
         return None
-    p = (OVL_CONFIG_DIR / m.group(1)).resolve()   # base_path ../../.. = repo root
-    if not p.exists():
-        p = (REPO_ROOT / m.group(1).replace("../", "")).resolve()
-    return p if p.exists() else None
+    rel = m.group(1)
+    cands = [(OVL_CONFIG_DIR / rel).resolve()]   # base_path ../../.. = repo root
+    for r in (roots if roots is not None else blob_roots()):
+        cands.append((r / rel.replace("../", "")).resolve())
+    for p in cands:
+        if p.exists():
+            return p
+    return None
+
+
+class MissingBlobError(SystemExit):
+    """An overlay with registry entries has no extracted blob to fingerprint."""
+
+
+def require_blobs(missing: dict[str, int], roots: list[Path]) -> None:
+    """Fail loudly instead of writing fingerprint 0 for an overlay.
+
+    Overlay code resolves at run time only through its fingerprint (nothing
+    declares residency), so a 0 fingerprint silently makes every generated TU
+    of that overlay unreachable."""
+    if not missing:
+        return
+    lines = [f"  {ovl}: {n} registry entr{'y' if n == 1 else 'ies'}"
+             for ovl, n in sorted(missing.items())]
+    raise MissingBlobError(
+        "gen_overlay_ports: ERROR: no extracted blob for "
+        f"{len(missing)} overlay(s) with registry entries; refusing to write "
+        "fingerprint 0 (their generated TUs would never resolve):\n"
+        + "\n".join(lines)
+        + "\n  searched: " + ", ".join(str(r) for r in roots)
+        + "\n  fix: extract them (python3 tools/extract/peimg.py extract / room <id>) "
+          "in the main checkout.")
 
 
 def overlay_facts(ovl: str) -> tuple[str | None, int]:
@@ -604,12 +667,14 @@ def build_dispatch(args) -> tuple[int, list[str]]:
             sig = {"ret": ret, "params": g.split_top(prm), "sym": f"room_{gkey}__{nm}"}
             for rm in re.findall(r"decomp-source-overlay:\s*(\w+)/" + nm, txt):
                 room_entries.setdefault(rm, {})[nm] = sig
+    roots = blob_roots()
+    missing: dict[str, int] = {}
     for ovl_id, lo, hi in all_windows():
         ovl = parse_overlay(ovl_id)
         out_dir = REPO_ROOT / OUT_ROOT / ovl_id
         sigs = overlay_derived_sigs(ovl_id, out_dir)
         sigs.update(room_entries.get(ovl_id, {}))
-        blob = blob_path(ovl_id)
+        blob = blob_path(ovl_id, roots)
         data = blob.read_bytes() if blob else None
         sha, load_size = overlay_facts(ovl_id)
         ents = []
@@ -620,11 +685,15 @@ def build_dispatch(args) -> tuple[int, list[str]]:
             leaf = ovl["leaves"].get(name)
             if not leaf:
                 continue
-            fp = 0
-            if data is not None:
-                off, size = leaf["file_offset"], leaf["file_size"]
-                if off + size <= len(data):
-                    fp = fnv1a(data[off:off + size])
+            if data is None:
+                missing[ovl_id] = missing.get(ovl_id, 0) + 1
+                continue
+            off, size = leaf["file_offset"], leaf["file_size"]
+            if off + size > len(data):
+                raise SystemExit(f"gen_overlay_ports: ERROR: {ovl_id}/{name} "
+                                 f"[{off:#x},+{size:#x}) lies past the end of {blob} "
+                                 f"({len(data):#x} bytes)")
+            fp = fnv1a(data[off:off + size])
             sym = sig.get("sym") or symbol(ovl_id, name)
             params = ", ".join(sig["params"]) or "void"
             ents.append({"vma": leaf["vram"], "size": leaf["file_size"], "fp": fp,
@@ -632,6 +701,7 @@ def build_dispatch(args) -> tuple[int, list[str]]:
                          "decl": f"{sig['ret']} {sym}({params});"})
         tables.append({"id": ovl_id, "lo": lo, "hi": hi, "sha1": sha,
                        "load_size": load_size, "entries": ents})
+    require_blobs(missing, roots)
     dropped: list[str] = []
     cc = None if args.no_compile_check else g.find_compiler()
     text = render_dispatch(tables)

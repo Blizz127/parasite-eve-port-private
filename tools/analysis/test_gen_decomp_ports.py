@@ -815,6 +815,34 @@ class SignednessAdapterTests(unittest.TestCase):
         self.assertEqual(g.signedness_adapter(
             "long ", "int a0", {"ret": "int", "params": ["int a0"]}), "reject")
 
+    def test_trailing_param_header_over_void_leaf_adapts(self):
+        # E20b: field-VM handler header `int f(pe_addr_t args)` over the
+        # matched `int f(void)` (func_800155FC); retail ignores $a0.
+        canon = {"ret": "int", "params": ["pe_addr_t args"]}
+        ad = g.signedness_adapter("int ", "void", canon)
+        self.assertEqual(ad["dropped"], 1)
+        thunk = g.signedness_thunk("func_800155FC", ad)
+        self.assertIn("int func_800155FC(pe_addr_t pe_a0)", thunk)
+        self.assertIn("(void)pe_a0;", thunk)
+        self.assertIn("return (int)pe_leaf_func_800155FC();", thunk)
+        # leading parameters kept exactly, only the tail dropped
+        ad = g.signedness_adapter("void ", "int a0", {"ret": "void", "params": ["int a0", "pe_addr_t b"]})
+        thunk = g.signedness_thunk("func_80001234", ad)
+        self.assertIn("void func_80001234(int pe_a0, pe_addr_t pe_a1)", thunk)
+        self.assertIn("pe_leaf_func_80001234((int)pe_a0);", thunk)
+
+    def test_trailing_param_with_int_over_void_return_rejected(self):
+        # Kept out: header returns int over a void leaf (callers would read a
+        # value retail never produced), even when only trailing params differ.
+        canon = {"ret": "int", "params": ["pe_addr_t node"]}
+        self.assertEqual(g.signedness_adapter("void ", "void", canon), "reject")
+
+    def test_trailing_param_with_narrow_leading_param_rejected(self):
+        # Kept out: a narrower leading parameter (uint32_t header over an
+        # unsigned char leaf) would truncate where retail's callee did not.
+        canon = {"ret": "void", "params": ["uint32_t style", "pe_addr_t extra"]}
+        self.assertEqual(g.signedness_adapter("void ", "unsigned char style", canon), "reject")
+
     def test_rename_definition_only(self):
         body = "int func_80001234(int a0) {\n    return func_80001234(a0 - 1);\n}\n"
         out = g.rename_definition(body, "func_80001234", "pe_leaf_func_80001234")

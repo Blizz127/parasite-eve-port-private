@@ -433,6 +433,31 @@ static void pao_glow(pe_addr_t g, unsigned st, unsigned speed, unsigned delay, u
     PE_StoreU16(g + 0xEu, 0xFFF0u);
 }
 
+/* func_800E051C (now matched + native) draws for real: a valid MATRIX behind
+ * D_800BCFA4 (it is published to scratchpad +0x34), a scale behind
+ * D_800BCFA8, and packet / ordering-table buffers.  The translation z
+ * compensates pao_glow's vector z (0x9ABC = -25924) so sz = 1000 and the
+ * ordering-table slot (sz >> 2) - 8 = 242 lies inside PAO_GLOW_OT.  Each draw
+ * advances the packet cursor D_8009CDD8 by 0x28. */
+#define PAO_GLOW_MAT 0x80162000u
+#define PAO_GLOW_SCL 0x80162100u
+#define PAO_GLOW_OT  0x80163000u
+#define PAO_GLOW_PKT 0x80164000u
+static void pao_glow_draw_env(void)
+{
+    unsigned i;
+    for (i = 0; i < 32u; i += 4u) PE_StoreU32(PAO_GLOW_MAT + i, 0u);
+    PE_StoreU16(PAO_GLOW_MAT + 0u, 0x1000u); PE_StoreU16(PAO_GLOW_MAT + 8u, 0x1000u);
+    PE_StoreU16(PAO_GLOW_MAT + 16u, 0x1000u);
+    PE_StoreU32(PAO_GLOW_MAT + 28u, 25924u + 1000u);
+    PE_StoreU32(PAO_GLOW_SCL, 256u);
+    PE_StoreU32(0x800BCFA4u, PAO_GLOW_MAT);
+    PE_StoreU32(0x800BCFA8u, PAO_GLOW_SCL);
+    PE_StoreU32(0x8009CDD8u, 0u); PE_StoreU32(0x8009CDDCu, 0u);
+    PE_StoreU32(0x800B0E38u, PAO_GLOW_OT); PE_StoreU32(0x800B0E58u, PAO_GLOW_PKT);
+    for (i = 0; i < 0x400u; i += 4u) PE_StoreU32(PAO_GLOW_OT + i, 0x00FFFFFFu);
+}
+
 static void test_PA_ovl_E026C(void)
 {
     TEST("PA_ovl_E026C");
@@ -442,7 +467,7 @@ static void test_PA_ovl_E026C(void)
     PE_StoreU16(0x1F80001Eu, 0xEEEEu);
     func_800E026C(g);
     ASSERT(PE_LoadU16(0x1F80001Eu) == 0xEEEEu && PE_Decomp_BoundaryCount() == 0u, "E026C: inactive no-op");
-    PE_StoreU32(0x800BCFA4u, 0xCAFEF00Du);
+    pao_glow_draw_env();
     PE_StoreU16(0x800E21A4u, 5u);
     pao_glow(g, 1u, 2u, 0u, 0x20u);
     func_800E026C(g);
@@ -450,20 +475,21 @@ static void test_PA_ovl_E026C(void)
            PE_LoadU8(0x1F800018u) == 0x80u && PE_LoadU8(0x1F80001Au) == 0x80u &&
            PE_LoadU8(0x1F80001Cu) == 0x20u && PE_LoadU8(0x1F80001Du) == 0xD0u &&
            PE_LoadU16(0x1F800026u) == 0x5678u && PE_LoadU32(0x1F80002Cu) == 0xFFFFFFF0u &&
-           PE_LoadU32(0x1F800034u) == 0xCAFEF00Du, "E026C: scratchpad (alpha before the step)");
+           PE_LoadU32(0x1F800034u) == PAO_GLOW_MAT, "E026C: scratchpad (alpha before the step)");
     ASSERT(PE_LoadU8(g + 3u) == 0x30u && PE_LoadU8(g + 2u) == 2u && PE_LoadU8(g) == 1u,
            "E026C: alpha += 0x10, delay reloads");
-    ASSERT(g_bootstrap_arg4_call_count == 1 && g_bootstrap_arg4_calls[0].arg0 == g,
-           "E026C: func_800E051C with the live record");
+    ASSERT(PE_LoadU32(0x8009CDD8u) == 0x28u && PE_LoadU8(PAO_GLOW_PKT + 7u) == 0x2Eu,
+           "E026C: func_800E051C drew one glow packet (cursor +0x28)");
     func_800E026C(g);
-    ASSERT(PE_LoadU8(g + 2u) == 1u && PE_LoadU8(g + 3u) == 0x30u, "E026C: delay counts down");
+    ASSERT(PE_LoadU8(g + 2u) == 1u && PE_LoadU8(g + 3u) == 0x30u &&
+           PE_LoadU32(0x8009CDD8u) == 0x50u, "E026C: delay counts down (still drawn)");
     PE_StoreU8(g + 2u, 0u);
     func_800E026C(g);
     ASSERT(PE_LoadU8(g) == 0u && PE_LoadU8(g + 3u) == 0u && PE_LoadU16(0x800E21A4u) == 4u &&
-           g_bootstrap_arg4_call_count == 2, "E026C: past 0x30 frees without the draw");
+           PE_LoadU32(0x8009CDD8u) == 0x50u, "E026C: past 0x30 frees without the draw");
     pao_glow(g, 2u, 2u, 0u, 0x20u);
     func_800E026C(g);
-    ASSERT(PE_LoadU8(g + 3u) == 0x20u && g_bootstrap_arg4_call_count == 2, "E026C: state 2 only publishes");
+    ASSERT(PE_LoadU8(g + 3u) == 0x20u && PE_LoadU32(0x8009CDD8u) == 0x50u, "E026C: state 2 only publishes");
     PASS();
 }
 
@@ -475,6 +501,7 @@ static void test_PA_ovl_E03A0(void)
     pao_glow(g, 1u, 0x40u, 0u, 0u);
     PE_StoreU16(g + 0xCu, 0x50u);
     PE_StoreU8(g + 0x10u, 0x60u); PE_StoreU8(g + 0x11u, 0x20u); PE_StoreU8(g + 0x12u, 0xFFu);
+    pao_glow_draw_env();
     func_800E03A0(g);
     ASSERT(PE_LoadU16(0x1F80001Eu) == 0x7713u && PE_LoadU8(0x1F80001Cu) == 0xC0u &&
            PE_LoadU8(0x1F80001Du) == 0xCAu && PE_LoadU16(0x1F800028u) == 0x9ABCu,
@@ -482,9 +509,10 @@ static void test_PA_ovl_E03A0(void)
     ASSERT(PE_LoadU8(0x1F800018u) == 0x10u && PE_LoadU8(0x1F800019u) == 0u &&
            PE_LoadU8(0x1F80001Au) == 0xAFu, "E03A0: colour minus level, clamped at 0");
     ASSERT(PE_LoadU16(g + 0xCu) == 0x90u && PE_LoadU8(g) == 1u, "E03A0: fade up by a0[1]");
-    ASSERT(g_bootstrap_arg4_call_count == 1 && g_bootstrap_arg4_calls[0].arg0 == 0xAFu &&
-           g_bootstrap_arg4_calls[0].arg1 == g && g_bootstrap_arg4_calls[0].arg2 == 0x10u,
-           "E03A0: func_800E051C with live a0 = blue, a1 = record, a2 = red");
+    /* src/func_800E051C.c is void(void): it reads the scratchpad block only. */
+    ASSERT(PE_LoadU32(0x8009CDD8u) == 0x28u && PE_LoadU8(PAO_GLOW_PKT + 7u) == 0x2Eu &&
+           PE_LoadU8(PAO_GLOW_PKT + 4u) == 0x10u && PE_LoadU8(PAO_GLOW_PKT + 6u) == 0xAFu,
+           "E03A0: func_800E051C drew the glow with the clamped colour");
     PE_StoreU16(g + 0xCu, 0xF0u);
     func_800E03A0(g);
     ASSERT(PE_LoadU16(g + 0xCu) == 0xFFu && PE_LoadU8(g) == 2u, "E03A0: clamp at 0xFF, state 2");
@@ -492,7 +520,7 @@ static void test_PA_ovl_E03A0(void)
     PE_StoreU16(g + 0xCu, 0x30u);
     func_800E03A0(g);
     ASSERT(PE_LoadU8(g) == 0u && PE_LoadU16(g + 0xCu) == 0u && PE_LoadU16(0x800E21A4u) == 2u &&
-           g_bootstrap_arg4_call_count == 2, "E03A0: fade-down below 0 frees, no draw");
+           PE_LoadU32(0x8009CDD8u) == 0x50u, "E03A0: fade-down below 0 frees, no draw");
     PASS();
 }
 

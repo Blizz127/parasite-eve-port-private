@@ -35695,8 +35695,10 @@ static void test_ATK3_retail_attack_initialization(void)
 #include "test_m34_projectile.h"
 #include "test_m34_children.h"
 #include "test_pe_plat.h"
+#include "test_vblank_clock.h"
 #include "test_cheats.h"
 #include "test_split_brain.h"
+#include "test_glow_sprite.h"
 #include "test_actor_contact.h"
 #include "test_clear_image.h"
 #include "test_script_sound.h"
@@ -35705,6 +35707,7 @@ static void test_ATK3_retail_attack_initialization(void)
 #include "test_attachment_vm.h"
 #include "test_anchor_attachment.h"
 #include "test_ncct.h"
+#include "test_m0348i_gte.h"
 #include "test_m0034i_model.h"
 #include "test_m0034i_setup.h"
 #include "test_m0034i_delivery.h"
@@ -40713,6 +40716,9 @@ int main(void)
     test_DAY1_attachment_vm();
     test_DAY1_anchor_attachment();
     test_DAY1_ncct();
+    test_M348G_mvmva_words();
+    test_M348G_comp_matrix();
+    test_M348G_c4fc4_ring();
     test_DAY1_m0034i_model();
     test_DAY1_m0034i_setup();
     test_DAY1_m0034i_delivery();
@@ -40902,8 +40908,10 @@ int main(void)
     test_HANDHI_all();
     test_PORTABSENT_all();
     test_PLAT_all();   /* step P0: pe_plat adapters (test_pe_plat.h) */
+    test_HOSTFB_vblank_clock_vs_vsync_calls();
     test_CHEATS_all(); /* opt-in cheat console (test_cheats.h) */
     test_SPLIT_all();  /* one guest authority per retail scalar (test_split_brain.h) */
+    test_GLOW1_func_800E051C_packet();  /* matched-C packet check (test_glow_sprite.h) */
 
     /* Guard tests (4 tests) */
     test_no_emulator_process();

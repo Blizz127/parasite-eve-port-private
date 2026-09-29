@@ -113,14 +113,7 @@ int func_80014FD8(pe_addr_t args)
     return sew8_wait(12u);
 }
 
-int func_800155FC(pe_addr_t args)
-{
-    uint32_t phase = PE_LoadU32(GA_D_800BCF88) & 7u;
-    (void)args;
-    if (phase == 4u || phase == 0u)
-        return 1;
-    return sew8_wait(8u);
-}
+/* func_800155FC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800155FC_port.c (src/func_800155FC.c); hand port retired (port3 switch-over I). */
 
 /* func_80019B08: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80019B08_port.c (src/func_80019B08.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 

@@ -144,7 +144,10 @@ void func_8006A0E8(void)
 
 /* Original E01BC..E0808: effect walk, animation/fade, projected FT4. */
 #include "pe_sdk.h"
-static void park_effect_draw(void)
+/* func_800E051C: camera-facing glow sprite (POLY_FT4 code 0x2E), audited line by
+ * line against src/func_800E051C.c (inline-GTE leaf; the generator skips asm, so
+ * this is its native implementation).  Exported for func_800E026C/800E03A0. */
+void func_800E051C(void)
 {
     const pe_addr_t scratch=0x1F800000u;
     uint32_t offset=PE_LoadU32(0x8009CDD8u),bank=PE_LoadU32(0x8009CDDCu),xy,z;
@@ -178,7 +181,7 @@ static void park_effect_draw(void)
     PE_StoreU32(packet,(PE_LoadU32(packet)&0xFF000000u)|(PE_LoadU32(ot)&0xFFFFFFu));
     PE_StoreU32(ot,(PE_LoadU32(ot)&0xFF000000u)|(packet&0xFFFFFFu));
 }
-static void park_effect_tick(pe_addr_t slot,unsigned mode)
+__attribute__((unused)) static void park_effect_tick(pe_addr_t slot,unsigned mode)
 {
     const pe_addr_t scratch=0x1F800000u;
     if(!PE_LoadU8(slot))return;
@@ -212,21 +215,10 @@ static void park_effect_tick(pe_addr_t slot,unsigned mode)
             }
         }
     }
-    park_effect_draw();
+    func_800E051C();
 }
-void func_800E01BC(void)
-{
-    int processed=0;pe_addr_t slot=PE_LoadU32(0x800E2800u);
-    if((int16_t)PE_LoadU16(0x800E21A4u)<=0)return;
-    do {
-        if(PE_LoadU8(slot)) {
-            unsigned mode=PE_LoadU8(slot+10u);
-            if(mode<=1u)park_effect_tick(slot,mode);
-            processed++;
-        }
-        slot-=20u;
-    } while(processed<(int16_t)PE_LoadU16(0x800E21A4u));
-}
+/* func_800E01BC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800E01BC_port.c (src/func_800E01BC.c); hand port retired (port3 switch-over J). */
+void func_800E01BC(void);
 
 /* func_8006EC08: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8006EC08_port.c (src/func_8006EC08.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 int func_8006EC08(void);

@@ -221,18 +221,19 @@ static void ScriptPadLoad(const char *s)
 /* PE_PAD_SCRIPT frames count host presents by default.  The game presents
  * nothing while paused (retail's pause only waits VSync), so a present-keyed
  * script can never send the unpausing Start.  PE_PAD_SCRIPT_CLOCK=vblank
- * keys the script on emulated VBlanks instead, like a real pad. */
+ * keys the script on emulated VBlanks (PE_GPU_VSyncQuery: one per VBlank,
+ * not per VSync() call), the same unit as the emulator oracle's .pad files. */
 static uint16_t ScriptPadSource(void)
 {
     static int by_vblank = -1;
-    int presented = 0, vsync = 0;
+    int presented = 0;
     uint16_t mask = 0xFFFFu;
     if (by_vblank < 0) {
         const char *c = getenv("PE_PAD_SCRIPT_CLOCK");
         by_vblank = c && !strcmp(c, "vblank");
     }
-    HostFB_GetState(&vsync, NULL, &presented, NULL);
-    if (by_vblank) presented = vsync;
+    HostFB_GetState(NULL, NULL, &presented, NULL);
+    if (by_vblank) presented = (int)PE_GPU_VSyncQuery();
     for (unsigned i = 0; i < g_script_pad_count && presented >= g_script_pad[i].frame; i++)
         mask = g_script_pad[i].mask;
     return mask;
@@ -1247,8 +1248,11 @@ int main(int argc, char **argv) {
 
     Stub_PrintSummary();
     int vs, ds, pr, mk; HostFB_GetState(&vs, &ds, &pr, &mk);
-    fprintf(stderr, "[FB] vsyncs=%d drawsyncs=%d presents=%d mask=%d main_iters=%d\n",
-            vs, ds, pr, mk, g_port_main_iterations);
+    /* vsyncs = VSync() CALLS (counter queries included), not elapsed time;
+     * vblanks = emulated VBlanks (PE_GPU_VSyncQuery), the unit the emulator
+     * oracle and retail timings use. */
+    fprintf(stderr, "[FB] vsyncs=%d drawsyncs=%d presents=%d mask=%d main_iters=%d vblanks=%u\n",
+            vs, ds, pr, mk, g_port_main_iterations, (unsigned)PE_GPU_VSyncQuery());
     fprintf(stderr, "[HOST] stop_reason=%s\n",
             PE_Port_StopReasonName(PE_Port_GetStopReason()));
     fprintf(stderr, "[HOST] final room token=%08X story persist[74]=%08X\n",

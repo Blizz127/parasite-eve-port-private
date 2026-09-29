@@ -100,6 +100,28 @@ void HostFB_SetScanoutHook(void (*hook)(void)) { fb_scanout_hook = hook; }
  * screen on the PS1.  On a VBlank with no PutDispEnv this rescans the current
  * display start with the last PutDispEnv geometry.  Display only: it is not
  * a present (no present count, present hook, route clock or shot). */
+/* Harness aid (off by default): PE_SHOT_VSYNC=<dir>:<first>:<step> writes
+ * <dir>/v<vblank>.ppm of the displayed image every <step> emulated VBlanks
+ * (PE_GPU_VSyncQuery) from <first>, also while the game presents nothing
+ * (pause), which present-keyed shots cannot capture. */
+static void HostFB_ShotVBlank(void)
+{
+    static int init, next, step; static char dir[400];
+    int vblank;
+    if (!init) {
+        const char *e = getenv("PE_SHOT_VSYNC"); init = 1;
+        if (!e || sscanf(e, "%399[^:]:%d:%d", dir, &next, &step) != 3 || step < 1) dir[0] = 0;
+    }
+    if (!dir[0]) return;
+    vblank = (int)PE_GPU_VSyncQuery();
+    if (vblank >= next) {   /* a VBlank crossed inside a query quantum still gets its shot */
+        char path[512];
+        snprintf(path, sizeof path, "%s/v%06d.ppm", dir, next);
+        (void)HostFB_WritePPM(path);
+        while (next <= vblank) next += step;
+    }
+}
+
 static void HostFB_ScanOutIdleVBlank(void)
 {
     PeGpuState st;
@@ -278,24 +300,11 @@ uint32_t HostFB_VSync(int mode)
             else { PE_GPU_VBlankStep(); HostFB_VBlankGameCallbacks(); }
             if(PE_Port_ShouldStop()) break;
             HostFB_ScanOutIdleVBlank();
+            HostFB_ShotVBlank();
         }
     }
     fb_vsync_count++;
-    {   /* Harness aid (off by default): PE_SHOT_VSYNC=<dir>:<first>:<step>
-         * writes <dir>/v<vsync>.ppm of the displayed image every <step>
-         * VBlanks from <first>, also while the game presents nothing
-         * (pause), which present-keyed shots cannot capture. */
-        static int init, first, step; static char dir[400];
-        if (!init) {
-            const char *e = getenv("PE_SHOT_VSYNC"); init = 1;
-            if (!e || sscanf(e, "%399[^:]:%d:%d", dir, &first, &step) != 3 || step < 1) dir[0] = 0;
-        }
-        if (dir[0] && fb_vsync_count >= first && (fb_vsync_count - first) % step == 0) {
-            char path[512];
-            snprintf(path, sizeof path, "%s/v%06d.ppm", dir, fb_vsync_count);
-            (void)HostFB_WritePPM(path);
-        }
-    }
+    HostFB_ShotVBlank();
     /* VBlank edge. The retail return contract (80073A44) samples the free-
      * running scanline timer at ENTRY and returns `(entry - baseline) &
      * 0xFFFF` for every non-negative mode; waiting modes then re-latch the

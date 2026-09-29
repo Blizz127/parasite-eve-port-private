@@ -22,15 +22,4 @@
 #include "psx_compat.h"
 #include "pe_port_compat.h"
 
-void func_8004B5DC(pe_addr_t node)
-{
-    (void)node;   /* the draw callback receives the window but uses no node state */
-
-    func_8005E8A4(0x10, 0x0A);
-    func_8005FCAC(8 - (int32_t)func_8005E884());
-    func_8005EB58(func_80073A44(-1) & 0x10u);
-    func_8005E8A4(-0x10, -0x69);
-    func_8005EB64(0x7Bu);
-    func_8005E8A4(0, 0xBE);
-    func_8005ED18(0x7Bu, 2u);
-}
+/* func_8004B5DC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8004B5DC_port.c (src/func_8004B5DC.c); hand port retired (port3 switch-over I). */

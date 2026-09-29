@@ -95,6 +95,9 @@ Later additions (see docs/ai_context/PC_PORT_FROM_DECOMP.md §3):
       returns such an integer, keeps its verbatim body as a static
       `pe_leaf_func_X` behind an exported thunk with the header signature
       (same-width casts: identity on the retail register value).
+      E20b: the header may also carry extra TRAILING parameters the leaf
+      never takes (identical return type, exactly matching leading
+      parameters); the thunk drops them.
   Unit tests: test_gen_decomp_ports.py.
 
 E13-E16 all describe the same underlying fact from different angles: a 32-bit
@@ -1917,6 +1920,14 @@ def signedness_adapter(leaf_ret: str, leaf_params: str, canon: dict):
     cp = _param_types(cparams)
     if lret == cret and lp == cp:
         return None
+    if (len(cp) > len(lp) and lret == cret and cp[:len(lp)] == lp):
+        # E20b: the header carries extra TRAILING parameters the matched leaf
+        # never takes (e.g. the field-VM `pe_addr_t args` handler form over a
+        # `(void)` leaf).  Retail's callee ignores the extra argument
+        # registers, so dropping them is the identity.  Only with an
+        # identical return type and exactly matching leading parameters.
+        return {"leaf_ret": lret, "ret": cret, "leaf_params": lp, "params": cp,
+                "dropped": len(cp) - len(lp)}
     if len(lp) != len(cp):
         return "reject"
     for a, b in zip(lp, cp):
@@ -1949,10 +1960,18 @@ def signedness_thunk(name: str, ad: dict) -> str:
     formals = ", ".join(f"{t} pe_a{i}" for i, t in enumerate(ad["params"])) or "void"
     actuals = ", ".join(f"({t})pe_a{i}" for i, t in enumerate(ad["leaf_params"]))
     call = f"pe_leaf_{name}({actuals})"
-    head = ("\n/* E20 signedness adapter: the canonical pc_port prototype types this\n"
-            " * leaf's 32-bit integers differently; the casts are the identity on\n"
-            " * the retail register value. */\n"
-            f"{ad['ret']} {name}({formals})\n{{\n")
+    if ad.get("dropped"):
+        n = len(ad["leaf_params"])
+        unused = "".join(f"    (void)pe_a{i};\n" for i in range(n, len(ad["params"])))
+        head = ("\n/* E20b trailing-parameter adapter: the canonical pc_port prototype\n"
+                " * passes arguments this leaf never takes; retail ignores those\n"
+                " * argument registers. */\n"
+                f"{ad['ret']} {name}({formals})\n{{\n{unused}")
+    else:
+        head = ("\n/* E20 signedness adapter: the canonical pc_port prototype types this\n"
+                " * leaf's 32-bit integers differently; the casts are the identity on\n"
+                " * the retail register value. */\n"
+                f"{ad['ret']} {name}({formals})\n{{\n")
     if ad["ret"] == "void":
         stmt = f"    (void){call};\n" if ad["leaf_ret"] != "void" else f"    {call};\n"
     else:

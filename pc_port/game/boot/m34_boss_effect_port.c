@@ -898,8 +898,252 @@ static void m0348i_8019253C(pe_addr_t a1, pe_addr_t o)
         PE_StoreU8(a1 + 1u, 2u);
 }
 
+/* ── M34 phase 2 (m0348i) effect-VM callbacks, round 3: the fire-breath
+ * beam, its floor glow and the ember burst.  Line-for-line from the matched
+ * leaves src/overlays/room_m0348i/func_{80190E98,80191A98,80191FE0}.c
+ * (commit 054d91ee).  The generator rejects all three ("asm": their inline
+ * Psy-Q GTE macros) and they pass stack-local MATRIX/VECTOR addresses to
+ * guest-address callees, so they are translated here like rounds 1-2.
+ * gte_CompMatrix is reproduced op-for-op on the port GTE (pe_gte.c):
+ * SetRotMatrix(r1); per column ldclmv/rtir(MVMVA sf=1 RT*IR, no TR)/stclmv;
+ * SetTransMatrix(r1); ldlv0(r2+20) (low halves of r2.t); rt (MVMVA sf=1
+ * RT*V0+TR); stlvnl stores IR1-3 as words (the macro's swc2 $9-$11, as in
+ * retail) -- so r2 == r3 aliasing behaves exactly as on the console.
+ * Stack locals whose address escapes live in PE_M0348I_STACK:
+ * +0x00 MATRIX m, +0x20 MATRIX rm / m2, +0x40 VECTOR tmp, +0x50 SVECTOR
+ * angles (rot0/rot1/sv), +0x58 SVECTOR pos.  m2 (80190E98) is a plain copy
+ * and stays host-side. */
+void func_800C4FC4(pe_addr_t r, pe_addr_t matrix, unsigned billboard);   /* func_800C9C20_port.c */
+
+void PE_M0348iCompMatrix(pe_addr_t r1, pe_addr_t r2, pe_addr_t r3);
+void PE_M0348iCompMatrix(pe_addr_t r1, pe_addr_t r2, pe_addr_t r3)
+{
+    unsigned c, j;
+    PE_GTE_LoadRT33(r1);
+    for (c = 0; c < 3u; c++) {
+        PE_GTE_SetIR((int16_t)PE_LoadU16(r2 + c * 2u), (int16_t)PE_LoadU16(r2 + c * 2u + 6u),
+                     (int16_t)PE_LoadU16(r2 + c * 2u + 12u));
+        PE_GTE_MVMVA(0x9E012u);   /* 0x4A49E012 rtir */
+        for (j = 0; j < 3u; j++) PE_StoreU16(r3 + c * 2u + j * 6u, (uint16_t)g_pe_gte.ir[j]);
+    }
+    PE_GTE_LoadRT(r1);           /* SetTransMatrix (RT unchanged: same r1) */
+    PE_GTE_SetV0((int16_t)PE_LoadU16(r2 + 20u), (int16_t)PE_LoadU16(r2 + 24u), (int16_t)PE_LoadU16(r2 + 28u));
+    PE_GTE_MVMVA(0x80012u);      /* 0x4A480012 rt */
+    for (j = 0; j < 3u; j++) PE_StoreU32(r3 + 20u + j * 4u, (uint32_t)g_pe_gte.ir[j]);
+}
+static void m0348i_identity(pe_addr_t m, int32_t tx, int32_t ty, int32_t tz)
+{
+    PE_StoreU16(m + 0x10u, 0x1000); PE_StoreU16(m + 0x08u, 0x1000); PE_StoreU16(m + 0x00u, 0x1000);
+    PE_StoreU32(m + 0x1Cu, 0); PE_StoreU32(m + 0x18u, 0); PE_StoreU32(m + 0x14u, 0);
+    PE_StoreU16(m + 0x0Eu, 0); PE_StoreU16(m + 0x0Cu, 0); PE_StoreU16(m + 0x0Au, 0);
+    PE_StoreU16(m + 0x06u, 0); PE_StoreU16(m + 0x04u, 0); PE_StoreU16(m + 0x02u, 0);
+    PE_StoreU32(m + 0x14u, (uint32_t)tx); PE_StoreU32(m + 0x18u, (uint32_t)ty); PE_StoreU32(m + 0x1Cu, (uint32_t)tz);
+}
+/* func_80071A44(&scale, 0, 16); scale.v{x,y,z} = s; tmp = scale; */
+static void m0348i_scale_vec(pe_addr_t tmp, int32_t s)
+{
+    (void)func_80071A44(tmp, 0, 0x10);
+    PE_StoreU32(tmp + 0u, (uint32_t)s); PE_StoreU32(tmp + 4u, (uint32_t)s); PE_StoreU32(tmp + 8u, (uint32_t)s);
+}
+
+/* func_80191FE0: ember burst (4 embers through D_80192E40). */
+static void m0348i_80191FE0(pe_addr_t a2)
+{
+    const pe_addr_t m = PE_M0348I_STACK, tmp = PE_M0348I_STACK + 0x40u, ang = PE_M0348I_STACK + 0x50u;
+    const uint32_t rot0 = PE_LoadU32(0x8018F004u), rot1 = PE_LoadU32(0x8018F008u);
+    pe_addr_t x = m0348i_c2b50();
+    unsigned i;
+    func_800C2EAC(PE_LoadU8(x + 0x44u));
+    (void)func_800C2FF0(0x20, 0x20);
+    func_800C3098(0x100);
+    func_800C3238(2);
+    for (i = 0; i < 4u; i++) {
+        m0348i_identity(m, S16AT_(a2 + i * 8u + 0x30u), S16AT_(a2 + i * 8u + 0x32u), S16AT_(a2 + i * 8u + 0x34u));
+        PE_M0348iCompMatrix(a2, m, m);
+        PE_StoreU32(ang, rot0); PE_StoreU32(ang + 4u, rot1);
+        func_800794C4(ang, m);
+        m0348i_scale_vec(tmp, S16AT_(a2 + i * 2u + 0x70u));
+        (void)func_80078CC4(m, tmp);
+        PE_StoreU16(0x80192E4Au, PE_LoadU16(a2 + i * 2u + 0x78u));
+        PE_StoreU8(0x80192E40u, PE_LoadU8(a2 + i * 4u + 0x20u));
+        PE_StoreU8(0x80192E41u, PE_LoadU8(a2 + i * 4u + 0x21u));
+        PE_StoreU8(0x80192E42u, PE_LoadU8(a2 + i * 4u + 0x22u));
+        func_800C42A4(0x80192E40u, m, 1u);
+    }
+}
+
+/* func_80191A98: beam floor glow (two ring slots D_80192E80[2], 0x18 each). */
+static void m0348i_80191A98(pe_addr_t a2)
+{
+    const pe_addr_t m = PE_M0348I_STACK, m2 = PE_M0348I_STACK + 0x20u;
+    const pe_addr_t tmp = PE_M0348I_STACK + 0x40u, ang = PE_M0348I_STACK + 0x50u;
+    const uint32_t rot0 = PE_LoadU32(0x8018F004u), rot1 = PE_LoadU32(0x8018F008u);
+    pe_addr_t x = m0348i_c2b50();
+    m0348i_copy_words(a2, PE_LoadU32(PE_LoadU32(x) + 0x238u) + 0xA0u, 8u);
+    PE_StoreU16(0x80192E94u, PE_LoadU16(a2 + 0x34u));
+    PE_StoreU16(0x80192EACu, PE_LoadU16(a2 + 0x34u));
+    func_800C3238(2);
+    m0348i_identity(m, 0, 100, -100);
+    PE_M0348iCompMatrix(a2, m, m);
+    PE_StoreU32(ang, rot0); PE_StoreU32(ang + 4u, rot1);
+    func_800794C4(ang, m);
+    m0348i_scale_vec(tmp, S16AT_(a2 + 0x30u));
+    (void)func_80078CC4(m, tmp);
+    m0348i_copy_words(m2, m, 8u);
+    func_800C4FC4(0x80192E80u, m, 1u);
+    func_800C4FC4(0x80192E98u, m2, 1u);
+}
+
+/* func_80190E98: fire-breath beam (16 segments; floor glow D_80192EB0). */
+static void m0348i_80190E98(pe_addr_t a2)
+{
+    const pe_addr_t m = PE_M0348I_STACK, rm = PE_M0348I_STACK + 0x20u;
+    const pe_addr_t tmp = PE_M0348I_STACK + 0x40u, ang = PE_M0348I_STACK + 0x50u, pos = PE_M0348I_STACK + 0x58u;
+    const uint32_t r0a = PE_LoadU32(0x8018F004u), r0b = PE_LoadU32(0x8018F008u);
+    const uint32_t r1a = PE_LoadU32(0x8018EFF4u), r1b = PE_LoadU32(0x8018EFF8u);
+    uint32_t m2[8];
+    pe_addr_t x = m0348i_c2b50();
+    unsigned i, k;
+    func_800C2EAC(PE_LoadU8(x + 0x44u));
+    (void)func_800C2FF0(0x20, 0x20);
+    func_800C3098(0x100);
+    func_800C3238(2);
+    PE_StoreU16(ang + 0u, 0x20u);
+    PE_StoreU16(ang + 2u, PE_LoadU16(a2 + 0x180u));
+    PE_StoreU16(ang + 4u, 0u);
+    func_800794C4(ang, rm);
+    PE_StoreU32(rm + 0x14u, 0); PE_StoreU32(rm + 0x18u, 0); PE_StoreU32(rm + 0x1Cu, 0);
+    for (i = 0; i < 16u; i++) {
+        if ((int8_t)PE_LoadU8(a2 + i) == 1 && S16AT_(a2 + i * 8u + 0x64u) < -0x28A) {
+            int32_t t0, t2;
+            m0348i_identity(m, S16AT_(a2 + i * 8u + 0x60u), S16AT_(a2 + i * 8u + 0x62u), S16AT_(a2 + i * 8u + 0x64u));
+            PE_M0348iCompMatrix(rm, m, m);
+            PE_M0348iCompMatrix(a2 + 0x160u, m, m);
+            PE_StoreU32(ang, r0a); PE_StoreU32(ang + 4u, r0b);
+            func_800794C4(ang, m);
+            m0348i_scale_vec(tmp, S16AT_(a2 + i * 2u + 0x40u));
+            (void)func_80078CC4(m, tmp);
+            PE_StoreU16(0x80192EBAu, PE_LoadU16(a2 + i * 2u + 0x20u));
+            for (k = 0; k < 8u; k++) m2[k] = PE_LoadU32(m + k * 4u);
+            t0 = (int32_t)PE_LoadU32(m + 0x14u); t2 = (int32_t)PE_LoadU32(m + 0x1Cu);
+            PE_StoreU16(pos + 0u, (uint16_t)t0);
+            PE_StoreU16(pos + 2u, (uint16_t)PE_LoadU32(m + 0x18u));
+            PE_StoreU16(pos + 4u, (uint16_t)t2);
+            if (func_8001CAB0((int32_t)((uint32_t)t0 << 16), (int32_t)((uint32_t)t2 << 16),
+                              (pe_addr_t)PE_LoadU32(0x8009D248u), PE_LoadU16(0x8009D1CCu)) == 0)
+                PE_StoreU8(a2 + i, 0u);
+            if (func_800C6B90(pos, 200) != 0)
+                PE_StoreU16(x + 0x4Cu, 1u);
+            func_800C42A4(0x80192EB0u, m, 1u);
+            for (k = 0; k < 8u; k++) PE_StoreU32(m + k * 4u, m2[k]);
+            PE_StoreU32(ang, r1a); PE_StoreU32(ang + 4u, r1b);
+            func_800794C4(ang, m);
+            PE_StoreU32(m + 0x18u, (uint32_t)S16AT_(0x800942ECu));
+            m0348i_copy_words(tmp, 0x8018F03Cu, 4u);
+            (void)func_80078CC4(m, tmp);
+            PE_StoreU16(0x80192EBAu, (uint16_t)(S16AT_(a2 + i * 2u + 0x20u) >> 1));
+            func_800C42A4(0x80192EB0u, m, 0u);
+        }
+    }
+}
+
+/* func_80191DB0 (src/overlays/room_m0348i/func_80191DB0.c): floor-glow
+ * fade -- p+0x30 -= 150 (floor 400); from tick 8 p+0x34 -= 16, retire at 0. */
+static void m0348i_80191DB0(pe_addr_t q, pe_addr_t p)
+{
+    PE_StoreU16(p + 0x30u, (uint16_t)(S16AT_(p + 0x30u) - 150));
+    if (S16AT_(p + 0x30u) < 400)
+        PE_StoreU16(p + 0x30u, 400u);
+    if (S16AT_(q + 2u) >= 8) {
+        PE_StoreU16(p + 0x34u, (uint16_t)(S16AT_(p + 0x34u) - 16));
+        if (S16AT_(p + 0x34u) < 0) {
+            PE_StoreU16(p + 0x34u, 0u);
+            PE_StoreU8(q + 1u, 2u);
+        }
+    }
+}
+
+/* func_801922E0 (src/overlays/room_m0348i/func_801922E0.c): ember motion --
+ * pos[i] (+0x30) += vel[i] (+0x50), fade[i] (+0x78) -= 8 (floor 0); retire
+ * from tick 61. */
+static void m0348i_801922E0(pe_addr_t q, pe_addr_t p)
+{
+    unsigned i, k;
+    for (i = 0; i < 4u; i++) {
+        for (k = 0; k < 3u; k++)
+            PE_StoreU16(p + 0x30u + i * 8u + k * 2u,
+                        (uint16_t)(S16AT_(p + 0x30u + i * 8u + k * 2u) + S16AT_(p + 0x50u + i * 8u + k * 2u)));
+        PE_StoreU16(p + 0x78u + i * 2u, (uint16_t)(S16AT_(p + 0x78u + i * 2u) - 8));
+        if (S16AT_(p + 0x78u + i * 2u) < 0)
+            PE_StoreU16(p + 0x78u + i * 2u, 0u);
+    }
+    if (S16AT_(q + 2u) >= 61)
+        PE_StoreU8(q + 1u, 2u);
+}
+
+/* func_801914A0 (src/overlays/room_m0348i/func_801914A0.c, 2e6f7a66):
+ * beam per-segment update.  Every segment falls 150 (+0x64); the segment
+ * index a1->h2 - a2->h182 checks *func_800C2B28(7) == 1 and is then killed
+ * (flag byte 0) and counted (+0x184); on the first count the beam rotation
+ * (0x20, a2->h180, 0) is composed with the segment position and the matrix
+ * at +0x160 and written to a new func_800C2B90(a0, 1, D_801928F0,
+ * D_80192848) child.  a1->b1 = 2 from tick 0x79.  Stack locals: m at
+ * PE_M0348I_STACK+0x00, rm +0x20, sv +0x50. */
+static void m0348i_801914A0(pe_addr_t a0, pe_addr_t a1, pe_addr_t a2)
+{
+    const pe_addr_t m = PE_M0348I_STACK, rm = PE_M0348I_STACK + 0x20u, sv = PE_M0348I_STACK + 0x50u;
+    unsigned i;
+    for (i = 0; i < 16u; i++) {
+        PE_StoreU16(a2 + i * 8u + 0x64u, (uint16_t)(S16AT_(a2 + i * 8u + 0x64u) - 150));
+        if (S16AT_(a1 + 2u) == S16AT_(a2 + 0x182u) + (int32_t)i) {
+            if ((int32_t)PE_LoadU32(func_800C2B28(7)) == 1) {
+                PE_StoreU8(a2 + i, 0u);
+                PE_StoreU16(a2 + 0x184u, (uint16_t)(S16AT_(a2 + 0x184u) + 1));
+                if (S16AT_(a2 + 0x184u) == 1) {
+                    pe_addr_t p;
+                    PE_StoreU16(sv + 0u, 0x20u);
+                    PE_StoreU16(sv + 2u, PE_LoadU16(a2 + 0x180u));
+                    PE_StoreU16(sv + 4u, 0u);
+                    func_800794C4(sv, rm);
+                    PE_StoreU32(rm + 0x14u, 0); PE_StoreU32(rm + 0x18u, 0); PE_StoreU32(rm + 0x1Cu, 0);
+                    m0348i_identity(m, S16AT_(a2 + i * 8u + 0x60u), S16AT_(a2 + i * 8u + 0x62u),
+                                    S16AT_(a2 + i * 8u + 0x64u));
+                    PE_M0348iCompMatrix(rm, m, m);
+                    PE_M0348iCompMatrix(a2 + 0x160u, m, m);
+                    p = func_800C2B90(a0, 1u, 0x801928F0u, 0x80192848u);
+                    if (p != 0u) {
+                        PE_StoreU16(p + 0u, (uint16_t)PE_LoadU32(m + 0x14u));
+                        PE_StoreU16(p + 2u, (uint16_t)PE_LoadU32(m + 0x18u));
+                        PE_StoreU16(p + 4u, (uint16_t)PE_LoadU32(m + 0x1Cu));
+                    }
+                }
+            }
+        }
+    }
+    if (S16AT_(a1 + 2u) >= 0x79)
+        PE_StoreU8(a1 + 1u, 2u);
+}
+
 /* Weapon/effect-VM dispatch (PE_WeaponCallback): 1 = handled. */
+static int m0348i_effect_child(pe_addr_t fn, pe_addr_t slot, pe_addr_t rec, pe_addr_t data);
+uint32_t PE_GPU_VSyncQuery(void);
+/* Diagnostic (off unless PE_M348_FX_TRACE is set): one line per m0348i
+ * effect callback with the record's tick (rec+2) and state after the call
+ * (rec+1; 2 = retired), clocked in VBlanks (PE_GPU_VSyncQuery) -- the
+ * lifetime measurement compared against the oracle in #16. */
 int PE_M0348iEffectChild(pe_addr_t fn, pe_addr_t slot, pe_addr_t rec, pe_addr_t data)
+{
+    static int trace = -1;
+    int r;
+    if (trace < 0) trace = getenv("PE_M348_FX_TRACE") != NULL;
+    r = m0348i_effect_child(fn, slot, rec, data);
+    if (trace && r)
+        fprintf(stderr, "M348FX vbl=%u fn=%08X slot=%08X rec=%08X tick=%d state=%u\n",
+                (unsigned)PE_GPU_VSyncQuery(), (unsigned)fn, (unsigned)slot, (unsigned)rec,
+                (int)(int16_t)PE_LoadU16(rec + 2u), (unsigned)PE_LoadU8(rec + 1u));
+    return r;
+}
+static int m0348i_effect_child(pe_addr_t fn, pe_addr_t slot, pe_addr_t rec, pe_addr_t data)
 {
     if (!PE_M0348iEffectOverlay()) return 0;
     switch (fn) {
@@ -914,6 +1158,12 @@ int PE_M0348iEffectChild(pe_addr_t fn, pe_addr_t slot, pe_addr_t rec, pe_addr_t 
         return 1;
     case 0x8018F560u: return 1;   /* func_8018F560: empty leaf */
     case 0x8019253Cu: m0348i_8019253C(rec, data); return 1;
+    case 0x80190E98u: m0348i_80190E98(data); return 1;
+    case 0x80191A98u: m0348i_80191A98(data); return 1;
+    case 0x80191FE0u: m0348i_80191FE0(data); return 1;
+    case 0x80191DB0u: m0348i_80191DB0(rec, data); return 1;
+    case 0x801914A0u: m0348i_801914A0(slot, rec, data); return 1;
+    case 0x801922E0u: m0348i_801922E0(rec, data); return 1;
     default: return 0;
     }
 }

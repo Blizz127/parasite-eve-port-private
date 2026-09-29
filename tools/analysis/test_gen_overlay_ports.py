@@ -5,7 +5,11 @@ Run: python3 tools/analysis/test_gen_overlay_ports.py
 """
 from __future__ import annotations
 
+import os
+import shutil
+import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -136,6 +140,110 @@ class RoomDedupeTests(unittest.TestCase):
     def test_group_symbol(self):
         self.assertEqual(o.group_symbol("fcb523b2deadbeef", "func_8018F1CC"),
                          "room_fcb523b2__func_8018F1CC")
+
+
+def _tmpdir() -> Path:
+    """Scratch dir under $TMPDIR (callers keep it off the /tmp tmpfs)."""
+    return Path(tempfile.mkdtemp(prefix="gen_ovl_test_"))
+
+
+class BlobResolutionTests(unittest.TestCase):
+    """A git worktree has no extracted blobs (build/ is git-ignored); the
+    registry must still fingerprint every overlay, from the main checkout."""
+
+    def setUp(self):
+        self.tmp = _tmpdir()
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.cfg = self.tmp / "cfg"
+        self.cfg.mkdir()
+        (self.cfg / "room_x.yaml").write_text(
+            "options:\n  target_path: build/extracted/disc1/peimg/room_x_c2.bin\n",
+            encoding="utf-8")
+        self.old_cfg = o.OVL_CONFIG_DIR
+        o.OVL_CONFIG_DIR = self.cfg
+        self.addCleanup(setattr, o, "OVL_CONFIG_DIR", self.old_cfg)
+        self.wt, self.main = self.tmp / "wt", self.tmp / "main"
+        for r in (self.wt, self.main):
+            r.mkdir()
+
+    def put(self, root: Path) -> Path:
+        p = root / "build/extracted/disc1/peimg/room_x_c2.bin"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_bytes(b"\x08\x00\xe0\x03\x21\x10\x00\x00")
+        return p
+
+    def test_worktree_without_blobs_falls_back_to_main_checkout(self):
+        want = self.put(self.main)
+        self.assertEqual(o.blob_path("room_x", [self.wt, self.main]), want.resolve())
+
+    def test_own_checkout_wins(self):
+        self.put(self.main)
+        want = self.put(self.wt)
+        self.assertEqual(o.blob_path("room_x", [self.wt, self.main]), want.resolve())
+
+    def test_missing_everywhere_is_none(self):
+        self.assertIsNone(o.blob_path("room_x", [self.wt, self.main]))
+
+    def test_config_without_target_path_is_none(self):
+        (self.cfg / "room_y.yaml").write_text("options: {}\n", encoding="utf-8")
+        self.assertIsNone(o.blob_path("room_y", [self.wt, self.main]))
+
+
+@unittest.skipUnless(shutil.which("git"), "git not installed")
+class MainCheckoutTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = _tmpdir()
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        env = dict(os.environ, GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_SYSTEM=os.devnull)
+        self.main = self.tmp / "main"
+        self.main.mkdir()
+
+        def git(*a, cwd=self.main):
+            subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t",
+                            "-c", "commit.gpgsign=false", *a], cwd=cwd, env=env,
+                           check=True, capture_output=True)
+        git("init", "-q")
+        (self.main / "f").write_text("x", encoding="utf-8")
+        git("add", "f")
+        git("commit", "-q", "-m", "init")
+        self.wt = self.tmp / "wt"
+        git("worktree", "add", "-q", "--detach", str(self.wt))
+
+    def test_worktree_resolves_to_main_checkout(self):
+        self.assertEqual(o.main_checkout(self.wt), self.main.resolve())
+
+    def test_main_checkout_resolves_to_itself(self):
+        self.assertEqual(o.main_checkout(self.main), self.main.resolve())
+
+    def test_outside_a_repository_is_none(self):
+        outside = self.tmp / "plain"
+        outside.mkdir()
+        env_ceiling = os.environ.get("GIT_CEILING_DIRECTORIES")
+        os.environ["GIT_CEILING_DIRECTORIES"] = str(self.tmp)
+        try:
+            self.assertIsNone(o.main_checkout(outside))
+        finally:
+            if env_ceiling is None:
+                del os.environ["GIT_CEILING_DIRECTORIES"]
+            else:
+                os.environ["GIT_CEILING_DIRECTORIES"] = env_ceiling
+
+
+class RequireBlobsTests(unittest.TestCase):
+    def test_nothing_missing_passes(self):
+        o.require_blobs({}, [Path("/r")])
+
+    def test_missing_blob_fails_loudly_non_zero(self):
+        with self.assertRaises(SystemExit) as cm:
+            o.require_blobs({"room_m0348i": 27, "room_m0023i": 1}, [Path("/wt"), Path("/main")])
+        msg = str(cm.exception.code)
+        self.assertIsInstance(cm.exception, o.MissingBlobError)
+        self.assertIn("refusing to write fingerprint 0", msg)
+        self.assertIn("room_m0348i: 27 registry entries", msg)
+        self.assertIn("room_m0023i: 1 registry entry", msg)
+        self.assertIn("/wt, /main", msg)
+        # SystemExit with a message exits the process with status 1.
+        self.assertNotIn(cm.exception.code, (0, None))
 
 
 if __name__ == "__main__":

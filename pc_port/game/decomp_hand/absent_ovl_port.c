@@ -714,6 +714,7 @@ static void ov_glow_scratch(pe_addr_t a0)
  * implementation: a loud boundary.  It is declared without arguments;
  * pe_dis.sh 0x800E026C 0x134 shows $a0 never written, so the live $a0 at
  * the `jal 0x800e051c` (0x800E0388) is the record — recorded as arity 1. */
+void func_800E051C(void);
 void func_800E026C(pe_addr_t a0)
 {
     unsigned char c;
@@ -744,7 +745,7 @@ void func_800E026C(pe_addr_t a0)
         PE_StoreU8(a0 + 2u, (uint8_t)(PE_LoadU8(a0 + 2u) - 1u));
     }
     if (PE_LoadU8(a0) == 1u)
-        PE_Decomp_Boundary("func_800E051C", 0x800E051Cu, 1u, a0, 0u, 0u, 0u);
+        func_800E051C();   /* src/func_800E051C.c (native: func_8003F3C4_port.c) */
 }
 
 /* src/func_800E03A0.c: coloured glow.  Inactive returns at once.  Publishes
@@ -796,5 +797,5 @@ void func_800E03A0(pe_addr_t a0)
             PE_StoreU8(a0, 2u);
         }
     }
-    PE_Decomp_Boundary("func_800E051C", 0x800E051Cu, 3u, (uint32_t)b, a0, (uint32_t)r, 0u);
+    func_800E051C();   /* src/func_800E051C.c reads the scratchpad block, not $a0-$a2 */
 }

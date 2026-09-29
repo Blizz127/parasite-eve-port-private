@@ -192,3 +192,77 @@ void func_800C9FD8(pe_addr_t slot,pe_addr_t rec,pe_addr_t data)
         pistol_scale(&m,scale);PE_EffectQuadC42A4(0x800F34B8u,&m,0u);
     }
 }
+
+/* func_800C4FC4 (B57C4.s, 0x574; handwritten GTE wrapper, no matched C):
+ * ribbon/ring glow renderer.  r (style block): +0 SVECTOR ring array
+ * (2n vertices: ring 0 = [0,n), ring 1 = [n,2n)), +4/+8 colour ramps,
+ * +0xC u16 n, +0x12 s16 OT bias, +0x14 s16 ramp time.  billboard == 0:
+ * scratch RT/TR = camera (D_800BCFA4) x matrix; else the matrix translation
+ * is RotTrans'd through the camera in place (matrix+0x14) and the matrix is
+ * loaded as-is.  Each segment emits a POLY_G4 (code 0x38, 0x3A when
+ * D_800F337A) through RotTransPers4 (func_80079304: RTPT v0..v2 + RTPS v3,
+ * otz = SZ3 >> 2) plus a draw-mode word from func_80077C84, both linked at
+ * OT[otz + bias]; the packet cursor advances 0x2C per segment. */
+void func_800C4FC4(pe_addr_t r,pe_addr_t matrix,unsigned billboard)
+{
+    unsigned i,n,bank;uint32_t c0,c1;pe_addr_t verts;
+    pe_addr_t camera=PE_LoadU32(0x800BCFA4u);
+    PE_StoreU32(0x800F33B4u,0x1F800000u);
+    if (!(billboard&255u)) {
+        PE_GTE_LoadRT33(camera);
+        for (i=0;i<3;i++) {
+            PE_GTE_SetIR((int16_t)PE_LoadU16(matrix+i*2u),(int16_t)PE_LoadU16(matrix+6u+i*2u),
+                (int16_t)PE_LoadU16(matrix+12u+i*2u));
+            PE_GTE_MVMVA(0x9E012u);
+            for (unsigned j=0;j<3;j++) PE_StoreU16(0x1F80001Cu+i*2u+j*6u,(uint16_t)g_pe_gte.ir[j]);
+        }
+        PE_GTE_LoadRT(camera);
+        PE_GTE_SetV0((int16_t)PE_LoadU16(matrix+20u),(int16_t)PE_LoadU16(matrix+24u),(int16_t)PE_LoadU16(matrix+28u));
+        PE_GTE_MVMVA(0x80012u);
+        for (i=0;i<3;i++) PE_StoreU32(0x1F800030u+i*4u,(uint32_t)g_pe_gte.ir[i]);
+        PE_GTE_LoadRT(0x1F80001Cu);
+    } else {
+        PE_GTE_LoadRT(camera);
+        PE_GTE_SetV0((int16_t)PE_LoadU32(matrix+20u),(int16_t)PE_LoadU32(matrix+24u),(int16_t)PE_LoadU32(matrix+28u));
+        PE_GTE_MVMVA(0x80012u);   /* func_800792D4 RotTrans -> matrix+0x14 (MAC) */
+        for (i=0;i<3;i++) PE_StoreU32(matrix+20u+i*4u,(uint32_t)g_pe_gte.mac[i]);
+        PE_GTE_LoadRT(matrix);
+    }
+    PE_StoreU32(0x1F800040u,0u);   /* host stand-in for the 3-byte stack colours */
+    func_800C608C((int16_t)PE_LoadU16(r+0x14u),r+8u,0x1F800040u);   /* sp+0x28 */
+    c0=PE_LoadU32(0x1F800040u);
+    func_800C608C((int16_t)PE_LoadU16(r+0x14u),r+4u,0x1F800040u);   /* sp+0x30 */
+    c1=PE_LoadU32(0x1F800040u);
+    n=PE_LoadU16(r+0xCu);verts=PE_LoadU32(r);
+    for (i=0;i<n;i++) {
+        pe_addr_t pk,dm,ot;uint32_t off,xy[3],z[3],xy3,z3,depth;unsigned k1,j;
+        bank=PE_LoadU32(0x8009CDDCu);off=PE_LoadU32(0x8009CDD8u);
+        PE_StoreU32(0x8009CDD8u,off+0x2Cu);
+        pk=PE_LoadU32(0x800B0E58u+bank*4u)+off;dm=pk+0x24u;
+        (void)func_80077C84(dm,0u,0u,(PE_LoadU8(0x800E224Cu)&3u)<<5);
+        k1=(i+1u)%n;
+        {
+            const pe_addr_t v[4]={verts+(i&0xFFFFu)*8u,verts+k1*8u,
+                verts+((n+i)&0xFFFFu)*8u,verts+((n+k1)&0xFFFFu)*8u};
+            PE_GTE_SetV0((int16_t)PE_LoadU16(v[0]),(int16_t)PE_LoadU16(v[0]+2u),(int16_t)PE_LoadU16(v[0]+4u));
+            PE_GTE_SetV1((int16_t)PE_LoadU16(v[1]),(int16_t)PE_LoadU16(v[1]+2u),(int16_t)PE_LoadU16(v[1]+4u));
+            PE_GTE_SetV2((int16_t)PE_LoadU16(v[2]),(int16_t)PE_LoadU16(v[2]+2u),(int16_t)PE_LoadU16(v[2]+4u));
+            PE_GTE_RTPT_coordinates(xy,z);
+            PE_GTE_SetV0((int16_t)PE_LoadU16(v[3]),(int16_t)PE_LoadU16(v[3]+2u),(int16_t)PE_LoadU16(v[3]+4u));
+            PE_GTE_RTPS_coordinates(&xy3,&z3);
+        }
+        for (j=0;j<3;j++) PE_StoreU32(pk+8u+j*8u,xy[j]);
+        PE_StoreU32(pk+0x20u,xy3);
+        PE_StoreU32(0x1F80000Cu,(uint32_t)((int32_t)z3>>2));   /* RotTransPers4 return */
+        PE_StoreU32(pk+4u,c0);PE_StoreU32(pk+0xCu,c0);
+        PE_StoreU8(pk+3u,8u);PE_StoreU8(pk+7u,0x38u);
+        PE_StoreU32(pk+0x14u,c1);PE_StoreU32(pk+0x1Cu,c1);
+        PE_StoreU8(pk+7u,PE_LoadU8(0x800F337Au)?0x3Au:0x38u);
+        depth=PE_LoadU32(0x1F80000Cu)+(uint32_t)(int32_t)(int16_t)PE_LoadU16(r+0x12u);
+        ot=PE_LoadU32(0x800B0E38u+bank*4u)+depth*4u;
+        PE_StoreU32(pk,(PE_LoadU32(pk)&0xFF000000u)|(PE_LoadU32(ot)&0xFFFFFFu));
+        PE_StoreU32(ot,(PE_LoadU32(ot)&0xFF000000u)|(pk&0xFFFFFFu));
+        PE_StoreU32(dm,(PE_LoadU32(dm)&0xFF000000u)|(PE_LoadU32(ot)&0xFFFFFFu));
+        PE_StoreU32(ot,(PE_LoadU32(ot)&0xFF000000u)|(dm&0xFFFFFFu));
+    }
+}
