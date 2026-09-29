@@ -59,13 +59,16 @@ void func_80017018(void)
                     case 0:
                         args[i] = (int *)&ops[i];
                         break;
-                    case 1:
+                    /* Case labels follow the retail jump table jtbl_80010690
+                     * {0:imm, 1:actor vars, 2:D_800A77F0, 3:D_8009DF70,
+                     * 4:D_800B6A80}; the bodies stay in retail code order. */
+                    case 3:
                         args[i] = &D_8009DF70[ops[i]];
                         break;
-                    case 2:
+                    case 1:
                         args[i] = &D_8009D2F0->vars[ops[i]];
                         break;
-                    case 3:
+                    case 2:
                         args[i] = &D_800A77F0[ops[i]];
                         break;
                     case 4:
