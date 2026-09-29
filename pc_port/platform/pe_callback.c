@@ -10,6 +10,8 @@
  */
 #include "pe_callback.h"
 #include "game_port.h"
+#include "pe_guestcode.h"
+#include "host_framebuffer.h"
 #include <stdio.h>
 
 #define PE_CALLBACK_MAX_BINDS 16
@@ -28,6 +30,7 @@ static uint64_t       g_reset_order = 0;
 
 void PE_Callback_Init(void)
 {
+    HostFB_SetVBlankDispatch(PE_Callback_DispatchChecked);
     g_bind_count = 0;
     g_reg_count  = 0;
     g_err_count  = 0;
@@ -139,8 +142,15 @@ int PE_Callback_DispatchChecked(void)
             continue;
         }
         PECallback fn = Resolve(guest);
+        const PeGuestCodeEntry *code = fn ? NULL : PE_GuestCode_Resolve(guest);
         if (fn) {
             fn();
+            if(PE_Port_StopEpoch()!=epoch)return 0;
+        } else if (code) {
+            /* No manual bind (e.g. func_8003E680 now a generated TU that
+             * registers the retail pointer only): the verified guest-code
+             * registry resolves the address, as the retail jalr would. */
+            (void)code->thunk(0u, 0u, 0u, 0u);
             if(PE_Port_StopEpoch()!=epoch)return 0;
         } else {
             fprintf(stderr,

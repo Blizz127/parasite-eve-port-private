@@ -28,6 +28,9 @@ void HostFB_SetDispMask(int mask);
 uint32_t HostFB_VSync(int mode);
 /* Current timer1-lane counter (host model of 1F801110 in the VBlank lane). */
 uint32_t HostFB_VSyncTimer(void);
+/* libetc VBlank callback dispatcher for the non-device VBlank edge (set by
+ * PE_Callback_Init; func_8007440C semantics). */
+void HostFB_SetVBlankDispatch(int (*dispatch)(void));
 /* Advance the modeled CD device clock by the quantum a guest poll-loop
  * iteration stands for, then deliver its IRQs.  The guest's 2000-iteration
  * stream waits (func_80121270 call batches) represent far more real CPU time

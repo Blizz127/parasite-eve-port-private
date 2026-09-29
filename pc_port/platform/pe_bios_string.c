@@ -97,3 +97,100 @@ pe_addr_t func_80071A44(pe_addr_t dst, int32_t fillbyte, int32_t len)
         PE_StoreU8(dst + (uint32_t)n, (uint8_t)fillbyte);
     return dst;
 }
+
+/* Host sprintf (see pe_bios_string.h).  Standard C formatting semantics. */
+int32_t PE_Bios_SprintfHost(char *dst, uint32_t cap, pe_addr_t fmt, const uint32_t *args, int nargs)
+{
+    uint32_t out = 0, f = fmt;
+    if (!cap) return 0;
+    int ai = 0;
+#define NEXT_ARG() (ai < nargs ? args[ai++] : 0u)
+#define EMIT(ch) do { if (out + 1u < cap) dst[out] = (char)(ch); out++; } while (0)
+    for (;;) {
+        char c = (char)PE_LoadU8(f++);
+        char digits[40];
+        int n = 0, left = 0, zero = 0, plus = 0, space = 0, width = 0, prec = -1;
+        int neg = 0;
+        uint32_t v;
+        if (!c) break;
+        if (c != '%') { EMIT(c); continue; }
+        for (;;) {
+            c = (char)PE_LoadU8(f++);
+            if (c == '-') left = 1;
+            else if (c == '0') zero = 1;
+            else if (c == '+') plus = 1;
+            else if (c == ' ') space = 1;
+            else if (c == '#') {}
+            else break;
+        }
+        if (c == '*') { width = (int32_t)NEXT_ARG(); c = (char)PE_LoadU8(f++); }
+        else while (c >= '0' && c <= '9') { width = width * 10 + (c - '0'); c = (char)PE_LoadU8(f++); }
+        if (c == '.') {
+            prec = 0; c = (char)PE_LoadU8(f++);
+            if (c == '*') { prec = (int32_t)NEXT_ARG(); c = (char)PE_LoadU8(f++); }
+            else while (c >= '0' && c <= '9') { prec = prec * 10 + (c - '0'); c = (char)PE_LoadU8(f++); }
+        }
+        while (c == 'h' || c == 'l' || c == 'L') c = (char)PE_LoadU8(f++);
+        if (width < 0) { left = 1; width = -width; }
+        switch (c) {
+        case 'c':
+            digits[n++] = (char)NEXT_ARG();
+            break;
+        case 's': {
+            pe_addr_t s = NEXT_ARG();
+            int len = 0;
+            while (s && PE_LoadU8(s + (uint32_t)len) && (prec < 0 || len < prec)) len++;
+            if (!left) for (int i = len; i < width; i++) EMIT(' ');
+            for (int i = 0; i < len; i++) EMIT(PE_LoadU8(s + (uint32_t)i));
+            if (left) for (int i = len; i < width; i++) EMIT(' ');
+            continue;
+        }
+        case 'd': case 'i': case 'u': case 'x': case 'X': case 'o': case 'p': {
+            unsigned base = (c == 'x' || c == 'X' || c == 'p') ? 16u : c == 'o' ? 8u : 10u;
+            const char *hex = c == 'X' ? "0123456789ABCDEF" : "0123456789abcdef";
+            v = NEXT_ARG();
+            if ((c == 'd' || c == 'i') && (int32_t)v < 0) { neg = 1; v = 0u - v; }
+            do { digits[n++] = hex[v % base]; v /= base; } while (v && n < 32);
+            while (prec >= 0 && n < prec && n < 32) digits[n++] = '0';
+            if (neg) digits[n++] = '-';
+            else if ((c == 'd' || c == 'i') && plus) digits[n++] = '+';
+            else if ((c == 'd' || c == 'i') && space) digits[n++] = ' ';
+            if (zero && !left && prec < 0) {
+                int sign = neg || ((c == 'd' || c == 'i') && (plus || space));
+                char s = sign ? digits[--n] : 0;
+                while (n + sign < width && n < 38) digits[n++] = '0';
+                if (sign) digits[n++] = s;
+            }
+            /* digits are reversed */
+            for (int i = 0; i < n / 2; i++) { char t = digits[i]; digits[i] = digits[n - 1 - i]; digits[n - 1 - i] = t; }
+            break;
+        }
+        case '%':
+            digits[n++] = '%';
+            break;
+        case 0:
+            f--;
+            continue;
+        default:
+            digits[n++] = c;
+            break;
+        }
+        if (!left) for (int i = n; i < width; i++) EMIT(' ');
+        for (int i = 0; i < n; i++) EMIT(digits[i]);
+        if (left) for (int i = n; i < width; i++) EMIT(' ');
+    }
+    dst[out < cap ? out : cap - 1u] = 0;
+    return (int32_t)out;
+#undef NEXT_ARG
+#undef EMIT
+}
+
+int32_t PE_Bios_Sprintf(pe_addr_t dst, pe_addr_t fmt, const uint32_t *args, int nargs)
+{
+    char buf[1024];
+    int32_t n = PE_Bios_SprintfHost(buf, sizeof buf, fmt, args, nargs);
+    uint32_t len = (uint32_t)n < sizeof buf ? (uint32_t)n : (uint32_t)sizeof buf - 1u;
+    for (uint32_t i = 0; i < len; i++) PE_StoreU8(dst + i, (uint8_t)buf[i]);
+    PE_StoreU8(dst + len, 0u);
+    return n;
+}

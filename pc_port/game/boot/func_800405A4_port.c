@@ -1,16 +1,34 @@
-/* Original card-status polling machine, 405A4..409B4 (260 words).
- * BIOS event/card calls remain explicit nonreturning port boundaries. */
+/* Original card-status polling machine, 405A4..409B4 (260 words), from the
+ * matched C (src/func_800405A4.c).  The BIOS/libcard calls (TestEvent,
+ * _card_info, _card_load, _new_card+sector write) are host services
+ * (platform/pe_bios_card.c) that deliver the card events whose handlers
+ * set D_800A1820..D_800A1834.
+ *
+ * Test frontier (PE_Memcard_BoundaryMode): each BIOS call records the
+ * nonreturning boundary the retail_card_status oracle fixture expects and
+ * the machine returns at that call, as before the host card existed. */
 #include "psx_compat.h"
 #include "pe_port_compat.h"
 #include "game_port.h"
 #include "stub_registry.h"
+#include "pe_sdk.h"
+#include "pe_memcard.h"
 
+/* Returns 1 when the call was made (continue), 0 at a test frontier. */
 static int card_status_call(pe_addr_t target,uint32_t argument)
 {
+    if (!PE_Memcard_BoundaryMode()) {
+        switch (target) {
+        case 0x800726F4u:(void)func_800726F4(argument);break;
+        case 0x8007DD44u:(void)func_8007DD44(argument);break;
+        case 0x8007DD54u:(void)func_8007DD54(argument);break;
+        case 0x8007DD74u:func_8007DD74(argument);break;
+        }
+        return 1;
+    }
     if (target == 0x800726F4u && PE_Port_CardTestEventHostReturn()) {
-        /* TestEvent: no card event pending.  Lets title-loop 425DC return. */
+        /* Legacy frontier: no card event pending; lets title-loop 425DC return. */
         Stub_Record("card_status_TestEvent", "HOST_ADAPTED");
-        (void)argument;
         return 0;
     }
     (void)Bootstrap_ReturnInt4Indirect("card status BIOS call","func_800405A4",0,

@@ -5,6 +5,7 @@
  */
 #include "psx_compat.h"
 #include "pe_port_compat.h"
+#include "pe_guestcode.h"
 #include "game_port.h"
 
 static pe_addr_t effect_slot(uint32_t index)
@@ -30,36 +31,35 @@ static void clear_effect_slot(pe_addr_t slot)
 
 int32_t func_8006FC18(uint32_t index, pe_addr_t owner, uint32_t force)
 {
+    /* src/func_8006FC18.c (Pm_Stop, audit item 27): the destroy callback
+     * (entry+0x14) runs with (slot, clamped code, force) and its result is
+     * the return value; the slot is then freed (0x72 also clears the seven
+     * D_800E10A0 words and D_800B0CD8 bit 16 -- clear_effect_slot). */
     pe_addr_t slot, entry, fn;
     uint32_t state, code;
+    int32_t result;
     if (index>=22u) return -22;
     slot=effect_slot(index); state=PE_LoadU8(slot);
     if (!state || state==6u || (!force && PE_LoadU32(slot+8u)!=owner)) return 0;
     code=PE_LoadU8(slot+1u);
     if (code>=0xC0u) return -23;
-    entry=PE_LoadU32(PE_LoadU32(0x800942E0u)+(code<0x55u?code:0x55u)*4u);
+    if (code>=0x55u) code=0x55u;
+    entry=PE_LoadU32(PE_LoadU32(0x800942E0u)+code*4u);
     if (!entry) return -24;
     fn=PE_LoadU32(entry+0x14u);
     if (!fn) return -1;
-    switch (fn) {
-    case 0x800C7DC4u: case 0x800C8F08u: case 0x800C9C00u:
-    case 0x800CA798u: case 0x800CD960u: case 0x800CCF80u:
-    case 0x800CE1DCu: case 0x800CBFA4u: case 0x800D4850u:
-        PE_StoreU8(slot,4u); break;
-    case 0x80192090u:
-    case 0x801920A0u:
-        if ((fn==0x80192090u && PE_M32MovementOverlay()) ||
-            (fn==0x801920A0u && PE_M28MovementOverlay())) {
-            (void)PE_M28MovementCleanup(slot); break;
-        }
-        /* fall through */
-    default:
-        if(fn==0x8018F1B8u && PE_M34BossEffectOverlay()) {
-            (void)PE_M34BossEffectCleanup(slot);break;
-        }
-        if(fn==0x8018F1B4u && PE_M0348iEffectOverlay()) {
-            (void)PE_M0348iEffectCleanup(slot);break;
-        }
+    if ((fn==0x80192090u && PE_M32MovementOverlay()) ||
+        (fn==0x801920A0u && PE_M28MovementOverlay()))
+        result=PE_M28MovementCleanup(slot);          /* host room-overlay callbacks */
+    else if (fn==0x8018F1B8u && PE_M34BossEffectOverlay())
+        result=PE_M34BossEffectCleanup(slot);
+    else if (fn==0x8018F1B4u && PE_M0348iEffectOverlay())
+        result=PE_M0348iEffectCleanup(slot);
+    else if (PE_GuestCode_Resolve(fn)) {
+        unsigned epoch=PE_Port_StopEpoch();
+        result=PE_GuestCall("func_8006FC18",fn,3u,slot,code,force,0u);
+        if (PE_Port_StopEpoch()!=epoch) return result;
+    } else {
         if (g_pe_strict_effect_stack) {
             (void)Bootstrap_ReturnInt4Indirect("effect_destroy_callback", "func_8006FC18",
                 -1,fn,slot,owner,force,0u,NULL,0u);
@@ -67,7 +67,8 @@ int32_t func_8006FC18(uint32_t index, pe_addr_t owner, uint32_t force)
             return -1;
         }
         /* DAY1 SHIM (DAY1_FIDELITY_GAPS.md, "unported room effect init /
-         * callback"): unported destroy callback -> skip it, free the slot. */
+         * callback"): a destroy callback with no host implementation is
+         * skipped (result 0) and the slot freed. */
         {
             static pe_addr_t seen[16]; static unsigned nseen; unsigned k;
             for (k = 0; k < nseen && seen[k] != fn; k++) {}
@@ -77,10 +78,10 @@ int32_t func_8006FC18(uint32_t index, pe_addr_t owner, uint32_t force)
                         fn,(unsigned)PE_LoadU32(0x8009D280u));
             }
         }
-        break;
+        result=0;
     }
     clear_effect_slot(effect_slot(index));
-    return 0;
+    return result;
 }
 
 /* func_80070064: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80070064_port.c (src/func_80070064.c); hand port retired (audit batch, port3). */

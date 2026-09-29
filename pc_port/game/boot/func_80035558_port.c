@@ -48,6 +48,7 @@
 #include <stdlib.h>
 #include "game_port.h"
 #include "pe_sdk.h"
+int32_t func_80068014(pe_addr_t actor);
 
 #define GA_D_8009D20C 0x8009D20Cu
 #define GA_D_8009D254 0x8009D254u
@@ -648,8 +649,21 @@ static void pe_35558_body(void)
                     if ((flags & 0x20000000u) == 0u)
                         func_8003AC90(instance, 0x800B89F8u);
                 }
-                if ((flags & 0x20000000u) == 0u)
+                if ((flags & 0x20000000u) == 0u) {
                     (void)func_8003AF14(instance, 0x800B89F8u);
+                    /* 35AE8..35B10: +0x98&0x8800 raises +0x250 bit 0, then
+                     * the floor shadow func_80068014 (retail asm
+                     * translation, decomp_hand/shadow_68014_port.c). */
+                    if (PE_LoadU32(actor + 0x98u) & 0x8800u)
+                        PE_StoreU16(actor + 0x250u, (uint16_t)(PE_LoadU16(actor + 0x250u) | 1u));
+                    {   /* Gated with PE_CD_GPU_DMA_ORDER until its route run:
+                         * without it the shadow CLUT is clobbered (pink quads). */
+                        static int on = -1;
+                        if (on < 0) { const char *e = getenv("PE_CD_GPU_DMA_ORDER"); on = e && e[0] == '1'; }
+                        if (on && PE_LoadU32(instance) != 0u)
+                            (void)func_80068014(actor);
+                    }
+                }
             }
         }
         actor = PE_LoadU32(actor + 4u);

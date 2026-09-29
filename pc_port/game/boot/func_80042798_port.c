@@ -37,6 +37,8 @@
  */
 #include "psx_compat.h"
 #include "game_port.h"
+#include "pe_sdk.h"
+#include "pe_memcard.h"
 
 #define GA_EV_TABLE_BASE 0x800A0ED4u
 #define GA_EV_TABLE_END_OFF 0x831u
@@ -62,12 +64,17 @@ void func_80042798(void)
         uint32_t tag = PE_LoadU8(cursor);
         if (tag == GA_EV_TAG_HIT0 || tag == GA_EV_TAG_HIT1) {
             uint32_t handle = PE_LoadU32(cursor + 0xBu);
-            (void)Bootstrap_ReturnInt4Indirect(
-                "func_80072774", "func_80042798", 0, GA_EV_CALLEE,
-                handle, 0u, 0u, 0u, NULL, 0u);
-            PE_Port_RequestStop(PE_PORT_STOP_UNRESOLVED_BOUNDARY);
-            /* Original suffix requires the callee to return. */
-            return;
+            if (PE_Memcard_BoundaryMode()) {
+                /* Test frontier (see pe_memcard.h). */
+                (void)Bootstrap_ReturnInt4Indirect(
+                    "func_80072774", "func_80042798", 0, GA_EV_CALLEE,
+                    handle, 0u, 0u, 0u, NULL, 0u);
+                PE_Port_RequestStop(PE_PORT_STOP_UNRESOLVED_BOUNDARY);
+                return;
+            }
+            (void)func_80072774((int)handle);   /* BIOS B(36h) close */
+            PE_StoreU32(cursor + 0xBu, 0xFFFFFFFFu);
+            PE_StoreU8(cursor, GA_EV_TAG_DONE);
         }
         cursor += GA_EV_STRIDE;
     }

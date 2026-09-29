@@ -20,6 +20,7 @@
  * replaces the retail callback queue: ResetCallback's first guard-passing
  * call zeroes the 8 guest slots at D_8009568C and the dispatch counter.
  */
+#include <string.h>
 #include "pe_rcnt2.h"
 #include "pe_sio0.h"
 #include "pe_mmio.h"
@@ -43,6 +44,20 @@ static int g_audio_event_enabled;
 static int g_spu_event_handle;
 static int g_spu_event_enabled;
 static int g_spu_event_delivered;
+
+/* Card event control blocks (libcard SW 0xF4000001 / HW 0xF0000011
+ * classes).  Host kernel model: an opened, enabled event whose result is
+ * delivered by the host card controller (pe_bios_card.c) runs its handler
+ * when its mode is EvMdINTR (0x1000), else it becomes "already" for
+ * TestEvent.  TestEvent returns 1 once per delivery. */
+#define PE_CARD_EVENT_MAX 16
+static struct {
+    int handle;
+    uint32_t cls, spec, mode;
+    pe_addr_t handler;
+    int enabled, already;
+} g_card_events[PE_CARD_EVENT_MAX];
+static int g_card_event_count;
 
 #define GA_IRQ_RESET_BLOCK          0x800945E4u
 #define GA_IRQ_RESET_BLOCK_BYTES    0x00001068u
@@ -287,6 +302,17 @@ int PE_Irq_LockDepth(void)
 int PE_Event_Open(uint32_t cls, uint32_t spec, uint32_t mode, pe_addr_t handler)
 {
     int handle = (int)g_next_event_handle++;
+    if ((cls == 0xF4000001u || cls == 0xF0000011u) &&
+        g_card_event_count < PE_CARD_EVENT_MAX) {
+        g_card_events[g_card_event_count].handle = handle;
+        g_card_events[g_card_event_count].cls = cls;
+        g_card_events[g_card_event_count].spec = spec;
+        g_card_events[g_card_event_count].mode = mode;
+        g_card_events[g_card_event_count].handler = handler;
+        g_card_events[g_card_event_count].enabled = 0;
+        g_card_events[g_card_event_count].already = 0;
+        g_card_event_count++;
+    }
     if (cls == 0xF0000009u && spec == 0x20u && mode == 0x2000u && !handler) {
         g_spu_event_handle = handle;
         g_spu_event_enabled = 0;
@@ -302,6 +328,8 @@ int PE_Event_Open(uint32_t cls, uint32_t spec, uint32_t mode, pe_addr_t handler)
 
 int PE_Event_Enable(int handle)
 {
+    for (int i = 0; i < g_card_event_count; i++)
+        if (g_card_events[i].handle == handle) g_card_events[i].enabled = 1;
     if (g_spu_event_handle && handle == g_spu_event_handle)
         g_spu_event_enabled = 1;
     if (g_audio_event_handle && handle == g_audio_event_handle)
@@ -345,6 +373,30 @@ int PE_Event_UnDeliver(uint32_t cls, uint32_t spec)
 int func_800857F4(int handle) { return PE_Event_Disable(handle); }          /* B(0Dh) */
 int func_800857E4(int handle) { return PE_Event_Close(handle); }            /* B(09h) */
 int func_80085804(uint32_t cls, uint32_t spec) { return PE_Event_UnDeliver(cls, spec); } /* B(20h) */
+
+pe_addr_t PE_Event_DeliverCard(uint32_t cls, uint32_t spec)
+{
+    for (int i = 0; i < g_card_event_count; i++) {
+        if (g_card_events[i].cls != cls || g_card_events[i].spec != spec ||
+            !g_card_events[i].enabled) continue;
+        if (g_card_events[i].mode == 0x1000u && g_card_events[i].handler)
+            return g_card_events[i].handler;
+        g_card_events[i].already = 1;
+        return 0;
+    }
+    return 0;
+}
+
+int PE_Event_Test(int handle)
+{
+    for (int i = 0; i < g_card_event_count; i++) {
+        if (g_card_events[i].handle != handle) continue;
+        if (!g_card_events[i].already) return 0;
+        g_card_events[i].already = 0;
+        return 1;
+    }
+    return 0;
+}
 
 int PE_Event_SpuDmaEnabled(void)
 {
@@ -402,6 +454,8 @@ void PE_Sdk_ResetState(void)
     g_spu_event_handle = 0;
     g_spu_event_enabled = 0;
     g_spu_event_delivered = 0;
+    memset(g_card_events, 0, sizeof g_card_events);
+    g_card_event_count = 0;
     PE_IRQ_Reset();
     PE_Timer1_Reset();
     PE_Rcnt2_Reset();

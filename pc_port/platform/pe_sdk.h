@@ -123,6 +123,23 @@ void PE_GTE_AVSZ3(const uint32_t z[3]);
 void PE_GTE_AVSZ4(const uint32_t z[4]);
 int32_t PE_GTE_NCLIP(void);
 
+/* ── memory-card BIOS / libcard (pc_port/platform/pe_bios_card.c) ──── */
+int  func_800726F4(uint32_t handle);                 /* B(0Bh) TestEvent */
+int  func_8007DD44(uint32_t chan);                   /* A(ABh) _card_info */
+int  func_8007DD54(uint32_t chan);                   /* A(ACh) _card_load */
+void func_8007DD74(pe_addr_t chan);                  /* _new_card + sector-3Fh write (generated TU) */
+void func_8007DDC4(pe_addr_t chan);                  /* B(50h) allow_new_card */
+int  func_8007DDB4(pe_addr_t chan, int sector, int src); /* B(4Eh) */
+int  func_80072734(pe_addr_t name, uint32_t mode);   /* B(32h) open */
+int  func_80072744(int fd, int32_t offset, int whence); /* B(33h) lseek */
+int  func_80072754(int fd, pe_addr_t dst, int32_t length); /* B(34h) read */
+int  func_80072764(int fd, pe_addr_t src, int32_t length); /* B(35h) write */
+int  func_80072774(int fd);                          /* B(36h) close */
+int  func_80072784(pe_addr_t device);                /* B(41h) format */
+pe_addr_t PE_Bios_FirstFile(pe_addr_t pattern, pe_addr_t dir); /* B(42h) */
+pe_addr_t func_80072794(pe_addr_t dir);              /* B(43h) nextfile */
+int  func_800727A4(pe_addr_t name);                  /* B(45h) delete */
+
 /* ── libetc (pc_port/platform/pe_libetc.c) ──────────────────────────── */
 void func_80073C74(uint32_t flag); /* BIOS ChangeClearPAD */
 uint32_t func_80073C84(uint32_t counter,uint32_t flag); /* ChangeClearRCnt,0..3 */
@@ -166,6 +183,10 @@ void PE_Irq_GetSource0BiosState(PeIrqSource0BiosState *out);
  * Never returns -1 at boot (event classes used never exhaust). */
 int  PE_Event_Open(uint32_t cls, uint32_t spec, uint32_t mode, pe_addr_t handler);
 int  PE_Event_Enable(int handle);
+/* Card events: returns the EvMdINTR handler to run for (cls, spec), or 0
+ * (not opened/enabled, or recorded for TestEvent instead). */
+pe_addr_t PE_Event_DeliverCard(uint32_t cls, uint32_t spec);
+int  PE_Event_Test(int handle);
 int  PE_Event_Disable(int handle);
 int  PE_Event_Close(int handle);
 int  PE_Event_UnDeliver(uint32_t cls, uint32_t spec);

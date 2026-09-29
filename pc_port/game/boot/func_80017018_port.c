@@ -46,6 +46,7 @@
 #include "psx_compat.h"
 #include "pe_port_compat.h"
 #include "game_port.h"
+#include "pe_guestcode.h"
 
 #define GA_D_8009D300 0x8009D300u
 #define GA_D_8009D2F0 0x8009D2F0u
@@ -734,8 +735,39 @@ static int pe_attachment_command(pe_addr_t fn, pe_addr_t args)
 
 extern int func_80014E30(pe_addr_t a0);
 
+/* Audit item 26, batch 1: opcode handlers that have generated matched TUs
+ * (src/func_*.c) run through the verified guest-code registry, as retail's
+ * jalr D_800910A0[op] does, instead of the inline re-implementations below. */
+/* Batch 2 (audit item 26): the remaining inline handlers whose src/ leaf the
+ * generator cannot emit (guest pointer vectors / structs) were audited line by
+ * line against src/: 80018D50, 80018DD4, 80019450, 80018B98, 80018818,
+ * 80018864, 80018894, 800199CC, 80017A24 (MIPS sllv low-5 shift), 80017D3C,
+ * 80017C8C, 80015648 (fixed: full-width id compares).  80016F10/80014E30 keep
+ * their route-only skip shims (HOST_ADAPTED, off on a normal start). */
+static const uint32_t k_17018_matched_ops[] = {
+    0x80017EFCu, 0x80017F20u, 0x8001967Cu, 0x80018F74u, 0x800182A0u, 0x80017AC0u,
+    0x80018C58u, 0x80018B68u, 0x80019CECu, 0x800176B8u, 0x800182C0u, 0x800182E0u,
+    0x800190BCu, 0x80016FE0u, 0x800176E0u, 0x80017968u, 0x80017928u, 0x80017948u,
+    0x80017A78u, 0x80017AA4u, 0x80017CC4u, 0x80017D18u, 0x80017EA4u, 0x80018754u,
+    0x80017FDCu, 0x800193B8u, 0x80019298u, 0x80019A9Cu, 0x800199F8u, 0x80017820u,
+    0x80018B00u, 0x80018C88u, 0x80018CB8u, 0x80018CF0u, 0x80018D20u, 0x800197D0u,
+    0x800197F0u, 0x8001994Cu, 0x8001998Cu, 0x80019D44u, 0x80019C4Cu, 0x80019768u,
+};
+
+static int pe_17018_matched_op(pe_addr_t fn)
+{
+    static int legacy = -1;
+    if (legacy < 0) legacy = getenv("PE_VM_INLINE_OPS") != NULL;   /* bisect aid */
+    if (legacy) return 0;
+    for (unsigned k = 0; k < sizeof k_17018_matched_ops / sizeof k_17018_matched_ops[0]; k++)
+        if (k_17018_matched_ops[k] == fn) return PE_GuestCode_Resolve(fn) != NULL;
+    return 0;
+}
+
 static int pe_17018_dispatch_body(pe_addr_t fn, pe_addr_t args)
 {
+    if (pe_17018_matched_op(fn))
+        return PE_GuestCall("func_80017018", fn, 1u, args, 0u, 0u, 0u);
     if (fn == 0x80018300u) return func_80018300(args);
     if (fn == 0x80018364u) return func_80018364(args);
     if (fn == 0x80015108u || fn == 0x80019170u || fn == 0x80019260u || fn == 0x80019F04u ||
@@ -1253,8 +1285,10 @@ static int pe_17018_dispatch_body(pe_addr_t fn, pe_addr_t args)
                 uint32_t idb = PE_LoadU32(PE_LoadU32(args + 4u));
                 found = PE_LoadU32(GA_D_8009D20C);
                 while (found != 0u) {
-                    if (PE_LoadU8(found + 0x0Cu) == (uint8_t)type &&
-                        PE_LoadU8(found + 0x0Du) == (uint8_t)idb &&
+                    /* src/func_80015648.c compares the bytes with the full
+                     * int operands (no truncation). */
+                    if ((uint32_t)PE_LoadU8(found + 0x0Cu) == type &&
+                        (uint32_t)PE_LoadU8(found + 0x0Du) == idb &&
                         (PE_LoadU32(found + 0x98u) & 0x10u) == 0u)
                         break;
                     found = PE_LoadU32(found + 4u);
@@ -1305,6 +1339,9 @@ static int pe_17018_dispatch_body(pe_addr_t fn, pe_addr_t args)
     }
     if (fn == 0x80019DB8u)return func_80019DB8(args);
     if (fn == 0x80019DF4u)return func_80019DF4(args);
+    /* Any other handler with a verified host implementation: retail jalr. */
+    if (PE_GuestCode_Resolve(fn))
+        return PE_GuestCall("func_80017018", fn, 1u, args, 0u, 0u, 0u);
     /* Unported / empty table slot: explicit boundary. Retail would jalr
      * the entry; yielding here left the task suspended (delay 0). Retain
      * the opcode PC so the stop report names the exact script word. */

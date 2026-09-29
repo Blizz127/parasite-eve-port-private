@@ -16,7 +16,7 @@ objective evidence: a byte-matched C path, a numeric comparison against the
 matched code and disc data, or an emulator/video diff. Anything not checked is
 marked **untested**.
 
-Last updated: 2026-09-28. **Open divergences: 19.**
+Last updated: 2026-09-28. **Open divergences: 16.**
 
 ## Structural (whole classes of code)
 
@@ -34,7 +34,6 @@ Last updated: 2026-09-28. **Open divergences: 19.**
 | 5 | Movies are fed by a host-side stream producer instead of the modelled CD drive's interrupt-driven delivery; ~2 s read-ahead cap; no seek/spin-up timing | `pc_port/platform/pe_str_feed.c` | Open |
 | 8 | SPU main volume assumed 0x3FFF; SPU IRQ and CD-DA not modelled | `pe_spu.c` | Open |
 | 9 | The field-VM host argument frame lives in guest RAM at 0x801FF400 (port-only scratch) | `func_80017018_port.c` | Also covers GA_POLY/GA_DESC/GA_EA_SLOT, moved out of the overlay window into the same audited block. Audited: nothing else writes it (`PE_VMFRAME_AUDIT=1`, bad=0 over ~1.6M opcodes); retail uses the real stack instead, so it stays listed until the port runs the matched VM |
-| 10 | Memory-card saves do not persist after quitting | — | Open |
 
 ## Game behaviour (open bugs, observed by the owner or tests)
 
@@ -47,16 +46,18 @@ Last updated: 2026-09-28. **Open divergences: 19.**
 | 17 | Eve's flash: when the caller-stack ring position is unresolved, the first frame uses the owner joint position | `m0023i_effect_port.c` | Open |
 | 18 | Police-siren ambience after Carnegie Hall | owner report (unsure) | **Untested** — to be checked against the retail video first |
 | 19 | Frame pacing paces one host frame per emulated VBlank at 59.94 Hz | `host_window.c` | Believed faithful (240 Hz sequencer tick measured retail-exact); window-side timing **untested** on the owner's PC beyond his playtest |
-| 20 | Second Eve battle: the music's vocal/choir layer is missing (instrumental plays) | owner report on r2 | **Not reproduced** in the first ~30 s of the fight: vocal-band (600–1500 Hz vibrato) event clusters match retail part 02 @ 1:23–1:53 at similar density; song, sample bank and driver inputs match retail. **Untested** beyond 30 s (needs a port fight kept alive 60+ s) |
-| 26 | The field-VM dispatcher `func_80017018` is itself a hand port; 47 opcodes are re-implemented inline (34 have generated matched TUs, 12 have faithful ports) and an unlisted opcode stops the port | shadow audit | Switch to matched C in batches |
-| 27 | `func_8006FC18` (Pm_Stop) skips unknown destroy callbacks and always returns 0 instead of the callback's result | shadow audit | Open |
-| 28 | Game Over hand-off timing: death → restart at +304 port frames vs retail ~+268 (emulator oracle) | oracle vs port | Open |
+| 20 | Second Eve battle: the music's vocal/choir layer is missing (instrumental plays) | owner report on r2 | **Not reproduced over the whole retail fight** (audio3, 2026-09-29): a port fight kept alive 92 s (opt-in god mode) matches retail part 02 @ 1:23–2:20 in the 600–1500 Hz vocal band in every 3 s window (median r 0.58 vs 0.21 at a wrong offset; lag drift 0.07 s over 57 s), incl. the second-section vibrato vocals @ 2:03–2:12; see REPORT.md. Candidate for closing once the owner confirms on a current build |
+| 26 | The field-VM dispatcher `func_80017018` is a hand port; its inline opcode re-implementations are being switched to the generated matched handlers (batch 1: 42 opcodes done, suite + route green; unlisted opcodes now use the guest-code registry instead of stopping) | shadow audit | In progress (port3); note the matched `src/func_80017018.c` itself has mislabelled case labels (see ACTIVE_HANDOFF) |
 
 ## Fixed (kept for the record)
 
+- Retail's per-VBlank game callback `func_8003E91C` (RNG advance + the four timer ramps incl. play time) now runs every VBlank in normal play, as verbatim retail TUs; rates identical to the emulator oracle (frame counter +1/VSync, play time +600 per 600 VSyncs). Saves now record real play time (former #29).
+- `func_8006FC18` (Pm_Stop) now follows the matched C: calls the destroy callback, returns its result, frees the slot; 0 destroy-callback skips over the whole Day-1 route (former #27).
+- Game Over timing: no divergence. Mode-3 phases 1–5 match retail per phase to the VSync (emulator oracle vs port: 48/142/62/162/120/2, 536 VSyncs mode 3 → restart in both). The earlier +304-frame figure included the port-side forced-death detection lag (former #28; re-check after #29).
+- Memory-card saves persist: host 128 KiB .mcd behind our own BIOS card-file functions (clean-room from psx-spx); save → relaunch → load → resume verified in-game (former #10). Play time saves as 00:00:00 until #29 is fixed.
 - Particle/effect sprites as streaks (Eve's spells, rats): `func_8006914C` skipped retail's effect-module inits, so the effect texpage table was never filled; now runs them (matches retail part 01 @ 9:45–9:58). (former #12)
 - Pause kept audio running: `func_8006A0E8` was a stub; now sends the retail AKAO pause/resume (verified in a real-time window). (former #14)
-- Game Over: field side (ops 0x31/0xED, `func_8006A25C`, BIOS event calls) and battle side (`func_8002B29C`, `func_8006CC68` tail) now the matched C; fade → green caption → restart → FMV001 → title, same order as the emulator oracle. Residual: port reaches the restart at +304 frames vs retail ~+268 (tracked as #28). (former #21)
+- Game Over: field side (ops 0x31/0xED, `func_8006A25C`, BIOS event calls) and battle side (`func_8002B29C`, `func_8006CC68` tail) now the matched C; fade → green caption → restart → FMV001 → title, same order as the emulator oracle. Timing matches retail per phase (see below). (former #21)
 - Battle tick `func_800299CC` now a complete translation of the matched C (was hand cuts). (former #22)
 - Battle mode-3 death path now the matched C (item 0x12 consume, countdowns, enemy walk). (former #23)
 - `func_80024A3C` now all 17 phases from the matched C. (former #24)

@@ -30,4 +30,15 @@ int32_t func_80072314(pe_addr_t src);
 pe_addr_t func_80071A34(pe_addr_t dst, pe_addr_t src, int32_t len);
 pe_addr_t func_80071A44(pe_addr_t dst, int32_t fillbyte, int32_t len);
 
+/* Host C-library sprintf over guest memory for the EXE's Psy-Q libc
+ * formatter func_80071A84 (variadic; its full frame-level translation is
+ * the separate PE_FormatterFrame model).  Supports the conversions the
+ * game's formats use: flags '-' '0' ' ' '+', width, precision, length
+ * modifiers h/l (ignored: int is 32-bit), and d i u x X o c s p %.
+ * `args` are the 32-bit argument words in call order (a2, a3, stack...);
+ * %s arguments are guest addresses.  Writes the NUL; returns the length. */
+int32_t PE_Bios_Sprintf(pe_addr_t dst, pe_addr_t fmt, const uint32_t *args, int nargs);
+/* Same, into a host buffer of `cap` bytes (always NUL-terminated). */
+int32_t PE_Bios_SprintfHost(char *dst, uint32_t cap, pe_addr_t fmt, const uint32_t *args, int nargs);
+
 #endif

@@ -316,3 +316,67 @@ Each song's reverb set-up by the interpreted driver overrides this.
 - The port keys the bank-130 choir samples **once** per fight (5–10 s in, ~5 s sustain), both in a short fight and in a 100 s fight.
 - Verified identical to retail: the song bytes, the bank upload/relocation (`func_80087428`), the SFX/command producers, and the driver (retail bytes).
 - Needs a retail timestamp where the choir is heard, or an AKAO channel decode of song 0x25.
+
+### audio3: Eve 2 vocals over the whole fight (divergence #20)
+
+**Verdict: no gap.** The port plays the same vocal/choir events as retail for the
+whole retail fight, part 02 @ 1:23–2:20 (57 s of battle music).
+
+Run: `PE_CHEAT_KEYS=42800:F2` (god mode, opt-in cheat), `--route-pad --hand-over-at 42930
+--max-frames 45700` with `PE_AUDIO_WAV`. The Eve 2 battle starts at route frame 42924. No death edge
+follows before the frame limit, so the fight runs about 92 s with no player input.
+
+Alignment: the full-band spectrogram cross-correlation peaks with retail part 02 @ 1:28.0 at port
+capture 1447.0 s (r = 0.59; neighbouring offsets 0.48–0.50).
+
+Test: correlation of the 600–1500 Hz log spectrogram per 3 s window, best lag within ±0.3 s
+(`build/lanes/audio3/tools/bandcorr.c`). The baseline is the same comparison with the port shifted
+by +5 s.
+- Aligned: r = 0.26–0.75 (median 0.58) across windows 0–54 s.
+- Baseline: r = 0.03–0.34 (median 0.21).
+- The best lag drifts only −0.02 → +0.07 s over 57 s: the port follows the same song timeline.
+- The low aligned windows (6, 15, 24, 51 s) are the ones with fight SFX. The player's actions
+  differ between the video and the port.
+- Retail's fight ends at 57 s: retail band energy falls 10 dB, r = −0.05.
+- The second song section is where retail's strongest ~1 kHz vibrato vocals are (part 02 @ 2:03–2:12).
+  Its windows score r = 0.58–0.75.
+- An aligned 400–2000 Hz spectrogram pair (`build/lanes/audio3/eve2_ret_vs_port.png`, retail on top)
+  shows every vibrato vocal blob at the same music time in both.
+
+Port level in this band is +7…+8 dB above the video. That is the known capture calibration (FMV002
+XA: port/video ×2.4), not a missing layer.
+
+The bank-130 samples 0x54070/0x571C0 key once, at 10.6 s, as before (`voice.txt`). The recurring
+vocals are the song's own instruments.
+
+This build is later than r2: it has audio2's per-VBlank pacing, which fixed the 2× tempo and the
+overflow that dropped half the samples. The owner's r2 report is therefore not reproduced on the
+current tree. Whether r2's overflow was the cause is not proven.
+
+### audio3: audit item 12 (boot reverb) — fixed
+
+`src/func_80085290.c` ends with `func_800862F4(i,0,0,0,0)` in both 24-voice loops, then
+`func_8008CB54(4)` and `func_80085A64(1)`.
+
+**Change.** `pe_stream.c` `PE_Stream_StateInit` collapsed all of these. It now runs them, using the
+same condition as the existing `func_80085F74` call: SpuInit's register base is 0x1F801C00. The
+reverb-RAM clear inside `func_8008CB54` waits on the SPU DMA completion event, so the event must also
+be live. Unit fixtures have neither; the booted port has both.
+
+**Evidence.** Headless, `--max-frames 30`, VBlank 33, before any song:
+
+| | before | after |
+|---|---|---|
+| SPU 1A2 | unwritten | F204 (the type-4 work area) |
+| SPUCNT | 0001 | 0081 (reverb enable) |
+| SPU register writes | 16 | 138 |
+
+- Boot plus 1500 route frames: stop_reason frame-limit, 0 faults.
+- `pe-native-tests`: 1603/1603.
+
+**Also fixed.** The reverb-mode attribute temp in `stream_mode_configure` stands in for retail
+`func_8008CF70`'s stack record. It lived at guest 0x80122300, which is ovl_03C5 (movie controller)
+.text +0x1600 (ovl_03C5 is at 0x80120D00, size 0x2000). Every song start that changed the reverb
+mode wrote 0x44 bytes over it. It is now at 0x801FFF40–0x801FFF83, unused port scratch next to the
+0x801FFF00 DISPENV and 0x801FFF20 movie words. No visible effect was found, because the port runs
+that overlay natively.

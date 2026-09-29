@@ -22,13 +22,10 @@
  *   - func_8007DB24(-1) (SPU heap query in func_80085EB4): host SPU-heap
  *     model starts at 0x1010 after SsInit (deterministic); only the store
  *     to D_8009B414 is guest-visible and the caller discards the return.
- *   - func_80085F74 / func_800862F4 (voice attribute/parameter setters in
- *     func_80085290): write through the voice-table base D_8009B3FC, which
- *     is installed by the collapsed SPU hardware init; not reproducible on
- *     host (same situation as D_8009B784 in pe_save.c).
- *   - func_8008CB54/func_8008CF70/func_80085A64 (streaming-mode command +
- *     SPU voice key off/on in func_80085290): SPU configuration/voice hardware paths, still deferred. This does not
- *     include 8CA84, whose command and channel RAM effects are native.
+ *   - func_80085F74 / func_800862F4 / func_8008CB54(4) / func_80085A64(1)
+ *     (func_80085290's SPU calls) run for real once SpuInit has installed
+ *     the register base D_8009B3FC = 0x1F801C00; unit fixtures without that
+ *     base skip them.
  *   - func_80085C44 (SPU control-register wait with "SPU:T/O" diagnostic),
  *     func_80085DC4 (SPU transfer-mode sequence in func_80085D84).
  *   - func_80085814/func_800858E8 (libapi SetRCnt/StartRCnt for root
@@ -46,6 +43,8 @@
 int func_80085814(unsigned short a0, short a1, int a2);   /* generated TU */
 int func_800858E8(unsigned int a0);                      /* generated TU */
 void func_80085F74(pe_addr_t a0);                        /* generated TU (src/func_80085F74.c) */
+void func_800862F4(int voice, unsigned short lvol, unsigned short rvol, short lmode, short rmode); /* generated TU */
+int func_80085A64(int a0);                               /* decomp_hand/batch20_hi_port.c */
 #include "stub_registry.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -166,7 +165,11 @@ static int stream_mode_configure(uint32_t mode)
 {
     unsigned clear = !!(mode & 0x100u); mode &= ~0x100u;
     if (mode >= 10u || stream_mode_allocated(PE_LoadU32(0x8009B46Cu + mode * 4u))) return -1;
-    const pe_addr_t attributes = 0x80122300u; /* guest temporary replacing stack record */
+    /* Guest temporary replacing retail's stack record.  It was 0x80122300,
+     * inside the movie/subsystem overlay window: every reverb-mode change
+     * (8CB54 from an AKAO song start) overwrote 0x44 bytes of the loaded
+     * overlay.  0x801FFF40..0x801FFF83 is unused port scratch. */
+    const pe_addr_t attributes = 0x801FFF40u;
     PE_StoreU32(0x8009B3A0u, mode);
     PE_StoreU32(0x8009B398u, PE_LoadU32(0x8009B46Cu + mode * 4u));
     for (unsigned i = 0; i < 0x44u; i++) PE_StoreU8(attributes + i, PE_LoadU8(0x8009C8C0u + mode * 0x44u + i));
@@ -195,7 +198,7 @@ void func_8008CB54(uint32_t mode)
 /* ── func_80085290 — bulk streaming state init (verbatim transcription) ── */
 static void PE_Stream_StateInit(void)
 {
-    int i;
+    int i, spu_live;
     pe_addr_t s0, v1;
 
     PE_StoreU32(0x8009D2C8u, 0x800B6980u);
@@ -257,7 +260,8 @@ static void PE_Stream_StateInit(void)
      * the retail values instead of pe_spu's unwritten-register defaults. */
     /* Without that base (unit fixtures that skip SpuInit) the retail call
      * would write through a null pointer; the block stays unapplied. */
-    if ((PE_LoadU32(0x8009B3FCu) & 0x1FFFFFFFu) == 0x1F801C00u)
+    spu_live = (PE_LoadU32(0x8009B3FCu) & 0x1FFFFFFFu) == 0x1F801C00u;
+    if (spu_live)
         func_80085F74(0x800C0D90u);
     PE_StoreU32(0x8009D268u, 0);
     PE_StoreU32(0x8009D22Cu, 0);
@@ -275,7 +279,7 @@ static void PE_Stream_StateInit(void)
         PE_StoreU32(s0 + 0xA0u, 0x18u);
         PE_StoreU16(s0 + 0x04u, 0);
         PE_StoreU32(s0 + 0x00u, 0);
-        /* func_800862F4(i, 0, 0, 0, 0) — voice-param setter: collapsed */
+        if (spu_live) func_800862F4(i, 0, 0, 0, 0);
     }
     for (i = 0; i < 0x18; i++) {
         s0 = 0x800B8AC0u + 0x50u + (uint32_t)(0x18 + i) * 0x11Cu;
@@ -283,7 +287,7 @@ static void PE_Stream_StateInit(void)
         PE_StoreU32(s0 + 0xA0u, 0x18u);
         PE_StoreU16(s0 + 0x04u, 0);
         PE_StoreU32(s0 + 0x00u, 0);
-        /* func_800862F4(0x18 + i, 0, 0, 0, 0) — collapsed */
+        if (spu_live) func_800862F4(i, 0, 0, 0, 0);   /* retail: i again, 0..23 */
     }
     /* 12-entry channel block at 0x800BC03C, i = 0xC..0x17 */
     for (i = 0xC; i < 0x18; i++) {
@@ -316,8 +320,15 @@ static void PE_Stream_StateInit(void)
     PE_StoreU16(v1 + 0xC0u, 0);
     PE_StoreU16(v1 + 0x58u, 0);
     PE_StoreU32(0x8009D2C4u, PE_LoadU32(0x8009D2C4u) | 0x80u);
-    /* func_8008CB54(4) — streaming-mode command: collapsed (see header) */
-    /* func_80085A64(1) — SPU voice key-on: collapsed (see header) */
+    /* Retail tail (src/func_80085290.c): per-voice volume 0 above, then
+     * reverb type 4 and reverb enable.  Needs the SpuInit register base,
+     * like func_80085F74 above, and the SPU DMA completion event that the
+     * reverb-RAM clear waits on (unit fixtures without SpuInit have
+     * neither; the booted port always has both, as retail does). */
+    if (spu_live && PE_Event_SpuDmaEnabled()) {
+        func_8008CB54(4);
+        (void)func_80085A64(1);
+    }
 }
 
 /* ── func_8008CB08 — command-ring allocator ───────────────────────────── */

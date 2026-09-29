@@ -14,12 +14,4 @@
 
 #define GA_D_800B1624 0x800B1624u
 
-int func_800659C8(unsigned int index, unsigned int value)
-{
-    pe_addr_t container = PE_LoadU32(GA_D_800B1624);
-    pe_addr_t slot = container + PE_LoadU32(container + 0x10u)
-                   + (index << 4);
-
-    PE_StoreU16(slot + 8u, (uint16_t)(value >> 8));
-    return 0;
-}
+/* func_800659C8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800659C8_port.c (src/func_800659C8.c); hand port retired (switch1 lane, audit klass a-replaceable, generator-verified eligible). */

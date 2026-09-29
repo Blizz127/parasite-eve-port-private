@@ -1352,6 +1352,8 @@ int PE_GPU_CanBeginImageLoad(int needs_dma)
     return 1;
 }
 
+static uint32_t g_dma2_snapshot[PE_GPU_VRAM_PIXELS / 2u + 16u];
+
 int PE_GPU_DMA2Issue(pe_addr_t madr, uint32_t bcr, uint32_t chcr)
 {
     uint32_t blocks;
@@ -1381,6 +1383,15 @@ int PE_GPU_DMA2Issue(pe_addr_t madr, uint32_t bcr, uint32_t chcr)
         return 0;
     }
 
+    /* psx-spx "DMA": the CPU is halted while a (non-chopped) DMA runs, so
+     * a CPU->VRAM block transfer reads its source at issue time.  The
+     * native completion is serviced later (event/IRQ timing), so snapshot
+     * the source words now; retail code reuses LoadImage buffers right
+     * after the call (e.g. func_8006AD40's shadow TIM at 0x8012A8B8). */
+    if (!readback) {
+        uint32_t k;
+        for (k = 0; k < words; k++) g_dma2_snapshot[k] = PE_LoadU32(madr + k * 4u);
+    }
     g_gpu.state.dma2_madr = madr;
     g_gpu.state.dma2_bcr = bcr;
     g_gpu.state.dma2_chcr = chcr;
@@ -1444,7 +1455,7 @@ int PE_GPU_ServiceDMA2Completion(uint64_t event_token)
     for (i = 0; i < g_gpu.state.dma2_word_count; i++) {
         if (g_gpu.state.dma2_chcr==PE_GPU_DMA2_CHCR_STORE)
             PE_StoreU32(source+i*4u,ReadImageWord());
-        else WriteImageWord(PE_LoadU32(source + i * 4u));
+        else WriteImageWord(g_dma2_snapshot[i]);
     }
     if (g_gpu.state.image_remaining_pixels != 0) {
         return 0;

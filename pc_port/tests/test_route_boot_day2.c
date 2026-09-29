@@ -38,6 +38,7 @@
 #include "pe_disc.h"
 #include "pe_guest_image.h"
 #include "pe_route_pad.h"
+#include "pe_memcard.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -929,6 +930,9 @@ int main(void)
         return 0;
     }
 
+    /* Never touch the user's memory-card image: in-memory card. */
+    PE_Memcard_SetPath(0, "");
+    PE_Memcard_SetPath(1, NULL);
     reason = RunRoute(ROUTE_FRAME_LIMIT);
     if(g_ram_window_failed)return 1;
     /* Optional read-only checkpoint for original/native differential probes.

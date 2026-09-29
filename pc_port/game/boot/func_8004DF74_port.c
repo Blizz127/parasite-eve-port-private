@@ -28,8 +28,7 @@ void func_8005F874(int32_t value)
 
 /* func_8006006C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8006006C_port.c (src/func_8006006C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-uint32_t func_80052894(uint32_t index)
-{ return PE_LoadU32(0x800A76A4u+index*12u)/60u; }
+/* func_80052894: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80052894_port.c (src/func_80052894.c); hand port retired (switch1 lane, audit klass a-replaceable, generator-verified eligible). */
 
 pe_addr_t func_8005DD3C(uint32_t id)
 {

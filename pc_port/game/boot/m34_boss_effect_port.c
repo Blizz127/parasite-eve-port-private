@@ -843,6 +843,61 @@ static void m0348i_80190D88(pe_addr_t o, pe_addr_t p)
     (void)func_800C6800(o, 1389u, p + 0x60u);
 }
 
+/* func_8019253C (src/overlays/room_m0348i/func_8019253C.c): up to 8 rising
+ * sparks spawned off the matrix of *(func_800C2B50()) + 0x238.  SVECTOR
+ * locals a/b/c/oa/ob/oc live at PE_M0348I_STACK + 0x40 (their addresses go
+ * to ApplyMatrixSV func_80078C34). */
+static void m0348i_8019253C(pe_addr_t a1, pe_addr_t o)
+{
+    const pe_addr_t sa = PE_M0348I_STACK + 0x40u, sb = sa + 8u, sc = sa + 16u;
+    const pe_addr_t soa = sa + 24u, sob = sa + 32u, soc = sa + 40u;
+    pe_addr_t x = m0348i_c2b50();
+    pe_addr_t mat = PE_LoadU32(PE_LoadU32(x) + 0x238u);
+    unsigned int i;
+    m0348i_copy_words(sa, 0x8018F04Cu, 2u);
+    m0348i_copy_words(sb, 0x8018F054u, 2u);
+    m0348i_copy_words(sc, 0x8018F05Cu, 2u);
+    for (i = 0; i < 8u; i++) {
+        pe_addr_t e = o + i * 8u, h = o + i * 2u;
+        if (PE_LoadU8(o + i + 0xB4u) == 0u) {
+            int32_t s = S16AT_(a1 + 2u);
+            if ((int32_t)(int16_t)(s % 8) == (int32_t)i && s < 0x5A) {
+                PE_StoreU8(o + i + 0xB4u, 1u);
+                PE_StoreU32(o, PE_LoadU32(o) + 1u);
+                (void)func_80078C34(mat + 0xA0u, sa, soa);
+                (void)func_80078C34(mat + 0xA0u, sb, sob);
+                (void)func_80078C34(mat + 0xA0u, sc, soc);
+                PE_StoreU16(e + 4u, (uint16_t)(S16AT_(soa + 0u) + (int32_t)PE_LoadU32(x + 0x38u)));
+                PE_StoreU16(e + 6u, (uint16_t)(S16AT_(soa + 2u) + (int32_t)PE_LoadU32(x + 0x3Cu)));
+                PE_StoreU16(e + 8u, (uint16_t)(S16AT_(soa + 4u) + (int32_t)PE_LoadU32(x + 0x40u)));
+                if (!((int32_t)func_80071A54() & 1))
+                    m0348i_copy_words(e + 0x44u, soc, 2u);
+                else
+                    m0348i_copy_words(e + 0x44u, sob, 2u);
+                PE_StoreU16(h + 0x84u, 0x800u);
+                PE_StoreU16(h + 0x94u, 0x80u);
+                PE_StoreU16(h + 0xA4u, 0u);
+            }
+        } else {
+            int32_t r;
+            PE_StoreU16(e + 4u, (uint16_t)(S16AT_(e + 4u) + S16AT_(e + 0x44u)));
+            r = (int32_t)func_80071A54();
+            PE_StoreU16(e + 8u, (uint16_t)(S16AT_(e + 8u) + S16AT_(e + 0x48u)));
+            PE_StoreU16(e + 6u, (uint16_t)(S16AT_(e + 6u) - 0x14));
+            PE_StoreU16(e + 6u, (uint16_t)(S16AT_(e + 6u) - r % 20));
+            PE_StoreU16(h + 0x94u, (uint16_t)(S16AT_(h + 0x94u) - 8));
+            PE_StoreU16(h + 0xA4u, (uint16_t)(S16AT_(h + 0xA4u) + 1));
+            if (S16AT_(h + 0x94u) <= 0) {
+                PE_StoreU16(h + 0x94u, 0u);
+                PE_StoreU8(o + i + 0xB4u, 0u);
+                PE_StoreU32(o, PE_LoadU32(o) - 1u);
+            }
+        }
+    }
+    if (PE_LoadU32(o) == 0u && S16AT_(a1 + 2u) > 0x5A)
+        PE_StoreU8(a1 + 1u, 2u);
+}
+
 /* Weapon/effect-VM dispatch (PE_WeaponCallback): 1 = handled. */
 int PE_M0348iEffectChild(pe_addr_t fn, pe_addr_t slot, pe_addr_t rec, pe_addr_t data)
 {
@@ -858,6 +913,7 @@ int PE_M0348iEffectChild(pe_addr_t fn, pe_addr_t slot, pe_addr_t rec, pe_addr_t 
         for (unsigned i = 0; i < 8u; i++) PE_StoreU8(data + 0xB4u + i, 0);
         return 1;
     case 0x8018F560u: return 1;   /* func_8018F560: empty leaf */
+    case 0x8019253Cu: m0348i_8019253C(rec, data); return 1;
     default: return 0;
     }
 }

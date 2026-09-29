@@ -37,6 +37,8 @@ set(PLATFORM_SRCS
     platform/pe_spu.c
     platform/pe_audio_driver.c
     platform/pe_libcard.c
+    platform/pe_memcard.c
+    platform/pe_bios_card.c
     platform/pe_cdreg.c
     platform/pe_libcd.c
     platform/pe_disc.c

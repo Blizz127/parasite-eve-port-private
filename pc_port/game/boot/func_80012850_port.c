@@ -34,18 +34,7 @@
 
 /* func_8003708C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8003708C_port.c (src/func_8003708C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
-uint32_t func_800370A8(uint32_t a, uint32_t b)
-{
-    int32_t denom;
-    int32_t quot;
-
-    denom = (int32_t)b >> 8;
-    /* Retail `div` breaks on 0; live path does not hit that. */
-    if (denom == 0)
-        return 0u;
-    quot = (int32_t)a / denom;
-    return (uint32_t)quot << 8;
-}
+/* func_800370A8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800370A8_port.c (src/func_800370A8.c); hand port retired (switch1 lane, audit klass a-replaceable, generator-verified eligible). */
 
 int func_80012850(pe_addr_t args)
 {

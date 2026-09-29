@@ -17,6 +17,7 @@
 #include "pe_disc.h"
 #include "pe_guest_image.h"
 #include "test_retail_fixups.h"
+#include "pe_memcard.h"
 /* Stripped retail-oracle headers (RETAILFIX tables used across test files). */
 #include "retail_actor_flag_vm_cases.h"
 #include "retail_music_consumer_cases.h"
@@ -186,7 +187,19 @@ static void B558_PlantPointers(void);
 static void B558_PlantChain(void);
 
 /* ── Helper: reset all test state ────────────────────────────────────── */
+/* Tests never touch the user's card image: port 0 is an in-memory card,
+ * port 1 empty, and the BIOS card calls keep the oracle-fixture frontier
+ * unless a memory-card test turns it off. */
+static void Test_ResetMemcard(void)
+{
+    PE_Memcard_Reset();
+    PE_Memcard_SetPath(0, "");
+    PE_Memcard_SetPath(1, NULL);
+    PE_Memcard_SetBoundaryMode(1);
+}
+
 static void ResetTestState(void) {
+    Test_ResetMemcard();
     g_stub_count = 0;
     g_stub_order_count = 0;
     g_stub_bootstrap_invocations = 0;
@@ -31163,11 +31176,11 @@ static void test_B53E_exact_dma_threshold_async_issue(void)
     PASS();
 }
 
-static void test_B53E_remainder_dma_visibility_and_live_source(void)
+static void test_B53E_remainder_dma_visibility_and_issue_source(void)
 {
     uint8_t ring_before[32];
     uint64_t token;
-    TEST("B53E_remainder_dma_visibility_and_live_source");
+    TEST("B53E_remainder_dma_visibility_and_issue_source");
     ResetTestState();
     B53E_SetupRetailGpu();
     PE_Fill(B53C_RING_BASE, sizeof(ring_before), 0xA5u);
@@ -31192,13 +31205,17 @@ static void test_B53E_remainder_dma_visibility_and_live_source(void)
                                                  sizeof(ring_before)),
                   sizeof(ring_before)) == 0,
            "issue pumped a ring, callback, or completion");
+    /* psx-spx "DMA Channels": the CPU is halted while a non-chopped DMA
+     * runs, so the block transfer reads its source at issue.  A store made
+     * after the issue must not reach VRAM (the PCSX-Redux oracle VRAM of the
+     * func_8006AD40 shadow TIM at (704,64) matches only with this). */
     PE_StoreU32(B53E_SOURCE + 4u, 0xBBBB9999u);
     token = PE_GPU_DMA2EventToken();
     ASSERT(PE_GPU_ServiceDMA2Completion(token) == 1 &&
-           B53B_Pixel(2, 10) == 0x9999u &&
-           B53B_Pixel(3, 10) == 0xBBBBu &&
+           B53B_Pixel(2, 10) == 0x5001u &&
+           B53B_Pixel(3, 10) == 0x6001u &&
            !PE_GPU_DMA2CompletionPending(),
-           "explicit completion did not consume live DMA source");
+           "DMA completion must deliver the source as read at issue");
     PASS();
 }
 
@@ -34183,10 +34200,11 @@ static void test_B53B_remainder_plus_dma_visibility(void)
 
     /* The descriptor retains a guest address, not a copied payload or host
      * pointer: event-time data must observe this intervening guest write. */
+    /* At-issue source (psx-spx: CPU halted during non-chopped DMA). */
     PE_StoreU32(source + 4u, 0xBEEFCAFEu);
     ASSERT(PE_GPU_ServiceDMA2Completion(token), "explicit DMA service failed");
-    ASSERT(B53B_Pixel(12, 20) == 0xCAFEu &&
-           B53B_Pixel(13, 20) == 0xBEEFu &&
+    ASSERT(B53B_Pixel(12, 20) == 3u &&
+           B53B_Pixel(13, 20) == 4u &&
            B53B_Pixel(43, 20) == 34u,
            "DMA suffix data/order mismatch after service");
     PE_GPU_GetState(&state);
@@ -35837,6 +35855,7 @@ static void test_ATK3_retail_attack_initialization(void)
 #include "test_formatter_copy.h"
 #include "test_formatter_frame.h"
 #include "test_card_operation_frame.h"
+#include "test_memcard.h"
 #include "test_dispenv.h"
 #include "test_camera_target.h"
 #include "test_transition_gte.h"
@@ -39218,6 +39237,7 @@ int main(void)
     test_filter = getenv("PE_TEST_FILTER");
 
     PE_RamInit();
+    Test_ResetMemcard();
     PE_GuestCode_InstallGenerated();   /* guest-code dispatch registry */
     PE_Callback_Init();
     Bootstrap_Init();
@@ -40397,7 +40417,7 @@ int main(void)
     test_B53E_guest_abi_clamps_and_zero_returns();
     test_B53E_cpu_only_pixel_order_padding_and_wrap();
     test_B53E_exact_dma_threshold_async_issue();
-    test_B53E_remainder_dma_visibility_and_live_source();
+    test_B53E_remainder_dma_visibility_and_issue_source();
     test_B53E_source_span_validation_before_mutation();
     test_B53E_platform_preflight_is_mutation_free();
     test_B53E_gpustat_wait_boundary_and_explicit_transition();
@@ -40794,6 +40814,7 @@ int main(void)
     test_DAY1_formatter_copy();
     test_DAY1_formatter_frame();
     test_DAY1_card_operation_frame();
+    test_MC_all();
     test_DAY1_dispenv();
     test_DAY1_transition_camera_boundary();
     test_DAY1_transition_path();

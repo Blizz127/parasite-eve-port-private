@@ -10,6 +10,8 @@
  * pc_port implementation is a loud boundary.  Tests:
  * pc_port/tests/test_pa_r3.h.
  */
+#include "pe_bios_string.h"
+#include "pe_memcard.h"
 #include "pe_guest_decomp.h"
 #include "hand_absent_r3_protos.h"
 
@@ -296,11 +298,9 @@ void func_8003495C(void)
  * &D_8009EE70); f5 = n, f6 = 0, entry.f1 = 0, f1 = 1, f7 = 1, h14 =
  * 0x2000, h16 = 10, D_800A1854 = c, D_800A1858 = 0x2000, fB = entry.state
  * == 1 ? 0xB : 4, entry.state = 1.
- * func_80071A84 is the variadic sprintf (pe_dis.sh 0x80071A84 0x10: it
- * spills a1..a3 to the caller frame and reserves 0x250 bytes) with no
- * pc_port implementation: loud boundary.  The boundary vector holds four
- * registers; the fifth argument (f3 + 'A', a stack word in retail) is
- * computed but cannot be recorded. */
+ * func_80071A84 is the variadic Psy-Q sprintf (pe_dis.sh 0x80071A84 0x10: it
+ * spills a1..a3 to the caller frame and reserves 0x250 bytes); the host
+ * formatter PE_Bios_Sprintf (platform/pe_bios_string.c) performs it. */
 #define R3_CARD_BASE 0x800A0ED4u
 #define R3_CARD_SIZE 0x418u
 
@@ -323,13 +323,15 @@ void func_80042020(int slot, int n)
     PE_StoreU8(c + 3u, (uint8_t)n);
     {
         unsigned f3 = PE_LoadU8(c + 3u);
-        int fifth = (int)f3 + 'A';
+        uint32_t args[3] = {R3_CARD_BASE < c ? 1u : 0u,
+                            PE_LoadU8(c + 0x1Cu + f3 * 0x44u + 0x29u) + (uint32_t)'0',
+                            f3 + (uint32_t)'A'};
 
-        (void)PE_D_COMP_BOUNDARY4("func_80071A84", 0x80071A84u, 0x8009EE70u,
-                                  PE_LoadU32(0x80092224u),
-                                  R3_CARD_BASE < c ? 1 : 0,
-                                  PE_LoadU8(c + 0x1Cu + f3 * 0x44u + 0x29u) + '0');
-        (void)fifth;
+        if (PE_Memcard_BoundaryMode())      /* test frontier (pe_memcard.h) */
+            (void)PE_D_COMP_BOUNDARY4("func_80071A84", 0x80071A84u, 0x8009EE70u,
+                                      PE_LoadU32(0x80092224u), args[0], args[1]);
+        else
+            (void)PE_Bios_Sprintf(0x8009EE70u, PE_LoadU32(0x80092224u), args, 3);
     }
     (void)func_80040B80(0x8009EE70u);
     PE_StoreU8(c + 5u, (uint8_t)n);

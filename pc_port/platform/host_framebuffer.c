@@ -18,6 +18,7 @@
 #include "pe_cdreg.h"
 #include "pe_mdec.h"
 #include "pe_irq_delivery.h"
+#include "pe_irq.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -172,6 +173,39 @@ static void HostFB_DeviceTime(uint32_t cycles)
     }
 }
 
+/* Non-device VBlank edge.  Retail: the VBlank IRQ (I_STAT bit 0)
+ * reaches the libetc source-0 handler func_8007440C, which bumps D_800956AC
+ * and runs the eight callback slots — func_8003E91C (RNG advance
+ * func_80070D6C + timer ramps func_80036F7C, incl. the play-time clock).
+ * The device path gets this through PE_IRQ_ServicePendingForGeneration; the
+ * default (non-device) path previously never dispatched it.  Same guards as
+ * HostFB_ServiceDeviceIrq: not already inside a dispatch, the VBlank source
+ * unmasked, and ResetCallback has installed 8007440C in the source-0 slot. */
+static int (*g_vblank_dispatch)(void);
+static void HostFB_VBlankGameCallbacks(void)
+{
+    if (PE_Port_ShouldStop()) return;
+    if (PE_LoadU16(0x800945E6u) != 0u || !(PE_IRQ_GetMask() & 1u)) return;
+    if (PE_LoadU32(0x800945E8u) != 0x8007440Cu || !g_vblank_dispatch) return;
+    (void)g_vblank_dispatch();
+    {   /* PE_VBLANK_TRACE=N: every N dispatches log the D_800956AC VBlank
+         * count, the func_80070D6C RNG cursors (0x80070E04/08) and the
+         * D_800A76A0 timer counters (play time = D_800A76BC). */
+        static int every = -1;
+        if (every < 0) every = getenv("PE_VBLANK_TRACE") ? atoi(getenv("PE_VBLANK_TRACE")) : 0;
+        if (every > 0 && PE_LoadU32(0x800956ACu) % (uint32_t)every == 0u)
+            fprintf(stderr, "[VBLANK] n=%u rng_i=%d/%d t0=%u t1=%u t2(play)=%u t3=%u d1a0=%08X\n",
+                    PE_LoadU32(0x800956ACu), (int32_t)PE_LoadU32(0x80070E04u), (int32_t)PE_LoadU32(0x80070E08u),
+                    PE_LoadU32(0x800A76A4u), PE_LoadU32(0x800A76B0u), PE_LoadU32(0x800A76BCu),
+                    PE_LoadU32(0x800A76C8u), PE_LoadU32(0x8009D1A0u));
+    }
+}
+
+void HostFB_SetVBlankDispatch(int (*dispatch)(void))
+{
+    g_vblank_dispatch = dispatch;
+}
+
 uint32_t HostFB_VSyncTimer(void)
 {
     return fb_vsync_timer;
@@ -204,7 +238,7 @@ uint32_t HostFB_VSync(int mode)
         int ticks=mode>0?mode:1;
         while (ticks-->0) {
             if(device) HostFB_DeviceTime(564480u);
-            else PE_GPU_VBlankStep();
+            else { PE_GPU_VBlankStep(); HostFB_VBlankGameCallbacks(); }
             if(PE_Port_ShouldStop()) break;
         }
     }

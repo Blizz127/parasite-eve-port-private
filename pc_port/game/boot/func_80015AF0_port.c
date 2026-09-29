@@ -26,31 +26,7 @@ void func_8004D18C(void)
     func_8005C1EC(1);func_80042538();func_8005DE88();
 }
 
-int func_80015AF0(pe_addr_t args)
-{
-    (void)args;
-    if(PE_LoadU32(0x800B0CD8u)&0x1000u)return 1;
-    pe_addr_t task=PE_LoadU32(0x8009D300u);
-    uint16_t flags=PE_LoadU16(task+8u);
-    if(!(flags&0x20u)) {
-        PE_StoreU16(task+8u,flags|0x20u);
-        uint32_t next=PE_LoadU32(0x8009CE00u);
-        PE_StoreU32(task+16u,1u);
-        PE_StoreU32(0x8009CE00u,next-8u);
-        return 0;
-    }
-    unsigned epoch=PE_Port_StopEpoch();
-    func_80067CBC();func_8004D18C();
-    if(PE_Port_StopEpoch()!=epoch)return 0;
-    uint32_t scene=PE_LoadU32(0x800B0CD8u);
-    task=PE_LoadU32(0x8009D300u);
-    PE_StoreU32(0x800B0CD8u,scene|0x9000u);
-    uint32_t input=PE_LoadU32(0x8009D1A0u);
-    flags=PE_LoadU16(task+8u);
-    PE_StoreU32(0x8009D1A0u,input|4u);
-    PE_StoreU16(task+8u,flags&0xFFDFu);
-    return 1;
-}
+/* func_80015AF0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80015AF0_port.c (src/func_80015AF0.c); hand port retired (switch1 lane, audit klass a-replaceable, generator-verified eligible). */
 
 /* func_80042AD8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80042AD8_port.c (src/func_80042AD8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 /* func_80042910: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80042910_port.c (src/func_80042910.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */

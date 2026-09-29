@@ -224,6 +224,7 @@ static uint16_t ScriptPadSource(void)
 
 static int      g_handed_over;
 static int      g_hand_over_announced;
+static int      g_hand_over_frame;
 
 /* Hand-over: the autopilot drives the route until the player takes the pad.
  * `--hand-over-at <frame>` gates on the route frame; `--hand-over-key` then
@@ -257,6 +258,7 @@ static int RouteHandOverReady(void)
                 g_frame);
     }
     g_handed_over = 1;
+    g_hand_over_frame = g_frame;
     return 1;
 }
 
@@ -357,7 +359,19 @@ static uint16_t RoutePadSource(void)
     int rf;
 
     g_route_frame = g_frame;
-    if (RouteHandOverReady()) return HostWindow_PadRaw();
+    if (RouteHandOverReady()) {
+        /* PE_PAD_SCRIPT with --route-pad: after the hand-over the script
+         * drives the pad, its frames counted from the hand-over frame (a
+         * headless route can then e.g. answer a save prompt). */
+        if (g_script_pad_count) {
+            uint16_t m = 0xFFFFu;
+            for (unsigned i = 0; i < g_script_pad_count &&
+                 g_frame - g_hand_over_frame >= g_script_pad[i].frame; i++)
+                m = g_script_pad[i].mask;
+            return m;
+        }
+        return HostWindow_PadRaw();
+    }
     /* PE_ROUTE_PLAY_MOVIES: no buttons while a movie shows (a held
      * route button would skip it). */
     if (getenv("PE_ROUTE_PLAY_MOVIES") && PE_LoadU8(0x800B0DBAu) != 0u)
@@ -439,6 +453,18 @@ static uint16_t RoutePadSource(void)
 static void PresentHook_BlitWindow(void)
 {
     pe_plat_cheats_frame();   /* opt-in cheat console (pe_plat/cheats.h); no-op while all off */
+    {   /* Harness aid (non-route runs): PE_SHOT_DIR=<dir> + PE_SHOT_EVERY=N write
+         * <dir>/p<present>.ppm every N presents (menu / load verification). */
+        static const char *sdir = (const char *)1; static int sev;
+        if (sdir == (const char *)1) { sdir = getenv("PE_SHOT_DIR"); sev = getenv("PE_SHOT_EVERY") ? atoi(getenv("PE_SHOT_EVERY")) : 60; }
+        if (sdir && sev > 0 && !g_opts.route_pad) {
+            int presented = 0; HostFB_GetState(NULL, NULL, &presented, NULL);
+            if (presented % sev == 0) {
+                char path[512]; snprintf(path, sizeof path, "%s/p%06d.ppm", sdir, presented);
+                (void)HostFB_WritePPM(path);
+            }
+        }
+    }
     if (g_opts.route_pad) {
         /* fmv2 harness aid, PE_ROUTE_PLAY_MOVIES=1 only: the route pad
          * schedule was recorded with --skip-movie, so hold the route
@@ -452,6 +478,18 @@ static void PresentHook_BlitWindow(void)
         g_frame++;
         RecordSewerVictory();
         RouteAmmoTrace();
+        if (getenv("PE_GO_TRACE")) {
+            /* Game Over phase trace: battle mode, mode-3 phase CE74, timer CE70, D1A0, token, VSync. */
+            static uint32_t sig = 0xFFFFFFFFu;
+            uint32_t m = PE_LoadU32(0x8009D28Cu), ph = PE_LoadU8(0x8009CE74u), tm = PE_LoadU8(0x8009CE70u);
+            uint32_t ns = (m << 16) ^ (ph << 8) ^ (uint32_t)D_8009D280 ^ (PE_LoadU32(0x8009D1A0u) & 0x6u);
+            if (ns != sig || (m == 3u && g_frame % 10 == 0)) {
+                PeGpuState st; PE_GPU_GetState(&st);
+                fprintf(stderr, "GO frame=%d vbl=%u token=%08X mode=%d phase=%u timer=%u d1a0=%X\n",
+                        g_frame, st.vsync_count, (unsigned)D_8009D280, (int)m, ph, tm, PE_LoadU32(0x8009D1A0u));
+                sig = ns;
+            }
+        }
         {   /* PE_ACTOR_TRACE=TT:II: log that actor's anim (+0xE) and x/z every 15 frames. */
             const char *at = getenv("PE_ACTOR_TRACE");
             if (at && g_frame % 15 == 0) {
@@ -481,7 +519,8 @@ static void PresentHook_BlitWindow(void)
                         shot_at = g_frame;
                     {   /* PE_ROUTE_SHOT_FROM/TO: also shoot every N frames in a frame window. */
                         const char *fr = getenv("PE_ROUTE_SHOT_FROM"), *to = getenv("PE_ROUTE_SHOT_TO");
-                        if (n > 0 && fr && to && g_frame >= atoi(fr) && g_frame <= atoi(to) && g_frame % n == 0)
+                        if (n > 0 && ((fr && to && g_frame >= atoi(fr) && g_frame <= atoi(to) && g_frame % n == 0) ||
+                                      (g_handed_over && ((g_frame - g_hand_over_frame) % n) == 0)))
                             shot_at = g_frame;
                     }
                 }
@@ -518,6 +557,23 @@ static void PresentHook_BlitWindow(void)
                 fprintf(stderr, "[ROUTE] change frame=%d token=%08X story=%08X\n",
                         g_frame, (unsigned)tok, (unsigned)st);
                 last_tok = tok; last_story = st;
+            }
+        }
+        {
+            /* PE_DEBUG_SAVE_MENU_AT=<frame>: verification aid for the memory
+             * card.  At that route frame, run the field VM opcode E7 body
+             * (func_80015AF0's second stage: 67CBC, the save-menu
+             * constructor 4D18C, scene bits 9000, input bit 4) as a phone
+             * would, so a headless run can reach the in-game save menu. */
+            static int at = -2;
+            if (at == -2) at = getenv("PE_DEBUG_SAVE_MENU_AT") ? atoi(getenv("PE_DEBUG_SAVE_MENU_AT")) : -1;
+            if (at >= 0 && g_frame == at && !(PE_LoadU32(0x800B0CD8u) & 0x1000u)) {
+                fprintf(stderr, "[ROUTE] debug: opening the save menu (E7 body) at frame %d token=%08X story=%08X\n",
+                        g_frame, (unsigned)D_8009D280, (unsigned)PE_LoadU32(0x800A7918u));
+                (void)func_80067CBC();
+                func_8004D18C();
+                PE_StoreU32(0x800B0CD8u, PE_LoadU32(0x800B0CD8u) | 0x9000u);
+                PE_StoreU32(0x8009D1A0u, PE_LoadU32(0x8009D1A0u) | 4u);
             }
         }
         if ((g_frame % 500) == 0)
@@ -1023,7 +1079,7 @@ int main(int argc, char **argv) {
     }
 
     /* PE_CHEAT_KEYS (scripted cheat keys) needs the present hook headless too. */
-    if (g_opts.headless && getenv("PE_CHEAT_KEYS"))
+    if (g_opts.headless && (getenv("PE_CHEAT_KEYS") || getenv("PE_SHOT_DIR")))
         PE_Port_SetPresentHook(PresentHook_BlitWindow);
     /* Autopilot-only aids (M34 HP lock etc.) are test-harness only: they may
      * be armed solely by --route-pad.  A normal start must never see them. */
@@ -1073,6 +1129,11 @@ int main(int argc, char **argv) {
      * e.g. FFF7 Start, DFFF Circle) drives a headless non-route run by
      * host present count, so title/movie/menu paths can be verified
      * without --route-pad (which forces --skip-movie). */
+    if (g_opts.route_pad && getenv("PE_PAD_SCRIPT")) {
+        ScriptPadLoad(getenv("PE_PAD_SCRIPT"));
+        fprintf(stderr, "[PAD] PE_PAD_SCRIPT: %u scripted pad changes after the route hand-over\n",
+                g_script_pad_count);
+    }
     if (!g_opts.route_pad && getenv("PE_PAD_SCRIPT")) {
         ScriptPadLoad(getenv("PE_PAD_SCRIPT"));
         PE_Port_SetPadSource(ScriptPadSource);
@@ -1162,6 +1223,8 @@ int main(int argc, char **argv) {
             vs, ds, pr, mk, g_port_main_iterations);
     fprintf(stderr, "[HOST] stop_reason=%s\n",
             PE_Port_StopReasonName(PE_Port_GetStopReason()));
+    fprintf(stderr, "[HOST] final room token=%08X story persist[74]=%08X\n",
+            (unsigned)PE_LoadU32(0x8009D280u), (unsigned)PE_LoadU32(0x800A7918u));
     {
         PeGpuState gpu;
 
