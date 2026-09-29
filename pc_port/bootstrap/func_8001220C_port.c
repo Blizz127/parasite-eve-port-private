@@ -37,7 +37,7 @@ extern void func_80074D28(int mask);
 
 /* D_800B0CD8 is a guest-RAM lvalue macro (psx_compat.h) */
 
-extern unsigned int D_800A7918;
+/* D_800A7918: guest-memory macro from psx_compat.h */
 
 /* ── Scratchpad host adapter ───────────────────────────────────────── */
 

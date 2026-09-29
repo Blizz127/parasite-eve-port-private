@@ -48,7 +48,7 @@
 #include <errno.h>
 
 extern void func_8001220C(void);
-extern unsigned int D_800A7918;
+/* D_800A7918: guest-memory macro from psx_compat.h */
 extern void PE_Disc_SetActive(PE_Disc *disc);
 
 /* The library's translated code calls Trace_Direct; the CLI host normally

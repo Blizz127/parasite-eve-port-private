@@ -83,11 +83,15 @@ int PE_Globals_AdoptRetailImage(void);
 
 /* ── Host-owned scalar globals (plain data, no pointer arithmetic) ──── */
 
-extern uint32_t  D_800A7918;
+/* Story word persist[74]: one guest-memory authority (every writer stores
+ * the guest word; a host copy left the main-loop volume gate stale). */
+#define D_800A7918 PE_GUEST_U32(0x800A7918u)
 extern unsigned short D_80093164[];
 
 /* Resource-bank pointer/count owners below use canonical guest RAM. */
-extern unsigned int D_8009D018;
+/* gp+0x2A8: one guest-memory authority, like its D_8009D03C..64 neighbours
+ * (hand writers and generated readers such as func_80051E58 must agree). */
+#define D_8009D018 PE_GUEST_U32(0x8009D018u)
 #define D_8009D03C PE_GUEST_U32(0x8009D03Cu)
 #define D_8009D048 PE_GUEST_U32(0x8009D048u)
 #define D_8009D04C PE_GUEST_U32(0x8009D04Cu)

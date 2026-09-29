@@ -69,28 +69,11 @@ static int func_80051E58(void) {
  * If the capped sum < 51, calls func_80051E58() again (which may have
  * changed since the first call) and adds the byte to the new return.
  * Returns the capped value (0..50). */
-unsigned int func_80052F70(void) {
-    /* Retail 0x80052F78..0x80052FB0 (src/func_80052F70.c): call first, then
-     * `lbu`; the cap test is the SIGNED `slti v1,v1,51`, and the byte is
-     * reloaded after the second call.  (Was unsigned with the byte read
-     * once up front: a negative D_8009D018 returned 50; portverify.) */
-    int v = func_80051E58();
-    if ((int)PE_LoadU8(GA_800C0E0C) + v >= 0x33)
-        return 50u;
-    v = func_80051E58();
-    return (unsigned int)((int)PE_LoadU8(GA_800C0E0C) + v);
-}
+/* func_80052F70: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80052F70_port.c (src/func_80052F70.c); hand port retired (port3 switch-over P). */
 
 /* Retail 52F24..52F70: publish base inventory capacity and refresh the active
  * inventory count. A different resource buffer keeps its existing count. */
-void func_80052F24(int32_t capacity)
-{
-    if (capacity >= 51)
-        capacity = 50;
-    PE_StoreU8(GA_800C0E0C, (uint8_t)capacity);
-    if (D_8009D048 == GA_800C0E48)
-        D_8009D050 = func_80052F70();
-}
+/* func_80052F24: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80052F24_port.c (src/func_80052F24.c); hand port retired (port3 switch-over G). */
 
 /* ── func_80052EB0 — two-word state setter, 3 words ────────────────────
  * Executable 0x80052EB0..0x80052EBB, 3 words verified.

@@ -1,3 +1,11 @@
+## UPDATE 2026-09-29: r4 gate — split globals, batches F/G, pause screen
+
+r4 tree = b29d84cb + port3's split-global fix + batch G. Gate on that exact tree in a clean worktree (build/wt-r4): fresh build OK; native suite `1608 run, 1608 passed, 0 skipped` (run from the repo root); `REGRESS ok normal_start_shim_off`; `REGRESS PASS until=day1_end_80 frame=66994`; movies-on route into Day 2 (`build/lanes/lead/movies_day2_check.sh`): 5 field movies closed with dropped=0, story 0x80 → A80650C8 → A8004148 (0x88) → story 0x90, no boundary (`MOVIES_DAY2=PASS`).
+
+- Split globals: `D_8009D018` and `D_800A7918` now guest-only (see KNOWN_DIVERGENCES Fixed). This also unblocked `func_80052F70` and batch G (`func_80052F24`, `func_80054240`, `func_80057C54`) on generated TUs.
+- Earlier today: #30 pause screen and batch F (b29d84cb); `func_801914A0` matched (2e6f7a66); batches D+E and #11 closed (2e8d8a9f); #27 and batches A/C (8962e1a0). Open divergences: 17.
+- In progress: #16 (M34 phase-2 effects, day1 w16: all four callbacks ported from matched C, route end 67186 = +192 from the beam's full 121-tick lifetime; the retail tick rate is still to measure in the oracle). audio3: switch the harness clock to `PE_GPU_VSyncQuery`, then the real title-timing offset check (the earlier "157 VBlanks" compared VSync calls with VBlanks and means nothing).
+
 ## UPDATE 2026-09-29: checkpoint 3 — #27 ring-full wait, switch-over batches A/C, gfx2 round
 
 Gate on this exact tree (`git diff HEAD` sha256 f6ecb7a893b38471…, status 7a0f8c085c44f61f…, untracked e310c6c3b8a833c0…, identical before and after): fresh build `build/pcbuild-gate` BUILD_EXIT=0; native suite `Results: 1606 run, 1606 passed, 0 failed`; `REGRESS ok normal_start_shim_off`; `REGRESS PASS until=day1_end_80 frame=66994 token=A8000048 story=80` (logs build/tmp/gate-{build,suite,route}.log). Docs-only edits after the gate: KNOWN_DIVERGENCES, this file.

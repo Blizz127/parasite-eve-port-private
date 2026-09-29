@@ -21432,7 +21432,8 @@ static void test_6A9E4_zero_cycles_footprint(void) {
 
     for (a = PE_RAM_BASE; a < PE_RAM_END; a += 4) {
         uint32_t want = 0xA5A5A5A5u;
-        if (a==0x8009570Cu) want=0x80076C34u;
+        if (a==0x8009D018u) want=0u;   /* func_80051CC4: D_8009D018 = 0 (src/func_80051CC4.c:28) */
+        else if (a==0x8009570Cu) want=0x80076C34u;
         else if (a==0x80095710u) want=0x80076434u;
         else if (a==0x80095744u) want=0x80095704u;
         else if (a==0x8009574Cu) want=0xA5A500A5u;
@@ -22436,9 +22437,11 @@ static void test_5D6F4_full_ram_canary(void) {
     PE_StoreU32(0x800A803Cu, 0);
     /* B38: func_80086728 translated — zero ring buffer index for RingAlloc. */
     PE_StoreU32(0x8009D2F4u, 0);
+    PE_StoreU32(0x8009D018u, 0u);   /* gp+0x2A8 = 0 (retail boot; was an implicit host default) */
     func_8005D6F4();
     for (a = PE_RAM_BASE; a < PE_RAM_END; a += 4) {
         uint32_t want = 0xA5A5A5A5u;
+        if (a == 0x8009D018u) want = 0u;   /* fixture seed (retail-boot gp+0x2A8) */
         if (a >= B25_BUF_BASE && a < B25_BUF_BASE + B25_BZERO_LEN) {
             want = 0;
             if (a >= B25_BUF_SEL && a < B25_BUF_SEL + 8u)
@@ -24965,12 +24968,14 @@ static void test_5CCA4_write_footprint(void) {
     func_80071A24(0x800A8028u, 0xC18u);
     /* bzero the func_8005D6F4 clear range = background for func_8005CCA4. */
     func_80071A24(0x800C0DE0u, 0x12E4u);
+    PE_StoreU32(0x8009D018u, 0u);   /* gp+0x2A8 = 0 (retail boot; was an implicit host default) */
 
     func_8005CCA4();
 
     for (a = PE_RAM_BASE; a < PE_RAM_END; a += 4) {
         uint32_t got = PE_LoadU32(a);
         uint32_t want = 0xA5A5A5A5u;
+        if (a == 0x8009D018u) want = 0u;   /* fixture seed (retail-boot gp+0x2A8) */
         if (a >= 0x800A8028u && a < 0x800A8C40u) {
             want = 0u;                       /* zeroed load-source region */
         } else if (a >= 0x800C0DE0u && a < 0x800C20C4u) {
@@ -25518,7 +25523,9 @@ static void test_51CC4_full_ram_canary_and_authority(void)
                        (a>=0x8009D048u && a<0x8009D04Cu) ||
                        (a>=0x8009D050u && a<0x8009D054u) ||
                        (a>=0x8009D058u && a<0x8009D05Cu) ||
-                       (a>=0x8009D064u && a<0x8009D068u));
+                       (a>=0x8009D064u && a<0x8009D068u) ||
+                       /* src/func_80051CC4.c:28 `D_8009D018 = 0` (guest word) */
+                       (a>=B39_GP_ALIAS && a<B39_GP_ALIAS+4u));
         if (before != after && !allowed) {
             free(snapshot);
             FAIL("func_80051CC4 full-RAM footprint");
@@ -25531,9 +25538,9 @@ static void test_51CC4_full_ram_canary_and_authority(void)
            "lower write guard");
     ASSERT(PE_LoadU32(B39_PARAM_LAST + 4u) == 0xA5A5A5A5u,
            "upper write guard");
-    ASSERT(PE_LoadU32(B39_GP_ALIAS) == 0xA5A5A5A5u,
-           "authoritative host global must not have guest duplicate");
-    ASSERT(D_8009D018 == 0u, "authoritative host mask clear");
+    ASSERT(PE_LoadU32(B39_GP_ALIAS) == 0u,
+           "func_80051CC4 clears the guest D_8009D018 word (one authority)");
+    ASSERT(D_8009D018 == 0u, "mask clear");
     ASSERT(!PE_AddressIsRam(0x000A1B30u), "no KUSEG/low-address mirror");
     PASS();
 }
@@ -25576,22 +25583,21 @@ static void test_51CC4_ramreset_no_split_brain(void)
     TEST("51CC4_ramreset_no_split_brain");
     uint8_t command = 8u;
     ResetTestState();
-    PE_StoreU32(B39_GP_ALIAS, 0xA5A5A5A5u);
+    PE_StoreU32(B39_GP_ALIAS, 0u);   /* one storage now: retail-boot value, not a canary */
     B39_SeedRecord(B39_RECORD, &command, 1u);
     B39_ScriptRecord(B39_RECORD);
     func_80051CC4();
-    ASSERT(D_8009D018 == 1u, "pre-reset authoritative mask");
-    ASSERT(PE_LoadU32(B39_GP_ALIAS) == 0xA5A5A5A5u,
-           "guest alias must remain independent");
+    ASSERT(D_8009D018 == 1u, "pre-reset mask");
+    ASSERT(PE_LoadU32(B39_GP_ALIAS) == 1u,
+           "D_8009D018 and its guest word are one storage");
     ASSERT(PE_AddressIsRam(D_8009D048) && PE_AddressIsRam(D_8009D058),
            "persistent pointer-shaped fields must be guest addresses");
     PE_RamReset();
-    ASSERT(D_8009D018 == 1u, "PE_RamReset must preserve host authority");
-    ASSERT(PE_LoadU32(B39_GP_ALIAS) == 0u,
-           "PE_RamReset must clear guest alias storage");
+    ASSERT(D_8009D018 == 0u && PE_LoadU32(B39_GP_ALIAS) == 0u,
+           "PE_RamReset clears D_8009D018 with the rest of guest RAM");
     PE_Sdk_ResetState();
     ASSERT(D_8009D018 == 0u && D_8009D048 == 0u && D_8009D058 == 0u,
-           "PE_Sdk_ResetState must clear authoritative host fields");
+           "PE_Sdk_ResetState must clear the resource-state fields");
     PASS();
 }
 
@@ -35690,6 +35696,7 @@ static void test_ATK3_retail_attack_initialization(void)
 #include "test_m34_children.h"
 #include "test_pe_plat.h"
 #include "test_cheats.h"
+#include "test_split_brain.h"
 #include "test_actor_contact.h"
 #include "test_clear_image.h"
 #include "test_script_sound.h"
@@ -36529,6 +36536,10 @@ static void test_EQP1_retail_equipment_binding(void)
         for (j=0;j<sizeof(ranges)/sizeof(ranges[0]);j++)
             for (b=0;b<ranges[j][1];b++)
                 PE_StoreU8(ranges[j][0]+b,(uint8_t)(b*37u+19u));
+        /* pe_equipment_oracle.fixture: sw 0 to the resource-state words
+         * after the pattern fill (gp+0x2A8 included). */
+        { static const uint32_t zw[]={0x8009D018u,0x8009D048u,0x8009D04Cu,0x8009D050u,0x8009D054u,0x8009D058u,0x8009D064u};
+          for (j=0;j<7;j++) PE_StoreU32(zw[j],0u); }
         for (j=0;j<7;j++) PE_StoreU32(0x800A1B30u+j*4u,0u);
         PE_StoreU32(0x8009D254u,0x80140000u);
         PE_StoreU32(0x800A8038u,(n/33u)&1u?0x150000u-0xA8028u:0u);
@@ -40892,6 +40903,7 @@ int main(void)
     test_PORTABSENT_all();
     test_PLAT_all();   /* step P0: pe_plat adapters (test_pe_plat.h) */
     test_CHEATS_all(); /* opt-in cheat console (test_cheats.h) */
+    test_SPLIT_all();  /* one guest authority per retail scalar (test_split_brain.h) */
 
     /* Guard tests (4 tests) */
     test_no_emulator_process();

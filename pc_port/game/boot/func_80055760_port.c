@@ -45,21 +45,7 @@ void func_80055760(void)
 
 /* func_80055FE0: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80055FE0_port.c (src/func_80055FE0.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
-int func_80057C54(uint32_t first_list,int32_t first,uint32_t second_list,int32_t second)
-{
-    pe_addr_t a=D_8009D048+(uint32_t)first*2u,b=D_8009D048+(uint32_t)second*2u;
-    uint16_t value;unsigned i;
-    (void)first_list;(void)second_list;
-    value=PE_LoadU16(a)^PE_LoadU16(b);PE_StoreU16(a,value);
-    value=PE_LoadU16(b)^value;PE_StoreU16(b,value);
-    value=PE_LoadU16(a)^value;PE_StoreU16(a,value);
-    for (i=0;i<2;i++) {
-        pe_addr_t equipped=0x800C0E20u+i*2u;int32_t selected=(int8_t)PE_LoadU8(equipped);
-        if (selected==first) PE_StoreU8(equipped,(uint8_t)second);
-        else if (selected==second) PE_StoreU8(equipped,(uint8_t)first);
-    }
-    func_80055760();return 1;
-}
+/* func_80057C54: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80057C54_port.c (src/func_80057C54.c); hand port retired (port3 switch-over G). */
 
 int32_t func_8005401C(void)
 {
@@ -69,11 +55,7 @@ int32_t func_8005401C(void)
     return (int32_t)count;
 }
 
-int func_80054240(int32_t index)
-{
-    return D_8009D048==0x800C0E48u && ((int8_t)PE_LoadU8(0x800C0E20u)==index ||
-        (int8_t)PE_LoadU8(0x800C0E22u)==index);
-}
+/* func_80054240: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80054240_port.c (src/func_80054240.c); hand port retired (port3 switch-over G). */
 
 /* func_8005FA3C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8005FA3C_port.c (src/func_8005FA3C.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
