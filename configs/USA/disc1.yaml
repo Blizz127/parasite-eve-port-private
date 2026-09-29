@@ -787,7 +787,8 @@ segments:
       - [0x257C4, c, func_80034FC4]
       # scene entity alloc
       - [0x25838, c, func_80035038]
-      - [0x25D58, asm]
+      # frame pump: actor +0x190 handlers, pause gates, model matrices (inline GTE), clip ticks
+      - [0x25D58, c, func_80035558]
       - [0x26484, c, func_80035C84]
       - [0x26604, c, func_80035E04]
       - [0x26754, c, func_80035F54]
