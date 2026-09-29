@@ -563,6 +563,13 @@ if(BUILD_TESTS)
         target_include_directories(pe-host-pad-tests PRIVATE platform)
         add_test(NAME host-pad-input COMMAND pe-host-pad-tests)
         set_tests_properties(host-pad-input PROPERTIES TIMEOUT 30)
+    # Syscall-mocked hot-plug replay (ENODEV mid-burst, fd reuse, renumber,
+    # layout change): the Legion sequence of run-20260929T151702Z.log.
+    # The test #includes host_pad.c, so it is not linked separately.
+    add_executable(pe-host-pad-hotplug-tests tests/test_host_pad_hotplug.c)
+    target_include_directories(pe-host-pad-hotplug-tests PRIVATE platform)
+    add_test(NAME host-pad-hotplug COMMAND pe-host-pad-hotplug-tests)
+    set_tests_properties(host-pad-hotplug PROPERTIES TIMEOUT 30)
     endif()
 
     if(UNIX AND NOT APPLE)

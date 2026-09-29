@@ -974,11 +974,111 @@ static void WatchdogArm(void)
     signal(SIGABRT, WatchdogHandler);
     alarm(g_watchdog_sec);
 }
+
+/* Host termination.  The Linux launcher runs the port as
+ * `parasite-eve-port ... 2>&1 | tee run-*.log`, and a Steam / gamescope
+ * "exit game" is SIGTERM (then SIGKILL).  With default dispositions the
+ * port died without a line in the log, which reads the same as a crash
+ * (build/lanes/legion/run-20260929T151702Z.log).
+ *  - SIGTERM/SIGINT/SIGHUP: logged, then the normal host-quit stop (the
+ *    path Escape / window close take), so the log ends with the usual
+ *    summary; the signal is re-raised at exit so the parent still sees it.
+ *    A second signal, or 5 s without reaching exit, terminates at once.
+ *  - SIGPIPE ignored: if tee goes away first, stderr writes fail with EPIPE
+ *    instead of killing the game.
+ *  - SIGSEGV/SIGBUS/SIGILL/SIGFPE: one line + backtrace, then the default
+ *    action, so a crash is distinguishable from a kill in a user's log. */
+static volatile sig_atomic_t g_host_term_sig;
+
+static const char *HostSigName(int sig)
+{
+    switch (sig) {
+    case SIGTERM: return "SIGTERM";
+    case SIGINT:  return "SIGINT";
+    case SIGHUP:  return "SIGHUP";
+    case SIGSEGV: return "SIGSEGV";
+    case SIGBUS:  return "SIGBUS";
+    case SIGILL:  return "SIGILL";
+    case SIGFPE:  return "SIGFPE";
+    default:      return "signal";
+    }
+}
+static void HostSigWrite(const char *a, const char *b, const char *c)
+{
+    (void)!write(2, a, strlen(a));
+    (void)!write(2, b, strlen(b));
+    (void)!write(2, c, strlen(c));
+}
+static void HostTermDeadline(int sig)
+{
+    int term = (int)g_host_term_sig;
+    (void)sig;
+    HostSigWrite("[HOST] shutdown did not finish within 5 s of ", HostSigName(term),
+                 "; exiting now\n");
+    signal(term, SIG_DFL);
+    raise(term);
+}
+static void HostTermHandler(int sig)
+{
+    /* SA_RESETHAND: a second signal takes the default action. */
+    g_host_term_sig = sig;
+    HostSigWrite("[HOST] ", HostSigName(sig), " received: stopping (host-quit)\n");
+    if (!g_watchdog_sec) {
+        signal(SIGALRM, HostTermDeadline);
+        alarm(5);
+    }
+}
+static void HostCrashHandler(int sig)
+{
+    void *frames[48];
+    int n = backtrace(frames, 48);
+    HostSigWrite("[HOST] fatal ", HostSigName(sig), ": backtrace\n");
+    backtrace_symbols_fd(frames, n, 2);
+    raise(sig);   /* SA_RESETHAND: default action (core) on return */
+}
+static void HostSignalsInstall(void)
+{
+    static char altstack[64 * 1024];
+    static const int term[] = {SIGTERM, SIGINT, SIGHUP};
+    static const int crash[] = {SIGSEGV, SIGBUS, SIGILL, SIGFPE};
+    struct sigaction sa;
+    stack_t ss;
+    void *warm[1];
+
+    (void)backtrace(warm, 1);     /* load libgcc now, not inside a handler */
+    signal(SIGPIPE, SIG_IGN);
+    memset(&sa, 0, sizeof(sa));
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESETHAND;
+    sa.sa_handler = HostTermHandler;
+    for (unsigned i = 0; i < sizeof(term) / sizeof(term[0]); i++) sigaction(term[i], &sa, NULL);
+    memset(&ss, 0, sizeof(ss));
+    ss.ss_sp = altstack;
+    ss.ss_size = sizeof(altstack);
+    sa.sa_flags = SA_RESETHAND | (sigaltstack(&ss, NULL) == 0 ? SA_ONSTACK : 0);
+    sa.sa_handler = HostCrashHandler;
+    for (unsigned i = 0; i < sizeof(crash) / sizeof(crash[0]); i++) sigaction(crash[i], &sa, NULL);
+}
+static void HostSignalsExit(void)
+{
+    int sig = (int)g_host_term_sig;
+    if (!sig) return;
+    fprintf(stderr, "[HOST] exiting on %s\n", HostSigName(sig));
+    fflush(stderr);
+    signal(sig, SIG_DFL);
+    raise(sig);
+}
 #else
 static void WatchdogArm(void) {}
+static const int g_host_term_sig = 0;
+static void HostSignalsInstall(void) {}
+static void HostSignalsExit(void) {}
 #endif
+static int QuitPoll_Window(void) { return g_host_term_sig || HostWindow_Poll(); }
+static int QuitPoll_Signal(void) { return g_host_term_sig != 0; }
 
 int main(int argc, char **argv) {
+    HostSignalsInstall();
     WatchdogArm();
     ParseArgs(argc, argv); TraceInit();
     g_bootstrap_disc = g_opts.bootstrap_disc;
@@ -1100,13 +1200,14 @@ int main(int argc, char **argv) {
                             g_opts.fullscreen) != 0)
             use_window = 0;
         else {
-            PE_Port_SetQuitPoll(HostWindow_Poll);
+            PE_Port_SetQuitPoll(QuitPoll_Window);
             PE_Port_SetPresentHook(PresentHook_BlitWindow);
             HostFB_SetScanoutHook(ScanoutHook_BlitWindow);
             PE_Port_SetPadSource(HostWindow_PadRaw);
         }
     }
 
+    if (!use_window) PE_Port_SetQuitPoll(QuitPoll_Signal);
     /* PE_CHEAT_KEYS (scripted cheat keys) needs the present hook headless too. */
     if (g_opts.headless && (getenv("PE_CHEAT_KEYS") || getenv("PE_SHOT_DIR")))
         PE_Port_SetPresentHook(PresentHook_BlitWindow);
@@ -1318,5 +1419,6 @@ int main(int argc, char **argv) {
     TraceEvent("shutdown_end"); TraceClose();
     PE_Disc_Close(disc);
     PE_RamDestroy();
+    HostSignalsExit();
     return 0;
 }
