@@ -786,8 +786,8 @@ int func_800677FC(pe_addr_t prim_base, pe_addr_t *cursor)
  *
  * 83 words 0x80068B94..0x80068CE0. Retail: 65B70, 677FC(B0E40),
  * 79024, 655D4, then RTPS of the player integer XYZ into BCFB4/B6.
- * Initializes camera and background controllers. The final player screen
- * projection remains outside this entry helper.
+ * Initializes camera and background controllers, then projects the
+ * player position (src/func_80068B94.c).
  */
 /*
  * 6E9A0 publishes dest2 at B0E64 (= dest2+0) and B0E40 at dest2+8.
@@ -879,6 +879,28 @@ int func_80068B94(void)
     rc = func_800677FC(prim, &cursor);
     if (rc != 0)
         return -2;
+    /* src/func_80068B94.c: SetGeomScreen(state[8]) between 677FC and
+     * 655D4, then RTPS of the player's integer position (zeros without a
+     * player) with OFX/OFY = 160/112 and the camera matrix *D_800BCFA4;
+     * SXY2 -> D_800BCFB4 / D_800BCFB6. */
+    func_80079024((int)PE_LoadU32(0x800B8A18u));
     func_800655D4();
+    {
+        pe_addr_t pl = PE_LoadU32(GA_D_8009D254);
+        int16_t v[3] = { 0, 0, 0 };
+        uint32_t xy, z;
+
+        if (pl != 0u) {
+            v[0] = (int16_t)PE_LoadU16(pl + 0x2Au);
+            v[1] = (int16_t)PE_LoadU16(pl + 0x2Eu);
+            v[2] = (int16_t)PE_LoadU16(pl + 0x32u);
+        }
+        func_80079004(160, 112);
+        PE_GTE_LoadRT(PE_LoadU32(0x800BCFA4u));
+        PE_GTE_SetV0(v[0], v[1], v[2]);
+        PE_GTE_RTPS_coordinates(&xy, &z);
+        PE_StoreU16(0x800BCFB4u, (uint16_t)(xy & 0xFFFFu));
+        PE_StoreU16(0x800BCFB6u, (uint16_t)(xy >> 16));
+    }
     return 0;
 }

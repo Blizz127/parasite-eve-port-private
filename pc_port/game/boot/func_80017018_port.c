@@ -357,14 +357,7 @@ int func_80019D84(pe_addr_t args)
  * D_800910A0[0x22]. jal 37548(lh *arg0). byte0==0 → v0=1.
  * Else CE00-=0xC, D300+0x10=1, v0=0. Live after 0x0D id 7.
  */
-int func_800177C8(pe_addr_t args)
-{
-    if (func_80037548((int)(int16_t)PE_LoadU16(PE_LoadU32(args))) == 0)
-        return 1;
-    PE_StoreU32(GA_D_8009CE00, PE_LoadU32(GA_D_8009CE00) - 0xCu);
-    PE_StoreU32(PE_LoadU32(GA_D_8009D300) + 0x10u, 1u);
-    return 0;
-}
+/* func_800177C8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800177C8_port.c (src/func_800177C8.c); hand port retired (port3 switch-over C). */
 
 /* func_80037864: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80037864_port.c (src/func_80037864.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
@@ -647,7 +640,7 @@ static pe_addr_t attachment_ram(pe_addr_t p)
     return p < 0x200000u ? p | 0x80000000u : p;
 }
 
-static int pe_attachment_command(pe_addr_t fn, pe_addr_t args)
+__attribute__((unused)) static int pe_attachment_command(pe_addr_t fn, pe_addr_t args)
 {
     pe_addr_t actor = PE_LoadU32(GA_D_8009D2F0), parent, node;
     if (fn == 0x80019170u || fn == 0x80019F04u || fn == 0x80015108u) {
@@ -735,6 +728,14 @@ static int pe_attachment_command(pe_addr_t fn, pe_addr_t args)
 
 extern int func_80014E30(pe_addr_t a0);
 
+/* src-derived attachment handlers (decomp_hand/absent_lo_actor_port.c,
+ * e9_guest_ptr_port.c, absent_lo_state_port.c). */
+int func_80015108(pe_addr_t arg0);
+int func_80019170(pe_addr_t arg0);
+int func_80019F04(pe_addr_t arg0);
+int func_80019FE0(void);
+int func_8001A064(void);
+
 /* Audit item 26, batch 1: opcode handlers that have generated matched TUs
  * (src/func_*.c) run through the verified guest-code registry, as retail's
  * jalr D_800910A0[op] does, instead of the inline re-implementations below. */
@@ -745,7 +746,7 @@ extern int func_80014E30(pe_addr_t a0);
  * 80017C8C, 80015648 (fixed: full-width id compares).  80016F10/80014E30 keep
  * their route-only skip shims (HOST_ADAPTED, off on a normal start). */
 static const uint32_t k_17018_matched_ops[] = {
-    0x80017EFCu, 0x80017F20u, 0x8001967Cu, 0x80018F74u, 0x800182A0u, 0x80017AC0u,
+    0x80019260u, 0x80017EFCu, 0x80017F20u, 0x8001967Cu, 0x80018F74u, 0x800182A0u, 0x80017AC0u,
     0x80018C58u, 0x80018B68u, 0x80019CECu, 0x800176B8u, 0x800182C0u, 0x800182E0u,
     0x800190BCu, 0x80016FE0u, 0x800176E0u, 0x80017968u, 0x80017928u, 0x80017948u,
     0x80017A78u, 0x80017AA4u, 0x80017CC4u, 0x80017D18u, 0x80017EA4u, 0x80018754u,
@@ -770,9 +771,15 @@ static int pe_17018_dispatch_body(pe_addr_t fn, pe_addr_t args)
         return PE_GuestCall("func_80017018", fn, 1u, args, 0u, 0u, 0u);
     if (fn == 0x80018300u) return func_80018300(args);
     if (fn == 0x80018364u) return func_80018364(args);
-    if (fn == 0x80015108u || fn == 0x80019170u || fn == 0x80019260u || fn == 0x80019F04u ||
-        fn == 0x80019FE0u || fn == 0x8001A064u)
-        return pe_attachment_command(fn, args);
+    /* Attachment opcodes: the src-derived handlers (decomp_hand/, generated
+     * 80019260) replace the former inline pe_attachment_command copy
+     * (VM batch 3, audited against src/func_{80015108,80019170,80019F04,
+     * 80019FE0,8001A064}.c). */
+    if (fn == 0x80015108u) return func_80015108(args);
+    if (fn == 0x80019170u) return func_80019170(args);
+    if (fn == 0x80019F04u) return func_80019F04(args);
+    if (fn == 0x80019FE0u) return func_80019FE0();
+    if (fn == 0x8001A064u) return func_8001A064();
     if (fn == 0x800192C8u)
         return func_800192C8();
     if (fn == 0x800192DCu)
@@ -1513,10 +1520,11 @@ static void pe_17018_run(void)
             imm_base = pc + 8u;
             PE_StoreU32(GA_D_8009CE00, imm_base + argc * 4u);
             vmframe_audit_pre(op);
-            for (i = 0; i < 16u; i++) {
-                PE_StoreU32(GA_VM_FRAME + i * 4u, 0u);
-                written[i] = 0u;
-            }
+            /* src/func_80017018.c: args[16] is a stack local that is NOT
+             * cleared per opcode -- slots past argc keep the previous
+             * opcode's pointers (the frame here persists the same way). */
+            for (i = 0; i < 16u; i++)
+                written[i] = PE_LoadU32(GA_VM_FRAME + i * 4u);
             for (i = 0; i < argc; i++) {
                 kind = kinds & 7u;
                 if (kind < 5u) {
@@ -1562,7 +1570,9 @@ static void pe_17018_run(void)
             if (again)
                 task = PE_LoadU32(GA_D_8009D300);
         }
-        PE_StoreU32(task, PE_LoadU32(GA_D_8009CE00));
+        /* src: D_8009D300->pc = D_8009CE00 -- the CURRENT task global,
+         * which a handler may have changed before returning 0. */
+        PE_StoreU32(PE_LoadU32(GA_D_8009D300), PE_LoadU32(GA_D_8009CE00));
         pe_17018_walk_next();
     }
 }

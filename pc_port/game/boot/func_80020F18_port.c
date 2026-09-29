@@ -88,19 +88,7 @@ int32_t func_8006FC18(uint32_t index, pe_addr_t owner, uint32_t force)
 
 /* 6FE14 releases every effect owned by an actor, across both pools. The
  * second clear is present in retail even when 6FC18 ignored a dormant slot. */
-int32_t func_8006FE14(pe_addr_t owner)
-{
-    unsigned index;
-    int32_t result=0;
-    if (!owner) return -25;
-    for (index=0;index<22;index++) {
-        if (PE_LoadU32(effect_slot(index)+8u)!=owner) continue;
-        result=func_8006FC18(index,owner,1u);
-        if (result) return result;
-        clear_effect_slot(effect_slot(index));
-    }
-    return result;
-}
+/* func_8006FE14: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8006FE14_port.c (src/func_8006FE14.c); hand port retired (port3 switch-over C). */
 
 /* 702DC and 701B4: release each complete pool, including dormant headers. */
 static int32_t clear_effect_pool(unsigned first)

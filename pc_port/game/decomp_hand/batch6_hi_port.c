@@ -169,23 +169,7 @@ pe_addr_t func_800742B8(void)
 /* src/func_8006E590.c: w = *(a0 + *(a0 + 4) + 0x30); n = w >> 22 entries
  * of 12 bytes at a0 + (w & 0x3FFFFF); return a0 + (entry->+4 & 0xFFFFFF)
  * for the first entry whose +0xA halfword equals a1, else NULL. */
-pe_addr_t func_8006E590(pe_addr_t a0, int a1)
-{
-    uint32_t w = PE_LoadU32(a0 + PE_LoadU32(a0 + 4u) + 0x30u);
-    pe_addr_t p = a0 + (w & 0x3FFFFFu);
-    unsigned int n = w >> 22;
-    unsigned int i = 0;
-
-    if (n != 0) {
-        do {
-            if ((int)PE_LoadU16(p + 0xAu) == a1)
-                return a0 + (PE_LoadU32(p + 4u) & 0xFFFFFFu);
-            i++;
-            p += 0xCu;
-        } while (i < n);
-    }
-    return 0u;
-}
+/* func_8006E590: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8006E590_port.c (src/func_8006E590.c); hand port retired (port3 switch-over A). */
 
 /* src/func_800C8BC0.c (+ byte-identical 800C9974 / 800CA4B4 / 800CBB30):
  * integrate position (+8/+A/+C) by velocity (+0x10/+0x12/+0x14), gravity

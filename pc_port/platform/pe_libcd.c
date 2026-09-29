@@ -356,8 +356,7 @@ int func_8006E6D4(int lba_base, int lba_off, pe_addr_t dest, int sectors)
         return -1;
     }
     byte_count = (uint32_t)sectors * PE_DISC_USER_SECTOR;
-    /* PE_CD_GPU_DMA_ORDER=1 (gfx lane, opt-in pending route validation):
-     * the host delivers the whole read here, synchronously.  On hardware a
+    /* The host delivers the whole read here, synchronously.  On hardware a
      * CPU->VRAM DMA2 issued before this call completes (and its IRQ runs
      * the libgpu queue, issuing the next queued LoadImage) within
      * microseconds, long before the drive delivers even the first sector
@@ -366,13 +365,9 @@ int func_8006E6D4(int lba_base, int lba_off, pe_addr_t dest, int sectors)
      * sectors overwrite it (func_8006AD40: the shadow CLUT at 0x8012B8B8
      * is inside the later D_800B0CD8+0x16C read). */
     {
-        static int order = -1;
-        if (order < 0) { const char *e = getenv("PE_CD_GPU_DMA_ORDER"); order = e && e[0] == '1'; }
-        if (order) {
-            int n;
-            for (n = 0; n < 16 && PE_GPU_DMA2Pending(); n++)
-                if (PE_Port_ServiceDmaIrqCheckpoint() != PE_PORT_DMA_IRQ_CHECKPOINT_RETURNED) break;
-        }
+        int n;
+        for (n = 0; n < 16 && PE_GPU_DMA2Pending(); n++)
+            if (PE_Port_ServiceDmaIrqCheckpoint() != PE_PORT_DMA_IRQ_CHECKPOINT_RETURNED) break;
     }
     if (byte_count > 0 && (!d ||
         !PE_RangeIsRam(dest, (size_t)byte_count) ||

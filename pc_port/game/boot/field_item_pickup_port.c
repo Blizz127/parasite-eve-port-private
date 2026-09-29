@@ -90,23 +90,7 @@ void func_8004F490(uint32_t item)
     func_8005DE88();
 }
 
-int func_80015BAC(pe_addr_t args)
-{
-    pe_addr_t task;
-    uint16_t flags;
-    if (PE_LoadU32(0x800B0CD8u)&0x1000u) return 1;
-    task=PE_LoadU32(0x8009D300u);flags=PE_LoadU16(task+8u);
-    if (!(flags&32u)) {
-        PE_StoreU16(task+8u,flags|32u);PE_StoreU32(task+16u,1u);
-        PE_StoreU32(0x8009CE00u,PE_LoadU32(0x8009CE00u)-12u);
-        return 0;
-    }
-    func_80067CBC();func_8004F490(PE_LoadU32(PE_LoadU32(args)));
-    PE_StoreU32(0x800B0CD8u,PE_LoadU32(0x800B0CD8u)|0x9000u);
-    task=PE_LoadU32(0x8009D300u);D_8009D1A0|=4u;
-    PE_StoreU16(task+8u,PE_LoadU16(task+8u)&0xFFDFu);
-    return 1;
-}
+/* func_80015BAC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80015BAC_port.c (src/func_80015BAC.c); hand port retired (VM batch 3, port3). */
 
 /* func_8004F644: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8004F644_port.c (src/func_8004F644.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 

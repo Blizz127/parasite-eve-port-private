@@ -63,12 +63,7 @@ int func_80065A60(uint32_t index, uint32_t entry, uint32_t value)
     return 0;
 }
 
-int func_80065A9C(uint32_t index, uint32_t bits)
-{
-    pe_addr_t rec = sew3_rec16(index);
-    PE_StoreU8(rec, (uint8_t)(PE_LoadU8(rec) | (bits & 0x30u)));
-    return 0;
-}
+/* func_80065A9C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80065A9C_port.c (src/func_80065A9C.c); hand port retired (port3 switch-over A). */
 
 static void sew3_rec56_bit(pe_addr_t rec, uint32_t on, uint8_t bit)
 {

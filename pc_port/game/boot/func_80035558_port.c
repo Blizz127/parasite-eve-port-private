@@ -656,13 +656,11 @@ static void pe_35558_body(void)
                      * translation, decomp_hand/shadow_68014_port.c). */
                     if (PE_LoadU32(actor + 0x98u) & 0x8800u)
                         PE_StoreU16(actor + 0x250u, (uint16_t)(PE_LoadU16(actor + 0x250u) | 1u));
-                    {   /* Gated with PE_CD_GPU_DMA_ORDER until its route run:
-                         * without it the shadow CLUT is clobbered (pink quads). */
-                        static int on = -1;
-                        if (on < 0) { const char *e = getenv("PE_CD_GPU_DMA_ORDER"); on = e && e[0] == '1'; }
-                        if (on && PE_LoadU32(instance) != 0u)
-                            (void)func_80068014(actor);
-                    }
+                    /* Needs the CD/GPU-DMA ordering in pe_libcd.c
+                     * (func_8006E6D4): without it the shadow CLUT is
+                     * clobbered (pink quads). */
+                    if (PE_LoadU32(instance) != 0u)
+                        (void)func_80068014(actor);
                 }
             }
         }

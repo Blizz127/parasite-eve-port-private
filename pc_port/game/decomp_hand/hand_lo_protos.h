@@ -104,6 +104,9 @@ void func_800434C0(int a);
 void func_8003DBE4(pe_addr_t a0, pe_addr_t a1, short idx);
 void func_8003DD08(pe_addr_t a0, pe_addr_t a1, short a2);
 void func_8003DF50(pe_addr_t dst, pe_addr_t source, short index);
+/* ── field lighting-state setters (gte_light_state_port.c) ── */
+void func_8003F758(pe_addr_t dst, int r, int g, int b);
+void func_8003F798(pe_addr_t state, int index, int r, int g, int b);
 int func_80018460(pe_addr_t a0);
 int func_80042170(int card, int slot);
 void func_80047E94(int a0);

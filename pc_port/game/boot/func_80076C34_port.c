@@ -18,9 +18,9 @@
  * the payload, writes the entry metadata, advances the producer, restores
  * the saved I_MASK, and calls the pump at 0x80076EA4.  While the first
  * transfer is in flight the pump returns 1 and consumes nothing; only its
- * untranslated idle-DMA path stops.  A full ring still stops at
- * func_80077404 (call at 0x80076C68).  No callback delivery, consumer
- * movement, or DMA completion happens here.
+ * untranslated idle-DMA path stops.  A full ring waits as retail does
+ * (func_80077404 poll + pump), servicing the in-flight DMA2 through the
+ * DMA/IRQ checkpoint; only the timeout recovery half stays a boundary.
  *
  * B54K-R adds the exact `func_80076B98` MoveImage packet subset on both the
  * direct and queued paths.  It accepts only the five-word GP0(80h) packet
@@ -266,16 +266,47 @@ static int func_80076C34_prefix(pe_addr_t worker, pe_addr_t argument,
     consumer = PE_LoadU32(GA_GPU_RING_CONSUMER);
     next = (producer + 1u) & 63u;
 
-    if (next == consumer) {
-        /* 0x80076C68: the full-ring timeout helper is the first dependency
-         * on this alternate path.  Retail DOES consume its result:
-         * 0x80076C70 `bnez v0` returns -1 from the delay slot, and a zero
-         * result falls through to the pump at 0x80076C78 and re-runs the
-         * space test.  Neither continuation is translated. */
-        (void)Bootstrap_ReturnInt(
-            "func_80077404", "func_80076C34", 0);
-        PE_Port_RequestStop(PE_PORT_STOP_UNRESOLVED_BOUNDARY);
-        return 0; /* host prefix cut; not a claimed retail result */
+    /* 0x80076C60..0x80076C98: while the 64-entry ring is full, retail
+     * calls func_80077404 (0x80076C68; nonzero -> return -1 from the
+     * 0x80076C70 delay slot), then the pump func_80076EE4 (0x80076C78), and
+     * re-tests the space.  On hardware the in-flight DMA2 finishes on its
+     * own and its completion IRQ runs the pump callback that advances the
+     * consumer; here that hardware opportunity is the DMA/IRQ checkpoint,
+     * as in pe_libgpu.c's DrawSync wait.  func_80077404's normal half is the
+     * deadline/poll-count test; its recovery half (ring reset, GP1/DPCR
+     * writes) stays a named boundary. */
+    while (next == consumer) {
+        uint32_t now = PE_GPU_VSyncQuery();
+        uint32_t deadline = PE_LoadU32(GA_GPU_TIMEOUT_DEADLINE);
+        uint32_t polls = PE_LoadU32(GA_GPU_TIMEOUT_POLLS);
+        int pump_returned = 0;
+
+        int timed_out = (int32_t)deadline < (int32_t)now;
+
+        if (!timed_out) {   /* `D_8009588C++ > 0xF0000` runs only here */
+            PE_StoreU32(GA_GPU_TIMEOUT_POLLS, polls + 1u);
+            timed_out = (int32_t)polls > (int32_t)0x000F0000;
+        }
+        if (timed_out) {
+            (void)Bootstrap_ReturnInt4Indirect(
+                "func_80077404_timeout_recovery_cut", "func_80076C34", -1,
+                0x80077458u, deadline, now, polls, 0u, NULL, 0u);
+            PE_Port_RequestStop(PE_PORT_STOP_UNRESOLVED_BOUNDARY);
+            return -1;
+        }
+        if (PE_GPU_DMA2Pending()) {
+            PEPortDmaIrqCheckpointResult r = PE_Port_ServiceDmaIrqCheckpoint();
+            if (r == PE_PORT_DMA_IRQ_CHECKPOINT_BOUNDARY ||
+                r == PE_PORT_DMA_IRQ_CHECKPOINT_STALE) {
+                PE_Port_RequestStop(PE_PORT_STOP_UNRESOLVED_BOUNDARY);
+                return -1;
+            }
+        }
+        (void)PE_func_80076EE4_Pump(&pump_returned);
+        if (PE_Port_ShouldStop()) return -1;
+        producer = PE_LoadU32(GA_GPU_RING_PRODUCER);
+        consumer = PE_LoadU32(GA_GPU_RING_CONSUMER);
+        next = (producer + 1u) & 63u;
     }
 
     /* 0x80076CA0: jal func_80073E10, delay a0=0 — now the translated

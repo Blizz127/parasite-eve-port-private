@@ -193,14 +193,7 @@ int func_8001A474(pe_addr_t a0)
 /* ── small helpers ─────────────────────────────────────────────────── */
 
 /* src/func_80038CE4.c: base = D_80091A28; return base[4 + base[0x1D + (a0 & 0xFF)]]. */
-int func_80038CE4(unsigned int a0)
-{
-    pe_addr_t base = PE_LoadU32(0x80091A28u);
-    pe_addr_t p = base + (a0 & 0xFFu);
-    unsigned int v = PE_LoadU8(p + 0x1Du);
-
-    return PE_LoadU8(base + v + 4u);
-}
+/* func_80038CE4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80038CE4_port.c (src/func_80038CE4.c); hand port retired (port3 switch-over A). */
 
 /* src/func_8004D690.c: func_8005E8A4(0, 2);
  * func_80062A7C(*(int *)(*(int *)(arg0 + 4) + 0x24) - 0x11). */

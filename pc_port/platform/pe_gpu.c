@@ -616,8 +616,8 @@ static void DrawMonoRectangle(uint32_t size)
 }
 
 /* POLY1: integer affine polygon rasterization. Packet formats and draw
- * attributes follow psx-spx GPU Render Polygon Commands. Edge/interpolation
- * rounding remains a native implementation pending hardware image comparison. */
+ * attributes follow psx-spx GPU Render Polygon Commands. Edge coverage is a
+ * native top-left rule; attribute interpolation rounds to nearest (below). */
 typedef struct {
     int32_t x, y, u, v;
     int32_t color[3];
@@ -653,7 +653,7 @@ static void DrawPolygonTriangle(PePolygonVertex a, PePolygonVertex b, PePolygonV
                                 uint32_t command, uint32_t clut)
 {
     static const int8_t dither[4][4] = {{-4,0,-3,1},{2,-2,3,-1},{-3,1,-4,0},{3,-1,2,-2}};
-    int64_t area = PolygonEdge(&a,&b,c.x,c.y);
+    int64_t area = PolygonEdge(&a,&b,c.x,c.y), half;
     int32_t minx, maxx, miny, maxy, x, y;
     int textured = (command & 0x04000000u) != 0u;
     int raw = textured && (command & 0x01000000u);
@@ -661,6 +661,14 @@ static void DrawPolygonTriangle(PePolygonVertex a, PePolygonVertex b, PePolygonV
                     (textured || (command & 0x10000000u));
     if (!area) return;
     if (area < 0) { PePolygonVertex temp = b; b = c; c = temp; area = -area; }
+    /* Interpolated UV and RGB round to nearest (half-unit bias on the planar
+     * value), not truncate: the hardware-researched rasterizers add
+     * 1 << (frac-1) to the attribute base (Mednafen/DuckStation convention),
+     * and the emulator oracle's first room agrees (gfx2 lane: 95.87% ->
+     * 98.90% identical pixels vs oracle VSync 9713, with the model packets
+     * and GTE colour tables already bit-identical).  Inside the triangle every
+     * edge weight is >= 0, so the numerators are non-negative. */
+    half = area / 2;
     minx = a.x < b.x ? a.x : b.x; if (c.x < minx) minx = c.x;
     maxx = a.x > b.x ? a.x : b.x; if (c.x > maxx) maxx = c.x;
     miny = a.y < b.y ? a.y : b.y; if (c.y < miny) miny = c.y;
@@ -681,15 +689,15 @@ static void DrawPolygonTriangle(PePolygonVertex a, PePolygonVertex b, PePolygonV
             pixel = &g_gpu.vram[(uint32_t)y * 1024u + (uint32_t)x];
             if ((g_gpu.state.mask_setting & 2u) && (*pixel & 0x8000u)) continue;
             if (textured) {
-                uint32_t u = (uint32_t)((w0*a.u + w1*b.u + w2*c.u) / area);
-                uint32_t v = (uint32_t)((w0*a.v + w1*b.v + w2*c.v) / area);
+                uint32_t u = (uint32_t)((w0*a.u + w1*b.u + w2*c.u + half) / area);
+                uint32_t v = (uint32_t)((w0*a.v + w1*b.v + w2*c.v + half) / area);
                 texture = PolygonTexel(u,v,clut);
                 if (texture == 0u) continue;
             }
             if (raw) color = texture;
             else {
                 for (channel = 0u; channel < 3u; channel++) {
-                    int value = (int)((w0*a.color[channel] + w1*b.color[channel] + w2*c.color[channel]) / area);
+                    int value = (int)((w0*a.color[channel] + w1*b.color[channel] + w2*c.color[channel] + half) / area);
                     if (textured) value = (int)(((texture >> (channel*5u)) & 31u) * (unsigned int)value) >> 4;
                     if (dithering) value += dither[y & 3][x & 3];
                     if (value < 0) value = 0;

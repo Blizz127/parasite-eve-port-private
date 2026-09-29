@@ -5,7 +5,8 @@
  * pc_port/tools/pe_btl6_3a088_walk_oracle.py against EXE SHA-1
  * 452fb033f2eaa4b18aa20a5bca60b8125af3a37b and PE.IMG [428,434).
  *
- * Retail 392 words 0x8003A088..0x8003A6A8. Live dest+0x28 is 0.
+ * Retail 392 words 0x8003A088..0x8003A6A8. dest+0x28 modes 1/3/4
+ * (source copy / rigid attach / parent-relative) follow src/func_8003A088.c.
  * Walk at 0x8003A3B4: parent bytes from dest+0x20. POSE1 adds
  * branch save/restore markers and non-root bone offsets.
  * cop2 0x049E012 = MVMVA sf=1 mx=RT v=IR cv=None lm=0
@@ -16,6 +17,7 @@
 #include "pe_port_compat.h"
 #include "pe_sdk.h"
 #include <string.h>
+#include "game/decomp_hand/hand_lo_protos.h"
 
 #define CMD_RTIR  0x049E012u
 #define CMD_RTV0  0x0480012u
@@ -64,9 +66,58 @@ void func_8003A088_mode0_walk_cut(pe_addr_t dest)
     if (dest == 0u)
         return;
 
+    /* src/func_8003A088.c head: +0x28 selects how the model matrix at
+     * +0x34 is seeded before the walk (+0x24 = animation source / parent
+     * model, +0x2A = its bone index). */
     mode = (int16_t)PE_LoadU16(dest + 0x28u);
-    if (mode == 1 || mode == 3 || mode == 4)
+    if (mode == 1) {
+        /* Copy the source's bone matrix into +0x34, then walk. */
+        func_8003DBE4(dest, PE_LoadU32(dest + 0x24u),
+                      (short)PE_LoadU16(dest + 0x2Au));
+    } else if (mode == 3) {
+        /* Rigid attachment (Aya's weapon, func_8006CC68 sets 3 / bone
+         * 0x12): no walk.  +0x9C bit 0x400 copies the model matrix into
+         * joint 1; otherwise the parent's bone matrix goes to joints 0/1. */
+        if (PE_LoadU16(dest + 0x9Cu) & 0x400u) {
+            unsigned int k;
+            for (k = 0; k < 9u; k++)
+                PE_StoreU16(PE_LoadU32(dest + 0x84u) + 0x20u + k * 2u,
+                            PE_LoadU16(dest + 0x34u + k * 2u));
+            for (k = 0; k < 3u; k++)
+                PE_StoreU32(PE_LoadU32(dest + 0x84u) + 0x34u + k * 4u,
+                            PE_LoadU32(dest + 0x48u + k * 4u));
+        } else {
+            func_8003DD08(dest, PE_LoadU32(dest + 0x24u),
+                          (short)PE_LoadU16(dest + 0x2Au));
+        }
         return;
+    } else if (mode == 4) {
+        /* Parent-relative: +0x34 rotation and +0x48 translation are
+         * transformed by the parent's bone matrix in place (MVMVA
+         * RT*IR per column; RT*V0+TR for the translation, stored from
+         * IR1..3 as retail's swc2 $9..$11). */
+        pe_addr_t pm = PE_LoadU32(PE_LoadU32(dest + 0x24u) + 0x84u)
+            + (pe_addr_t)((int)(int16_t)PE_LoadU16(dest + 0x2Au) * 0x20);
+        unsigned c;
+
+        PE_GTE_LoadRT(pm);
+        for (c = 0; c < 3u; c++) {
+            pe_addr_t col = dest + 0x34u + c * 2u;
+            PE_GTE_SetIR((int16_t)PE_LoadU16(col), (int16_t)PE_LoadU16(col + 6u),
+                         (int16_t)PE_LoadU16(col + 12u));
+            PE_GTE_MVMVA(CMD_RTIR);
+            PE_StoreU16(col, (uint16_t)g_pe_gte.ir[0]);
+            PE_StoreU16(col + 6u, (uint16_t)g_pe_gte.ir[1]);
+            PE_StoreU16(col + 12u, (uint16_t)g_pe_gte.ir[2]);
+        }
+        PE_GTE_SetV0((int16_t)PE_LoadU16(dest + 0x48u),
+                     (int16_t)PE_LoadU16(dest + 0x4Cu),
+                     (int16_t)(PE_LoadU32(dest + 0x50u) & 0xFFFFu));
+        PE_GTE_MVMVA(CMD_RTV0);
+        PE_StoreU32(dest + 0x48u, (uint32_t)(int32_t)g_pe_gte.ir[0]);
+        PE_StoreU32(dest + 0x4Cu, (uint32_t)(int32_t)g_pe_gte.ir[1]);
+        PE_StoreU32(dest + 0x50u, (uint32_t)(int32_t)g_pe_gte.ir[2]);
+    }
 
     obj = PE_LoadU32(dest + 0x00u);
     if (obj == 0u)

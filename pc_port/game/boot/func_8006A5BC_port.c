@@ -19,16 +19,4 @@ extern uint32_t func_80073A44(int a);   /* VSync (SDK) */
 extern int  func_8007F7A8(void);    /* already C, 5EL */
 /* D_800B0DD4 is a guest-RAM lvalue macro (psx_compat.h) */
 
-void func_8006A5BC(void) {
-    func_80085644();
-    func_80086FF8();
-    func_80087024();
-    func_8008682C(0);
-    while (func_8007ED58() != 1) {
-        func_80073A44(0);
-    }
-    while (func_8007F72C() != 1) {
-        func_80073A44(0);
-    }
-    D_800B0DD4 = func_8007F7A8();
-}
+/* func_8006A5BC: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8006A5BC_port.c (src/func_8006A5BC.c); hand port retired (port3 switch-over A). */

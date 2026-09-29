@@ -268,7 +268,14 @@ void HostFB_DrawSync(int mode)
 
 int HostFB_WritePPM(const char *path)
 {
-    FILE *f = fopen(path, "wb");
+    FILE *f;
+    {   /* PE_GPU_RAM_DUMP=<path>: debug aid (off by default) — also write
+         * the 2 MB guest RAM image with every screenshot (oracle RAM diffs). */
+        const char *e = getenv("PE_GPU_RAM_DUMP");
+        FILE *r = (e && *e) ? fopen(e, "wb") : NULL;
+        if (r) { fwrite(PE_TranslateConst(PE_RAM_BASE, PE_RAM_SIZE), 1, PE_RAM_SIZE, r); fclose(r); }
+    }
+    f = fopen(path, "wb");
     if (!f) return -1;
 
     fprintf(f, "P6\n%d %d\n255\n", PE_PORT_FB_WIDTH, PE_PORT_FB_HEIGHT);

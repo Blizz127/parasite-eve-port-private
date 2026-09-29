@@ -380,3 +380,91 @@ be live. Unit fixtures have neither; the booted port has both.
 mode wrote 0x44 bytes over it. It is now at 0x801FFF40–0x801FFF83, unused port scratch next to the
 0x801FFF00 DISPENV and 0x801FFF20 movie words. No visible effect was found, because the port runs
 that overlay natively.
+
+### audio3: Eve 2 vocals on r2, and a control run
+
+**r2 reproduces the owner's report.** The r2 preview binary (`rel-ship2`, 9f74e882 plus uncommitted fixes) ran the same `--route-pad` route to frame 44400. Its autopilot fights Eve 2 from frame 42925 to 44054, about 38 s.
+- Alignment matches the current tree: retail part 02 @ 1:28 ↔ capture 1447.0 s, r = 0.61.
+- In the 600–1500 Hz band the instruments still match. The vibrato vocal blobs at 18–21 s and 25–29 s of music (retail part 02 @ 1:44–1:53) are absent. See `build/lanes/audio3/eve2_ret_cur_r2.png` (retail / current / r2).
+- Mean band r over the three vocal windows (18, 21, 27 s):
+
+| Build | Mean band r |
+|---|---|
+| current tree | 0.593 |
+| r2 | 0.297 |
+
+**EA100/101 is not the cause.** r2's EA log marks EA100/101 (AKAO pause/resume) as dropped four times just before the fight (VBlank 84868–85190). The only other drop on the route is EA408, at VBlank 30564. Control: the current tree, with only EA100/101 suppressed (a private, env-gated binary; the shared source is unchanged), still has every vocal blob, mean r = 0.483 (`eve2_ret_dropea100.png`).
+
+**`func_8006F044` is not the cause.** It was also ported after r2, but its only caller is `func_8001220C`'s 0xAA108448 branch, which is off the Day-1 route.
+
+The r2→current change that restored the vocals is unidentified.
+
+**Current-tree lead.** The vocal blobs coincide with slow-attack sustained voices (ADSR B4FF/5FE8) on resident samples SPU 0x0F540/0x0FE70.
+
+**Regression check.** `pc_port/tools/audio/eve2_vocal_check.sh <capture.wav> <approx music start s>` needs the git-ignored owner video. It aligns to retail over 100–4000 Hz, then fails if the vocal-window mean r is below 0.42:
+
+| Capture | Mean r | Result |
+|---|---|---|
+| current tree | 0.593 | PASS |
+| r2 | 0.297 | FAIL (exit 1) |
+| EA100/101 suppressed | 0.483 | PASS |
+
+### audio3: Day-1 audio sweep with movies (vs the owner's retail video)
+
+**Runs.** Movies on (`PE_ROUTE_PLAY_MOVIES=1 --route-pad`), current tree, with `PE_AUDIO_WAV`, `PE_AUDIO_EA_LOG`, `PE_AUDIO_VOICE_LOG` and `PE_AUDIO_ROOMSND_LOG`.
+- Run 1 went to 72000 presents: route frame ~60000, the sewers.
+- Run 2 went to 95000 presents. It reached A8000048 story 0x80 (the reporter and the car ride) at route frame 66610, then stopped (see below). Capture length: 2471 s.
+- Engine: 0 faults, 0 CD underruns. Every movie played all its frames: FMV002/003/004/005/006 = 1021/1151/561/231/744, dropped = 0.
+
+**Method.** `build/lanes/audio3/tools/align.c` matches each 10 s port segment against the whole retail part 01 + part 02 audio, using 24 log bands from 80 Hz to 5 kHz at 10 fps and Pearson r. Flagged segments were then checked by hand with finer band correlation (`bandcorr`), 0.1 s RMS timelines, the EA and voice logs, and video frames.
+
+**Result: no missing or wrong sound found from New Game to the car ride.**
+- Run 1: 158 of 220 segments match at r ≥ 0.75. The level offset port − video is +7.3 dB (sd 2.6), which is the capture calibration.
+- Run 2 tail: the sewers, FMV006, the alligator fight, the reporter and the car ride all match.
+
+**Car-ride engine drone (part 02 @ 15:50+).**
+- Port 2440–2460 s aligns with part 02 @ 16:05–16:35 at r = 0.95.
+- The level is steady at 62.1–62.3 dB, which is 54.9 dB after calibration; retail is 54.8.
+- Per-band shares are within 0.3 dB of retail in every band below 9.6 kHz (port −4.4/−4.7/−8.7/−9.5/−13.6/−20.9/−30.4 vs retail −4.5/−4.7/−8.4/−9.6/−13.6/−20.9/−30.6).
+
+**Flags that were checked and are not defects.**
+- **Digital silences.** They occur in the same places as retail: after FMV002, and after the Eve 2 fight (retail part 02 @ 2:25–2:34 and 3:11–3:17). The port's silences are longer because the autopilot waits on dialogue. The footstep segment in between has retail's structure: isolated steps with silence between them.
+- **Player timing.**
+  - Song 0x21 (EA200 at port 1473 s) plays about 120 s in A80614C8; the video player left after about 20 s.
+  - Several quiet rooms sit near the video's noise floor (~41 dB).
+- **FMV003.** The alignment shifts once by 1.38 s at port ~254 s (retail part 01 @ ~7:31), and the lag is stable on either side. The port played the complete stream (1151/1151 frames, 1440 XA sectors, 76.9 s). Its long-term spectrum is within 1 dB per band of retail below 9.6 kHz. No duplicated audio was found in the video around the jump, so the cause is unexplained; it is not treated as a port defect.
+- **FMV006.**
+  - The field script starts song 0x29 during the movie (EA200 at VBlank 136371; the movie closes at 137513) and again at the movie's end. `func_80121C04` (src/overlays/ovl_03C5) only starts the movie and returns, so in retail too the VM runs while a movie plays.
+  - The movie's two halves sit at the same per-band offset from retail (+10.7…+11.1 dB, except the top band at +13.0/+11.8), so the port adds no layer retail lacks.
+  - The song's post-movie restart matches retail part 02 @ 11:55.2 (r = 0.76).
+
+**Not audio: stop after story 0x80.** Run 2 stopped with `stop_reason=unresolved-boundary` at 2471 s, right after the car ride. The log line is `[STUB:BOOTSTRAP_RET] func_80077404`. The StoreImage attribution first given here was wrong; see the next section for the cause and the fix.
+
+### audio3: Day 1 → Day 2 stop (divergence #27) — fixed
+
+**Symptom.** With movies on, the port stopped right after the car ride (A8000048, story 0x80, 2471 s), logging `[STUB:BOOTSTRAP_RET] func_80077404`. The no-movie route never gets that far. Three port sites stop through that name: `func_800768A0` (StoreImage wait), `func_80076664` (LoadImage wait) and `func_80076C34` (command-ring enqueue).
+
+**Not StoreImage.** A diagnostic on StoreImage's fatal timeout path never printed in a repro run that stopped at the same point (`build/lanes/audio3/si/run.log`).
+
+**Cause: `func_80076C34`'s full-ring cut.**
+- Retail (`src/func_80076C34.c`): `while (((D_80095874+1)&0x3F) == D_80095878) { if (func_80077404() != 0) return -1; func_80076EE4(); }`.
+- The port called the stub on the first full ring and stopped ("Neither continuation is translated"). The Day 1 → Day 2 transition queues more than 63 GPU commands.
+
+**Fix, in `pc_port/game/boot/func_80076C34_port.c`.** The full-ring path now loops as retail does. Each pass:
+1. Runs `func_80077404`'s normal half: `VSync(-1) > D_80095888`, then `D_8009588C++ > 0xF0000`. The increment happens only when the deadline has not passed, as in retail.
+2. Lets the in-flight DMA2 finish through `PE_Port_ServiceDmaIrqCheckpoint()`. Its IRQ runs the pump callback, which advances the consumer; on hardware this happens on its own. It is the same pattern as `pe_libgpu.c`'s DrawSync wait.
+3. Calls the pump (0x80076C78) and re-tests.
+
+The timeout-recovery half (ring reset, GP1/DPCR writes) stays a named boundary.
+
+**Test.** `B53C_full_detection_and_wrap` pinned the old stop. Its full-ring cases now assert that the worker is not issued directly and that the wait was entered (in that fixture the pump reaches an unpopulated slot). `pe-native-tests`: 1606/1606.
+
+**Evidence** (movies on, `build/lanes/audio3/si2/`):
+- The run continues past story 0x80 through A80650C8, A8004148 (the Day 2 title, then the precinct, story 0x88) and A80040C8 (story 0x90), to route frame 77000 with no boundary. Screenshots are `si2/f0*.ppm`; there the route's pad script has ended and Aya stands in the chief's office.
+- Audio after the car ride:
+  - Day 1 closing narration: port 2470–2500 s ↔ part 02 @ 18:17–18:42, r = 0.74–0.96, level offset +7.6…+10.0 dB.
+  - Day 2 title: port 2510 s ↔ part 03 @ 0:06, r = 0.82.
+  - The precinct and chief's office are digital silence with short footstep bursts, as in retail part 03 @ 0:12–2:06.
+  - Retail's precinct music (part 03 @ 2:11+) starts only after the player leaves the office, which the route never does.
+- Part 02 @ 19:06+ is the YouTube channel's outro, not game audio.
+- Part 03 was fetched into `build/reference/retail-video/` (git-ignored; README updated).

@@ -8131,9 +8131,12 @@ static void test_BTL7_6CC68_gates_and_d10(void) {
     ASSERT(PE_LoadU16(0x800B0D16u) == 0x12u, "D16=0x12");
     ASSERT(g_pe_gte.ofx == (0xA0 << 16), "661CC OFX 0xA0");
     ASSERT(g_pe_gte.ofy == (0x70 << 16), "661CC OFY 0x70");
-    PE_StoreU32(0x800B0D10u, 0x11111111u);
+    /* D10 is the weapon's parent model (func_8003A088 mode 3 reads its
+     * +0x84 joint table), so the "already set" value must be a guest
+     * pointer, not a poison word. */
+    PE_StoreU32(0x800B0D10u, 0x8010C000u);
     ASSERT(func_8006CC68() == 0, "repeat v0=0");
-    ASSERT(PE_LoadU32(0x800B0D10u) == 0x11111111u, "D10 kept if set");
+    ASSERT(PE_LoadU32(0x800B0D10u) == 0x8010C000u, "D10 kept if set");
     ASSERT(PE_LoadU32(0x8009D28Cu) == 0u, "mode stays 0");
     PASS();
 }
@@ -27442,8 +27445,17 @@ static void test_6AD40_strict_completes_without_frontier(void)
     func_8006AD40();
     ASSERT(B54KM_CompletionStateIsExact(),
            "normal complete path retained a boundary or wrong final state");
-    ASSERT(!PE_GPU_DMA2Pending() && PE_GPU_DMA2CompletionPending(),
-           "DrawSync did not complete the pending DMA through its event");
+    /* The seeded DMA (issued before 6AD40, DICR = 0) now completes at the
+     * first CD read issue (func_8006E6D4 services pending GPU DMA before the
+     * host delivers the sectors — on hardware the 16-word block finishes in
+     * microseconds, long before a sector arrives).  DICR is still 0 there,
+     * so no DMA2 IRQ flag is raised; psx-spx "DMA": DICR flags 24-30 are set
+     * on completion only while the channel's enable bit (16-22) is set, and
+     * enabling it later does not set the flag retroactively.  The old
+     * expectation (flag raised at DrawSync) encoded the host's late
+     * completion, after the fixture's DICR enable. */
+    ASSERT(!PE_GPU_DMA2Pending() && !PE_GPU_DMA2CompletionPending(),
+           "seeded DMA was not completed at hardware time (before DICR enable)");
     FxFree(&fx);
     PASS();
 }
@@ -30223,17 +30235,20 @@ static void test_B53C_full_detection_and_wrap(void)
     ResetTestState();
     PE_StoreU32(B53C_PRODUCER, 0u);
     PE_StoreU32(B53C_CONSUMER, 1u);
+    /* A full ring waits (func_80077404 poll + pump) as retail does instead
+     * of issuing the worker; this fixture's ring slots are unpopulated, so
+     * the pump's dispatch of slot 1 is the first boundary reached. */
     (void)func_80076C34(0x80076664u, 0x80100000u, 8, 0x80110000u);
-    ASSERT(CountOrderLog("func_80077404") == 1 &&
-           CountOrderLog("func_80076664") == 0,
+    ASSERT(CountOrderLog("func_80076664") == 0 &&
+           PE_Port_GetStopReason() != PE_PORT_STOP_NONE,
            "slot-zero full condition is wrong");
 
     ResetTestState();
     PE_StoreU32(B53C_PRODUCER, 63u);
     PE_StoreU32(B53C_CONSUMER, 0u);
     (void)func_80076C34(0x80076664u, 0x80100000u, 8, 0x80110000u);
-    ASSERT(CountOrderLog("func_80077404") == 1 &&
-           CountOrderLog("func_80076664") == 0,
+    ASSERT(CountOrderLog("func_80076664") == 0 &&
+           PE_Port_GetStopReason() != PE_PORT_STOP_NONE,
            "producer wrap full condition is wrong");
 
     ResetTestState();
@@ -37013,6 +37028,7 @@ static void test_POLY1_gpu_shared_edge_and_texture(void)
 }
 
 #include "test_gpu_prims.h"
+#include "test_gfx2_models.h"
 
 static void test_DRAW1_polygon_submission(void)
 {
@@ -40626,6 +40642,7 @@ int main(void)
     test_STG2_background_controller_frames();
     test_POLY1_gpu_shared_edge_and_texture();
     test_GFX1_gp0_primitives();
+    test_GFX2_models();
     test_DRAW1_polygon_submission();
     test_PROJ1_mesh_batches_and_saturation();
     test_POS1_model_anchors_and_script_sync();

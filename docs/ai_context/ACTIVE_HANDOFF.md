@@ -1,3 +1,15 @@
+## UPDATE 2026-09-29: checkpoint 3 — #27 ring-full wait, switch-over batches A/C, gfx2 round
+
+Gate on this exact tree (`git diff HEAD` sha256 f6ecb7a893b38471…, status 7a0f8c085c44f61f…, untracked e310c6c3b8a833c0…, identical before and after): fresh build `build/pcbuild-gate` BUILD_EXIT=0; native suite `Results: 1606 run, 1606 passed, 0 failed`; `REGRESS ok normal_start_shim_off`; `REGRESS PASS until=day1_end_80 frame=66994 token=A8000048 story=80` (logs build/tmp/gate-{build,suite,route}.log). Docs-only edits after the gate: KNOWN_DIVERGENCES, this file.
+
+- #27 fixed (audio3): `func_80076C34` full-ring path waits as retail does; the movies-on run reaches Day 2 (story 0x90). Evidence docs/evidence/pe-native-audio/REPORT.md.
+- port3 switch-over batches A (boot/room transitions, 5) and C (field VM, 8) run generated matched TUs; coverage `from_decomp=977 hand=1142`. Batch D+E (13) is being gated in build/wt-mc3; 7 candidates held back (host-mirrored inventory globals, card driver, a host prototype signedness conflict).
+- gfx2 round: CD-order default, gun model, shading (first room 98.90% vs oracle), test updates. #13 (gun) stays Open until there is recorded evidence.
+- New #30: the port does not draw retail's pause screen (it pauses correctly; presents only on PutDispEnv). The earlier "FMV002-end hang" was that pause plus the present-clocked PE_PAD_SCRIPT (a paused game presents nothing, so the unpausing Start never fires; 256-change cap truncated silently). audio3 is adding VBlank scan-out and `PE_PAD_SCRIPT_CLOCK=vblank`.
+- r3 (b45aee3e) is published to the owner channel by the coordinator; the owner note says to press Start if the picture freezes.
+
+Next: audio3 pause scan-out + harness clock; port3 batch D+E; wire the three matched M34 phase-2 effects (054d91ee) into the port (#16); r4 package.
+
 ## UPDATE 2026-09-29: checkpoint 2 — VBlank callback, memory cards, VM batches, DMA timing
 
 Gate on this exact tree (day1; tree hashes re-checked before/after build and route): fresh build rc=0; native suite `Results: 1603 run, 1603 passed`; `REGRESS ok normal_start_shim_off` + `REGRESS PASS until=day1_end_80 frame=66994` (build/lanes/day1/gate_*.log). Contents: retail per-VBlank callback always on (func_8003E91C/func_80036F7C verbatim TUs, dispatcher handles stop epochs; oracle-verified rates); memory-card persistence (host .mcd behind our own BIOS card functions; save→relaunch→load verified in-game); field-VM batches 1+2 (42 opcodes → generated matched handlers; unlisted opcodes use the registry); Pm_Stop matched semantics; M0348I func_8019253C; DMA2 CPU→VRAM source read at issue (psx-spx; shadow TIM matches oracle VRAM); CD-order fix + floor shadow behind PE_CD_GPU_DMA_ORDER (default off, route-verified on); boot reverb setup (audit 12); switch1 batch 1 (6 leaves → generated TUs). Known divergences: see docs/port/KNOWN_DIVERGENCES.md.

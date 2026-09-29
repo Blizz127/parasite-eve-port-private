@@ -85,7 +85,7 @@ int func_8001787C(pe_addr_t args)
             t = PE_LoadU32(t + 0x24u);
         }
     }
-    return 3;
+    return 1;   /* src/func_8001787C.c: not found -> 1 */
 }
 
 int func_80014FD8(pe_addr_t args)

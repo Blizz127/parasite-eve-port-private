@@ -3,6 +3,7 @@
 #include "psx_compat.h"
 #include "pe_gpu.h"
 #include "game_port.h"
+#include <stdio.h>
 
 static int store_wait(uint32_t ready)
 {
@@ -14,6 +15,15 @@ static int store_wait(uint32_t ready)
     }
     return 1;
 timeout:
+    {   /* Diagnostic on the fatal path only: what the GPU model held. */
+        PeGpuState st; PE_GPU_GetState(&st);
+        fprintf(stderr,"[STOREIMAGE] timeout waiting for %08X: status=%08X gp0_state=%d "
+                "image=%u,%u %ux%u remaining=%u dma_dir=%u vsync=%u deadline=%d\n",
+                (unsigned)ready,(unsigned)st.status,(int)st.gp0_state,(unsigned)st.image_x,
+                (unsigned)st.image_y,(unsigned)st.image_width,(unsigned)st.image_height,
+                (unsigned)st.image_remaining_pixels,(unsigned)st.gp1_dma_direction,
+                (unsigned)PE_GPU_VSyncQuery(),(int)PE_LoadU32(0x80095888u));
+    }
     (void)Bootstrap_ReturnInt("func_80077404","func_800768A0",-1);
     PE_Port_RequestStop(PE_PORT_STOP_UNRESOLVED_BOUNDARY);return 0;
 }

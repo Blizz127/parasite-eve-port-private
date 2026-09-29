@@ -26,29 +26,7 @@ static int s21_div(int num, int den)
  * D_800B1624: nx = +0x28 + dx clamped to [+0x30, +0x32] (on the s16 value),
  * ny = +0x2A + dy clamped to [+0x34, +0x36], na = +0x24 + dz; results into
  * +0x2C / +0x2E / +0x26 (halfword stores); returns 0. */
-int func_800679C4(int dx, int dy, int dz)
-{
-    pe_addr_t g = PE_LoadU32(0x800B1624u);
-    int nx = PE_LoadU16(g + 0x28u) + dx;
-    int ny = PE_LoadU16(g + 0x2Au) + dy;
-    int na = PE_LoadU16(g + 0x24u) + dz;
-    int x = (short)nx;
-    int y;
-
-    if (x < (int16_t)PE_LoadU16(g + 0x30u))
-        nx = (int16_t)PE_LoadU16(g + 0x30u);
-    else if ((int16_t)PE_LoadU16(g + 0x32u) < x)
-        nx = (int16_t)PE_LoadU16(g + 0x32u);
-    y = (ny << 16) >> 16;
-    if (y < (int16_t)PE_LoadU16(g + 0x34u))
-        ny = (int16_t)PE_LoadU16(g + 0x34u);
-    else if ((int16_t)PE_LoadU16(g + 0x36u) < y)
-        ny = (int16_t)PE_LoadU16(g + 0x36u);
-    PE_StoreU16(g + 0x2Cu, (uint16_t)nx);
-    PE_StoreU16(g + 0x2Eu, (uint16_t)ny);
-    PE_StoreU16(g + 0x26u, (uint16_t)na);
-    return 0;
-}
+/* func_800679C4: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800679C4_port.c (src/func_800679C4.c); hand port retired (port3 switch-over C). */
 
 /* src/func_800DAB98.c: swaying wisp.  Mode 1: x = a1[1] * cos((f << 10) /
  * a1[3]) / 4096, z += 0x10, life a1[3].  Mode 2: colour curve D_800E1C04

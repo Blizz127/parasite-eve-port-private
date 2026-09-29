@@ -155,21 +155,7 @@ int func_80012850(pe_addr_t args)
     return 1;
 }
 
-int func_8001731C(pe_addr_t args)
-{
-    uint32_t cond;
-    pe_addr_t actor;
-    uint32_t off;
-
-    cond = PE_LoadU32(PE_LoadU32(args));
-    if (cond == 0u) {
-        actor = PE_LoadU32(GA_D_8009D2F0);
-        off = PE_LoadU32(PE_LoadU32(args + 4u));
-        PE_StoreU32(GA_D_8009CE00,
-                    PE_LoadU32(actor + 0x9Cu) + (off << 1));
-    }
-    return 1;
-}
+/* func_8001731C: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8001731C_port.c (src/func_8001731C.c); hand port retired (port3 switch-over C). */
 
 int func_80017588(pe_addr_t args)
 {

@@ -28,16 +28,10 @@ extern void func_80090F68(pe_addr_t pe_a0, unsigned int a1);
 /* func_80081254: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80081254_port.c (src/func_80081254.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 6). */
 
 /* src/func_800C2B10.c: return D_800E2248 + arg0 * 4 + 8. */
-pe_addr_t func_800C2B10(int arg0)
-{
-    return PE_LoadU32(0x800E2248u) + (uint32_t)(arg0 * 4 + 8);
-}
+/* func_800C2B10: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800C2B10_port.c (src/func_800C2B10.c); hand port retired (port3 switch-over C). */
 
 /* src/func_800C2B28.c: return D_800E2248 + arg0 * 4 + 0x48. */
-pe_addr_t func_800C2B28(int arg0)
-{
-    return PE_LoadU32(0x800E2248u) + (uint32_t)(arg0 * 4 + 0x48);
-}
+/* func_800C2B28: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800C2B28_port.c (src/func_800C2B28.c); hand port retired (port3 switch-over C). */
 
 /* src/func_80085728.c: D_8009D240 = base; D_8009D260 = base + 0x800. */
 void func_80085728(pe_addr_t base)

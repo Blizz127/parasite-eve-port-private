@@ -82,17 +82,4 @@ int func_80069594(void)
 }
 
 /* Original 69660: small-pool draw followed by updates, before field collision. */
-int func_80069660(void)
-{
-    if(!(D_8009D1A0&0x80u))return 0;
-    func_800661A4();
-    for(unsigned i=11;i<22;i++) {
-        (void)func_8006F8EC(i);if(PE_Port_ShouldStop())break;
-    }
-    func_800661CC();
-    if((D_8009D1A0&0x104u) || PE_Port_ShouldStop())return 0;
-    for(unsigned i=11;i<22;i++) {
-        (void)func_8006F9F0(i);if(PE_Port_ShouldStop())break;
-    }
-    return 0;
-}
+/* func_80069660: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80069660_port.c (src/func_80069660.c); hand port retired (port3 switch-over A). */
