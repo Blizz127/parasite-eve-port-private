@@ -150,8 +150,14 @@ const PeGuestCodeEntry *PE_GuestCode_Resolve(pe_addr_t addr)
             return e;
         if (e->fingerprint && PE_RangeIsRam(addr, e->size) &&
             PE_GuestCode_Fnv1a(addr, e->size) == e->fingerprint) {
-            by_fp = e;
-            fp_matches++;
+            /* The same resident bytes at the same address are the same
+             * code whichever room table lists them: the 8-byte `return 0`
+             * behaviour-table stubs every room carries count as one match.
+             * Longer bodies stay ambiguous (their callees are room-local). */
+            if (!by_fp || e->size != 8u || by_fp->size != e->size ||
+                by_fp->fingerprint != e->fingerprint)
+                fp_matches++;
+            if (!by_fp) by_fp = e;
         }
     }
     return fp_matches == 1 ? by_fp : NULL;

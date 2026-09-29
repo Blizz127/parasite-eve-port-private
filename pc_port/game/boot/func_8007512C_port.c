@@ -78,7 +78,13 @@ static int DRW1_ValidateNode(pe_addr_t node, uint32_t tag, uint32_t count,
     i = 0u;
     while (i < count) {
         uint32_t word = PE_LoadU32(node + 4u + i * 4u);
-        uint32_t words = PE_GPU_GP0_PacketWords(word);
+        uint32_t stream[15], k, words;
+
+        /* Polylines are variable length (to their 5xxx5xxx terminator). */
+        for (k = 0u; k < count - i; k++) stream[k] = PE_LoadU32(node + 4u + (i + k) * 4u);
+        words = PE_GPU_GP0_StreamPacketWords(stream, count - i);
+        if (words == 0u && (word & 0xE8000000u) != 0x48000000u)
+            words = PE_GPU_GP0_PacketWords(word);
 
         if (words == 0u && IsGp0EnvironmentWord(word))
             words = 1u;

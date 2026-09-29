@@ -13,7 +13,59 @@
 #include "pe_timer1.h"
 
 #include <stddef.h>
+#include <stdio.h>
+#include <execinfo.h>
+#include <stdlib.h>
 #include <string.h>
+
+/* PE_GPU_PRIM_LOG=<path>[:first[:last]]: debug aid, off by default.  Writes
+ * one decoded line per executed GP0 draw primitive (and each rejected GP0
+ * word) while the host frame passed to PE_GPU_PrimLogFrame lies inside
+ * [first,last].  Host diagnostics only; never alters GPU state. */
+static FILE *g_prim_log;
+static int g_prim_log_first, g_prim_log_last = 0x7FFFFFFF, g_prim_log_frame = -1;
+static int g_prim_log_init;
+
+static int PrimLogOn(void)
+{
+    if (!g_prim_log_init) {
+        const char *e = getenv("PE_GPU_PRIM_LOG");
+        g_prim_log_init = 1;
+        if (e && *e) {
+            char path[512];
+            const char *colon = strchr(e, ':');
+            size_t n = colon ? (size_t)(colon - e) : strlen(e);
+            if (n >= sizeof path) n = sizeof path - 1u;
+            memcpy(path, e, n); path[n] = 0;
+            if (colon) {
+                g_prim_log_first = atoi(colon + 1);
+                colon = strchr(colon + 1, ':');
+                if (colon) g_prim_log_last = atoi(colon + 1);
+            }
+            g_prim_log = fopen(path, "w");
+        }
+    }
+    return g_prim_log && g_prim_log_frame >= g_prim_log_first &&
+           g_prim_log_frame <= g_prim_log_last;
+}
+
+/* PE_GPU_XFER_LOG=<path>: debug aid, one line per CPU->VRAM (A0h) and
+ * VRAM->VRAM (80h) transfer with the current host frame. */
+static void XferLog(const char *kind, uint32_t a, uint32_t b, uint32_t c)
+{
+    static FILE *f; static int init;
+    if (!init) { const char *e = getenv("PE_GPU_XFER_LOG"); init = 1; if (e && *e) f = fopen(e, "w"); }
+    if (f) { fprintf(f, "%d %s %08X %08X %08X\n", g_prim_log_frame, kind, a, b, c); fflush(f); }
+    if (f && getenv("PE_GPU_WATCH_BT") && strtoul(getenv("PE_GPU_WATCH_BT"), 0, 16) == a) {
+        void *bt[24]; int n = backtrace(bt, 24); backtrace_symbols_fd(bt, n, fileno(f));
+    }
+}
+
+void PE_GPU_PrimLogFrame(int frame)
+{
+    g_prim_log_frame = frame;
+    if (PrimLogOn()) { fprintf(g_prim_log, "F %d\n", frame); fflush(g_prim_log); }
+}
 
 typedef struct {
     PeGpuState state;
@@ -27,6 +79,10 @@ typedef struct {
     uint32_t mono_rectangle_command;
     uint32_t mono_rectangle_position;
     uint32_t polygon_words[12];
+    /* GP0 polyline (48h..5Fh with bit 27) stream state. */
+    int polyline, polyline_expect_color;
+    uint32_t polyline_command, polyline_color, polyline_next_color;
+    uint32_t polyline_xy, polyline_vertices;
     uint32_t polygon_received;
     uint32_t polygon_expected;
     uint16_t vram[PE_GPU_VRAM_PIXELS];
@@ -81,6 +137,7 @@ static void ResetParser(void)
     g_gpu.mono_rectangle_command = 0;
     g_gpu.mono_rectangle_position = 0;
     g_gpu.polygon_received = g_gpu.polygon_expected = 0u;
+    g_gpu.polyline = 0;
 }
 
 static void ResetDisplayRegisters(void)
@@ -148,6 +205,15 @@ static void FinishImage(void)
     g_gpu.state.image_remaining_pixels = 0;
 }
 
+static long g_watch_x = -2, g_watch_y = -1;
+static void WatchInit(void)
+{
+    const char *e;
+    if (g_watch_x != -2) return;
+    g_watch_x = -1; e = getenv("PE_GPU_WATCH");
+    if (e) { char *end; g_watch_x = strtol(e, &end, 10); if (*end == ',') g_watch_y = strtol(end + 1, 0, 10); }
+}
+
 static void WriteImagePixel(uint16_t pixel)
 {
     uint32_t ordinal;
@@ -165,6 +231,14 @@ static void WriteImagePixel(uint16_t pixel)
         (PE_GPU_VRAM_WIDTH - 1u);
     y = (g_gpu.state.image_y + ordinal / g_gpu.state.image_width) &
         (PE_GPU_VRAM_HEIGHT - 1u);
+    WatchInit();
+    if ((long)x == g_watch_x && (long)y == g_watch_y)
+    {
+        fprintf(stderr, "[GPU_WATCH] A0 image (%u,%u) %ux%u sets %04X (dma2=%d src=%08X)\n",
+                g_gpu.state.image_x, g_gpu.state.image_y, g_gpu.state.image_width,
+                g_gpu.state.image_height, pixel, g_gpu.state.dma2_active, (unsigned)g_gpu.state.dma2_source);
+        if (getenv("PE_GPU_WATCH_BT")) { void *bt[24]; int n = backtrace(bt, 24); backtrace_symbols_fd(bt, n, 2); }
+    }
     g_gpu.vram[y * PE_GPU_VRAM_WIDTH + x] = pixel;
     g_gpu.state.image_current_pixel++;
     g_gpu.state.image_remaining_pixels--;
@@ -242,6 +316,7 @@ static uint16_t ModulateTextureColor(uint16_t texture, uint32_t command)
 }
 
 static uint16_t BlendSemiTransparent(uint16_t back, uint16_t front);
+static uint32_t MonoRectangleFixedSize(uint32_t command);
 
 /* GP0 textured rectangles. Raw-texture variants preserve texel RGB; blending
  * requires both command bit 25 and texel bit 15. Rectangles do not dither.
@@ -271,6 +346,10 @@ static void DrawTexturedRectangle(uint32_t size)
         origin_x += SignExtend11(g_gpu.state.drawing_offset);
         origin_y += SignExtend11(g_gpu.state.drawing_offset >> 11);
     }
+    if (PrimLogOn())
+        fprintf(g_prim_log, "S %08X (%d,%d) uvclut=%08X %ux%u mode=%04X\n",
+                g_gpu.rectangle_command, origin_x, origin_y, g_gpu.rectangle_uv_clut,
+                width, height, (unsigned)(draw_mode & 0xFFFFu));
 
     for (row = 0u; row < height; row++) {
         int32_t destination_y = origin_y + (int32_t)row;
@@ -313,7 +392,15 @@ static void DrawTexturedRectangle(uint32_t size)
                 (flip_x ? (0u - column) : column)) & 0xFFu;
             if (g_gpu.state.texture_window_count != 0u)
                 texture_u = ApplyTextureWindow(texture_u, 1);
-            if (((draw_mode >> 7) & 3u) == 1u) {
+            if (((draw_mode >> 7) & 3u) >= 2u) {
+                /* 15bpp direct (depth 3 "reserved" behaves as 15bpp). */
+                texture_color = g_gpu.vram[
+                    ((texture_y + texture_v) &
+                     (PE_GPU_VRAM_HEIGHT - 1u)) * PE_GPU_VRAM_WIDTH +
+                    ((texture_x + texture_u) &
+                     (PE_GPU_VRAM_WIDTH - 1u))];
+                goto have_texel;
+            } else if (((draw_mode >> 7) & 3u) == 1u) {
                 packed = g_gpu.vram[
                     ((texture_y + texture_v) &
                      (PE_GPU_VRAM_HEIGHT - 1u)) * PE_GPU_VRAM_WIDTH +
@@ -334,6 +421,7 @@ static void DrawTexturedRectangle(uint32_t size)
                 clut_y * PE_GPU_VRAM_WIDTH +
                 ((clut_x + palette_index) &
                  (PE_GPU_VRAM_WIDTH - 1u))];
+        have_texel:
             if (texture_color == 0u)
                 continue;
             {
@@ -363,11 +451,17 @@ static void DrawTexturedRectangle(uint32_t size)
 static int TexturedRectangleIndexedModeSupported(void)
 {
     /* Variable and fixed rectangles use the same E1h texture depth.
-     * Both indexed depths are implemented; 15bpp and the second-MiB
-     * Y base remain outside the represented rectangle subset. */
-    uint32_t depth = (g_gpu.state.draw_mode >> 7) & 3u;
+     * 4bpp, 8bpp and 15bpp (and reserved depth 3, which the GPU treats
+     * as 15bpp) are all implemented.  E1h bit 11 (texture disable) only
+     * takes effect when GP1(09h) allows it, which retail never enables. */
+    return 1;
+}
 
-    return depth <= 1u && (g_gpu.state.draw_mode & 0x800u) == 0u;
+/* Textured rectangle size class (bits 27-28): 0 variable, 1 1x1,
+ * 2 8x8, 3 16x16 (psx-spx "GPU Render Rectangle Commands"). */
+static uint32_t TexturedRectangleFixedSize(uint32_t command)
+{
+    return MonoRectangleFixedSize(command);
 }
 
 /* GP0(02h), console VRAM: 16-pixel horizontal alignment/rounding,
@@ -489,6 +583,9 @@ static void DrawMonoRectangle(uint32_t size)
         origin_x += SignExtend11(g_gpu.state.drawing_offset);
         origin_y += SignExtend11(g_gpu.state.drawing_offset >> 11);
     }
+    if (PrimLogOn())
+        fprintf(g_prim_log, "T %08X (%d,%d) %ux%u mode=%04X\n", command, origin_x, origin_y,
+                width, height, (unsigned)(g_gpu.state.draw_mode & 0xFFFFu));
 
     for (row = 0u; row < height; row++) {
         int32_t y = origin_y + (int32_t)row;
@@ -634,6 +731,15 @@ static void DrawPolygon(void)
             }
         }
     }
+    if (PrimLogOn()) {
+        fprintf(g_prim_log, "P %08X mode=%04X clut=%04X", command,
+                (unsigned)(g_gpu.state.draw_mode & 0xFFFFu), (unsigned)clut);
+        for (i = 0; i < count; i++)
+            fprintf(g_prim_log, " (%d,%d uv%d,%d c%02X%02X%02X)", vertices[i].x, vertices[i].y,
+                    vertices[i].u, vertices[i].v, (unsigned)vertices[i].color[0],
+                    (unsigned)vertices[i].color[1], (unsigned)vertices[i].color[2]);
+        fputc('\n', g_prim_log);
+    }
     DrawPolygonTriangle(vertices[0],vertices[1],vertices[2],command,clut);
     if (count == 4u) DrawPolygonTriangle(vertices[1],vertices[2],vertices[3],command,clut);
     g_gpu.state.polygon_count++;
@@ -666,6 +772,9 @@ static void DrawLine(void)
         if (delta[axis]<0) delta[axis]=-delta[axis];
     }
     g_gpu.state.line_count++;
+    if (PrimLogOn())
+        fprintf(g_prim_log, "L %08X (%d,%d) (%d,%d) mode=%04X\n", command, ends[0][0], ends[0][1],
+                ends[1][0], ends[1][1], (unsigned)(g_gpu.state.draw_mode & 0xFFFFu));
     if (delta[0]>=1024 || delta[1]>=512) return;
     span=delta[0]>delta[1]?delta[0]:delta[1];
     if (span && ends[0][0]>=ends[1][0]) {
@@ -731,16 +840,57 @@ uint32_t PE_GPU_GP0_PacketWords(uint32_t command)
         /* Structural length only.  Whether the texture depth/page is
          * executable is decided at execution against the draw mode in
          * force *then* (E1h may precede it in the same packet). */
-        if ((opcode & 0xFCu) == 0x64u)
-            return 4u;                 /* variable 4bpp: cmd, xy, uv, size */
-        if ((opcode & 0xFCu) == 0x7Cu)
-            return 3u;                 /* SPRT_16: cmd, xy, uv/clut */
-        return 0u;
+        /* textured: cmd, xy, uv/clut, [size] for the variable class */
+        return MonoRectangleFixedSize(command) != 0u ? 3u : 4u;
     }
     return 0u;
 }
 
+/* Length of the GP0 packet starting at words[0] given `avail` words, or 0
+ * when it is not a complete executable packet.  Fixed-length commands use
+ * PE_GPU_GP0_PacketWords; polylines run to their 5xxx5xxx terminator. */
+uint32_t PE_GPU_GP0_StreamPacketWords(const uint32_t *words, uint32_t avail)
+{
+    uint32_t command, i, vertices = 0u, gouraud, expect_color = 0u;
+
+    if (!avail) return 0u;
+    command = words[0];
+    if ((command & 0xE8000000u) != 0x48000000u) {
+        uint32_t n = PE_GPU_GP0_PacketWords(command);
+        return n <= avail ? n : 0u;
+    }
+    gouraud = (command & 0x10000000u) != 0u;
+    for (i = 1u; i < avail; i++) {
+        if (vertices >= 2u && (words[i] & 0xF000F000u) == 0x50005000u)
+            return i + 1u;
+        if (expect_color) { expect_color = 0u; continue; }
+        vertices++;
+        expect_color = gouraud;
+    }
+    return 0u;
+}
+
+static int GP0WriteInner(uint32_t value);
+
+/* PE_GPU_WATCH=x,y: debug aid, report each GP0 word that changes that VRAM pixel. */
 int PE_GPU_WriteGP0(uint32_t value)
+{
+    static int init; static long wx = -1, wy = -1; static uint32_t last_cmd;
+    uint16_t before = 0; int r;
+    if (!init) { const char *e = getenv("PE_GPU_WATCH"); init = 1;
+        if (e) { char *end; wx = strtol(e, &end, 10); if (*end == ',') wy = strtol(end + 1, 0, 10); } }
+    if (wy < 0) return GP0WriteInner(value);
+    if (g_gpu.state.gp0_state == PE_GPU_GP0_IDLE) last_cmd = value;
+    before = g_gpu.vram[wy * PE_GPU_VRAM_WIDTH + wx];
+    r = GP0WriteInner(value);
+    if (g_gpu.vram[wy * PE_GPU_VRAM_WIDTH + wx] != before)
+        fprintf(stderr, "[GPU_WATCH] (%ld,%ld) %04X->%04X cmd=%08X word=%08X mode=%04X off=%08X\n", wx, wy, before,
+                g_gpu.vram[wy * PE_GPU_VRAM_WIDTH + wx], last_cmd, value,
+                (unsigned)(g_gpu.state.draw_mode & 0xFFFFu), g_gpu.state.drawing_offset);
+    return r;
+}
+
+static int GP0WriteInner(uint32_t value)
 {
     uint64_t pixels;
 
@@ -749,6 +899,38 @@ int PE_GPU_WriteGP0(uint32_t value)
     switch (g_gpu.state.gp0_state) {
     case PE_GPU_GP0_POLYGON_DATA:
     case PE_GPU_GP0_LINE_DATA:
+        if (g_gpu.polyline) {
+            /* psx-spx: the terminator is any word with
+             * (w & F000F000h) == 50005000h, recognised once two
+             * vertices have been received. */
+            if (g_gpu.polyline_vertices >= 2u &&
+                (value & 0xF000F000u) == 0x50005000u) {
+                g_gpu.polyline = 0;
+                g_gpu.state.gp0_state = PE_GPU_GP0_IDLE;
+                return 1;
+            }
+            if (g_gpu.polyline_expect_color) {
+                g_gpu.polyline_next_color = value & 0xFFFFFFu;
+                g_gpu.polyline_expect_color = 0;
+                return 1;
+            }
+            if (g_gpu.polyline_vertices != 0u) {
+                uint32_t gouraud = g_gpu.polyline_command & 0x10000000u;
+                g_gpu.polygon_words[0] = (g_gpu.polyline_command & 0xFF000000u & ~0x08000000u) |
+                                         g_gpu.polyline_color;
+                g_gpu.polygon_words[1] = g_gpu.polyline_xy;
+                if (gouraud) {
+                    g_gpu.polygon_words[2] = g_gpu.polyline_next_color;
+                    g_gpu.polygon_words[3] = value;
+                } else g_gpu.polygon_words[2] = value;
+                DrawLine();
+                if (gouraud) g_gpu.polyline_color = g_gpu.polyline_next_color;
+            }
+            g_gpu.polyline_xy = value;
+            g_gpu.polyline_vertices++;
+            g_gpu.polyline_expect_color = (g_gpu.polyline_command & 0x10000000u) != 0u;
+            return 1;
+        }
         g_gpu.polygon_words[g_gpu.polygon_received++] = value;
         if (g_gpu.polygon_received == g_gpu.polygon_expected) {
             if (g_gpu.state.gp0_state==PE_GPU_GP0_LINE_DATA) DrawLine();
@@ -757,6 +939,16 @@ int PE_GPU_WriteGP0(uint32_t value)
         }
         return 1;
     case PE_GPU_GP0_IDLE:
+        if ((value & 0xE8000000u) == 0x48000000u) {
+            if (g_gpu.state.dma2_active) return 0;
+            g_gpu.polyline = 1;
+            g_gpu.polyline_command = value;
+            g_gpu.polyline_color = value & 0xFFFFFFu;
+            g_gpu.polyline_vertices = 0u;
+            g_gpu.polyline_expect_color = 0;
+            g_gpu.state.gp0_state = PE_GPU_GP0_LINE_DATA;
+            return 1;
+        }
         if ((value & 0xE0000000u) == 0x20000000u ||
             (value & 0xE8000000u) == 0x40000000u) {
             if (g_gpu.state.dma2_active) return 0;
@@ -825,16 +1017,8 @@ int PE_GPU_WriteGP0(uint32_t value)
             g_gpu.state.mask_setting_count++;
             return 1;
         }
-        if ((value & 0xFC000000u) == 0x64000000u) {
-            if (g_gpu.state.dma2_active ||
-                !TexturedRectangleIndexedModeSupported()) {
-                return 0;
-            }
-            g_gpu.rectangle_command = value;
-            g_gpu.state.gp0_state = PE_GPU_GP0_RECT_EXPECT_POSITION;
-            return 1;
-        }
-        if ((value & 0xFC000000u) == 0x7C000000u) {
+        if ((value & 0xE4000000u) == 0x64000000u) {
+            /* textured rectangle, any size class (64h..7Fh, bit 26 set) */
             if (g_gpu.state.dma2_active ||
                 !TexturedRectangleIndexedModeSupported()) {
                 return 0;
@@ -855,6 +1039,7 @@ int PE_GPU_WriteGP0(uint32_t value)
             g_gpu.state.gp0_state = PE_GPU_GP0_MONO_RECT_EXPECT_POSITION;
             return 1;
         }
+        if (PrimLogOn()) fprintf(g_prim_log, "X %08X rejected\n", value);
         return 0;
 
     case PE_GPU_GP0_READ_EXPECT_POSITION:
@@ -880,6 +1065,7 @@ int PE_GPU_WriteGP0(uint32_t value)
     case PE_GPU_GP0_EXPECT_SIZE:
         g_gpu.state.image_width = value & 0xFFFFu;
         g_gpu.state.image_height = value >> 16;
+        XferLog("A0", g_gpu.state.image_x | (g_gpu.state.image_y << 16), value, 0u);
         if (g_gpu.state.image_width == 0 ||
             g_gpu.state.image_width > PE_GPU_VRAM_WIDTH ||
             g_gpu.state.image_height == 0 ||
@@ -914,13 +1100,13 @@ int PE_GPU_WriteGP0(uint32_t value)
 
         if (g_gpu.state.dma2_active) return 0;
         g_gpu.rectangle_uv_clut = value;
-        opcode = g_gpu.rectangle_command >> 24;
-        if ((opcode & 0xFCu) == 0x7Cu) {
-            DrawTexturedRectangle(0x00100010u);
+        opcode = TexturedRectangleFixedSize(g_gpu.rectangle_command);
+        if (opcode != 0u) {
+            DrawTexturedRectangle(opcode);
             g_gpu.state.rectangle_command = g_gpu.rectangle_command;
             g_gpu.state.rectangle_position = g_gpu.rectangle_position;
             g_gpu.state.rectangle_uv_clut = g_gpu.rectangle_uv_clut;
-            g_gpu.state.rectangle_size = 0x00100010u;
+            g_gpu.state.rectangle_size = opcode;
             g_gpu.state.rectangle_count++;
             ResetParser();
             return 1;
@@ -1070,6 +1256,13 @@ static void CopyVramSpan(uint32_t source_x, uint32_t source_y,
 
 int PE_GPU_MoveImage(uint32_t source, uint32_t destination, uint32_t size)
 {
+    XferLog("80", source, destination, size);
+    WatchInit();
+    if (g_watch_y >= 0 && g_watch_x >= (long)(destination & 0x3FFu) &&
+        g_watch_x < (long)(destination & 0x3FFu) + (long)(size & 0xFFFFu) &&
+        g_watch_y >= (long)((destination >> 16) & 0x1FFu) &&
+        g_watch_y < (long)((destination >> 16) & 0x1FFu) + (long)(size >> 16))
+        fprintf(stderr, "[GPU_WATCH] 80 move src=%08X dst=%08X size=%08X\n", source, destination, size);
     uint32_t source_x;
     uint32_t source_y;
     uint32_t destination_x;

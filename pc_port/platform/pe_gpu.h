@@ -236,6 +236,10 @@ int PE_GPU_ReadVRAM(uint32_t x, uint32_t y, uint16_t *pixel);
 
 uint32_t PE_GPU_VSyncQuery(void);
 void PE_GPU_VBlankStep(void);
+/* Debug: current host frame for the env-gated PE_GPU_PRIM_LOG. */
+void PE_GPU_PrimLogFrame(int frame);
+/* Packet length at words[0] (polylines to their terminator); 0 = incomplete. */
+uint32_t PE_GPU_GP0_StreamPacketWords(const uint32_t *words, uint32_t avail);
 /* Physical signal inputs from the future raster scheduler. Rising edges
  * advance timer1/latch IRQ0; they never run callbacks. Repeated levels and
  * stale generations are inert. SDK/GPU reset begins in blanking. */
