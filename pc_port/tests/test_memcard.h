@@ -339,6 +339,142 @@ static void test_MC_operation_scan_and_save(void)
     PASS();
 }
 
+/* Overwrite an existing save (owner report on r4b: "it closes if i overwrite a
+ * save already saved").  Retail chain, all matched C except the card driver:
+ *   func_8004D6D4 (save over a used slot) arms the 0x29 confirm window with
+ *   update func_80044E98 and D_8009CFA8 = func_80050544;
+ *   func_80044E98 (confirm, row 0) calls D_8009CFA8(window, 1);
+ *   func_80050544 -> func_80042B50(func_800504F4): D_800A1870/1874 = cb, 1;
+ *   func_80042B6C runs cb on its 3rd tick after that -> func_800504F4 ->
+ *   func_80042020(D_8009CF44, D_8009CF48): used entry -> next state 0xB;
+ *   func_80041108 state 1 -> 11: open old name, close, B(45h) delete it,
+ *   -> 4: B(32h) create the new variant (D_800A1704), write 0x2000 bytes.
+ * The r4b hand func_80044E98 had a fixed callback list without 0x80050544
+ * and stopped the port (unresolved boundary) at the confirm. */
+static void test_MC_overwrite_existing_save(void)
+{
+    const pe_addr_t c = 0x800A0ED4u, win = 0x80171000u, list = 0x80171100u;
+    const char *fmt = "bu%d0:BASLUS-00662TESTSV%c%c";
+    const pe_addr_t fmt_at = 0x80170000u;
+    char path[512];
+    static uint8_t back[0x2000];
+    PeMcDirEntry d;
+    int guard, fd, n;
+    TEST("MC_overwrite_existing_save");
+    ResetTestState();
+    PE_Memcard_SetBoundaryMode(0);
+    MC_TestTempPath(path, sizeof path, "overwrite.mcd");
+    PE_Memcard_SetPath(0, path);
+    for (unsigned i = 0; i <= strlen(fmt); i++) PE_StoreU8(fmt_at + i, (uint8_t)fmt[i]);
+    PE_StoreU32(0x80092224u, fmt_at);
+    /* first save: entry A, variant '0', old bytes */
+    fd = PE_Memcard_Open("bu00:BASLUS-00662TESTSV0A", 0x10200u);
+    PE_Memcard_Close(fd);
+    fd = PE_Memcard_Open("bu00:BASLUS-00662TESTSV0A", 2);
+    for (unsigned i = 0; i < 0x2000u; i++) back[i] = (uint8_t)(i * 3u + 7u);
+    ASSERT(PE_Memcard_Write(fd, back, 0x2000) == 0x2000, "first save written");
+    PE_Memcard_Close(fd);
+    /* card record: port 0 inserted, ready (f8 == 4), entry A used, variant 0 */
+    PE_StoreU8(c, 1u); PE_StoreU8(c + 1u, 0u); PE_StoreU8(c + 8u, 4u);
+    PE_StoreU32(c + 0xCu, 0xFFFFFFFFu);
+    PE_StoreU8(c + 0x1Cu, 1u); PE_StoreU8(c + 0x1Cu + 0x29u, 0u);
+    PE_StoreU32(0x8009CF44u, 0u); PE_StoreU32(0x8009CF48u, 0u);
+    PE_StoreU32(0x800A1704u, 1u);                /* next variant digit */
+    /* the confirm window: row 0 (list+0x44 base 0, +0x48 factor 0) = "Yes" */
+    for (pe_addr_t a = win; a < list + 0x80u; a += 4u) PE_StoreU32(a, 0u);
+    PE_StoreU32(win + 8u, list); PE_StoreU32(win + 0x24u, 0x29u);
+    PE_StoreU32(list + 0x34u, 1u);
+    PE_StoreU32(0x8009CFA8u, 0x80050544u);
+    PE_StoreU32(0x800A1870u, 0u); PE_StoreU32(0x800A1874u, 0u);
+    ASSERT(func_80044E98(win, 0x10000u) == 1, "confirm handled");
+    ASSERT(!PE_Port_ShouldStop(), "confirming the overwrite does not stop the port");
+    ASSERT(PE_LoadU32(0x800A1870u) == 0x800504F4u && PE_LoadU32(0x800A1874u) == 1u,
+           "func_80050544 queued func_800504F4");
+    for (n = 0; n < 3; n++) func_80042B6C();
+    ASSERT(!PE_Port_ShouldStop() && PE_LoadU32(0x800A1870u) == 0u, "queued callback ran on the 4th count");
+    ASSERT(PE_LoadU8(c + 1u) == 1u && PE_LoadU8(c + 0xBu) == 0xBu, "func_80042020 armed the overwrite (state 1 -> 0xB)");
+    for (guard = 0; guard < 64 && PE_LoadU8(c + 1u) != 3u; guard++) {
+        func_80041108(0);
+        if (PE_Port_ShouldStop()) break;
+    }
+    ASSERT(!PE_Port_ShouldStop() && PE_LoadU8(c + 1u) == 3u, "delete/create/write reached state 3");
+    ASSERT(!PE_Memcard_FirstFile("bu00:BASLUS-00662TESTSV0A", &d), "old variant deleted");
+    ASSERT(PE_Memcard_FirstFile("bu00:BASLUS-00662TESTSV1A", &d) && d.size == 0x2000u, "new variant on card");
+    ASSERT(!PE_Memcard_NextFile(&d), "exactly one save file");
+    /* func_80042020 -> func_80040B80 builds the save image into D_8009EED0
+     * (header + CRC); the card must hold exactly that image, not the old one. */
+    {
+        static uint8_t want[0x2000];
+        int differs = 0;
+        for (unsigned i = 0; i < 0x2000u; i++) {
+            want[i] = PE_LoadU8(0x8009EED0u + i);
+            if (want[i] != (uint8_t)(i * 3u + 7u)) differs = 1;
+        }
+        ASSERT(differs, "second save image differs from the first save");
+        PE_Memcard_Reset();
+        PE_Memcard_SetPath(0, path);
+        fd = PE_Memcard_Open("bu00:BASLUS-00662TESTSV1A", 1);
+        ASSERT(fd >= 0 && PE_Memcard_Read(fd, back, 0x2000) == 0x2000, "reload reads the overwritten save");
+        PE_Memcard_Close(fd);
+        ASSERT(memcmp(back, want, sizeof want) == 0, "reloaded bytes are the second save's image (D_8009EED0)");
+    }
+    ASSERT(!PE_Memcard_FirstFile("bu00:BASLUS-00662TESTSV0A", &d), "old variant still gone after reload");
+    remove(path);
+    Test_ResetMemcard();
+    PASS();
+}
+
+/* The same confirm answered "No" (row 1): the port keeps running, nothing is
+ * queued or deleted, and the first save is byte-identical after a reload. */
+static void test_MC_overwrite_declined(void)
+{
+    const pe_addr_t c = 0x800A0ED4u, win = 0x80171000u, list = 0x80171100u;
+    char path[512];
+    static uint8_t back[0x2000];
+    PeMcDirEntry d;
+    int fd, n;
+    TEST("MC_overwrite_declined");
+    ResetTestState();
+    PE_Memcard_SetBoundaryMode(0);
+    MC_TestTempPath(path, sizeof path, "declined.mcd");
+    PE_Memcard_SetPath(0, path);
+    fd = PE_Memcard_Open("bu00:BASLUS-00662TESTSV0A", 0x10200u);
+    PE_Memcard_Close(fd);
+    fd = PE_Memcard_Open("bu00:BASLUS-00662TESTSV0A", 2);
+    for (unsigned i = 0; i < 0x2000u; i++) back[i] = (uint8_t)(i * 3u + 7u);
+    ASSERT(PE_Memcard_Write(fd, back, 0x2000) == 0x2000, "first save written");
+    PE_Memcard_Close(fd);
+    PE_StoreU8(c, 1u); PE_StoreU8(c + 1u, 0u); PE_StoreU8(c + 8u, 4u);
+    PE_StoreU8(c + 0x1Cu, 1u);
+    PE_StoreU32(0x8009CF44u, 0u); PE_StoreU32(0x8009CF48u, 0u);
+    for (pe_addr_t a = win; a < list + 0x80u; a += 4u) PE_StoreU32(a, 0u);
+    PE_StoreU32(win + 8u, list); PE_StoreU32(win + 0x24u, 0x29u);
+    PE_StoreU32(list + 0x34u, 1u); PE_StoreU32(list + 0x48u, 1u);   /* row 1 = "No" */
+    PE_StoreU32(0x8009CFA8u, 0x80050544u);
+    PE_StoreU32(0x800A1870u, 0u); PE_StoreU32(0x800A1874u, 0u);
+    ASSERT(func_80044E98(win, 0x10000u) == 1, "confirm handled");
+    ASSERT(!PE_Port_ShouldStop(), "declining the overwrite does not stop the port");
+    ASSERT(PE_LoadU32(0x800A1870u) == 0u, "nothing queued (func_80050544 enabled = 0)");
+    for (n = 0; n < 4; n++) func_80042B6C();
+    for (n = 0; n < 8; n++) func_80041108(0);
+    ASSERT(!PE_Port_ShouldStop() && PE_LoadU8(c + 1u) == 0u, "card driver stays idle");
+    PE_Memcard_Reset();
+    PE_Memcard_SetPath(0, path);
+    ASSERT(PE_Memcard_FirstFile("bu00:*", &d) && memcmp(d.name, "BASLUS-00662TESTSV0A", 20) == 0 &&
+           !PE_Memcard_NextFile(&d), "only the first save, not deleted");
+    fd = PE_Memcard_Open("bu00:BASLUS-00662TESTSV0A", 1);
+    ASSERT(fd >= 0 && PE_Memcard_Read(fd, back, 0x2000) == 0x2000, "first save readable");
+    PE_Memcard_Close(fd);
+    {
+        int ok = 1;
+        for (unsigned i = 0; i < 0x2000u; i++) if (back[i] != (uint8_t)(i * 3u + 7u)) ok = 0;
+        ASSERT(ok, "first save bytes unchanged after reload");
+    }
+    remove(path);
+    Test_ResetMemcard();
+    PASS();
+}
+
 static void test_MC_all(void)
 {
     test_MC_format_layout();
@@ -348,4 +484,6 @@ static void test_MC_all(void)
     test_MC_bios_trampolines();
     test_MC_card_status_events();
     test_MC_operation_scan_and_save();
+    test_MC_overwrite_existing_save();
+    test_MC_overwrite_declined();
 }
