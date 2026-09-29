@@ -161,18 +161,26 @@ static LRESULT CALLBACK PE_WndProc(HWND hwnd, UINT msg,
 }
 
 int HostWindow_Open(const char *display, int width, int height,
-                    const char *title, int scale)
+                    const char *title, int scale, int fullscreen)
 {
     WNDCLASSA wc;
     RECT rc;
-    DWORD style = WS_OVERLAPPEDWINDOW;
+    DWORD style = fullscreen ? WS_POPUP : WS_OVERLAPPEDWINDOW;
     (void)display; /* no display string on Windows */
 
     if (scale < 1) scale = 1;
     g_fb_w = PE_PORT_FB_WIDTH;
     g_fb_h = PE_PORT_FB_HEIGHT;
-    g_win_w = width > 0 ? width : g_fb_w * scale;
-    g_win_h = height > 0 ? height : g_fb_h * scale;
+    if (fullscreen) {
+        /* Borderless window sized to the primary monitor; HostWindow_Blit's
+         * letterbox/pillarbox math (host_window_scale.h) fits the 320x240
+         * source into it, same as the X11 backend's EWMH fullscreen path. */
+        g_win_w = GetSystemMetrics(SM_CXSCREEN);
+        g_win_h = GetSystemMetrics(SM_CYSCREEN);
+    } else {
+        g_win_w = width > 0 ? width : g_fb_w * scale;
+        g_win_h = height > 0 ? height : g_fb_h * scale;
+    }
 
     ZeroMemory(&wc, sizeof(wc));
     wc.lpfnWndProc   = PE_WndProc;
@@ -191,8 +199,11 @@ int HostWindow_Open(const char *display, int width, int height,
     AdjustWindowRect(&rc, style, FALSE);
 
     g_hwnd = CreateWindowExA(0, "PEPortWindow", title ? title : "PE",
-                             style, CW_USEDEFAULT, CW_USEDEFAULT,
-                             rc.right - rc.left, rc.bottom - rc.top,
+                             style,
+                             fullscreen ? 0 : CW_USEDEFAULT,
+                             fullscreen ? 0 : CW_USEDEFAULT,
+                             fullscreen ? g_win_w : rc.right - rc.left,
+                             fullscreen ? g_win_h : rc.bottom - rc.top,
                              NULL, NULL, wc.hInstance, NULL);
     if (!g_hwnd) {
         fprintf(stderr, "[WINDOW] CreateWindowExA failed (%lu)\n",

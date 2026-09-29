@@ -43,6 +43,7 @@ static struct {
     int headless, bootstrap_disc, strict_stubs;
     const char *screenshot, *vram_screenshot, *vram_raw, *trace_path;
     int hold_ms, scale, hold_until_close, debug_overlay;
+    int fullscreen;
     const char *window_title;
     int direct_clear_test;
     const char *stop_after_event;
@@ -606,6 +607,7 @@ static void ParseArgs(int argc, char **argv) {
         else if (!strcmp(a, "--bootstrap-disc"))       g_opts.bootstrap_disc = 1;
         else if (!strcmp(a, "--strict-stubs"))         g_opts.strict_stubs = 1;
         else if (!strcmp(a, "--windowed"))             g_opts.headless = 0;
+        else if (!strcmp(a, "--fullscreen"))           g_opts.fullscreen = 1;
         else if (!strcmp(a, "--hold-until-close"))     g_opts.hold_until_close = 1;
         else if (!strcmp(a, "--debug-overlay"))        g_opts.debug_overlay = 1;
         else if (!strcmp(a, "--direct-clear-test"))    g_opts.direct_clear_test = 1;
@@ -1069,7 +1071,8 @@ int main(int argc, char **argv) {
         const char *dpy = getenv("DISPLAY") ? getenv("DISPLAY") : ":10.0";
         int w = PE_PORT_FB_WIDTH * g_opts.scale;
         int h = PE_PORT_FB_HEIGHT * g_opts.scale;
-        if (HostWindow_Open(dpy, w, h, g_opts.window_title, g_opts.scale) != 0)
+        if (HostWindow_Open(dpy, w, h, g_opts.window_title, g_opts.scale,
+                            g_opts.fullscreen) != 0)
             use_window = 0;
         else {
             PE_Port_SetQuitPoll(HostWindow_Poll);

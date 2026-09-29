@@ -20,7 +20,7 @@ int main(void)
         {'Q',0x0400},{'E',0x0800},{'1',0x0100},{'3',0x0200},
         {VK_TAB,0x0001},{'P',0x0008},{VK_UP,0x0010},{VK_RIGHT,0x0020},
         {VK_DOWN,0x0040},{VK_LEFT,0x0080}};
-    if(HostWindow_Open(NULL,320,240,"PE Win32 input verification",1))return 1;
+    if(HostWindow_Open(NULL,320,240,"PE Win32 input verification",1,0))return 1;
     HWND window=FindWindowA(NULL,"PE Win32 input verification [Normal speed]");
     if(!window){fputs("test window not found\n",stderr);return 1;}
     HostWindow_Poll();

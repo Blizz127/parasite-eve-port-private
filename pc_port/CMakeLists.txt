@@ -522,6 +522,14 @@ if(BUILD_TESTS)
         set_tests_properties(win32-input PROPERTIES TIMEOUT 30)
     endif()
     enable_testing()
+
+    # Letterbox/pillarbox scale math is platform-independent (shared by the
+    # X11 and Win32 backends, and by --fullscreen); no X11/Win32/runtime
+    # dependency needed, so it always builds regardless of WIN32.
+    add_executable(pe-window-scale-tests tests/test_host_window_scale.c)
+    add_test(NAME window-scale-math COMMAND pe-window-scale-tests)
+    set_tests_properties(window-scale-math PROPERTIES TIMEOUT 30)
+
     add_executable(pe-native-tests tests/test_native.c ${PE_GUESTCODE_REGISTRY})
     target_link_libraries(pe-native-tests PRIVATE pe_field_runtime)
 

@@ -13,11 +13,17 @@
 
 #include <stdint.h>
 
-/* Open a window.  width/height are the output (client) size.
+/* Open a window.  width/height are the output (client) size (ignored, in
+ * favor of the screen size, when fullscreen is nonzero).
  * title sets the window title bar. scale is the initial integer zoom factor.
+ * fullscreen requests EWMH _NET_WM_STATE_FULLSCREEN (X11 backend) / an
+ * OS-native borderless-fullscreen equivalent; the 320x240 (or current
+ * display-mode) framebuffer is then letterboxed/pillarboxed into whatever
+ * size the window manager or compositor (e.g. gamescope/Steam Game Mode)
+ * actually grants, including on a later resize.
  * Returns 0 on success, -1 on failure. */
 int  HostWindow_Open(const char *display, int width, int height,
-                     const char *title, int scale);
+                     const char *title, int scale, int fullscreen);
 
 /* Upload RGB 8:8:8 framebuffer pixels to the window.
  * fb_w/fb_h are the SOURCE framebuffer dimensions (always 320×240).

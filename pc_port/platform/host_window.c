@@ -48,6 +48,11 @@ typedef unsigned long KeySym;
 #define StructureNotifyMask (1L<<17)
 #define FocusChangeMask (1L<<21)
 #define SubstructureNotifyMask (1L<<19)
+#define SubstructureRedirectMask (1L<<20)
+#define PropModeReplace 0
+#define XA_ATOM 4
+/* EWMH _NET_WM_STATE source-indication values (wm-spec section 4.3). */
+#define NET_WM_STATE_ADD 1
 
 /* ── Xlib types ─────────────────────────────────────────────────────── */
 typedef unsigned long XID;
@@ -93,6 +98,11 @@ static int   (*XFlush)(void *);
 static int   (*XDestroyWindow)(void *, Window);
 static Atom  (*XInternAtom)(void *, const char *, int);
 static int   (*XSetWMProtocols)(void *, Window, Atom *, int);
+static int   (*XSendEvent)(void *, Window, int, long, XEvent *);
+static int   (*XDisplayWidth)(void *, int);
+static int   (*XDisplayHeight)(void *, int);
+static int   (*XChangeProperty)(void *, Window, Atom, Atom, int, int,
+                                 const unsigned char *, int);
 
 static void *g_dpy = NULL;
 static Window g_win = 0;
@@ -103,6 +113,7 @@ static int g_win_w = 0, g_win_h = 0;
 static int g_fb_w = 0, g_fb_h = 0;
 static Atom g_wm_delete = 0;
 static int g_close_requested = 0;
+static int g_fullscreen = 0;
 
 int g_host_window_open = 0;
 static uint16_t g_sony_held = 0;
@@ -145,6 +156,42 @@ static void bind_all(void) {
     XDestroyWindow      = xlib_sym("XDestroyWindow");
     XInternAtom         = xlib_sym("XInternAtom");
     XSetWMProtocols     = xlib_sym("XSetWMProtocols");
+    XSendEvent          = xlib_sym("XSendEvent");
+    XDisplayWidth       = xlib_sym("XDisplayWidth");
+    XDisplayHeight      = xlib_sym("XDisplayHeight");
+    XChangeProperty     = xlib_sym("XChangeProperty");
+}
+
+/* Ask the window manager (or gamescope/Steam Game Mode) to make g_win
+ * fullscreen per the EWMH wm-spec (_NET_WM_STATE_FULLSCREEN):
+ *  - the property is set before mapping so WMs that read it at map time
+ *    apply fullscreen without an intermediate windowed frame;
+ *  - the ClientMessage is sent (to the root window, after mapping) as
+ *    the spec-mandated fallback for WMs that only honour the message.
+ * Under gamescope the compositor forces fullscreen regardless and this
+ * is a no-op that does no harm; the resulting ConfigureNotify is handled
+ * generically by resize_image() in HostWindow_Poll(). */
+static void request_fullscreen(int mapped)
+{
+    Atom state = XInternAtom(g_dpy, "_NET_WM_STATE", 0);
+    Atom fullscreen = XInternAtom(g_dpy, "_NET_WM_STATE_FULLSCREEN", 0);
+    if (!mapped) {
+        XChangeProperty(g_dpy, g_win, state, XA_ATOM, 32, PropModeReplace,
+                         (const unsigned char *)&fullscreen, 1);
+        return;
+    }
+    XEvent xev;
+    memset(&xev, 0, sizeof(xev));
+    xev.xclient.type = ClientMessage;
+    xev.xclient.window = g_win;
+    xev.xclient.message_type = state;
+    xev.xclient.format = 32;
+    xev.xclient.data[0] = NET_WM_STATE_ADD;
+    xev.xclient.data[1] = (long)fullscreen;
+    xev.xclient.data[2] = 0;
+    xev.xclient.data[3] = 1; /* source indication: normal application */
+    XSendEvent(g_dpy, XDefaultRootWindow(g_dpy), 0,
+               SubstructureRedirectMask | SubstructureNotifyMask, &xev);
 }
 
 static int resize_image(int width, int height)
@@ -163,7 +210,7 @@ static int resize_image(int width, int height)
 }
 
 int HostWindow_Open(const char *display, int width, int height,
-                    const char *title, int scale)
+                    const char *title, int scale, int fullscreen)
 {
     g_xlib = dlopen("libX11.so.6", RTLD_LAZY);
     if (!g_xlib) { fprintf(stderr, "[WINDOW] libX11.so.6 not found\n"); return -1; }
@@ -177,18 +224,31 @@ int HostWindow_Open(const char *display, int width, int height,
     /* Use scale to determine visible size: framebuffer is 320×240, scale × that */
     g_fb_w = PE_PORT_FB_WIDTH;
     g_fb_h = PE_PORT_FB_HEIGHT;
-    g_win_w = width > 0 ? width : g_fb_w * scale;
-    g_win_h = height > 0 ? height : g_fb_h * scale;
+    g_fullscreen = fullscreen != 0;
+    if (g_fullscreen) {
+        /* Size to the screen; HostWindow_Blit/ScaleBGRA letterbox the
+         * 320x240 source into whatever the WM/compositor gives us, and
+         * ConfigureNotify (gamescope forcing fullscreen, or a live
+         * resize) rescales via resize_image() below. */
+        g_win_w = XDisplayWidth(g_dpy, screen);
+        g_win_h = XDisplayHeight(g_dpy, screen);
+    } else {
+        g_win_w = width > 0 ? width : g_fb_w * scale;
+        g_win_h = height > 0 ? height : g_fb_h * scale;
+    }
 
-    g_win = XCreateSimpleWindow(g_dpy, root, 200, 200, g_win_w, g_win_h,
-                                 4, 0xFFFFFF, 0xFFFFFF);
+    g_win = XCreateSimpleWindow(g_dpy, root, g_fullscreen ? 0 : 200,
+                                 g_fullscreen ? 0 : 200, g_win_w, g_win_h,
+                                 g_fullscreen ? 0 : 4, 0xFFFFFF, 0xFFFFFF);
     g_fast_forward=0;g_speed_key_held=0;g_ff_active=0;g_pad_hotkeys=0;
     g_vblank_paced=0;g_last_vblank_ns=0;
     HostWindow_SetTitle(title);
     XSelectInput(g_dpy, g_win, ExposureMask | KeyPressMask | (1L<<1) | StructureNotifyMask | FocusChangeMask);
     g_wm_delete = XInternAtom(g_dpy, "WM_DELETE_WINDOW", 0);
     XSetWMProtocols(g_dpy, g_win, &g_wm_delete, 1);
+    if (g_fullscreen) request_fullscreen(0); /* property, before map */
     XMapWindow(g_dpy, g_win);
+    if (g_fullscreen) request_fullscreen(1); /* ClientMessage, after map */
 
     g_gc = XCreateGC(g_dpy, g_win, 0, NULL);
     if (resize_image(g_win_w, g_win_h) != 0) { HostWindow_Close(); return -1; }
@@ -200,8 +260,9 @@ int HostWindow_Open(const char *display, int width, int height,
     PE_AudioDriver_SetVBlankPacer(pace_vblank);
 
     XFlush(g_dpy);
-    fprintf(stderr, "[WINDOW] %dx%d (fb %dx%d) on %s title='%s'\n",
-            g_win_w, g_win_h, g_fb_w, g_fb_h, display, title);
+    fprintf(stderr, "[WINDOW] %dx%d (fb %dx%d) on %s title='%s'%s\n",
+            g_win_w, g_win_h, g_fb_w, g_fb_h, display, title,
+            g_fullscreen ? " fullscreen" : "");
     return 0;
 }
 
