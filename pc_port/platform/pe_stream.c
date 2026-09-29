@@ -45,6 +45,7 @@
 
 int func_80085814(unsigned short a0, short a1, int a2);   /* generated TU */
 int func_800858E8(unsigned int a0);                      /* generated TU */
+void func_80085F74(pe_addr_t a0);                        /* generated TU (src/func_80085F74.c) */
 #include "stub_registry.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -247,7 +248,17 @@ static void PE_Stream_StateInit(void)
     PE_StoreU16(0x800C0DACu, 0);
     PE_StoreU32(0x800C0DB0u, 0);
     PE_StoreU32(0x800C0DB4u, 0);
-    /* func_80085F74 — voice-attribute applier: collapsed (see header) */
+    /* func_80085F74 (libspu SpuSetCommonAttr, matched C) applies the
+     * block above: mask 0x3FCF = main volume L/R 0x3FFF, CD input volume
+     * L/R 0x7FFF, CD reverb off, CD mix on, external input 0/off.  Run it
+     * for real once SpuInit has installed the register base (retail
+     * D_8009B3FC = 0x1F801C00; writes reach the SPU through the MMIO
+     * shadow), so SPU 0x180/0x182/0x1B0/0x1B2 and the SPUCNT CD bits hold
+     * the retail values instead of pe_spu's unwritten-register defaults. */
+    /* Without that base (unit fixtures that skip SpuInit) the retail call
+     * would write through a null pointer; the block stays unapplied. */
+    if ((PE_LoadU32(0x8009B3FCu) & 0x1FFFFFFFu) == 0x1F801C00u)
+        func_80085F74(0x800C0D90u);
     PE_StoreU32(0x8009D268u, 0);
     PE_StoreU32(0x8009D22Cu, 0);
     PE_StoreU32(0x8009D2B8u, 0);

@@ -27,8 +27,9 @@
  * CE00 past the insn before jalr; v0=1 re-fetches the next 0x08.
  *
  * Descriptor lives at ROM sp+16. Native has no guest $sp:
- * GA_DESC 0x80120F70 is the same class of APPROXIMATION as the
- * 17018 arg frame. ROM has no null check on 35038's return.
+ * GA_DESC 0x801FF4A0 is the same class of APPROXIMATION as the
+ * 17018 arg frame (moved out of the 0x80120D00 overlay load window
+ * with it; old address 0x80120F70). ROM has no null check on 35038's return.
  *
  * func_8001AA78 — 154 words 0x8001AA78..0x8001ACE0, SHA-256
  * eaf36cc4…a935. Callers 12C9C and 1735C@173D4. Void.
@@ -82,9 +83,9 @@ static int PeOp77DbgOn(void)
 #define GA_D_8009CE08 0x8009CE08u
 #define GA_D_800BCF88 0x800BCF88u
 /* Host stand-in for ROM 1735C sp+16. APPROXIMATION: no guest $sp. */
-#define GA_DESC       0x80120F70u
+#define GA_DESC       0x801FF4A0u  /* 2 bytes; was 0x80120F70 (overlay window) */
 /* Host stand-in for ROM 14DA0 sp+16. APPROXIMATION: no guest $sp. */
-#define GA_POLY       0x80120F30u
+#define GA_POLY       0x801FF480u  /* 4 x 8 bytes; was 0x80120F30 (overlay window) */
 
 static int32_t pe_mult_lo(int32_t a, int32_t b)
 {

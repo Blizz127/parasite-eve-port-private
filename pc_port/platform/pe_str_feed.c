@@ -22,6 +22,8 @@
 #include "stub_registry.h"
 #include "pe_spu.h"
 #include "pe_gpu.h"
+#include "pe_cdreg.h"
+#include "pe_spu_dma.h"
 
 #define GA_RING_BASE    0x800C0DC8u
 #define GA_RING_COUNT   0x800C20C4u
@@ -48,12 +50,8 @@ static struct {
     uint8_t headers[STR_MAX_CHUNKS][32];
     uint8_t data[STR_MAX_CHUNKS][STR_CHUNK_BYTES];
     PeStrFeedStats stats;
+    uint8_t atv_logged[4];  /* PE_FMV_LOG: last ATV matrix reported */
 } g_feed;
-
-/* Drive audio volume matrix (L->L, L->R, R->R, R->L; 0x80 = 100%).  With
- * the CD register device disabled the ATV registers are not modeled, so
- * the retail power-on/CdMix default (straight stereo, full) is used. */
-static const uint8_t kXaVolume[4] = {0x80u, 0x00u, 0x80u, 0x00u};
 
 static uint32_t VBlankCount(void)
 {
@@ -90,6 +88,49 @@ static void Account(void)
         dp++;
     }
     HostFB_GetState(NULL, NULL, &g_feed.last_presented, NULL);
+}
+
+static int FmvLog(void)
+{
+    static int on = -1;
+    if (on < 0)
+        on = getenv("PE_FMV_DEBUG") != NULL || getenv("PE_FMV_LOG") != NULL;
+    return on;
+}
+
+/* PE_FMV_LOG evidence: FNV-1a over a published frame's bitstream (all its
+ * 2016-byte chunks), so the log names the frame content independently of
+ * the decoder; PE_FMV_SHOT_DIR=<dir> also writes the presented picture at
+ * a few frame counts (debug evidence only; keep it under build/). */
+static uint32_t FrameHash(uint32_t n)
+{
+    uint32_t h = 2166136261u, k, i;
+
+    for (k = 0u; k < n; k++)
+        for (i = 0u; i < STR_CHUNK_BYTES; i++)
+            h = (h ^ g_feed.data[k][i]) * 16777619u;
+    return h;
+}
+
+static void FrameEvidence(void)
+{
+    uint32_t n = g_feed.stats.frames_published;
+    const char *dir;
+
+    if (!FmvLog())
+        return;
+    if (n == 1u)
+        fprintf(stderr, "[FMV] first frame start_lba=%u frame=%u chunks=%u fnv=%08X\n",
+                g_feed.stats.start_lba, g_feed.frame, g_feed.chunks,
+                FrameHash(g_feed.chunks));
+    dir = getenv("PE_FMV_SHOT_DIR");
+    if (dir != NULL && (n == 3u || n == 60u || n == 300u || n == 900u)) {
+        char path[512];
+        snprintf(path, sizeof path, "%s/fmv_lba%u_f%04u.ppm", dir,
+                 g_feed.stats.start_lba, n);
+        if (HostFB_WritePPM(path) == 0)
+            fprintf(stderr, "[FMV] shot %s\n", path);
+    }
 }
 
 static uint32_t Bcd(uint8_t b) { return (uint32_t)(b >> 4) * 10u + (b & 15u); }
@@ -145,22 +186,30 @@ void PE_StrFeed_Open(pe_addr_t bcd_location, uint32_t mode)
     g_feed.assembling = 0;
     g_feed.pending = 0;
     g_feed.published = 0u;
+    memset(g_feed.atv_logged, 0xFF, sizeof(g_feed.atv_logged));
     HostFB_GetState(NULL, NULL, &g_feed.last_presented, NULL);
     g_feed.last_vblank = VBlankCount();
     g_feed.stats.start_lba = g_feed.lba;
     g_feed.stats.lba = g_feed.lba;
     PE_Spu_CdInputStop();
     Stub_Record("PE_StrFeed_ReadS_host_stream", "HOST_ADAPTED");
-    if (getenv("PE_FMV_DEBUG") || getenv("PE_FMV_LOG"))
-        fprintf(stderr, "[FMV] stream open lba=%u mode=%03X\n", g_feed.lba, mode);
+    if (FmvLog()) {
+        uint8_t atv[4];
+        PE_CdReg_GetAudioVolumes(atv);
+        fprintf(stderr, "[FMV] stream open lba=%u mode=%03X atv=%02X,%02X,%02X,%02X spu 180=%04X 182=%04X 1B0=%04X 1B2=%04X 1AA=%04X\n",
+                g_feed.lba, mode, atv[0], atv[1], atv[2], atv[3],
+                PE_SpuRegister_LoadU16(0x180u), PE_SpuRegister_LoadU16(0x182u),
+                PE_SpuRegister_LoadU16(0x1B0u), PE_SpuRegister_LoadU16(0x1B2u),
+                PE_SpuRegister_LoadU16(0x1AAu));
+    }
 }
 
 void PE_StrFeed_Close(void)
 {
     if (!g_feed.active)
         return;
-    if (getenv("PE_FMV_DEBUG") || getenv("PE_FMV_LOG"))
-        fprintf(stderr, "[FMV] stream close at_vblank=%u lba=%u frames=%u last=%u video=%u audio=%u vblanks=%u dropped=%u\n", VBlankCount(), g_feed.lba, g_feed.stats.frames_published, g_feed.stats.last_frame, g_feed.stats.video_sectors, g_feed.stats.audio_sectors, g_feed.stats.vblanks, g_feed.stats.frames_dropped);
+    if (FmvLog())
+        fprintf(stderr, "[FMV] stream close start_lba=%u at_vblank=%u lba=%u frames=%u last=%u video=%u audio=%u vblanks=%u dropped=%u\n", g_feed.stats.start_lba, VBlankCount(), g_feed.lba, g_feed.stats.frames_published, g_feed.stats.last_frame, g_feed.stats.video_sectors, g_feed.stats.audio_sectors, g_feed.stats.vblanks, g_feed.stats.frames_dropped);
     g_feed.active = 0;
     /* Natural end and skip alike: stop the XA already queued in the SPU
      * CD input so skipped movie audio does not play on into the game. */
@@ -219,6 +268,7 @@ static int PlaceFrame(void)
     g_feed.write_idx = w + n;
     g_feed.pending = 0;
     g_feed.stats.frames_published++;
+    FrameEvidence();
     return 1;
 }
 
@@ -232,7 +282,21 @@ static void Sector(const uint8_t *raw)
         g_feed.stats.audio_sectors++;
         /* XA-ADPCM real-time playback (mode 0x40) through the audio
          * lane's SPU CD input; mode 0x1E0 has no subheader filter. */
-        PE_Spu_CdSector(raw, (uint8_t)g_feed.mode, 0, 0u, 0u, kXaVolume);
+        /* CD drive audio volume matrix (ATV0..3: L->L, L->R, R->R, R->L;
+         * 0x80 = 100%), as the game last applied it through CdMix
+         * (func_8007B964 via func_800870F0 / func_80080AC4: ADPCTL bit5 on
+         * index 3).  pe_cdreg latches it whether or not the CD register
+         * device is enabled, so movie levels and the players' ATV fades
+         * (func_80191B64 / func_80192CE8 / 0x80122354) follow retail. */
+        uint8_t atv[4];
+        PE_CdReg_GetAudioVolumes(atv);
+        if (FmvLog() && memcmp(atv, g_feed.atv_logged, 4) != 0) {
+            fprintf(stderr, "[FMV] atv lba=%u frame=%u: %02X,%02X,%02X,%02X\n",
+                    g_feed.stats.start_lba, g_feed.stats.frames_published,
+                    atv[0], atv[1], atv[2], atv[3]);
+            memcpy(g_feed.atv_logged, atv, 4);
+        }
+        PE_Spu_CdSector(raw, (uint8_t)g_feed.mode, 0, 0u, 0u, atv);
         return;
     }
     if ((submode & 0x08u) && user[0] == 0x60u && user[1] == 0x01u &&

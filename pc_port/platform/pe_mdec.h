@@ -32,7 +32,8 @@ typedef struct {
     uint32_t reset_count;
     uint32_t input_wait_count;
     uint32_t upload_count;
-    uint32_t stale_input_discards;
+    uint32_t stale_input_discards;  /* commands begun with old input left */
+    uint32_t stale_output_bytes;    /* old-command output queued ahead of new */
     uint32_t completed_upload_count;
     int dma0_active;
     PeMdecUpload uploads[PE_MDEC_UPLOAD_HISTORY];

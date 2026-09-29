@@ -21,6 +21,12 @@ static uint16_t g_input[131070];
 static uint32_t g_input_pos,g_input_count,g_decode_command,g_macroblocks;
 static uint8_t g_pixels[768];
 static uint32_t g_pixel_pos,g_pixel_count;
+/* Output of a previous command still ahead of the current one in the
+ * data-out FIFO (see MdecBeginCommand). */
+#define MDEC_STALE_MACROBLOCKS 64u
+static uint8_t g_stale[MDEC_STALE_MACROBLOCKS*768u];
+static uint32_t g_stale_pos,g_stale_count;
+static int g_drain;
 
 static int MdecBoundary(const char *name,uint32_t value)
 {
@@ -67,7 +73,7 @@ static int MdecBlock(int32_t block[64],const uint8_t quant[64])
     }
     memset(block,0,64u*sizeof(*block));
     while(g_input_pos<g_input_count && g_input[g_input_pos]==0xFE00u) g_input_pos++;
-    if(g_input_pos==g_input_count) return MdecBoundary("MDEC_missing_block",g_input_pos);
+    if(g_input_pos==g_input_count) return g_drain?0:MdecBoundary("MDEC_missing_block",g_input_pos);
     uint16_t code=g_input[g_input_pos++];unsigned scale=code>>10u,k=0;
     for(;;) {
         int32_t value=MdecSigned(code,10u);
@@ -75,7 +81,7 @@ static int MdecBlock(int32_t block[64],const uint8_t quant[64])
         else if(!k) value*=quant[0];
         else value=MdecShift((int64_t)value*quant[k]*scale+4,3u);
         block[scale?scan[k]:k]=MdecClamp(value,-1024,1023);
-        if(g_input_pos==g_input_count) return MdecBoundary("MDEC_unterminated_block",g_input_pos);
+        if(g_input_pos==g_input_count) return g_drain?0:MdecBoundary("MDEC_unterminated_block",g_input_pos);
         code=g_input[g_input_pos++];k+=(code>>10u)+1u;
         if(k>=64u) break;
     }
@@ -124,15 +130,38 @@ static int MdecBeginCommand(uint32_t command,pe_addr_t source)
     unsigned required_tables=((command>>27u)&3u)<2u?5u:7u;
     if((g_tables&required_tables)!=required_tables) return MdecBoundary("MDEC_missing_tables",g_tables);
     if(!PE_RangeIsRam(source,words*4u)) return MdecBoundary("MDEC_input_range",source);
-    /* A new decode command while the previous one still holds input:
-     * libpress pads the VLC output with DC-only blocks past the last
-     * macroblock the game reads out.  With no output DMA in flight the
-     * tail can never be observed, so drop it (hardware leaves it in the
-     * FIFO until the next command word is parsed).  The command is only
-     * parsed here, lazily at DMA0 service, so an already-queued DMA1
-     * request belongs to the new command. */
+    /* A new decode command while the previous one still holds input
+     * (psx-spx MDEC: a command owns exactly its N parameter words; FE00h
+     * at a block start or after EOB is ignored, anywhere else it is EOB).
+     * The hardware decodes those words in order, so their macroblocks are
+     * queued in the data-out FIFO ahead of the new command's output and
+     * the next DMA1 reads them first.  Model that: finish the old
+     * command's complete macroblocks into g_stale (after any output not
+     * yet read) and serve it before the new command's pixels.  A trailing
+     * partial macroblock yields no output (only complete macroblocks
+     * reach the FIFO); psx-spx does not document it further.  The
+     * command is only parsed here, lazily at DMA0 service, so an
+     * already-queued DMA1 request belongs to the new command.  Not
+     * reached by the Day-1 movies (FMV001-FMV004: 0 occurrences). */
     if(g_input_pos<g_input_count || g_pixel_pos<g_pixel_count) {
-        g_input_pos=g_input_count;g_pixel_pos=g_pixel_count;
+        uint32_t keep=g_stale_count-g_stale_pos;
+        memmove(g_stale,g_stale+g_stale_pos,keep);g_stale_pos=0;g_stale_count=keep;
+        for(;;) {
+            uint32_t n=g_pixel_count-g_pixel_pos;
+            if(n) {
+                if(g_stale_count+n>sizeof(g_stale)) return MdecBoundary("MDEC_stale_output_overflow",g_stale_count);
+                memcpy(g_stale+g_stale_count,g_pixels+g_pixel_pos,n);
+                g_stale_count+=n;g_pixel_pos=g_pixel_count;
+                g_mdec.stale_output_bytes+=n;
+            }
+            while(g_input_pos<g_input_count && g_input[g_input_pos]==0xFE00u) g_input_pos++;
+            if(g_input_pos==g_input_count) break;
+            g_drain=1;
+            int ok=MdecMacroblock();
+            g_drain=0;
+            if(!ok) {g_pixel_pos=g_pixel_count=0;break;}
+        }
+        g_input_pos=g_input_count;
         g_mdec.stale_input_discards++;
     }
     g_decode_command=command;g_input_count=words*2u;g_input_pos=0;g_pixel_pos=g_pixel_count=0;g_macroblocks=0;g_decode_valid=1;
@@ -192,6 +221,7 @@ int PE_MDEC_ReadPixels(pe_addr_t destination,uint32_t bytes)
 {
     if(!PE_RangeIsRam(destination,bytes)) return MdecBoundary("MDEC_output_range",destination);
     for(unsigned i=0;i<bytes;i++) {
+        if(g_stale_pos<g_stale_count) {PE_StoreU8(destination+i,g_stale[g_stale_pos++]);continue;}
         if(g_pixel_pos==g_pixel_count && !MdecMacroblock()) return 0;
         PE_StoreU8(destination+i,g_pixels[g_pixel_pos++]);
     }
@@ -218,6 +248,7 @@ void PE_MDEC_Init(void)
     memset(&g_mdec, 0, sizeof(g_mdec));
     memset(g_quant,0,sizeof(g_quant));memset(g_scale,0,sizeof(g_scale));g_tables=0;
     g_input_pos=g_input_count=g_pixel_pos=g_pixel_count=g_macroblocks=0;
+    g_stale_pos=g_stale_count=0;
     g_decode_valid=g_input_pending=0;g_output_bytes=0;
 }
 
@@ -228,6 +259,7 @@ void PE_MDEC_BeginReset(void)
     memset(&g_mdec, 0, sizeof(g_mdec));
     g_mdec.reset_count = reset_count;
     g_input_pos=g_input_count=g_pixel_pos=g_pixel_count=g_macroblocks=0;
+    g_stale_pos=g_stale_count=0;
     g_decode_valid=g_input_pending=0;g_output_bytes=0;
     PE_MDEC_WriteControl(0x80000000u);
 }

@@ -161,3 +161,145 @@ The rest of the run is unchanged: New Game, FMV000, then field audio
 `PE_AUDIO_LATENCY_MS` (100 ms) of already-rendered audio. The host fast-forward
 fade is not wired in: `host_audio.c` is linked only into the executable, not
 the runtime library.
+
+## Wrong movie on New Game and at the opera stage (fmv2 lane, 2026-09-28)
+
+Owner bug on c744fab6: New Game played a short movie with a loud burst and cut
+early to the car-arrival scene. At the opera stage the same short movie played
+again instead of the combustion movie.
+
+**Cause.** The movie was always `FMV000.STR` (the 150-frame SQUARE logo, which
+retail plays at boot). The feeder and the player read the file they were
+given. The wrong id came from the field VM. `func_80017018_port.c` put its host
+stand-in for the retail `sp+16` argument frame at `GA_VM_FRAME = 0x80120F80`.
+That address lies inside the movie overlay's load window: section 1 of
+`func_80014E30` (PE.IMG sectors 0x3C5..0x3C9, 0x2000 bytes) loads to
+`D_8001160C[1] = 0x80120D00`. Opcode 0x35 (`func_80014E30`) loads the overlay
+first and only then reads `**args` (`src/func_80014E30.c`:
+`func_80121C04(**a0)`). By then `args[0]` holds overlay bytes (`";1\0\0"` =
+0x0000313B) and the id reads as 0. In retail the frame is on the stack
+(SYSTEM.CNF `STACK=801fff00`), so the load cannot reach it. Movie ids index the
+overlay's 47-entry table at 0x80122438 (20 bytes each: name pointer, wide flag,
+start frame, end frame, rectangle). Each name is appended to `"\FMV1"` or
+`"\FMV2"`, searched with DsSearchFile (`func_80081414`), then read with
+Setloc + ReadS. `PEDISC01.IDF` is not used for movies.
+
+**Fix.** `GA_VM_FRAME` is now 0x801FF400 and `GA_375E0_LIST` is 0x801FF460.
+Both are in the guest stack area, like retail's frame. They sit below every
+port scratch window (0x801FF4F0 and up) and above the highest overlay end
+(0x801ED7F8 + 0x4800 = 0x801F1FF8, `configs/USA/overlays/manifest.yaml`).
+The port has no guest `$sp` (native C, no MIPS interpreter), so no guest
+stack grows into that window. `PE_VMFRAME_AUDIT=1` checks after every dispatch
+that the frame still holds the decoded pointers, and between dispatches that
+nothing else wrote 0x801FF400..0x801FF4EF. It reported `bad=0` over 1.6 M
+opcodes in the movie route run below.
+
+**Harness aid.** With `PE_ROUTE_PLAY_MOVIES=1`, `--route-pad` still skips the
+boot/title movies but lets opcode 0x35 play. It holds the route clock and sends
+no pad input while `D_800B0DBA != 0` (a movie owns the display). With
+`PE_FMV_LOG=1`, the log gives the movie id and name, the stream's start LBA,
+the first frame's bitstream FNV hash, and a close line with frame and VBlank
+counts. `PE_FMV_SHOT_DIR=<dir under build/>` saves the picture at published
+frames 3, 60, 300 and 900.
+
+**Per-movie evidence.** Port figures are from `PE_ROUTE_PLAY_MOVIES=1
+PE_FMV_LOG=1 day1_route_regress.sh --until eve1_victory`
+(log `build/lanes/fmv2/route-movies.log`). Retail figures come from the owner's
+reference video (`build/reference/retail-video/`, ffmpeg `blackdetect`).
+Screenshots match the retail frames at the same movie time; the side-by-side
+images are `build/lanes/fmv2/cmp_fmv00{2,3,4}.png` (git-ignored).
+
+| Point | id / file (LBA) | Port: frames, VBlanks | Stream header | Retail video |
+| --- | --- | --- | --- | --- |
+| Boot | 1 `FMV001.STR` (189742) (it opens with the same SQUARE logo as `FMV000.STR`; retail does not play FMV000 at boot) | earlier fmv lane: 2077/2077 | 2077 frames | starts 29.95 s (audio cross-correlation 0.997); skipped by the video's player at ≈160 s |
+| New Game | 2 `FMV002.STR` (103206) | 1021/1021, 4089 VB = 68.15 s, 0 dropped | 1021 frames, record end 0x3FD | 181.05–249.1 s (audio cross-correlation 0.917) |
+| Opera stage (combustion) | 3 `FMV003.STR` (113438) | 1151/1151, 4610 VB = 76.83 s, 0 dropped | 1151 frames, record end 0x47F | ≈436.4–512.7 s (black-frame detection) |
+| Rat (backstage) | 4 `FMV004.STR` (125230) | 561/561, 2247 VB = 37.45 s, 0 dropped | 561 frames, record end 0x231 | ≈910.5–947.6 s (black-frame detection) |
+
+Before the fix, the New Game run in the first table above opened
+`lba=101705` (FMV000, 150 frames). With the fix, the same no-skip
+`PE_PAD_SCRIPT` run logs `movie id=2 name=\FMV1\FMV002.STR;1` and
+`stream open lba=103206`.
+
+Non-claims: the play-movies route loses sync at M0022I (token A8001148, story
+0x48, route frame ≈19300), before `eve1_room`. The route pads were recorded
+without movies, and the post-movie restore frames still move the pad clock.
+That is a harness limit; the standard skip-movie regression is the gate. Other
+field stand-ins in the old overlay window (`GA_EA_SLOT` 0x80120FC0 in
+`func_80015DAC_port.c`, `GA_DESC`/`GA_POLY` 0x80120F70/0x80120F30 in
+`func_8001735C_port.c`) are used only within a single call and were not moved.
+
+## Movie audio level, MDEC FIFO order, overlay-window stand-ins (fmv2 round 2)
+
+Covers KNOWN_DIVERGENCES #6 and #7, plus the last three stand-in addresses
+that sat in the old overlay window.
+
+**CD audio volume (#7).** There are two volume stages, as on hardware:
+
+- *Drive matrix (ATV0..3).* The game sets it through CdMix
+  (`func_800870F0` → `func_8007A88C` → `func_8007B964`, and
+  `func_80080AC4` for EA op 409). `pe_cdreg.c` already latched those writes
+  with the ADPCTL bit-5 apply, whether or not the CD device is enabled. The
+  feeder ignored them and mixed at a constant `0x80,0,0x80,0`. It now passes
+  `PE_CdReg_GetAudioVolumes()` for each XA sector. Measured values: the title
+  movie runs at `0x98` (`D_800B0DBE`, 119 %). The New Game movie runs at
+  `0x80` and fades out over frames 1006–1019 through `func_80191B64`. That
+  fade was lost before.
+- *SPU CD input and main volume (0x1B0/0x1B2, 0x180/0x182, SPUCNT bit 0).*
+  The sound init `func_80085290` applies a SpuCommonAttr block through
+  `func_80085F74` (SpuSetCommonAttr, matched C). The block is mask 0x3FCF:
+  main volume 0x3FFF, CD volume 0x7FFF, CD mix on. `pe_stream.c` had
+  collapsed that call. It now runs through the SPU MMIO shadow once
+  `D_8009B3FC == 0x1F801C00`. At movie open the registers read
+  `180=3FFF 182=3FFF 1B0=7FFF 1B2=7FFF 1AA=0001`; before, they were unwritten
+  and pe_spu applied its defaults. The values are unchanged, so the WAV level
+  is identical. The later driver CD-volume path (`func_8008D7D0`, from
+  `D_8009D2B4`) now writes onto real register state.
+
+Level check against the owner's retail video. The capture's absolute gain is
+unknown (YouTube normalisation), so the check compares the difference between
+two movies in the same recording. Windows are 0.5–9.5 s of the boot SQUARE
+logo (retail 29.95 s, port VBlank 486) and 5–60 s of FMV002 (retail
+181.05 s, port VBlank 2384). Both were aligned by cross-correlating the audio
+envelopes (`build/lanes/fmv2/level.py`, `align.py`).
+
+| | logo RMS | FMV002 RMS | logo − FMV002 |
+| --- | --- | --- | --- |
+| retail video | −32.42 dBFS | −24.48 dBFS | **−7.94 dB** |
+| port, fixed (drive ATV) | −24.54 dBFS | −16.93 dBFS | **−7.61 dB** |
+| port, before (constant 0x80) | — | — | −9.10 dB (derived: logo × 0x80/0x98) |
+
+The FMV002 fade-out tail, per 0.5 s window, relative to each body's level,
+movie time 66.0 / 66.5 / 67.0 / 67.5 / 68.0 s: retail −13.96 / −16.29 /
+−18.98 / −21.28 / −24.51 dB, port −13.09 / −15.92 / −19.15 / −21.32 / −24.54
+dB. No port window clipped (peaks 15477 and 30256).
+
+**MDEC (#6).** psx-spx (`ps1/cpu/mdec/macroblockdecodermdec`) says: a decode
+command owns exactly its N parameter words; FE00h at a block start or after
+EOB is ignored; elsewhere FE00h is EOB. The old code threw away any input the
+previous command had not decoded when a new command began. Now that input is
+decoded in order: its complete macroblocks queue in the data-out FIFO
+(`g_stale`, `stale_output_bytes`) ahead of the new command's output, and the
+next DMA1 reads them first. psx-spx does not document a trailing partial
+macroblock. It produces no output here because only complete macroblocks
+reach the FIFO. New unit case in `test_mdec_pixels.h` (stale block before the
+new command's block, accounting). This path never occurs in the Day-1 movies.
+A temporary counter found 0 occurrences over FMV001 (205 frames) and FMV002
+(1021 frames), so pictures are unchanged.
+
+**Stand-ins moved out of the overlay window.** `GA_POLY` (0x801FF480,
+4 × 8 bytes) and `GA_DESC` (0x801FF4A0, 2 bytes, not kept by
+`func_80035038`) are in `func_8001735C_port.c`. `GA_EA_SLOT` (0x801FF4B0,
+slot word + four CD gain bytes) is in `func_80015DAC_port.c`. They were at
+0x80120F30 / 0x80120F70 / 0x80120FC0, inside the 0x80120D00 overlay load
+window. They now share the audited 0x801FF400..0x801FF4EF block with the VM
+frame. `PE_VMFRAME_AUDIT=1` also checks that no one writes this whole block
+between opcodes.
+
+Verification (round 2, build `build/pcbuild-fmv2` from the shared tree regenerated at 21:5x):
+native suite `Results: 1596 run, 1595 passed, 1 failed`. The failure is
+`DAY1_model_fade`, which exercises `func_8003AF14`/`8003C638`/…. Another lane
+is switching those to matched C; this round touched none of them.
+`day1_route_regress.sh --until eve1_victory` with `PE_VMFRAME_AUDIT=1` gives
+`REGRESS PASS frame=44352` (`eve1_room` at 42707, unchanged) and
+`[VMFRAME] … bad=0`. The new MDEC case `DAY2_mdec_pixels` passes.

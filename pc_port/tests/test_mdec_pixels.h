@@ -73,6 +73,30 @@ static void test_DAY2_mdec_pixels(void)
         ASSERT(PE_MDEC_BeginDecode(0x80144000u) && PE_MDEC_ReadPixels(0x80150000u,64u),"retail-table DC decode");
         for(unsigned i=0;i<64u;i++) ASSERT(PE_LoadU8(0x80150000u+i)==(unsigned)(128+dc/4),"retail-table DC pixels");
     }
+    /* psx-spx FIFO order: a second decode command issued while the first
+     * still holds a whole undecoded 8-bit block queues that block's output
+     * ahead of its own.  First command: DC +32 (read) then DC -32 (left);
+     * second: DC +16.  FE00h padding at a block start is ignored. */
+    {
+        PeMdecState st;
+        ResetTestState();MdecPixelTables();
+        PE_StoreU32(0x80144000u,0x28000003u);
+        PE_StoreU16(0x80144004u,(uint16_t)((8u<<10u)|32u));PE_StoreU16(0x80144006u,0xFE00u);
+        PE_StoreU16(0x80144008u,0xFE00u);
+        PE_StoreU16(0x8014400Au,(uint16_t)((8u<<10u)|(1024u-32u)));PE_StoreU16(0x8014400Cu,0xFE00u);
+        PE_StoreU16(0x8014400Eu,0xFE00u);
+        ASSERT(PE_MDEC_BeginDecode(0x80144000u) && PE_MDEC_ReadPixels(0x80150000u,64u),"MDEC first block");
+        ASSERT(PE_LoadU8(0x80150000u)==160u,"MDEC first block level");
+        PE_StoreU32(0x80146000u,0x28000001u);
+        PE_StoreU16(0x80146004u,(uint16_t)((8u<<10u)|16u));PE_StoreU16(0x80146006u,0xFE00u);
+        ASSERT(PE_MDEC_BeginDecode(0x80146000u),"MDEC second command");
+        ASSERT(PE_MDEC_ReadPixels(0x80150000u,128u) && !PE_Port_ShouldStop(),"MDEC stale+new output");
+        /* The diagonal test matrix maps DC to pixel 0 only (see the impulse
+         * loop above), so each block is identified by its pixel 0. */
+        for(unsigned i=0;i<128u;i++) ASSERT(PE_LoadU8(0x80150000u+i)==(i==0u?96u:i==64u?144u:128u),"MDEC stale block precedes the new command's block");
+        PE_MDEC_GetState(&st);
+        ASSERT(st.stale_input_discards==1u && st.stale_output_bytes==64u,"MDEC stale accounting");
+    }
     ResetTestState();MdecPixelTables();PE_StoreU32(0x80144000u,0x28000001u);
     PE_StoreU32(0x80144004u,0u);ASSERT(PE_MDEC_BeginDecode(0x80144000u),"MDEC malformed submission");
     ASSERT(!PE_MDEC_ReadPixels(0x80150000u,64u) && PE_Port_ShouldStop() && CountOrderLog("MDEC_unterminated_block")==1 && !PE_LoadU32(0x80150000u),"MDEC malformed block fabricated output");
