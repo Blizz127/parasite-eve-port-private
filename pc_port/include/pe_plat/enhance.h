@@ -106,6 +106,7 @@ void pe_enh_cycle_exp_mult(void);      /* 1 -> 2 -> 3 -> 1 */
  *   final retail damage just before subtracting it from the enemy's HP
  *   (body+0x10).  With 1-hit kills on it returns max(damage, HP) so the HP
  *   reaches exactly 0 and retail's own death, EXP, BP and item-drop path runs.
+ *   Inactive (returns damage) in story-scripted battles, D_8009D1A0 & 0x800.
  * pe_enh_player_shielded: 1 while god mode is on.  The player damage paths
  *   (func_8001F4D4 enemy hits, the contact-damage tick in func_8001D340, the
  *   HP-halving / HP-to-1 status effects in func_80020288) skip only their HP

@@ -17,6 +17,7 @@
 #   PE_SOURCE_COMMIT  source commit recorded in build-info (default: git HEAD)
 #   PE_SOURCE_NOTE    free-text provenance note recorded in build-info
 #   PE_OUTPUT_DIR     output dir (default: build/lanes/preview/dist; must be git-ignored)
+#   PE_PREVIEW_DEV_MENU=1  the launcher exports PE_DEV_MENU=1 (controller dev menu on; checkpoint builds)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -83,6 +84,9 @@ fi
 cd "$HERE"
 SKIP=()
 [[ "${PE_SKIP_MOVIE:-__DEFAULT_SKIP__}" == 1 ]] && SKIP=(--skip-movie)
+# Dev menu (Back/View + Start/Menu on a controller, F8 on the keyboard): on for
+# checkpoint builds packaged with PE_PREVIEW_DEV_MENU=1; PE_DEV_MENU=0 turns it off.
+export PE_DEV_MENU="${PE_DEV_MENU:-__DEV_MENU__}"
 exec "$HERE/bin/parasite-eve-port" --windowed "${SKIP[@]}" --scale 3 \
     --window-title "Parasite Eve - Day 1 preview" \
     --disc-image "$DISC" "$@"
@@ -167,11 +171,13 @@ VARIANT="${PE_PREVIEW_VARIANT:-current}"
 LIMITS_FILE="${PE_PREVIEW_LIMITS:-}"
 if [[ -n "$LIMITS_FILE" ]]; then LIMITS="$(cat "$LIMITS_FILE")"; else LIMITS="* See build-info.json for the source commit."; fi
 DEFAULT_SKIP="${PE_PREVIEW_DEFAULT_SKIP:-0}"
-python3 - "$STAGE" "$LIMITS" "$DEFAULT_SKIP" <<'PY'
+DEV_MENU="${PE_PREVIEW_DEV_MENU:-0}"
+python3 - "$STAGE" "$LIMITS" "$DEFAULT_SKIP" "$DEV_MENU" <<'PY'
 import sys, pathlib
-stage, limits, skip = sys.argv[1:]
+stage, limits, skip, devmenu = sys.argv[1:]
 r = pathlib.Path(stage, "README-PREVIEW.txt"); r.write_text(r.read_text().replace("__LIMITS__", limits))
-l = pathlib.Path(stage, "parasite-eve-preview"); l.write_text(l.read_text().replace("__DEFAULT_SKIP__", skip))
+l = pathlib.Path(stage, "parasite-eve-preview")
+l.write_text(l.read_text().replace("__DEFAULT_SKIP__", skip).replace("__DEV_MENU__", devmenu))
 PY
 BIN_SHA="$(sha256sum "$STAGE/bin/parasite-eve-port" | cut -d' ' -f1)"
 LAUNCHER_SHA="$(sha256sum "$STAGE/parasite-eve-preview" | cut -d' ' -f1)"

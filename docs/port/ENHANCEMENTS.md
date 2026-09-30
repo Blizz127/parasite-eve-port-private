@@ -71,7 +71,14 @@ EXP, BP and item-drop logic (`func_80027D14` → `func_80028E94`) runs as for
 any kill. Nothing else in the routine changes: hit flashes, status infliction
 and knock-back are retail.
 
-*Caps and caveats.* The assist does not know which enemies are bosses. A boss
+*Caps and caveats.* **Story-scripted battles are exempt.** When the game's
+battle flag word `D_8009D1A0` has bit `0x800` set (the Day-1 Eve stage fight
+has it; ordinary fights such as the rats do not), the hook returns retail's
+damage unchanged. Found the hard way: with the assist active there, Eve dies
+at the first shot and the fight script, which ends the battle on its own cue
+rather than on her HP, waits forever (the Day-1 autopilot never left the
+fight). `test_ASSIST_one_hit_kills` checks the exemption. Beyond that flag the
+assist does not know which enemies are bosses. A boss
 whose room script advances a phase on an HP threshold (rather than on death)
 sees its HP go from full to 0 in one hit and never crosses the threshold; the
 death path still runs, but whether the script then continues or waits for a
@@ -116,7 +123,17 @@ multiplied.
 | `ASSIST_config_and_env` | persistence in `enhancements.conf`, movement settings untouched, env overrides apply and are not written back |
 | `ASSIST_dev_menu_rows` | root row 8 opens ASSISTS; the three rows toggle/cycle; OPTIONS stays row 7 |
 
-Native suite on the assists tree (`PE_DISC1_BIN` set): `Results: 1631 run, 1631 passed, 0 failed, 0 skipped`; the retail ATK17/ATK18 state-hash tests pass with the hooks compiled in.
+Native suite on the assists tree (`PE_DISC1_BIN` set): `Results: 1632 run, 1632 passed, 0 failed, 0 skipped` (after the option-registry commit; 1631 before it); the retail ATK17/ATK18 state-hash tests pass with the hooks compiled in.
+
+Default-build identity gate of the assists binary (b4b0bf95, sha256 `37a304e0…`)
+on the blizzpc runner, job `20260930-123023-pe-assists-gate-1512826`:
+`REGRESS PASS until=day1_end_80 frame=67186 token=A8000048 story=80`,
+`MOVIES_DAY2=PASS`, and no `enhancements.conf` was created. Showcase video:
+`~/Videos/decomp-demos/parasite-eve/parasite_eve_assists.mp4` (capture
+`pc_port/tools/assists_showcase.py`, encode `assists_showcase_encode.sh`):
+the Day-1 autopilot's Eve fight with God Mode off/on side by side (HP
+45 → 42 → 35 → 28 vs 45 throughout, everything else frame-identical), the
+rat fight with 1-Hit Kills off/on, and its results with EXP/BP x1 vs x3.
 
 ## The option registry (how options are added)
 

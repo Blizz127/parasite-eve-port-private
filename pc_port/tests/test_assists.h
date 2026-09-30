@@ -114,6 +114,12 @@ static void test_ASSIST_one_hit_kills(void)
     PE_StoreU32(AST_BODY + 0x10u, 1u);
     func_80028574(AST_ACTOR);
     ASSERT((int32_t)PE_LoadU32(AST_BODY + 0x10u) <= 0, "already-lethal hit still kills");
+    /* Story-scripted battles (game flag 0x800, the Eve stage fight) are exempt: retail damage. */
+    atk17_damage_fixture(ATK17_damage_cases[0]);
+    PE_StoreU32(0x8009D1A0u, PE_LoadU32(0x8009D1A0u) | 0x800u);
+    func_80028574(AST_ACTOR);
+    ASSERT((int32_t)PE_LoadU32(AST_BODY + 0x10u) > 0 && (int32_t)PE_LoadU32(AST_BODY + 0x10u) < 1000,
+           "scripted battle (flag 0x800): retail damage, enemy survives");
     /* The kill then awards retail EXP and BP through func_80028E94. */
     c = ast_award_case();
     if (c) {

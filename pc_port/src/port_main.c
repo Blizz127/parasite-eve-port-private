@@ -22,6 +22,7 @@
 #include "pe_guest_image.h"
 #include "pe_disc_check.h"
 #include "pe_route_pad.h"
+#include "pe_plat/enhance.h"
 #include "pe_port_compat.h"
 #include "pe_guest_ram.h"
 #include "pe_plat/cheats.h"
@@ -513,12 +514,41 @@ static void PresentHook_BlitWindow(void)
             if (every < 0) every = getenv("PE_AYA_TRACE") ? atoi(getenv("PE_AYA_TRACE")) : 0;
             if (every > 0 && g_frame % every == 0) {
                 pe_addr_t a = PE_LoadU32(0x8009D254u);
-                fprintf(stderr, "AYA frame=%d token=%08X d1a0=%X pos=%d,%d vbl=%u\n", g_frame,
+                pe_addr_t rec = PE_LoadU32(0x8009D278u);
+                fprintf(stderr, "AYA frame=%d token=%08X d1a0=%X pos=%d,%d vbl=%u hp=%d exp=%u bp=%u\n", g_frame,
                         (unsigned)D_8009D280, PE_LoadU32(0x8009D1A0u),
                         a ? (int32_t)PE_LoadU32(a + 0x28u) >> 16 : 0,
                         a ? (int32_t)PE_LoadU32(a + 0x30u) >> 16 : 0,
-                        (unsigned)PE_GPU_VSyncQuery());
+                        (unsigned)PE_GPU_VSyncQuery(),
+                        rec ? (int)(int16_t)PE_LoadU16(rec + 0xCu) : 0,
+                        (unsigned)PE_LoadU32(0x8009D304u), (unsigned)PE_LoadU16(0x8009D21Cu));
             }
+        }
+        {   /* PE_ENH_AT=<frame>:<option id>=<value>[,...]: harness aid (off by default) that sets a
+             * registered enhancement/assist option at a given frame, so a deterministic route can be
+             * captured with the option switched on mid-run (pc_port/tools/assists_showcase.py). */
+            static int parsed = -1;
+            static struct { int frame, opt, value; } at[8];
+            static int nat;
+            if (parsed < 0) {
+                const char *e = getenv("PE_ENH_AT");
+                parsed = 1; nat = 0;
+                while (e && *e && nat < 8) {
+                    char id[32]; int f, v, n = 0;
+                    if (sscanf(e, "%d:%31[a-z_]=%d%n", &f, id, &v, &n) == 3 && n > 0) {
+                        at[nat].frame = f; at[nat].opt = pe_enh_option_index(id); at[nat].value = v;
+                        if (at[nat].opt >= 0) nat++;
+                        e += n;
+                    } else break;
+                    if (*e == ',') e++;
+                }
+            }
+            for (int i = 0; i < nat; i++)
+                if (at[i].frame == g_frame) {
+                    pe_enh_option_set(at[i].opt, at[i].value);
+                    fprintf(stderr, "[ENH_AT] frame=%d %s=%d\n", g_frame, pe_enh_option(at[i].opt)->id,
+                            pe_enh_option_value(at[i].opt));
+                }
         }
         {   /* PE_ACTOR_TRACE=TT:II: log that actor's anim (+0xE) and x/z every 15 frames. */
             const char *at = getenv("PE_ACTOR_TRACE");

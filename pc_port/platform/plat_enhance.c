@@ -224,6 +224,10 @@ int32_t pe_enh_enemy_damage(uint32_t body, int32_t damage)
 {
     int32_t hp;
     if (!pe_enh_one_hit_kills() || body == 0u) return damage;    /* retail path */
+    /* Story-scripted battles (game flag 0x800: the Eve stage fight on Day 1) are ended by
+     * their script, not by the enemy's HP; killing the enemy there leaves the script
+     * waiting forever (observed on the Day-1 autopilot).  The assist stays inactive. */
+    if (PE_LoadU32(GA_GAME_FLAGS) & 0x800u) return damage;
     hp = (int32_t)PE_LoadU32(body + 0x10u);
     return (hp > 0 && damage < hp) ? hp : damage;
 }
