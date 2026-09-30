@@ -138,3 +138,9 @@ regression is the whole-game identity check.
 | Day-1 room sweep at 200 % (`pc_port/tools/move_speed_sweep.py`) | **7 of 13 warp rooms pass** (`build/lanes/enh/sweep200.txt`). Open, not yet explained: rooms 1, 2, 3, 5 (the opera rooms) report a *different room-change list* between 100 % and 200 % because the 100 % hold is twice as long in presents and reaches the timed scripted transition (battle token `A9400048`, then `A80830C8`, `A8001048`) that the shorter 200 % hold does not; room 7 (M0031I) reaches a different door per direction; room 4 (sewer entry) rests 96 units past the 100 % bounding box in one direction. None of these is a wall pass-through on inspection, but the sweep must be re-run with equal wall-clock holds (or a per-room hold cap) before this row can be called green. |
 
 The sweep re-run is the remaining gate item for this branch.
+
+## Thanks
+
+These options came from players. Thanks to u/stellarola on Reddit for the
+idea of Aya's run/walk speed option, and to u/SandmansSlave on Reddit for the
+idea of the no-grind assists (x2/x3 EXP, God Mode).

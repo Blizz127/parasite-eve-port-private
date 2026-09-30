@@ -1,0 +1,24 @@
+* For the next build's notes (fold into r6 / whatever ships branches
+  claude/enh-move-speed and claude/enh-assists). Plain words, r5 style.
+* New — optional, all OFF unless you turn them on (dev menu: Back/View +
+  Start/Menu, or F8 with PE_DEV_MENU=1). Your choices are remembered between
+  runs (~/.config/parasite-eve-port/enhancements.conf); delete that file to
+  go back to the real game's behaviour.
+  - Options > Enhancements > Movement Speed: Aya walks and runs 125–200 %
+    faster in the field. Only Aya's own walking and running changes; battles,
+    enemies, cutscenes, scripted walks and timers are exactly as in the real
+    game.
+  - Options > Enhancements > Always Run: Aya runs without holding Circle.
+  - Assists > 1-Hit Kills: every shot or Parasite Energy hit Aya lands kills
+    the enemy. Experience, BP and item drops are awarded as normal. Bosses
+    that change form part-way through a fight have not all been checked with
+    this on; if a boss fight seems stuck, turn it off for that fight (you can
+    open the dev menu mid-battle).
+  - Assists > God Mode (No Damage): Aya's HP never goes down from enemy hits
+    or status effects. Story events are unchanged. (This is different from
+    the older F2 cheat, which just refills HP every frame.)
+  - Assists > EXP/BP Multiplier: x2 or x3 experience and Bonus Points from
+    every battle, so levelling and BP spending go faster with no other change.
+* Thanks to u/stellarola on Reddit for the idea of Aya's run/walk speed
+  option, and to u/SandmansSlave on Reddit for the idea of the no-grind
+  assists (x2/x3 EXP, God Mode).
