@@ -2,6 +2,7 @@
  * Restores hit acknowledgement, contact recovery, PE timing and HUD colors. */
 #include "psx_compat.h"
 #include "pe_port_compat.h"
+#include "pe_plat/enhance.h"
 
 #define GA_D_8009D278 0x8009D278u
 #define GA_D_8009D254 0x8009D254u
@@ -61,7 +62,8 @@ void func_8001F4D4(pe_addr_t actor)
         if ((int32_t)PE_LoadU32(rec+52u)>0) damage/=2;
         if (damage>0) {
             if (PE_LoadU8(action+1u)==10u) damage/=2;
-            PE_StoreU16(rec+12u,(uint16_t)(PE_LoadU16(rec+12u)-damage));
+            if (!pe_enh_player_shielded())          /* assist: god mode (identity when off) */
+                PE_StoreU16(rec+12u,(uint16_t)(PE_LoadU16(rec+12u)-damage));
         }
         if ((int16_t)PE_LoadU16(rec+12u)) {
             (void)func_8001F814(actor);
@@ -231,7 +233,8 @@ void func_8001D340(unsigned int mode)
                 }
                 if ((PE_LoadU32(enemy+152u)&0x2000000u) && !(PE_LoadU32(rec+76u)&0x1000000u) &&
                     (int32_t)PE_LoadU32(body+16u)>0) {
-                    if (!(PE_LoadU32(rec+76u)&0x200u)) PE_StoreU16(rec+12u,(uint16_t)(PE_LoadU16(rec+12u)-PE_LoadU8(body+146u)));
+                    if (!(PE_LoadU32(rec+76u)&0x200u) && !pe_enh_player_shielded())
+                        PE_StoreU16(rec+12u,(uint16_t)(PE_LoadU16(rec+12u)-PE_LoadU8(body+146u)));
                     PE_StoreU8(0x8009CE34u,90u);PE_StoreU32(rec+76u,PE_LoadU32(rec+76u)|0x1000000u);
                     player_damage_number();player_stop_motion();
                     PE_StoreU32(actor+152u,PE_LoadU32(actor+152u)&~0xC0000u);

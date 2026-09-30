@@ -2,6 +2,7 @@
  * AB74.s: 1F9C4..209EC. Timers retain signed byte/halfword wrap. */
 #include "psx_compat.h"
 #include "pe_port_compat.h"
+#include "pe_plat/enhance.h"
 
 static pe_addr_t player_record(void) { return PE_LoadU32(0x8009D278u); }
 static void status_flags(uint32_t clear,uint32_t set)
@@ -129,13 +130,15 @@ void func_80020288(pe_addr_t enemy)
         PE_StoreU16(0x8009D228u,0u);status_flags(0xF00u,0u);
         if (kind==9u) {
             int16_t hp=(int16_t)PE_LoadU16(p+12u);
-            if (hp>=2) PE_StoreU16(p+12u,1u);
+            if (pe_enh_player_shielded()) {}          /* assist: god mode keeps HP */
+            else if (hp>=2) PE_StoreU16(p+12u,1u);
             else if (hp==1) PE_StoreU16(p+12u,65535u);
         }
     } else if (kind==7u) status_flags(0u,4096u);
     else if (kind==8u || kind==16u) {
         int16_t hp=(int16_t)PE_LoadU16(p+12u);
-        if (!(flags&512u) && hp>=2) PE_StoreU16(p+12u,(uint16_t)(kind==8u?hp/2:hp*3/4));
+        if (!(flags&512u) && hp>=2 && !pe_enh_player_shielded())
+            PE_StoreU16(p+12u,(uint16_t)(kind==8u?hp/2:hp*3/4));
     } else if (kind>=10u && kind<=13u && (armor&16u)) {
         if (func_80071A54()%100u<60u) return;
         if (kind<=11u) {

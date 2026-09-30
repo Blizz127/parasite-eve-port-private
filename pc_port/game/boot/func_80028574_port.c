@@ -4,6 +4,7 @@
 #include "psx_compat.h"
 #include "pe_port_compat.h"
 #include "game_port.h"
+#include "pe_plat/enhance.h"
 
 static int32_t damage_mul(int32_t a,int32_t b)
 { return (int32_t)((uint32_t)a*(uint32_t)b); }
@@ -119,6 +120,7 @@ void func_80028574(pe_addr_t actor)
         if ((flags&0xC0000u)==0xC0000u)
             PE_StoreU32(body+0xCCu,PE_LoadU32(body+0xCCu)|0x1000000u);
     }
+    damage=pe_enh_enemy_damage(body,damage);       /* assist: 1-hit kills (identity when off) */
     PE_StoreU32(body+0x10u,PE_LoadU32(body+0x10u)-(uint32_t)damage);
     if (!(PE_LoadU32(PE_LoadU32(0x8009D278u)+0x4Cu)&0x80000u)) func_80028C48(actor);
     PE_StoreU32(body,(PE_LoadU32(body)&~0x6000u)|0x4000u);

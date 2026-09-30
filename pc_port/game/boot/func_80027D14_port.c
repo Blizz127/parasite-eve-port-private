@@ -15,6 +15,7 @@
  */
 #include "psx_compat.h"
 #include "pe_port_compat.h"
+#include "pe_plat/enhance.h"
 
 #define GA_D_8009D254 0x8009D254u
 #define GA_D_8009D20C 0x8009D20Cu
@@ -117,11 +118,12 @@ void func_80028E94(pe_addr_t actor)
     for (walk=PE_LoadU32(GA_D_8009D20C);walk;walk=PE_LoadU32(walk+4u))
         if (!PE_LoadU32(walk) && PE_LoadU32(walk+0x18Cu)==actor)
             PE_StoreU32(walk+0x98u,PE_LoadU32(walk+0x98u)|0x10u);
-    PE_StoreU32(0x8009D304u,PE_LoadU32(0x8009D304u)+PE_LoadU16(body+14u));
+    /* assist: EXP/BP multiplier (identity when x1) */
+    PE_StoreU32(0x8009D304u,PE_LoadU32(0x8009D304u)+pe_enh_exp_award(PE_LoadU16(body+14u)));
     {
         int32_t reward=(int32_t)((uint32_t)PE_LoadU16(body+0x98u)-
             (uint32_t)PE_LoadU16(body+0x9Au)*PE_LoadU16(body+0x9Cu));
-        if (reward>0) PE_StoreU16(0x8009D21Cu,(uint16_t)(PE_LoadU16(0x8009D21Cu)+(uint32_t)reward));
+        if (reward>0) PE_StoreU16(0x8009D21Cu,(uint16_t)(PE_LoadU16(0x8009D21Cu)+pe_enh_bp_award((uint32_t)reward)));
     }
     for (i=0;i<10;i++) if (!(int16_t)PE_LoadU16(0x800A7FF0u+i*4u)) {
         PE_StoreU16(0x800A7FF0u+i*4u,PE_LoadU8(body+0x9Eu)); break;

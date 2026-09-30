@@ -35701,6 +35701,7 @@ static void test_ATK3_retail_attack_initialization(void)
 #include "test_vblank_clock.h"
 #include "test_cheats.h"
 #include "test_enhance.h"
+#include "test_assists.h"
 #include "test_split_brain.h"
 #include "test_glow_sprite.h"
 #include "test_v0_passthrough.h"
@@ -40916,6 +40917,7 @@ int main(void)
     test_HOSTFB_vblank_clock_vs_vsync_calls();
     test_CHEATS_all(); /* opt-in cheat console (test_cheats.h) */
     test_ENH_all();    /* opt-in movement speed / always run (test_enhance.h) */
+    test_ASSIST_all(); /* opt-in assists: 1-hit kills, god mode, EXP/BP mult (test_assists.h) */
     test_SPLIT_all();  /* one guest authority per retail scalar (test_split_brain.h) */
     test_GLOW1_func_800E051C_packet();  /* matched-C packet check (test_glow_sprite.h) */
     test_VPASS_all();  /* batch O: retail $v0 of func_80062A7C via func_80044E14 (test_v0_passthrough.h) */

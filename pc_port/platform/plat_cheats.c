@@ -157,10 +157,11 @@ static int day_warp_count(int day)
 static int dev_rows(void)
 {
     switch (C.dev_page) {
-    case 1: return 7;                        /* cheats, FF speed, warp, options */
+    case 1: return 8;                        /* cheats, FF speed, warp, options, assists */
     case 3: return day_warp_count(C.dev_day);
     case 4: return 1;                        /* OPTIONS: ENHANCEMENTS */
     case 5: return 2;                        /* ENHANCEMENTS: speed, always run */
+    case 6: return 3;                        /* ASSISTS: 1-hit kills, god mode, EXP/BP mult */
     default: return 6;                       /* DAY 1..6 */
     }
 }
@@ -211,6 +212,7 @@ int pe_plat_cheats_key(PeCheatKey key, int pressed)
             else if (C.dev_page == 2) { C.dev_page = 1; C.dev_index = 5; }
             else if (C.dev_page == 5) { C.dev_page = 4; C.dev_index = 0; }
             else if (C.dev_page == 4) { C.dev_page = 1; C.dev_index = 6; }
+            else if (C.dev_page == 6) { C.dev_page = 1; C.dev_index = 7; }
             else { C.menu = 0; C.dev_page = 0; }
         }
         return 1;
@@ -227,7 +229,8 @@ int pe_plat_cheats_key(PeCheatKey key, int pressed)
                     PE_CHEAT_KEY_F4, PE_CHEAT_KEY_F5, PE_CHEAT_KEY_F7};
                 if (C.dev_index < 5) pe_plat_cheats_key(actions[C.dev_index], 1);
                 else if (C.dev_index == 5) { C.dev_page = 2; C.dev_index = 0; }
-                else { C.dev_page = 4; C.dev_index = 0; }
+                else if (C.dev_index == 6) { C.dev_page = 4; C.dev_index = 0; }
+                else { C.dev_page = 6; C.dev_index = 0; }
             } else if (C.dev_page == 4) {
                 C.dev_page = 5; C.dev_index = 0;
             } else if (C.dev_page == 5) {
@@ -238,6 +241,19 @@ int pe_plat_cheats_key(PeCheatKey key, int pressed)
                 } else {
                     pe_enh_set_always_run(!pe_enh_always_run());
                     snprintf(m, sizeof m, "ALWAYS RUN %s", pe_enh_always_run() ? "ON" : "OFF");
+                }
+                toast(m);
+            } else if (C.dev_page == 6) {
+                char m[64];
+                if (C.dev_index == 0) {
+                    pe_enh_set_one_hit_kills(!pe_enh_one_hit_kills());
+                    snprintf(m, sizeof m, "1-HIT KILLS %s", pe_enh_one_hit_kills() ? "ON" : "OFF");
+                } else if (C.dev_index == 1) {
+                    pe_enh_set_god_mode(!pe_enh_god_mode());
+                    snprintf(m, sizeof m, "GOD MODE (NO DAMAGE) %s", pe_enh_god_mode() ? "ON" : "OFF");
+                } else {
+                    pe_enh_cycle_exp_mult();
+                    snprintf(m, sizeof m, "EXP/BP MULTIPLIER %dX", pe_enh_exp_mult());
                 }
                 toast(m);
             } else if (C.dev_page == 2) {
@@ -543,7 +559,7 @@ const uint8_t *pe_plat_cheats_overlay(const uint8_t *rgb, int w, int h)
     }
     if (C.menu && C.dev_page) {
         static const char *const rows[] = {"GOD MODE", "INF AMMO + FULL PE",
-            "INSTANT WIN", "AREA KEY ITEMS", "FAST-FORWARD SPEED", "WARP BY DAY", "OPTIONS"};
+            "INSTANT WIN", "AREA KEY ITEMS", "FAST-FORWARD SPEED", "WARP BY DAY", "OPTIONS", "ASSISTS"};
         int n = dev_rows();
         char label[64];
         draw_text(4, y, "DEV MENU: A/ENTER OK, B/ESC BACK", 120, 220, 255); y += 10;
@@ -561,6 +577,13 @@ const uint8_t *pe_plat_cheats_overlay(const uint8_t *rgb, int w, int h)
                          pe_enh_move_speed_pct() == 100 ? " (RETAIL)" : "");
             else if (C.dev_page == 5)
                 snprintf(label, sizeof label, "ALWAYS RUN: %s", pe_enh_always_run() ? "ON" : "OFF");
+            else if (C.dev_page == 6 && i == 0)
+                snprintf(label, sizeof label, "1-HIT KILLS: %s", pe_enh_one_hit_kills() ? "ON" : "OFF");
+            else if (C.dev_page == 6 && i == 1)
+                snprintf(label, sizeof label, "GOD MODE (NO DAMAGE): %s", pe_enh_god_mode() ? "ON" : "OFF");
+            else if (C.dev_page == 6)
+                snprintf(label, sizeof label, "EXP/BP MULTIPLIER: %dX%s", pe_enh_exp_mult(),
+                         pe_enh_exp_mult() == 1 ? " (RETAIL)" : "");
             else if (C.dev_page == 2) snprintf(label, sizeof label, "DAY %d (%d WARPS)", i + 1, day_warp_count(i + 1));
             else snprintf(label, sizeof label, "%s", k_warps[day_warp_index(C.dev_day, i)].name);
             if (sel) draw_text(4, y, ">", 255, 255, 0);

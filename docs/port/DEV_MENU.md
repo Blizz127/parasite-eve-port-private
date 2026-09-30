@@ -28,10 +28,11 @@ Up to eight mapped controllers can navigate. Navigation does not auto-repeat.
 The stick threshold is 12000 on SDL's signed 16-bit range.
 
 The root contains God Mode, Infinite Ammo + Full PE, Instant Win, Area Key
-Items, Fast-forward Speed, Warp by Day, and Options. Options ▸ Enhancements
-holds the opt-in gameplay enhancements (Movement Speed, Always Run); they are
-not cheats, persist in a config file, and are described in
-[ENHANCEMENTS.md](ENHANCEMENTS.md). These call the existing keyboard
+Items, Fast-forward Speed, Warp by Day, Options, and Assists. Options ▸
+Enhancements holds the opt-in gameplay enhancements (Movement Speed, Always
+Run); Assists holds 1-Hit Kills, God Mode (No Damage) and the EXP/BP
+Multiplier. Both pages persist in a config file, default to retail, and are
+described in [ENHANCEMENTS.md](ENHANCEMENTS.md). These call the existing keyboard
 cheat actions. Warp by Day lists Day 1 through Day 6 in order; empty days show
 no selectable checkpoints. EX/Chrysler entries are not supplied yet. Current
 checkpoint metadata belongs to the separate warp-sweep lane; the menu consumes
