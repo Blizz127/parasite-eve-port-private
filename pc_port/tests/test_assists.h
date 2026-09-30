@@ -268,8 +268,10 @@ static void test_ASSIST_dev_menu_rows(void)
     PASS();
 }
 
+static void test_ASSIST_option_registry(void);
 static void test_ASSIST_all(void)
 {
+    test_ASSIST_option_registry();
     test_ASSIST_defaults_are_retail();
     test_ASSIST_one_hit_kills();
     test_ASSIST_exp_mult();
@@ -278,4 +280,38 @@ static void test_ASSIST_all(void)
     test_ASSIST_dev_menu_rows();
     enh_isolate();                                  /* leave defaults for later tests */
     unsetenv("PE_ENH_CONFIG");
+}
+
+/* The option registry: one entry per player-facing option, retail first. */
+static void test_ASSIST_option_registry(void)
+{
+    char label[64];
+    int n = pe_enh_option_count();
+    TEST("ASSIST_option_registry");
+    enh_isolate();
+    ASSERT(n == 5, "five registered options");
+    ASSERT(pe_enh_category_count(PE_ENH_CAT_GAMEPLAY) == 2 && pe_enh_category_count(PE_ENH_CAT_ASSIST) == 3 &&
+           pe_enh_category_count(PE_ENH_CAT_GRAPHICS) == 0, "categories: 2 gameplay, 3 assists, 0 graphics");
+    for (int i = 0; i < n; i++) {
+        const PeEnhOption *o = pe_enh_option(i);
+        ASSERT(o && o->id && o->label && o->env && o->values && o->nvalues >= 2, "option is fully described");
+        ASSERT(pe_enh_option_index(o->id) == i, "ids are unique and resolve");
+        ASSERT(pe_enh_option_is_retail(i) && pe_enh_option_value(i) == o->values[0], "default is the retail value");
+        for (int j = 0; j < i; j++) ASSERT(strcmp(pe_enh_option(j)->id, o->id) != 0, "no duplicate ids");
+        pe_enh_option_label(i, label, sizeof label);
+        ASSERT(strncmp(label, o->label, strlen(o->label)) == 0 && strstr(label, ": "), "label renders as NAME: VALUE");
+        for (int k = 0; k < o->nvalues; k++) pe_enh_option_cycle(i);
+        ASSERT(pe_enh_option_is_retail(i), "cycling through every value returns to retail");
+    }
+    ASSERT(pe_enh_category_option(PE_ENH_CAT_GAMEPLAY, 0) == pe_enh_option_index("move_speed") &&
+           pe_enh_category_option(PE_ENH_CAT_ASSIST, 2) == pe_enh_option_index("exp_mult") &&
+           pe_enh_category_option(PE_ENH_CAT_ASSIST, 3) == -1, "category order is the menu order");
+    ASSERT(pe_enh_option(pe_enh_option_index("move_speed"))->credit != NULL &&
+           pe_enh_option(pe_enh_option_index("god_mode"))->credit != NULL, "credits recorded");
+    pe_enh_option_set(pe_enh_option_index("move_speed"), 160);
+    ASSERT(pe_enh_move_speed_pct() == 150, "set snaps to a listed value (160 -> 150)");
+    pe_enh_option_set(pe_enh_option_index("exp_mult"), 9);
+    ASSERT(pe_enh_exp_mult() == 3, "set snaps to the largest listed value");
+    unlink(enh_conf); pe_enh_reset();
+    PASS();
 }

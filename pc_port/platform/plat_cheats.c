@@ -160,8 +160,8 @@ static int dev_rows(void)
     case 1: return 8;                        /* cheats, FF speed, warp, options, assists */
     case 3: return day_warp_count(C.dev_day);
     case 4: return 1;                        /* OPTIONS: ENHANCEMENTS */
-    case 5: return 2;                        /* ENHANCEMENTS: speed, always run */
-    case 6: return 3;                        /* ASSISTS: 1-hit kills, god mode, EXP/BP mult */
+    case 5: return pe_enh_category_count(PE_ENH_CAT_GAMEPLAY);   /* ENHANCEMENTS (registry) */
+    case 6: return pe_enh_category_count(PE_ENH_CAT_ASSIST);     /* ASSISTS (registry) */
     default: return 6;                       /* DAY 1..6 */
     }
 }
@@ -233,29 +233,16 @@ int pe_plat_cheats_key(PeCheatKey key, int pressed)
                 else { C.dev_page = 6; C.dev_index = 0; }
             } else if (C.dev_page == 4) {
                 C.dev_page = 5; C.dev_index = 0;
-            } else if (C.dev_page == 5) {
-                char m[64];
-                if (C.dev_index == 0) {
-                    pe_enh_cycle_move_speed();
-                    snprintf(m, sizeof m, "MOVEMENT SPEED %d%%", pe_enh_move_speed_pct());
-                } else {
-                    pe_enh_set_always_run(!pe_enh_always_run());
-                    snprintf(m, sizeof m, "ALWAYS RUN %s", pe_enh_always_run() ? "ON" : "OFF");
+            } else if (C.dev_page == 5 || C.dev_page == 6) {
+                /* both pages list the option registry by category */
+                int opt = pe_enh_category_option(C.dev_page == 5 ? PE_ENH_CAT_GAMEPLAY : PE_ENH_CAT_ASSIST,
+                                                 C.dev_index);
+                if (opt >= 0) {
+                    char m[64];
+                    pe_enh_option_cycle(opt);
+                    pe_enh_option_label(opt, m, sizeof m);
+                    toast(m);
                 }
-                toast(m);
-            } else if (C.dev_page == 6) {
-                char m[64];
-                if (C.dev_index == 0) {
-                    pe_enh_set_one_hit_kills(!pe_enh_one_hit_kills());
-                    snprintf(m, sizeof m, "1-HIT KILLS %s", pe_enh_one_hit_kills() ? "ON" : "OFF");
-                } else if (C.dev_index == 1) {
-                    pe_enh_set_god_mode(!pe_enh_god_mode());
-                    snprintf(m, sizeof m, "GOD MODE (NO DAMAGE) %s", pe_enh_god_mode() ? "ON" : "OFF");
-                } else {
-                    pe_enh_cycle_exp_mult();
-                    snprintf(m, sizeof m, "EXP/BP MULTIPLIER %dX", pe_enh_exp_mult());
-                }
-                toast(m);
             } else if (C.dev_page == 2) {
                 C.dev_day = C.dev_index + 1;
                 C.dev_page = 3; C.dev_index = 0;
@@ -572,18 +559,10 @@ const uint8_t *pe_plat_cheats_overlay(const uint8_t *rgb, int w, int h)
                 else snprintf(label, sizeof label, "FAST-FORWARD SPEED: MAX");
             } else if (C.dev_page == 1) snprintf(label, sizeof label, "%s", rows[i]);
             else if (C.dev_page == 4) snprintf(label, sizeof label, "ENHANCEMENTS");
-            else if (C.dev_page == 5 && i == 0)
-                snprintf(label, sizeof label, "MOVEMENT SPEED: %d%%%s", pe_enh_move_speed_pct(),
-                         pe_enh_move_speed_pct() == 100 ? " (RETAIL)" : "");
-            else if (C.dev_page == 5)
-                snprintf(label, sizeof label, "ALWAYS RUN: %s", pe_enh_always_run() ? "ON" : "OFF");
-            else if (C.dev_page == 6 && i == 0)
-                snprintf(label, sizeof label, "1-HIT KILLS: %s", pe_enh_one_hit_kills() ? "ON" : "OFF");
-            else if (C.dev_page == 6 && i == 1)
-                snprintf(label, sizeof label, "GOD MODE (NO DAMAGE): %s", pe_enh_god_mode() ? "ON" : "OFF");
-            else if (C.dev_page == 6)
-                snprintf(label, sizeof label, "EXP/BP MULTIPLIER: %dX%s", pe_enh_exp_mult(),
-                         pe_enh_exp_mult() == 1 ? " (RETAIL)" : "");
+            else if (C.dev_page == 5 || C.dev_page == 6)
+                pe_enh_option_label(pe_enh_category_option(C.dev_page == 5 ? PE_ENH_CAT_GAMEPLAY
+                                                                           : PE_ENH_CAT_ASSIST, i),
+                                    label, sizeof label);
             else if (C.dev_page == 2) snprintf(label, sizeof label, "DAY %d (%d WARPS)", i + 1, day_warp_count(i + 1));
             else snprintf(label, sizeof label, "%s", k_warps[day_warp_index(C.dev_day, i)].name);
             if (sel) draw_text(4, y, ">", 255, 255, 0);

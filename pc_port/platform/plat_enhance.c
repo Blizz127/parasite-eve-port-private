@@ -9,25 +9,40 @@
 #include <sys/stat.h>
 
 const int pe_enh_move_speed_steps[PE_ENH_MOVE_SPEED_COUNT] = {100, 125, 150, 175, 200};
+static const int k_toggle[] = {0, 1};
+static const int k_mult[]   = {1, 2, 3};
+
+/* The registry.  Order within a category is the menu order. */
+enum { OPT_MOVE_SPEED, OPT_ALWAYS_RUN, OPT_ONE_HIT, OPT_GOD, OPT_EXP_MULT, OPT_COUNT };
+static const PeEnhOption k_options[OPT_COUNT] = {
+    {"move_speed",    PE_ENH_CAT_GAMEPLAY, "MOVEMENT SPEED",       PE_ENH_FMT_PERCENT,
+        pe_enh_move_speed_steps, PE_ENH_MOVE_SPEED_COUNT, "PE_MOVE_SPEED",    "u/stellarola"},
+    {"always_run",    PE_ENH_CAT_GAMEPLAY, "ALWAYS RUN",           PE_ENH_FMT_TOGGLE,
+        k_toggle, 2, "PE_ALWAYS_RUN",    "u/stellarola"},
+    {"one_hit_kills", PE_ENH_CAT_ASSIST,   "1-HIT KILLS",          PE_ENH_FMT_TOGGLE,
+        k_toggle, 2, "PE_ONE_HIT_KILLS", NULL},
+    {"god_mode",      PE_ENH_CAT_ASSIST,   "GOD MODE (NO DAMAGE)", PE_ENH_FMT_TOGGLE,
+        k_toggle, 2, "PE_GOD_MODE",      "u/SandmansSlave"},
+    {"exp_mult",      PE_ENH_CAT_ASSIST,   "EXP/BP MULTIPLIER",    PE_ENH_FMT_MULT,
+        k_mult, 3, "PE_EXP_MULT",       "u/SandmansSlave"},
+};
 
 #define GA_AYA_ACTOR  0x8009D254u   /* *(u32 *) = Aya's field actor */
 #define GA_GAME_FLAGS 0x8009D1A0u   /* bit 1 = battle */
 
 static struct {
     int inited;
-    int move_pct;
-    int always_run;
-    int one_hit, god, exp_mult;                     /* assists */
-    int env_speed, env_run;   /* set when an env override pinned the value */
+    int value[OPT_COUNT];
 } E;
 
-static int clamp_mult(int m) { return m < 1 ? 1 : m > PE_ENH_EXP_MULT_MAX ? PE_ENH_EXP_MULT_MAX : m; }
-
-static int clamp_step(int pct)
+/* Snap to a listed value: the largest listed value <= v, else the retail one. */
+static int snap(int i, int v)
 {
-    int best = 100;
-    for (int i = 0; i < PE_ENH_MOVE_SPEED_COUNT; i++)
-        if (pe_enh_move_speed_steps[i] <= pct) best = pe_enh_move_speed_steps[i];
+    const PeEnhOption *o = &k_options[i];
+    int best = o->values[0];
+    for (int k = 0; k < o->nvalues; k++)
+        if (o->values[k] <= v && o->values[k] >= best) best = o->values[k];
+    if (o->format == PE_ENH_FMT_TOGGLE) return v != 0;
     return best;
 }
 
@@ -51,12 +66,11 @@ static void load_config(void)
     f = fopen(path, "r");
     if (!f) return;
     while (fgets(line, sizeof line, f)) {
-        int v;
-        if (sscanf(line, "move_speed=%d", &v) == 1) E.move_pct = clamp_step(v);
-        else if (sscanf(line, "always_run=%d", &v) == 1) E.always_run = v != 0;
-        else if (sscanf(line, "one_hit_kills=%d", &v) == 1) E.one_hit = v != 0;
-        else if (sscanf(line, "god_mode=%d", &v) == 1) E.god = v != 0;
-        else if (sscanf(line, "exp_mult=%d", &v) == 1) E.exp_mult = clamp_mult(v);
+        char *eq = strchr(line, '=');
+        if (!eq || line[0] == '#') continue;
+        *eq = 0;
+        for (int i = 0; i < OPT_COUNT; i++)
+            if (strcmp(line, k_options[i].id) == 0) { E.value[i] = snap(i, atoi(eq + 1)); break; }
     }
     fclose(f);
 }
@@ -87,67 +101,105 @@ static void save_config(void)
         fprintf(stderr, "[ENH] cannot write %s: %s\n", path, strerror(errno));
         return;
     }
-    fprintf(f, "# Parasite Eve port enhancements (Options > Enhancements)\n");
-    fprintf(f, "move_speed=%d\nalways_run=%d\n", E.move_pct, E.always_run);
-    fprintf(f, "# Assists (dev menu > Assists)\n");
-    fprintf(f, "one_hit_kills=%d\ngod_mode=%d\nexp_mult=%d\n", E.one_hit, E.god, E.exp_mult);
+    fprintf(f, "# Parasite Eve port enhancements and assists (dev menu > Options / Assists)\n");
+    fprintf(f, "# Every value's default is the retail behaviour; delete this file to reset.\n");
+    for (int i = 0; i < OPT_COUNT; i++)
+        fprintf(f, "%s=%d\n", k_options[i].id, E.value[i]);
     fclose(f);
 }
 
 void pe_enh_init(void)
 {
-    const char *e;
+    int any = 0;
     if (E.inited) return;
     E.inited = 1;
-    E.move_pct = 100;
-    E.always_run = 0;
-    E.one_hit = 0; E.god = 0; E.exp_mult = 1;
+    for (int i = 0; i < OPT_COUNT; i++) E.value[i] = k_options[i].values[0];
     load_config();
-    e = getenv("PE_MOVE_SPEED");
-    if (e && *e) { E.move_pct = clamp_step(atoi(e)); E.env_speed = 1; }
-    e = getenv("PE_ALWAYS_RUN");
-    if (e && *e) { E.always_run = e[0] != '0'; E.env_run = 1; }
-    e = getenv("PE_ONE_HIT_KILLS");
-    if (e && *e) E.one_hit = e[0] != '0';
-    e = getenv("PE_GOD_MODE");
-    if (e && *e) E.god = e[0] != '0';
-    e = getenv("PE_EXP_MULT");
-    if (e && *e) E.exp_mult = clamp_mult(atoi(e));
-    if (E.move_pct != 100 || E.always_run)
-        fprintf(stderr, "[ENH] movement speed %d%%, always run %s\n",
-                E.move_pct, E.always_run ? "on" : "off");
-    if (E.one_hit || E.god || E.exp_mult != 1)
-        fprintf(stderr, "[ENH] assists: 1-hit kills %s, god mode %s, EXP/BP x%d\n",
-                E.one_hit ? "on" : "off", E.god ? "on" : "off", E.exp_mult);
+    for (int i = 0; i < OPT_COUNT; i++) {
+        const char *e = getenv(k_options[i].env);
+        if (e && *e) E.value[i] = snap(i, atoi(e));
+        if (E.value[i] != k_options[i].values[0]) any = 1;
+    }
+    if (any) {
+        fprintf(stderr, "[ENH]");
+        for (int i = 0; i < OPT_COUNT; i++)
+            if (E.value[i] != k_options[i].values[0]) fprintf(stderr, " %s=%d", k_options[i].id, E.value[i]);
+        fprintf(stderr, "\n");
+    }
 }
 
 void pe_enh_reset(void) { memset(&E, 0, sizeof E); }
 
-int pe_enh_move_speed_pct(void) { pe_enh_init(); return E.move_pct; }
-int pe_enh_always_run(void) { pe_enh_init(); return E.always_run; }
-
-void pe_enh_set_move_speed_pct(int pct)
+/* ── registry access ─────────────────────────────────────────────────── */
+int pe_enh_option_count(void) { return OPT_COUNT; }
+const PeEnhOption *pe_enh_option(int i) { return (i >= 0 && i < OPT_COUNT) ? &k_options[i] : NULL; }
+int pe_enh_option_index(const char *id)
+{
+    for (int i = 0; id && i < OPT_COUNT; i++) if (strcmp(id, k_options[i].id) == 0) return i;
+    return -1;
+}
+int pe_enh_category_count(PeEnhCategory cat)
+{
+    int n = 0;
+    for (int i = 0; i < OPT_COUNT; i++) if (k_options[i].category == cat) n++;
+    return n;
+}
+int pe_enh_category_option(PeEnhCategory cat, int n)
+{
+    for (int i = 0; i < OPT_COUNT; i++) if (k_options[i].category == cat && n-- == 0) return i;
+    return -1;
+}
+int pe_enh_option_value(int i)
 {
     pe_enh_init();
-    E.move_pct = clamp_step(pct);
+    return (i >= 0 && i < OPT_COUNT) ? E.value[i] : 0;
+}
+int pe_enh_option_is_retail(int i)
+{
+    return i >= 0 && i < OPT_COUNT && pe_enh_option_value(i) == k_options[i].values[0];
+}
+void pe_enh_option_set(int i, int value)
+{
+    if (i < 0 || i >= OPT_COUNT) return;
+    pe_enh_init();
+    E.value[i] = snap(i, value);
     save_config();
 }
-
-void pe_enh_cycle_move_speed(void)
+void pe_enh_option_cycle(int i)
 {
-    int i;
+    const PeEnhOption *o = pe_enh_option(i);
+    int k;
+    if (!o) return;
     pe_enh_init();
-    for (i = 0; i < PE_ENH_MOVE_SPEED_COUNT; i++)
-        if (pe_enh_move_speed_steps[i] == E.move_pct) break;
-    pe_enh_set_move_speed_pct(pe_enh_move_speed_steps[(i + 1) % PE_ENH_MOVE_SPEED_COUNT]);
+    for (k = 0; k < o->nvalues; k++) if (o->values[k] == E.value[i]) break;
+    pe_enh_option_set(i, o->values[(k + 1) % o->nvalues]);
+}
+void pe_enh_option_label(int i, char *buf, size_t n)
+{
+    const PeEnhOption *o = pe_enh_option(i);
+    int v;
+    if (!o) { if (n) buf[0] = 0; return; }
+    v = pe_enh_option_value(i);
+    switch (o->format) {
+    case PE_ENH_FMT_TOGGLE:  snprintf(buf, n, "%s: %s", o->label, v ? "ON" : "OFF"); break;
+    case PE_ENH_FMT_PERCENT: snprintf(buf, n, "%s: %d%%%s", o->label, v, pe_enh_option_is_retail(i) ? " (RETAIL)" : ""); break;
+    default:                 snprintf(buf, n, "%s: %dX%s", o->label, v, pe_enh_option_is_retail(i) ? " (RETAIL)" : ""); break;
+    }
 }
 
-void pe_enh_set_always_run(int on)
-{
-    pe_enh_init();
-    E.always_run = on != 0;
-    save_config();
-}
+/* ── named accessors (thin wrappers over the registry) ───────────────── */
+int  pe_enh_move_speed_pct(void)          { return pe_enh_option_value(OPT_MOVE_SPEED); }
+int  pe_enh_always_run(void)              { return pe_enh_option_value(OPT_ALWAYS_RUN); }
+void pe_enh_set_move_speed_pct(int pct)   { pe_enh_option_set(OPT_MOVE_SPEED, pct); }
+void pe_enh_cycle_move_speed(void)        { pe_enh_option_cycle(OPT_MOVE_SPEED); }
+void pe_enh_set_always_run(int on)        { pe_enh_option_set(OPT_ALWAYS_RUN, on); }
+int  pe_enh_one_hit_kills(void)           { return pe_enh_option_value(OPT_ONE_HIT); }
+int  pe_enh_god_mode(void)                { return pe_enh_option_value(OPT_GOD); }
+int  pe_enh_exp_mult(void)                { return pe_enh_option_value(OPT_EXP_MULT); }
+void pe_enh_set_one_hit_kills(int on)     { pe_enh_option_set(OPT_ONE_HIT, on); }
+void pe_enh_set_god_mode(int on)          { pe_enh_option_set(OPT_GOD, on); }
+void pe_enh_set_exp_mult(int mult)        { pe_enh_option_set(OPT_EXP_MULT, mult); }
+void pe_enh_cycle_exp_mult(void)          { pe_enh_option_cycle(OPT_EXP_MULT); }
 
 static int aya_in_field(uint32_t actor)
 {
@@ -167,20 +219,7 @@ int pe_enh_field_always_run(uint32_t actor)
     return pe_enh_always_run() && aya_in_field(actor);
 }
 
-/* ── Assists ─────────────────────────────────────────────────────────── */
-int pe_enh_one_hit_kills(void) { pe_enh_init(); return E.one_hit; }
-int pe_enh_god_mode(void)      { pe_enh_init(); return E.god; }
-int pe_enh_exp_mult(void)      { pe_enh_init(); return E.exp_mult; }
-
-void pe_enh_set_one_hit_kills(int on) { pe_enh_init(); E.one_hit = on != 0; save_config(); }
-void pe_enh_set_god_mode(int on)      { pe_enh_init(); E.god = on != 0; save_config(); }
-void pe_enh_set_exp_mult(int mult)    { pe_enh_init(); E.exp_mult = clamp_mult(mult); save_config(); }
-void pe_enh_cycle_exp_mult(void)
-{
-    pe_enh_init();
-    pe_enh_set_exp_mult(E.exp_mult >= PE_ENH_EXP_MULT_MAX ? 1 : E.exp_mult + 1);
-}
-
+/* ── Assist hooks ────────────────────────────────────────────────────── */
 int32_t pe_enh_enemy_damage(uint32_t body, int32_t damage)
 {
     int32_t hp;

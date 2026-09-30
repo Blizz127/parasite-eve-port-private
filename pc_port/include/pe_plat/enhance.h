@@ -23,6 +23,7 @@
 #define PE_PLAT_ENHANCE_H
 
 #include <stdint.h>
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -30,6 +31,47 @@ extern "C" {
 
 #define PE_ENH_MOVE_SPEED_COUNT 5
 extern const int pe_enh_move_speed_steps[PE_ENH_MOVE_SPEED_COUNT]; /* 100..200 */
+
+/* ── Option registry ─────────────────────────────────────────────────────
+ * Every player-facing option is registered exactly once here (id = config
+ * key, category, label, values in cycle order with values[0] = retail, env
+ * override, credit).  The dev menu lists the registry per category today; a
+ * future standalone Options/Enhancements menu lists the same registry. */
+typedef enum {
+    PE_ENH_CAT_GRAPHICS = 0,     /* rendering options (none yet) */
+    PE_ENH_CAT_GAMEPLAY,         /* quality-of-life gameplay options */
+    PE_ENH_CAT_ASSIST,           /* cheat-style assists (god mode, EXP, 1-hit) */
+    PE_ENH_CAT_COUNT
+} PeEnhCategory;
+
+typedef enum {
+    PE_ENH_FMT_TOGGLE = 0,       /* OFF / ON */
+    PE_ENH_FMT_PERCENT,          /* 150% */
+    PE_ENH_FMT_MULT              /* 2X */
+} PeEnhFormat;
+
+typedef struct {
+    const char   *id;            /* config key, e.g. "move_speed" */
+    PeEnhCategory category;
+    const char   *label;         /* menu label, e.g. "MOVEMENT SPEED" */
+    PeEnhFormat   format;
+    const int    *values;        /* cycle order; values[0] is the retail default */
+    int           nvalues;
+    const char   *env;           /* env override, e.g. "PE_MOVE_SPEED" (not written back) */
+    const char   *credit;        /* "suggested by", e.g. "u/stellarola", or NULL */
+} PeEnhOption;
+
+int  pe_enh_option_count(void);
+const PeEnhOption *pe_enh_option(int i);              /* NULL when out of range */
+int  pe_enh_option_index(const char *id);             /* -1 when unknown */
+int  pe_enh_category_count(PeEnhCategory cat);        /* options in a category */
+int  pe_enh_category_option(PeEnhCategory cat, int n);/* n-th option of a category, or -1 */
+int  pe_enh_option_value(int i);
+int  pe_enh_option_is_retail(int i);                  /* value == values[0] */
+void pe_enh_option_set(int i, int value);             /* snapped to a listed value; persists */
+void pe_enh_option_cycle(int i);                      /* next listed value, wraps */
+/* "MOVEMENT SPEED: 150%" / "ALWAYS RUN: OFF" / "EXP/BP MULTIPLIER: 1X (RETAIL)" */
+void pe_enh_option_label(int i, char *buf, size_t n);
 
 /* Loads the config once (idempotent). */
 void pe_enh_init(void);

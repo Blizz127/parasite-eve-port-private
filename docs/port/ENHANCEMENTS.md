@@ -8,10 +8,10 @@ runs the retail code path unchanged (see *Identity* below).
 
 Dev menu (`PE_DEV_MENU=1`): **Options ▸ Enhancements**.
 
-| Row | Values | Default |
-| --- | --- | --- |
-| Movement Speed | 100 % (retail), 125 %, 150 %, 175 %, 200 %; A cycles, 200 % wraps to 100 % | 100 % |
-| Always Run | Off / On; A toggles | Off |
+| Row | Values | Default | Suggested by |
+| --- | --- | --- | --- |
+| Movement Speed | 100 % (retail), 125 %, 150 %, 175 %, 200 %; A cycles, 200 % wraps to 100 % | 100 % | u/stellarola |
+| Always Run | Off / On; A toggles | Off | u/stellarola |
 
 **What it scales:** only Aya's player-controlled walk and run velocity in
 field scenes. The hooks are in `pc_port/game/boot/func_80035558_port.c`:
@@ -34,8 +34,10 @@ one and reverts a rejected move, so a longer step is resolved the same way.
 The Day-1 sweep below checks walls and doors empirically at 200 %.
 
 **Persistence:** `$XDG_CONFIG_HOME/parasite-eve-port/enhancements.conf`
-(`~/.config/parasite-eve-port/enhancements.conf` when unset), lines
-`move_speed=<pct>` and `always_run=<0|1>`, written when a menu row changes.
+(`~/.config/parasite-eve-port/enhancements.conf` when unset), one `<id>=<value>`
+line per registered option (`move_speed=<pct>`, `always_run=<0|1>`, and the
+assists below), written whenever a menu row changes; deleting the file resets
+everything to retail.
 Overrides: `PE_ENH_CONFIG=<path>` (a different file), `PE_MOVE_SPEED=<pct>`,
 `PE_ALWAYS_RUN=<0|1>`; the env overrides are not written back. A non-default
 setting logs one `[ENH] movement speed N%, always run on|off` line at start.
@@ -50,11 +52,11 @@ are opt-in like the enhancements above, persist in the same
 `enhancements.conf`, and at their defaults every hook returns its input and
 writes nothing, so the retail code path runs unchanged.
 
-| Row | Values | Default | Config line / env override |
-| --- | --- | --- | --- |
-| 1-Hit Kills | Off / On; A toggles | Off | `one_hit_kills=<0\|1>` / `PE_ONE_HIT_KILLS` |
-| God Mode (No Damage) | Off / On; A toggles | Off | `god_mode=<0\|1>` / `PE_GOD_MODE` |
-| EXP/BP Multiplier | 1x (retail), 2x, 3x; A cycles, 3x wraps to 1x | 1x | `exp_mult=<1\|2\|3>` / `PE_EXP_MULT` |
+| Row | Values | Default | Config line / env override | Suggested by |
+| --- | --- | --- | --- | --- |
+| 1-Hit Kills | Off / On; A toggles | Off | `one_hit_kills=<0\|1>` / `PE_ONE_HIT_KILLS` | the owner |
+| God Mode (No Damage) | Off / On; A toggles | Off | `god_mode=<0\|1>` / `PE_GOD_MODE` | u/SandmansSlave |
+| EXP/BP Multiplier | 1x (retail), 2x, 3x; A cycles, 3x wraps to 1x | 1x | `exp_mult=<1\|2\|3>` / `PE_EXP_MULT` | u/SandmansSlave |
 
 A non-default assist logs one `[ENH] assists: 1-hit kills on|off, god mode
 on|off, EXP/BP xN` line at start. The env overrides are not written back.
@@ -115,6 +117,21 @@ multiplied.
 | `ASSIST_dev_menu_rows` | root row 8 opens ASSISTS; the three rows toggle/cycle; OPTIONS stays row 7 |
 
 Native suite on the assists tree (`PE_DISC1_BIN` set): `Results: 1631 run, 1631 passed, 0 failed, 0 skipped`; the retail ATK17/ATK18 state-hash tests pass with the hooks compiled in.
+
+## The option registry (how options are added)
+
+Every player-facing option is registered once, in `k_options` in
+`pc_port/platform/plat_enhance.c` (`pe_plat/enhance.h`): an id that is also
+its config key, a category (Graphics, Gameplay/QoL, Assists), a menu label,
+its values in cycle order with the retail value first, an env override and a
+"suggested by" credit. The registry drives the config file, the env overrides,
+the two dev-menu pages (which list a category each) and the identity rule:
+every option's default is its retail value, and a value the player did not
+set never touches the game. The registry is meant to be listed by a future
+standalone Options/Enhancements menu unchanged; the dev menu is only where it
+lives for now. Dev-only items (the F-key cheats, warps, fast-forward) are not
+registry options and stay in the dev menu. `test_ASSIST_option_registry`
+checks the shape (unique ids, retail-first values, category order, snapping).
 
 ## Identity (100 % is retail)
 
