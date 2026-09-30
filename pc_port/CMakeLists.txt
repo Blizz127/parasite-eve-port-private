@@ -52,6 +52,7 @@ set(PLATFORM_SRCS
     platform/pe_guest_image.c
     platform/plat_mods.c
     platform/plat_cheats.c
+    platform/plat_enhance.c
     platform/plat_timing.c
     platform/plat_audio.c
 )

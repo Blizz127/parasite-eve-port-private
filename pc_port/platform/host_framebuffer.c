@@ -93,6 +93,8 @@ void HostFB_Present(void)
 static void ScanDisplay(uint32_t dx, uint32_t dy, uint32_t dw, uint32_t top, uint32_t dh, int rgb24);
 
 void HostFB_SetScanoutHook(void (*hook)(void)) { fb_scanout_hook = hook; }
+static const uint8_t *(*fb_shot_filter)(const uint8_t *, int, int);
+void HostFB_SetShotFilter(const uint8_t *(*filter)(const uint8_t *, int, int)) { fb_shot_filter = filter; }
 
 /* Hardware scans the GP1(05h) display area out of VRAM on every frame, not
  * only when the game calls PutDispEnv.  Anything drawn into the displayed
@@ -345,7 +347,8 @@ int HostFB_WritePPM(const char *path)
     if (!f) return -1;
 
     fprintf(f, "P6\n%d %d\n255\n", PE_PORT_FB_WIDTH, PE_PORT_FB_HEIGHT);
-    fwrite(fb, 1, sizeof(fb), f);
+    fwrite(fb_shot_filter ? fb_shot_filter(fb, PE_PORT_FB_WIDTH, PE_PORT_FB_HEIGHT) : fb,
+           1, sizeof(fb), f);
     fclose(f);
     return 0;
 }

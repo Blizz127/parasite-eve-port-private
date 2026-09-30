@@ -507,6 +507,19 @@ static void PresentHook_BlitWindow(void)
                 sig = ns;
             }
         }
+        {   /* PE_AYA_TRACE=N: log Aya's (*0x8009D254) x/z, room token and battle bit
+             * every N frames (movement-speed sweep, pc_port/tools/move_speed_sweep.py). */
+            static int every = -1;
+            if (every < 0) every = getenv("PE_AYA_TRACE") ? atoi(getenv("PE_AYA_TRACE")) : 0;
+            if (every > 0 && g_frame % every == 0) {
+                pe_addr_t a = PE_LoadU32(0x8009D254u);
+                fprintf(stderr, "AYA frame=%d token=%08X d1a0=%X pos=%d,%d vbl=%u\n", g_frame,
+                        (unsigned)D_8009D280, PE_LoadU32(0x8009D1A0u),
+                        a ? (int32_t)PE_LoadU32(a + 0x28u) >> 16 : 0,
+                        a ? (int32_t)PE_LoadU32(a + 0x30u) >> 16 : 0,
+                        (unsigned)PE_GPU_VSyncQuery());
+            }
+        }
         {   /* PE_ACTOR_TRACE=TT:II: log that actor's anim (+0xE) and x/z every 15 frames. */
             const char *at = getenv("PE_ACTOR_TRACE");
             if (at && g_frame % 15 == 0) {
@@ -1191,6 +1204,10 @@ int main(int argc, char **argv) {
     }
 
     pe_plat_cheats_init();   /* PE_CHEATS=0 hard-disables */
+    /* Harness aid (off by default): PE_SHOT_OVERLAY=1 composites the dev
+     * menu / cheat overlay into screenshots, as the window shows it. */
+    if (getenv("PE_SHOT_OVERLAY") && strcmp(getenv("PE_SHOT_OVERLAY"), "1") == 0)
+        HostFB_SetShotFilter(pe_plat_cheats_overlay);
     int use_window = !g_opts.headless;
     if (use_window) {
         const char *dpy = getenv("DISPLAY") ? getenv("DISPLAY") : ":10.0";

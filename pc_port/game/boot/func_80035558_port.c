@@ -48,6 +48,7 @@
 #include <stdlib.h>
 #include "game_port.h"
 #include "pe_sdk.h"
+#include "pe_plat/enhance.h"
 int32_t func_80068014(pe_addr_t actor);
 
 #define GA_D_8009D20C 0x8009D20Cu
@@ -298,6 +299,9 @@ void func_8007136C(pe_addr_t actor, pe_addr_t codep)
     }
     sp = (int32_t)func_8003708C((uint32_t)sp, PE_LoadU32(actor + 0x20u));
     sp = (int32_t)func_8003708C((uint32_t)sp, (uint32_t)PE_LoadU16(actor + 0x26u) << 4);
+    /* Opt-in enhancement (pe_plat/enhance.h): Aya's field run speed.  At the
+     * default 100 % this returns sp unchanged, so the retail path runs. */
+    sp = pe_enh_field_speed(actor, sp);
     if ((PE_LoadU16(GA_D_800BE9A0) & 0xF000u) == 0x7000u) {
         ang = func_80079FB4((int32_t)PE_LoadU8(0x800BE9A7u) - 0x80, (int32_t)PE_LoadU8(0x800BE9A6u) - 0x80) - 0x400;
         if (ang < 0) ang += 0x1000;
@@ -352,6 +356,12 @@ void func_800710A4(pe_addr_t actor, pe_addr_t codep)
         func_8007136C(actor, codep);
         return;
     }
+    /* Opt-in "Always run" (pe_plat/enhance.h): the field d-pad walk takes the
+     * Circle-held run path for Aya.  Off by default: no effect, retail path. */
+    if (pe_enh_field_always_run(actor)) {
+        func_8007136C(actor, codep);
+        return;
+    }
     if (PE_LoadU32(codep) != 0x16u) {
         func_8001A680_command_cut(actor, 0x16u);
         PE_StoreU32(codep, 0x16u);
@@ -359,6 +369,7 @@ void func_800710A4(pe_addr_t actor, pe_addr_t codep)
     scaled = func_8003708C(0x50000u, PE_LoadU32(actor + 0x20u));
     scaled = func_8003708C(scaled,
                            (uint32_t)PE_LoadU16(actor + 0x26u) << 4);
+    scaled = (uint32_t)pe_enh_field_speed(actor, (int32_t)scaled);  /* opt-in; 100 % = retail */
     pe_walk_digital_apply(actor, scaled);
 }
 

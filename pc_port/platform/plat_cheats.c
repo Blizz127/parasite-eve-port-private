@@ -21,6 +21,7 @@
  */
 #include "pe_plat/cheats.h"
 #include "pe_plat/mods.h"
+#include "pe_plat/enhance.h"
 #include "pe_guest_ram.h"
 
 #include <stdio.h>
@@ -153,6 +154,17 @@ static int day_warp_count(int day)
     for (int i = 0; i < N_WARPS; i++) if (warp_day(i) == day) n++;
     return n;
 }
+static int dev_rows(void)
+{
+    switch (C.dev_page) {
+    case 1: return 7;                        /* cheats, FF speed, warp, options */
+    case 3: return day_warp_count(C.dev_day);
+    case 4: return 1;                        /* OPTIONS: ENHANCEMENTS */
+    case 5: return 2;                        /* ENHANCEMENTS: speed, always run */
+    default: return 6;                       /* DAY 1..6 */
+    }
+}
+
 static int day_warp_index(int day, int row)
 {
     for (int i = 0; i < N_WARPS; i++)
@@ -197,13 +209,15 @@ int pe_plat_cheats_key(PeCheatKey key, int pressed)
         if (pressed) {
             if (C.dev_page == 3) { C.dev_page = 2; C.dev_index = C.dev_day - 1; }
             else if (C.dev_page == 2) { C.dev_page = 1; C.dev_index = 5; }
+            else if (C.dev_page == 5) { C.dev_page = 4; C.dev_index = 0; }
+            else if (C.dev_page == 4) { C.dev_page = 1; C.dev_index = 6; }
             else { C.menu = 0; C.dev_page = 0; }
         }
         return 1;
     }
     if (C.menu && C.dev_page &&
         (key == PE_CHEAT_KEY_UP || key == PE_CHEAT_KEY_DOWN || key == PE_CHEAT_KEY_ENTER)) {
-        int n = C.dev_page == 3 ? day_warp_count(C.dev_day) : 6;
+        int n = dev_rows();
         if (!pressed) return 1;
         if (key == PE_CHEAT_KEY_UP && n) C.dev_index = (C.dev_index + n - 1) % n;
         else if (key == PE_CHEAT_KEY_DOWN && n) C.dev_index = (C.dev_index + 1) % n;
@@ -212,7 +226,20 @@ int pe_plat_cheats_key(PeCheatKey key, int pressed)
                 static const PeCheatKey actions[] = {PE_CHEAT_KEY_F2, PE_CHEAT_KEY_F3,
                     PE_CHEAT_KEY_F4, PE_CHEAT_KEY_F5, PE_CHEAT_KEY_F7};
                 if (C.dev_index < 5) pe_plat_cheats_key(actions[C.dev_index], 1);
-                else { C.dev_page = 2; C.dev_index = 0; }
+                else if (C.dev_index == 5) { C.dev_page = 2; C.dev_index = 0; }
+                else { C.dev_page = 4; C.dev_index = 0; }
+            } else if (C.dev_page == 4) {
+                C.dev_page = 5; C.dev_index = 0;
+            } else if (C.dev_page == 5) {
+                char m[64];
+                if (C.dev_index == 0) {
+                    pe_enh_cycle_move_speed();
+                    snprintf(m, sizeof m, "MOVEMENT SPEED %d%%", pe_enh_move_speed_pct());
+                } else {
+                    pe_enh_set_always_run(!pe_enh_always_run());
+                    snprintf(m, sizeof m, "ALWAYS RUN %s", pe_enh_always_run() ? "ON" : "OFF");
+                }
+                toast(m);
             } else if (C.dev_page == 2) {
                 C.dev_day = C.dev_index + 1;
                 C.dev_page = 3; C.dev_index = 0;
@@ -516,8 +543,8 @@ const uint8_t *pe_plat_cheats_overlay(const uint8_t *rgb, int w, int h)
     }
     if (C.menu && C.dev_page) {
         static const char *const rows[] = {"GOD MODE", "INF AMMO + FULL PE",
-            "INSTANT WIN", "AREA KEY ITEMS", "FAST-FORWARD SPEED", "WARP BY DAY"};
-        int n = C.dev_page == 3 ? day_warp_count(C.dev_day) : 6;
+            "INSTANT WIN", "AREA KEY ITEMS", "FAST-FORWARD SPEED", "WARP BY DAY", "OPTIONS"};
+        int n = dev_rows();
         char label[64];
         draw_text(4, y, "DEV MENU: A/ENTER OK, B/ESC BACK", 120, 220, 255); y += 10;
         for (int i = 0; i < n; i++, y += 9) {
@@ -528,6 +555,12 @@ const uint8_t *pe_plat_cheats_overlay(const uint8_t *rgb, int w, int h)
                 if (k_ff_mult[C.ff_index]) snprintf(label, sizeof label, "FAST-FORWARD SPEED: %dX", k_ff_mult[C.ff_index]);
                 else snprintf(label, sizeof label, "FAST-FORWARD SPEED: MAX");
             } else if (C.dev_page == 1) snprintf(label, sizeof label, "%s", rows[i]);
+            else if (C.dev_page == 4) snprintf(label, sizeof label, "ENHANCEMENTS");
+            else if (C.dev_page == 5 && i == 0)
+                snprintf(label, sizeof label, "MOVEMENT SPEED: %d%%%s", pe_enh_move_speed_pct(),
+                         pe_enh_move_speed_pct() == 100 ? " (RETAIL)" : "");
+            else if (C.dev_page == 5)
+                snprintf(label, sizeof label, "ALWAYS RUN: %s", pe_enh_always_run() ? "ON" : "OFF");
             else if (C.dev_page == 2) snprintf(label, sizeof label, "DAY %d (%d WARPS)", i + 1, day_warp_count(i + 1));
             else snprintf(label, sizeof label, "%s", k_warps[day_warp_index(C.dev_day, i)].name);
             if (sel) draw_text(4, y, ">", 255, 255, 0);

@@ -45,6 +45,10 @@ const uint8_t *HostFB_GetPixels(void);
 void HostFB_GetState(int *vsync, int *drawsync, int *presented, int *mask);
 /* Display-only refresh after a VBlank scan-out (not a present). */
 void HostFB_SetScanoutHook(void (*hook)(void));
+/* Harness aid: screenshots (HostFB_WritePPM) pass the pixels through this
+ * filter first (NULL = raw framebuffer).  port_main installs the dev overlay
+ * compositor under PE_SHOT_OVERLAY=1 so headless captures include the menu. */
+void HostFB_SetShotFilter(const uint8_t *(*filter)(const uint8_t *rgb, int w, int h));
 /* Number of idle-VBlank scan-outs so far (diagnostics, PE_FRAME_TRACE). */
 uint32_t HostFB_ScanOutCount(void);
 
