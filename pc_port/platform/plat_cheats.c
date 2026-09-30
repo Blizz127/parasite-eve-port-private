@@ -67,6 +67,7 @@ static const CheatWarp k_warps[] = {
 static struct {
     int inited, enabled, hook;
     int god, ammo, help, menu, menu_index, ff_index;
+    int dev_page, dev_index, dev_day;
     int pending_win, pending_kit, pending_warp;
     unsigned wins, kits, warps;
     uint32_t ammo_gun, ammo_loaded_max, ammo_pool_max[3];
@@ -91,7 +92,8 @@ static PeCheatKey key_from_name(const char *s, size_t n)
         {"F1",PE_CHEAT_KEY_F1},{"F2",PE_CHEAT_KEY_F2},{"F3",PE_CHEAT_KEY_F3},
         {"F4",PE_CHEAT_KEY_F4},{"F5",PE_CHEAT_KEY_F5},{"F7",PE_CHEAT_KEY_F7},
         {"F8",PE_CHEAT_KEY_F8},{"UP",PE_CHEAT_KEY_UP},{"DOWN",PE_CHEAT_KEY_DOWN},
-        {"ENTER",PE_CHEAT_KEY_ENTER}};
+        {"ENTER",PE_CHEAT_KEY_ENTER},{"BACK",PE_CHEAT_KEY_BACK},
+        {"DEV_MENU",PE_CHEAT_KEY_DEV_MENU}};
     for (size_t i = 0; i < sizeof(t) / sizeof(t[0]); i++)
         if (strlen(t[i].name) == n && !strncmp(s, t[i].name, n)) return t[i].key;
     return PE_CHEAT_KEY_NONE;
@@ -133,6 +135,31 @@ void pe_plat_cheats_init(void)
 }
 
 int pe_plat_cheats_enabled(void) { return C.inited ? C.enabled : 1; }
+int pe_plat_cheats_dev_menu_enabled(void)
+{
+    const char *e = getenv("PE_DEV_MENU");
+    return pe_plat_cheats_enabled() && e && strcmp(e, "1") == 0;
+}
+
+/* The warp lane supplies day metadata; all base checkpoints are Day 1. */
+extern int pe_plat_cheats_warp_day(int index) __attribute__((weak));
+static int warp_day(int index)
+{
+    return pe_plat_cheats_warp_day ? pe_plat_cheats_warp_day(index) : 1;
+}
+static int day_warp_count(int day)
+{
+    int n = 0;
+    for (int i = 0; i < N_WARPS; i++) if (warp_day(i) == day) n++;
+    return n;
+}
+static int day_warp_index(int day, int row)
+{
+    for (int i = 0; i < N_WARPS; i++)
+        if (warp_day(i) == day && row-- == 0) return i;
+    return -1;
+}
+
 int pe_plat_cheats_menu_open(void) { return C.enabled && C.menu; }
 int pe_plat_cheats_ff_multiplier(void) { return k_ff_mult[C.ff_index & 3]; }
 int pe_plat_cheats_warp_count(void) { return N_WARPS; }
@@ -157,6 +184,45 @@ int pe_plat_cheats_key(PeCheatKey key, int pressed)
     char msg[64];
     if (!C.inited) pe_plat_cheats_init();
     if (!C.enabled) return 0;
+    if (key == PE_CHEAT_KEY_DEV_MENU) {
+        if (!pe_plat_cheats_dev_menu_enabled()) return 0;
+        if (pressed) {
+            C.menu = !C.menu; C.dev_page = C.menu ? 1 : 0;
+            C.dev_index = 0; C.help = 0;
+        }
+        return 1;
+    }
+    if (key == PE_CHEAT_KEY_BACK) {
+        if (!C.menu) return 0;
+        if (pressed) {
+            if (C.dev_page == 3) { C.dev_page = 2; C.dev_index = C.dev_day - 1; }
+            else if (C.dev_page == 2) { C.dev_page = 1; C.dev_index = 5; }
+            else { C.menu = 0; C.dev_page = 0; }
+        }
+        return 1;
+    }
+    if (C.menu && C.dev_page &&
+        (key == PE_CHEAT_KEY_UP || key == PE_CHEAT_KEY_DOWN || key == PE_CHEAT_KEY_ENTER)) {
+        int n = C.dev_page == 3 ? day_warp_count(C.dev_day) : 6;
+        if (!pressed) return 1;
+        if (key == PE_CHEAT_KEY_UP && n) C.dev_index = (C.dev_index + n - 1) % n;
+        else if (key == PE_CHEAT_KEY_DOWN && n) C.dev_index = (C.dev_index + 1) % n;
+        else if (key == PE_CHEAT_KEY_ENTER) {
+            if (C.dev_page == 1) {
+                static const PeCheatKey actions[] = {PE_CHEAT_KEY_F2, PE_CHEAT_KEY_F3,
+                    PE_CHEAT_KEY_F4, PE_CHEAT_KEY_F5, PE_CHEAT_KEY_F7};
+                if (C.dev_index < 5) pe_plat_cheats_key(actions[C.dev_index], 1);
+                else { C.dev_page = 2; C.dev_index = 0; }
+            } else if (C.dev_page == 2) {
+                C.dev_day = C.dev_index + 1;
+                C.dev_page = 3; C.dev_index = 0;
+            } else if (n) {
+                int index = day_warp_index(C.dev_day, C.dev_index);
+                if (index >= 0) { C.pending_warp = index + 1; C.menu = 0; C.dev_page = 0; }
+            }
+        }
+        return 1;
+    }
     if (C.menu && (key == PE_CHEAT_KEY_UP || key == PE_CHEAT_KEY_DOWN || key == PE_CHEAT_KEY_ENTER)) {
         if (pressed) {
             if (key == PE_CHEAT_KEY_UP) C.menu_index = (C.menu_index + N_WARPS - 1) % N_WARPS;
@@ -182,7 +248,11 @@ int pe_plat_cheats_key(PeCheatKey key, int pressed)
         if (k_ff_mult[C.ff_index]) snprintf(msg, sizeof msg, "FAST-FORWARD SPEED %dX", k_ff_mult[C.ff_index]);
         else snprintf(msg, sizeof msg, "FAST-FORWARD SPEED MAX");
         toast(msg); break;
-    case PE_CHEAT_KEY_F8: C.menu = !C.menu; break;
+    case PE_CHEAT_KEY_F8:
+        C.menu = !C.menu;
+        C.dev_page = C.menu && pe_plat_cheats_dev_menu_enabled() ? 1 : 0;
+        if (C.dev_page) { C.dev_index = 0; C.help = 0; }
+        break;
     default: break;
     }
     return 1;
@@ -444,7 +514,27 @@ const uint8_t *pe_plat_cheats_overlay(const uint8_t *rgb, int w, int h)
         for (int i = 0; help[i]; i++, y += 9) draw_text(4, y, help[i], 255, 255, 255);
         y += 4;
     }
-    if (C.menu) {
+    if (C.menu && C.dev_page) {
+        static const char *const rows[] = {"GOD MODE", "INF AMMO + FULL PE",
+            "INSTANT WIN", "AREA KEY ITEMS", "FAST-FORWARD SPEED", "WARP BY DAY"};
+        int n = C.dev_page == 3 ? day_warp_count(C.dev_day) : 6;
+        char label[64];
+        draw_text(4, y, "DEV MENU: A/ENTER OK, B/ESC BACK", 120, 220, 255); y += 10;
+        for (int i = 0; i < n; i++, y += 9) {
+            int sel = i == C.dev_index;
+            if (C.dev_page == 1 && i < 2)
+                snprintf(label, sizeof label, "%s: %s", rows[i], (i ? C.ammo : C.god) ? "ON" : "OFF");
+            else if (C.dev_page == 1 && i == 4) {
+                if (k_ff_mult[C.ff_index]) snprintf(label, sizeof label, "FAST-FORWARD SPEED: %dX", k_ff_mult[C.ff_index]);
+                else snprintf(label, sizeof label, "FAST-FORWARD SPEED: MAX");
+            } else if (C.dev_page == 1) snprintf(label, sizeof label, "%s", rows[i]);
+            else if (C.dev_page == 2) snprintf(label, sizeof label, "DAY %d (%d WARPS)", i + 1, day_warp_count(i + 1));
+            else snprintf(label, sizeof label, "%s", k_warps[day_warp_index(C.dev_day, i)].name);
+            if (sel) draw_text(4, y, ">", 255, 255, 0);
+            draw_text(12, y, label, sel ? 255 : 170, sel ? 255 : 170, sel ? 0 : 170);
+        }
+        if (!n) draw_text(12, y, "NO VERIFIED WARPS FOR THIS DAY", 170, 170, 170);
+    } else if (C.menu) {
         draw_text(4, y, "WARP (UP/DOWN, ENTER, F8 CLOSES)", 120, 220, 255); y += 10;
         for (int i = 0; i < N_WARPS; i++, y += 9) {
             int sel = i == C.menu_index;

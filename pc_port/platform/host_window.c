@@ -9,6 +9,7 @@
 #include "host_frame_pacer.h"
 #include "host_window_scale.h"
 #include "host_pad.h"
+#include "host_dev_menu.h"
 #include "host_audio.h"
 #include "pe_audio_driver.h"
 #include "game_port.h"
@@ -540,8 +541,9 @@ int HostWindow_Poll(void)
 {
     if (!g_dpy) return 0;
     HostPad_Poll();
+    HostDevMenu_Poll();
     {
-        uint8_t hk=HostPad_Hotkeys();
+        uint8_t hk=(pe_plat_cheats_menu_open() || HostDevMenu_CapturesInput()) ? 0 : HostPad_Hotkeys();
         if ((hk&HOST_PAD_HOTKEY_FF_TOGGLE)&&!(g_pad_hotkeys&HOST_PAD_HOTKEY_FF_TOGGLE))
             g_fast_forward=!g_fast_forward;
         g_pad_hotkeys=hk;
@@ -576,7 +578,8 @@ int HostWindow_Poll(void)
                         PE_CHEAT_KEY_F7, PE_CHEAT_KEY_F8};
                     ck = fk[ks - XK_F1];
                 } else if (pe_plat_cheats_menu_open()) {
-                    if (ks == XK_Up) ck = PE_CHEAT_KEY_UP;
+                    if (ks == XK_Escape) ck = PE_CHEAT_KEY_BACK;
+                    else if (ks == XK_Up) ck = PE_CHEAT_KEY_UP;
                     else if (ks == XK_Down) ck = PE_CHEAT_KEY_DOWN;
                     else if (ks == XK_Return) ck = PE_CHEAT_KEY_ENTER;
                 }
@@ -597,6 +600,7 @@ int HostWindow_Poll(void)
                     if (pe_plat_cheats_key(ck, ev.type == KeyPress)) continue;
                 }
             }
+            if (ks == XK_F6 && (pe_plat_cheats_menu_open() || HostDevMenu_CapturesInput())) continue;
             if (ks == XK_F6) {
                 /* X11 auto-repeat may synthesize release/press pairs. */
                 if (ev.type==KeyRelease && XPending(g_dpy)) {
@@ -657,6 +661,7 @@ int HostWindow_Poll(void)
 uint16_t HostWindow_PadRaw(void)
 {
     /* Keyboard and controller both drive the pad at once. */
+    if (pe_plat_cheats_menu_open() || HostDevMenu_CapturesInput()) return 0xFFFFu;
     return (uint16_t)(~(g_sony_held | HostPad_Held()));
 }
 
@@ -769,5 +774,6 @@ void HostWindow_Close(void)
     if (g_xlib) { dlclose(g_xlib); g_xlib = NULL; }
     g_host_window_open = 0;
     g_sony_held = 0;
+    HostDevMenu_Close();
     HostPad_Close();
 }

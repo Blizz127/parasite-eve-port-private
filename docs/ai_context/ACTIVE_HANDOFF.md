@@ -1,3 +1,20 @@
+## UPDATE 2026-09-30 UTC (September 29 CDT): r6 controller development menu lane
+
+Branch `codex/r6-menu`, base `bcbea70f`, isolated `build/wt-codex-menu`.
+Added the host-only development menu (`PE_DEV_MENU=1`, default off), SDL2
+GameController navigation/hotplug via runtime loading, cheat actions and Day
+1–6 warp hierarchy. The Linux joystick gameplay backend remains in place;
+menu capture reserves Back/Start and drains held inputs before returning to
+play. Warp table unchanged; day metadata is supplied by the warp lane.
+See `docs/port/DEV_MENU.md` for controls, build/runtime requirements, and lane
+gate results: native 1618/1618, no skips; SDL virtual controllers 101 + 3
+assertions; Psy-Q both binaries PASS; Day 1 67186; MOVIES_DAY2 PASS; fingerprints
+221/221; libc-only executable. Additional CTest 19/20: old Day 2 harness fails
+identically in the untouched hotpad build (frame 2 unresolved boundary),
+reported separately to the parent. No Sony code, game data, pushes or
+publication. Legion Go physical-controller operation requires an owner-machine
+check. Parent must gate this together with the r6 timing and warp patches.
+
 ## UPDATE 2026-09-29: r4 gate — split globals, batches F/G, pause screen
 
 r4 tree = b29d84cb + port3's split-global fix + batch G. Gate on that exact tree in a clean worktree (build/wt-r4): fresh build OK; native suite `1608 run, 1608 passed, 0 skipped` (run from the repo root); `REGRESS ok normal_start_shim_off`; `REGRESS PASS until=day1_end_80 frame=66994`; movies-on route into Day 2 (`build/lanes/lead/movies_day2_check.sh`): 5 field movies closed with dropped=0, story 0x80 → A80650C8 → A8004148 (0x88) → story 0x90, no boundary (`MOVIES_DAY2=PASS`).

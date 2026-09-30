@@ -17,7 +17,9 @@
  * "CHEATS" is shown on screen whenever any cheat is active.
  *
  * Scripted keys for headless tests: PE_CHEAT_KEYS="frame:KEY,frame:KEY"
- * (frame = present count; KEY = F1..F8, UP, DOWN, ENTER).
+ * (frame = present count; KEY = F1..F8, UP, DOWN, ENTER, BACK, DEV_MENU).
+ * PE_DEV_MENU=1 enables a host-only cheats/Day-warp menu (F8 or controller).
+ * See docs/port/DEV_MENU.md for the SDL controller controls.
  */
 #ifndef PE_PLAT_CHEATS_H
 #define PE_PLAT_CHEATS_H
@@ -33,6 +35,7 @@ typedef enum {
     PE_CHEAT_KEY_F1, PE_CHEAT_KEY_F2, PE_CHEAT_KEY_F3, PE_CHEAT_KEY_F4,
     PE_CHEAT_KEY_F5, PE_CHEAT_KEY_F7, PE_CHEAT_KEY_F8,
     PE_CHEAT_KEY_UP, PE_CHEAT_KEY_DOWN, PE_CHEAT_KEY_ENTER,
+    PE_CHEAT_KEY_DEV_MENU, PE_CHEAT_KEY_BACK,
     PE_CHEAT_KEY_COUNT
 } PeCheatKey;
 
@@ -43,6 +46,7 @@ int  pe_plat_cheats_enabled(void);          /* 0 when PE_CHEATS=0 */
 /* A key press (pressed=1) or release.  Returns 1 when the console consumed
  * it (the host must not pass it to the game pad). */
 int  pe_plat_cheats_key(PeCheatKey key, int pressed);
+int  pe_plat_cheats_dev_menu_enabled(void); /* PE_DEV_MENU=1, default off */
 int  pe_plat_cheats_menu_open(void);        /* warp menu: arrows/Enter are ours */
 /* Once per presented frame (emits the mods FRAME_TICK event). */
 void pe_plat_cheats_frame(void);
@@ -67,6 +71,7 @@ void pe_plat_cheats_apply(void);
 int  pe_plat_cheats_area_kit(uint32_t lo, uint32_t hi);
 int  pe_plat_cheats_warp_count(void);
 const char *pe_plat_cheats_warp_name(int index);
+int pe_plat_cheats_warp_day(int index); /* warp lane: 1..6, 0 invalid */
 
 #ifdef __cplusplus
 }
