@@ -7,6 +7,9 @@
  * (PE_D_COMP_BOUNDARYn), exactly as a generated TU would spell them.
  */
 #include "pe_guest_decomp.h"
+/* Generated TU pc_port/game/decomp/func_8008A92C_port.c (src/func_8008A92C.c);
+ * native since its func_8008A750 callee became a hand adapter (2026-10-07). */
+void func_8008A92C(pe_addr_t pe_a0, int a1, int a2);
 #include "pe_spu_dma.h"
 #include "hand_hi_protos.h"
 
@@ -191,7 +194,7 @@ void func_8008B040(int a0)
 }
 
 /* src/func_8008B084.c: save arg0[1]/[2], reset arg0[1..4] to 0x400,
- * 0x1000000, 0x80, 0x7F, then func_8008A92C(arg0, a, b) — boundary. */
+ * 0x1000000, 0x80, 0x7F, then func_8008A92C(arg0, a, b) (native since 2026-10-07). */
 void func_8008B084(pe_addr_t arg0)
 {
     int a = (int)PE_LoadU32(arg0 + 4u);
@@ -201,7 +204,7 @@ void func_8008B084(pe_addr_t arg0)
     PE_StoreU32(arg0 + 8u, 0x1000000u);
     PE_StoreU32(arg0 + 12u, 0x80u);
     PE_StoreU32(arg0 + 16u, 0x7Fu);
-    PE_D_COMP_BOUNDARY3("func_8008A92C", 0x8008A92Cu, arg0, a, b);
+    func_8008A92C((pe_addr_t)(arg0), (int)(a), (int)(b));
 }
 
 /* src/func_8008AB1C.c: two lookups in the D_8009D240 u16 offset table at
@@ -229,19 +232,19 @@ void func_8008AB1C(pe_addr_t out0, pe_addr_t out1, unsigned int a2)
 }
 
 /* src/func_8008B124.c: func_8008AB1C(&p1, &p2, arg0->+4) into two stack
- * locals, then func_8008A92C(arg0, p1, p2) — boundary.  The locals never
+ * locals, then func_8008A92C(arg0, p1, p2) (native since 2026-10-07).  The locals never
  * escape beyond the lookup, so they are kept host-side (ab1c_lookup). */
 void func_8008B124(int arg0)
 {
     pe_addr_t p1, p2;
 
     ab1c_lookup(PE_LoadU32((pe_addr_t)arg0 + 4u), &p1, &p2);
-    PE_D_COMP_BOUNDARY3("func_8008A92C", 0x8008A92Cu, arg0, p1, p2);
+    func_8008A92C((pe_addr_t)(arg0), (int)(p1), (int)(p2));
 }
 
 /* src/func_8008B0C8.c: func_8008AB1C(&x, &y, a0[1]) into stack locals
  * (kept host-side as in func_8008B124), a0[2..4] = 0x2000000, 0x80, 0x7F,
- * then func_8008A92C(a0, x, y) — boundary. */
+ * then func_8008A92C(a0, x, y) (native since 2026-10-07). */
 void func_8008B0C8(pe_addr_t a0)
 {
     pe_addr_t x, y;
@@ -250,5 +253,5 @@ void func_8008B0C8(pe_addr_t a0)
     PE_StoreU32(a0 + 8u, 0x2000000u);
     PE_StoreU32(a0 + 12u, 0x80u);
     PE_StoreU32(a0 + 16u, 0x7Fu);
-    PE_D_COMP_BOUNDARY3("func_8008A92C", 0x8008A92Cu, a0, x, y);
+    func_8008A92C((pe_addr_t)(a0), (int)(x), (int)(y));
 }

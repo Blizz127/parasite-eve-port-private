@@ -24,6 +24,12 @@
 
 void func_8008A750(pe_addr_t a0, pe_addr_t s, unsigned int m, int a3);
 void func_8008AC40(int arg0);
+void func_8008A92C(pe_addr_t pe_a0, int a1, int a2);
+void func_8008B084(pe_addr_t arg0);
+void func_8008B168(pe_addr_t a0);
+void func_8008B124(int arg0);
+void func_8008B0C8(pe_addr_t a0);
+void func_80090C88(pe_addr_t a0);
 void Trace_Direct(const char *event) { (void)event; }   /* host trace hook (port_main.c) */
 
 static uint32_t g_rng = 0x12345678u;
@@ -83,11 +89,14 @@ static void randomise(void)
         uint32_t r = rnd();
         memcpy(ram + a, &r, 4);
     }
-    for (uint32_t a = 0x100000u; a < 0x101000u; a += 4) {
+    for (uint32_t a = 0x100000u; a < 0x120000u; a += 4) {
         uint32_t r = rnd();
         memcpy(ram + a, &r, 4);
     }
     PE_StoreU32(0x8009D2C8u, 0x80100000u + (rnd() % 0x300u) * 4u);
+    /* func_8008AB1C's lookup tables (u16 offsets / byte base). */
+    PE_StoreU32(0x8009D240u, 0x80104000u + (rnd() % 0x100u) * 2u);
+    PE_StoreU32(0x8009D260u, 0x80108000u + (rnd() % 0x100u));
 }
 
 static uint8_t *g_snap, *g_ref;
@@ -164,6 +173,56 @@ static void native_ac40(const uint32_t *a)
     func_8008AC40((int)a[0]);
 }
 
+/* Stream-record callers (func_8008A92C and the AKAO opcode hand ports that
+ * call it).  rec is word-aligned RAM in the window; rec+8 (the stop mask
+ * handed to func_8008A400) is 0 half the time; p1/p2 are 0 a third of the
+ * time each (the "no zone" cases). */
+static uint32_t rec_addr(void) { return 0x80110000u + (rnd() % 0x800u) * 4u; }
+static uint32_t maybe0(void) { return (rnd() % 3u) == 0 ? 0u : rnd(); }
+static void setup_a92c(uint32_t *a)
+{
+    a[0] = rec_addr();
+    if (rnd() & 1u) PE_StoreU32(a[0] + 8u, 0u);
+    a[1] = maybe0();
+    a[2] = maybe0();
+    a[3] = 0;
+}
+static void native_a92c(const uint32_t *a) { func_8008A92C(a[0], (int)a[1], (int)a[2]); }
+
+static void setup_rec(uint32_t *a)
+{
+    a[0] = rec_addr();
+    if (rnd() & 1u) PE_StoreU32(a[0] + 8u, 0u);
+    a[1] = a[2] = a[3] = 0;
+}
+static void native_b084(const uint32_t *a) { func_8008B084(a[0]); }
+static void native_b124(const uint32_t *a) { func_8008B124((int)a[0]); }
+static void native_b0c8(const uint32_t *a) { func_8008B0C8(a[0]); }
+
+/* func_8008B168: *(a0+4) points at two u16 offsets (0xFFFF = none). */
+static void setup_b168(uint32_t *a)
+{
+    uint32_t base = 0x80118000u + (rnd() % 0x400u) * 4u;
+    setup_rec(a);
+    PE_StoreU32(a[0] + 4u, base);
+    if ((rnd() % 3u) == 0) PE_StoreU16(base, 0xFFFFu);
+    if ((rnd() % 3u) == 0) PE_StoreU16(base + 2u, 0xFFFFu);
+}
+static void native_b168(const uint32_t *a) { func_8008B168(a[0]); }
+
+/* func_80090C88: a0 is a voice; *(a0) is its script cursor (two u16 LE
+ * offsets, 0 = none). */
+static void setup_0c88(uint32_t *a)
+{
+    uint32_t cur = 0x80118000u + (rnd() % 0x400u) * 4u + (rnd() & 3u);
+    a[0] = 0x800B8AC0u + (rnd() % 24u) * 0x11Cu;
+    PE_StoreU32(a[0], cur);
+    if ((rnd() % 3u) == 0) { PE_StoreU8(cur, 0); PE_StoreU8(cur + 1u, 0); }
+    if ((rnd() % 3u) == 0) { PE_StoreU8(cur + 2u, 0); PE_StoreU8(cur + 3u, 0); }
+    a[1] = a[2] = a[3] = 0;
+}
+static void native_0c88(const uint32_t *a) { func_80090C88(a[0]); }
+
 int main(void)
 {
     const char *dir = getenv("PE_LEAF_ORACLE_DIR");
@@ -181,6 +240,12 @@ int main(void)
     if (!g_snap || !g_ref) return 2;
     ok &= run_leaf("func_8008A750", sym("func_8008A750"), cases, setup_a750, native_a750);
     ok &= run_leaf("func_8008AC40", sym("func_8008AC40"), cases, setup_ac40, native_ac40);
+    ok &= run_leaf("func_8008A92C", sym("func_8008A92C"), cases, setup_a92c, native_a92c);
+    ok &= run_leaf("func_8008B084", sym("func_8008B084"), cases, setup_rec, native_b084);
+    ok &= run_leaf("func_8008B124", sym("func_8008B124"), cases, setup_rec, native_b124);
+    ok &= run_leaf("func_8008B0C8", sym("func_8008B0C8"), cases, setup_rec, native_b0c8);
+    ok &= run_leaf("func_8008B168", sym("func_8008B168"), cases, setup_b168, native_b168);
+    ok &= run_leaf("func_80090C88", sym("func_80090C88"), cases, setup_0c88, native_0c88);
     printf("LEAF_ORACLE %s\n", ok ? "PASS" : "FAIL");
     return ok ? 0 : 1;
 }

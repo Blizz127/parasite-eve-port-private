@@ -4,6 +4,9 @@
  * leaves src/func_XXXXXXXX.c; pointers are guest addresses.
  */
 #include "pe_guest_decomp.h"
+/* Generated TU pc_port/game/decomp/func_8008A92C_port.c (src/func_8008A92C.c);
+ * native since its func_8008A750 callee became a hand adapter (2026-10-07). */
+void func_8008A92C(pe_addr_t pe_a0, int a1, int a2);
 #include "hand_hi_protos.h"
 
 /* src/func_8008CB08.c: *a0 = D_800B8628 + D_8009D2F4 * 0x24; D_8009D2F4++. */
@@ -184,7 +187,7 @@ void func_80084644(pe_addr_t a0)
 
 /* src/func_8008B168.c: base = a0->+4; p1 = base[0] (u16) != 0xFFFF ?
  * base + 4 + it : 0; p2 likewise from base[1]; a0->+4 = a0->+0x14; then
- * func_8008A92C(a0, p1, p2) — no pc_port implementation: boundary. */
+ * func_8008A92C(a0, p1, p2) (generated TU, native since 2026-10-07). */
 void func_8008B168(pe_addr_t a0)
 {
     pe_addr_t base = PE_LoadU32(a0 + 4u);
@@ -196,7 +199,7 @@ void func_8008B168(pe_addr_t a0)
     if (o != 0xFFFFu)
         p2 = o + PE_LoadU32(a0 + 4u) + 4u;
     PE_StoreU32(a0 + 4u, PE_LoadU32(a0 + 0x14u));
-    PE_D_COMP_BOUNDARY3("func_8008A92C", 0x8008A92Cu, a0, p1, p2);
+    func_8008A92C((pe_addr_t)(a0), (int)(p1), (int)(p2));
 }
 
 /* ── callers of the batch 1–5 adapters that the generator cannot derive ── */

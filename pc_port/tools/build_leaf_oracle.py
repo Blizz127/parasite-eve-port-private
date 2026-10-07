@@ -23,7 +23,8 @@ The test executable pe-leaf-oracle-tests loads the blobs into guest RAM and
 runs them in tests/pe_akao_interp_oracle.c against the native C on the same
 randomised guest state.
 
-Usage: pc_port/tools/build_leaf_oracle.py [--out build/leaf-oracle] func_X ...
+Usage: pc_port/tools/build_leaf_oracle.py [--out build/leaf-oracle] [func_X ...]
+       (no leaves = DEFAULT_LEAVES, the set pe-leaf-oracle-tests checks)
 """
 import argparse
 import json
@@ -77,6 +78,14 @@ def run(cmd, **kw):
 
 ORACLE_BASE = 0x801C0000
 
+# The leaves pe-leaf-oracle-tests checks plus their callee closure.
+DEFAULT_LEAVES = [
+    "func_8008A750", "func_8008AC40", "func_80089F58", "func_8008F178", "func_8008F0D0",
+    "func_80089FE0", "func_80089960", "func_80089B28", "func_80089CF0", "func_8008D820",
+    "func_8008A92C", "func_8008A400", "func_8008A8CC", "func_8008F1B0", "func_8008AB1C",
+    "func_8008B084", "func_8008B168", "func_8008B124", "func_8008B0C8", "func_80090C88",
+]
+
 
 def compile_leaf(name, prof, t):
     src = ROOT / "src" / f"{name}.c"
@@ -115,8 +124,10 @@ def compile_leaf(name, prof, t):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=str(ROOT / "build/leaf-oracle"))
-    ap.add_argument("leaves", nargs="+")
+    ap.add_argument("leaves", nargs="*")
     a = ap.parse_args()
+    if not a.leaves:
+        a.leaves = list(DEFAULT_LEAVES)
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     prof = json.loads(PROFILES.read_text())
