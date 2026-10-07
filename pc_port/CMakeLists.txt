@@ -559,7 +559,10 @@ if(BUILD_TESTS)
     add_test(NAME window-scale-math COMMAND pe-window-scale-tests)
     set_tests_properties(window-scale-math PROPERTIES TIMEOUT 30)
 
-    add_executable(pe-native-tests tests/test_native.c ${PE_GUESTCODE_REGISTRY})
+    # tests/pe_akao_interp_oracle.c: TEST-ONLY retail-code oracle (R3000A
+    # interpreter).  Never add it to pe_field_runtime or parasite-eve-port:
+    # the port binary is native only (no MIPS execution, 2026-10-07).
+    add_executable(pe-native-tests tests/test_native.c tests/pe_akao_interp_oracle.c ${PE_GUESTCODE_REGISTRY})
     target_link_libraries(pe-native-tests PRIVATE pe_field_runtime)
 
     # Small external-consumer contract: this source is intentionally not part

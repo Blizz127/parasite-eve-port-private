@@ -431,8 +431,8 @@ extern int PE_AkaoVerify_Tick(void) __attribute__((weak));
 
 void PE_Event_ServiceAudioCommands(void)
 {
-    /* Audio lane: the native audio driver runs the whole retail tick
-     * func_8008DB7C (which calls func_8008CA84 itself) at 240 Hz. */
+    /* Audio lane: the native audio driver runs the whole tick natively,
+     * func_8008DB7C (which calls func_8008CA84 itself), at 240 Hz. */
     if (PE_AudioDriver_Active()) return;
     if (PE_AkaoVerify_Tick && g_audio_event_enabled && !g_irq_lock_depth &&
         !PE_Port_ShouldStop() && PE_AkaoVerify_Tick()) return;

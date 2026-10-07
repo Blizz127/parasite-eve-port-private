@@ -276,3 +276,31 @@ Feasible, but not trivial.
 - **Toolchain:** MinGW-w64 cross-compiling needs `apt install mingw-w64`,
   which needs owner approval.
 - **Estimate:** half a day to a first build, 1–2 days to a complete one.
+
+## 9. Native-only pass (2026-10-07, branch `cursor/pe-native-only-akao-6f51`)
+
+Owner rule: the port runs recompiled C only; no MIPS interpreter or CPU
+emulation fallback; a missing function STOPs.
+
+- **Removed emulation from the port binary.** `platform/pe_audio_driver.c`
+  ran the retail AKAO tick `func_8008DB7C` out of guest RAM in an R3000A
+  interpreter at 240 Hz in every normal run. The driver clock now calls the
+  native `func_8008DB7C` (`game/decomp_hand/akao_tick_port.c`). The
+  interpreter moved to `pc_port/tests/pe_akao_interp_oracle.c`, linked into
+  `pe-native-tests` only (`nm parasite-eve-port` shows
+  `PE_AudioDriver_CallGuest` as an unresolved weak symbol only).
+  `PE_AKAO_VERIFY=1` therefore needs an oracle-linked binary.
+- **Boundary STOP.** `PE_Decomp_BoundaryFrom` / `PE_GuestCall` misses print
+  `CPU_BOUNDARY/REFUSED pc=0x<callee> ra=<native caller> sym=... a0..a3` and
+  request `PE_PORT_STOP_UNRESOLVED_BOUNDARY` when the stop policy is on.
+  `parasite-eve-port` turns it on by default (`[NATIVE] boundary policy=stop`);
+  `PE_BOUNDARY_POLICY=record` restores log-and-continue for diagnosis. The
+  library default stays record, so the suite is unchanged.
+- **Not yet gated on a real disc** (the box has no disc): the Day 1 route
+  (`day1_route_regress.sh`) and `movies_day2_check.sh` must be re-run; any
+  boundary on those paths now ends the run with the STOP line above, which
+  names the next function to carve.
+- Disc-free suite on the box: 1634 run, 1393 pass, 239 skip (disc), 2 fail
+  (`PORTABSENT_guestcode`, `PORTABSENT_room_dedupe_dispatch`; both fail
+  identically on the unmodified base without `build/extracted`, because the
+  overlay fingerprints are 0). Psy-Q guard PASS, retail-data guard OK.

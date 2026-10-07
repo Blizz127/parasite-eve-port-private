@@ -15,9 +15,12 @@
  * Opcode handlers (D_8009CCF0 / D_8009C8F0) are called through PE_GuestCall
  * with the handler address read from guest RAM, as the retail `jalr` does.
  *
+ * Runtime: this native tick is the ONLY AKAO tick in the port binary
+ * (platform/pe_audio_driver.c calls it at 240 Hz; native only, 2026-10-07).
  * Verification: PE_AKAO_VERIFY=1 (pe_libetc.c) runs every driver tick once in
- * the audio lane's retail interpreter and once natively from the same guest
- * RAM + SPU register snapshot, and compares both.
+ * the test-only retail-code oracle and once natively from the same guest
+ * RAM + SPU register snapshot, and compares both (needs a binary that links
+ * tests/pe_akao_interp_oracle.c).
  */
 #include "pe_guest_decomp.h"
 #include "pe_spu_dma.h"
@@ -822,7 +825,16 @@ int PE_AkaoVerify_Tick(void)
         mode = e ? atoi(e) : 0;
     }
     if (mode == 2) { func_8008DB7C(); pe_plat_audio_commit_registers(); return 1; }
-    if (mode != 1 || !PE_AudioDriver_CallGuest) return 0;
+    if (mode != 1) return 0;
+    if (!PE_AudioDriver_CallGuest) {
+        /* Native-only port binary: the retail-code oracle is linked into
+         * test executables only. */
+        static int said;
+        if (!said) { said = 1; fprintf(stderr, "[AKAO_VERIFY] mode 1 needs the "
+            "test-only interpreter oracle; not in this binary (native only)\n"); }
+        mode = 0;
+        return 0;
+    }
     if (!snap) {
         snap = (uint8_t *)malloc(0x200000u);
         ra = (uint8_t *)malloc(0x200000u);
