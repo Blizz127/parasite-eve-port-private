@@ -160,10 +160,10 @@ static int stream_mode_clear(uint32_t mode)
     return result;
 }
 
-/* src/func_8008D610.c (libspu SpuClearReverbWorkArea): native entry for
+/* Host backend for libspu SpuClearReverbWorkArea (retail 0x8008D610) for
  * callers outside this file (func_8008CF70, absent_hi2_port.c), which used
  * to reach it only as a loud boundary.  Same host model as the AKAO path. */
-int func_8008D610(int mode)
+int PE_SpuReverb_ClearWorkArea(int mode)
 {
     return stream_mode_clear((uint32_t)mode);
 }

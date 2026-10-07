@@ -18,7 +18,6 @@ void func_80089960(void);
 void func_80089B28(void);
 void func_80089CF0(void);
 int func_80085BB4(unsigned int a0);
-int func_8008D610(int mode);   /* pe_stream.c */
 void func_8007DAE0(int a0, unsigned int a1, int a2);
 
 /* ── src/func_800878F0.c ───────────────────────────────────────────────
@@ -306,7 +305,7 @@ int func_8008CF70(int a0)
     PE_StoreU16(0x8009B39Cu + 0xAu, 0u);
     func_8008D140(entry);
     if (clear)
-        (void)func_8008D610(a0);
+        (void)PE_SpuReverb_ClearWorkArea(a0);   /* SpuClearReverbWorkArea, 0x8008D610 */
     func_8007DAE0(0xD1, PE_LoadU32(0x8009B398u), 0);
     if (on)
         hi2_spu_store(0xD5u * 2u, (uint16_t)(hi2_spu_load(0xD5u * 2u) | 0x80u));
