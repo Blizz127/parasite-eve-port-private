@@ -35,6 +35,8 @@ static struct {
     unsigned warned_io_n;
     uint64_t faults;
     uint64_t instructions;
+    uint32_t last_fault_pc, last_fault_addr;
+    const char *last_fault_what;
 } O;
 
 typedef struct {
@@ -197,7 +199,7 @@ static uint32_t run(Cpu *c, uint32_t budget)
             c->npc = c->pc + 4u;
             continue;
         }
-        if (++steps > budget) { fault(c, "instruction budget exhausted", cur); break; }
+        if (++steps > budget) { fault(c, "instruction budget exhausted", cur); c->fault_pc = cur; break; }
         if ((cur & 3u) || !PE_RangeIsRam(PE_RamCanonical(cur, 4), 4)) {
             fault(c, "bad instruction fetch", cur);
             break;
@@ -350,6 +352,17 @@ uint32_t PE_AudioDriver_CallGuest(uint32_t entry, uint32_t a0, uint32_t a1,
                     "insn=0x%08X (entry 0x%08X)\n", c.fault_what, c.fault_addr,
                     c.fault_pc, c.fault_insn, entry);
     }
+    O.last_fault_pc = c.fault ? c.fault_pc : 0;
+    O.last_fault_addr = c.fault ? c.fault_addr : 0;
+    O.last_fault_what = c.fault ? c.fault_what : 0;
     if (ok) *ok = !c.fault;
     return c.r[2];
+}
+
+/* Test hook: where the last CallGuest faulted (pc 0 = no fault). */
+const char *PE_AkaoOracle_LastFault(uint32_t *pc, uint32_t *addr)
+{
+    if (pc) *pc = O.last_fault_pc;
+    if (addr) *addr = O.last_fault_addr;
+    return O.last_fault_what;
 }

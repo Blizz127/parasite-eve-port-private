@@ -92,9 +92,15 @@ def compile_leaf(name, prof, t):
     if not src.exists():
         raise SystemExit(f"build_leaf_oracle: no matched source {src}")
     pname, p = profile_for(name, prof)
+    # FOLD knobs only retarget local switch/rodata tables onto the retail
+    # table symbols (which live in retail rodata we do not have); dropping
+    # them keeps cc1's own table in the object with identical semantics.
+    e = {k: v for k, v in p.get("environment", {}).items()
+         if k not in ("MASPSX_DISPATCH_FOLD", "MASPSX_RODATA_FOLD", "MASPSX_CDK_SPLIT_DISPATCH")}
     env = os.environ.copy()
-    env.update(p.get("environment", {}))
-    e = p.get("environment", {})
+    for k in ("MASPSX_DISPATCH_FOLD", "MASPSX_RODATA_FOLD", "MASPSX_CDK_SPLIT_DISPATCH"):
+        env.pop(k, None)
+    env.update(e)
     gdir = ROOT / f"tools/era/gcc-{e.get('ERA_CC1_VER', '2.7.2')}-psx"
     with open(t / f"{name}.i", "wb") as f:
         subprocess.run([str(gdir / "cpp"), str(src)], stdout=f, stderr=subprocess.DEVNULL,
@@ -114,7 +120,9 @@ def compile_leaf(name, prof, t):
     run([AS, "-EL", "-mips1", "-mabi=32", "-I", str(ROOT / "include"),
          "-o", str(t / f"{name}.o"), str(t / f"{name}.m.s")], env=env)
     sects = run(["mips-linux-gnu-objdump", "-h", str(t / f"{name}.o")]).stdout.decode()
-    for sec in (".rodata", ".data", ".sdata", ".rdata", ".bss", ".sbss"):
+    # read-only data (switch jump tables, constants) is merged into the image
+    # by the linker script below; writable sections are not supported.
+    for sec in (".data", ".sdata", ".bss", ".sbss"):
         m = re.search(rf"\s{re.escape(sec)}\s+([0-9a-f]+)", sects)
         if m and int(m.group(1), 16):
             raise SystemExit(f"build_leaf_oracle: {name}: non-empty {sec}; not supported")
@@ -124,17 +132,61 @@ def compile_leaf(name, prof, t):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=str(ROOT / "build/leaf-oracle"))
+    ap.add_argument("--range", nargs=2, metavar=("LO", "HI"),
+                    help="also add every src/func_X.c with LO <= X < HI (hex)")
     ap.add_argument("leaves", nargs="*")
     a = ap.parse_args()
     if not a.leaves:
         a.leaves = list(DEFAULT_LEAVES)
+    if a.range:
+        lo, hi = int(a.range[0], 16), int(a.range[1], 16)
+        for f in sorted((ROOT / "src").glob("func_*.c")):
+            m = re.fullmatch(r"func_([0-9A-F]{8})", f.stem)
+            if m and lo <= int(m.group(1), 16) < hi and f.stem not in a.leaves:
+                a.leaves.append(f.stem)
+    # callee closure from the matched sources
+    i = 0
+    while i < len(a.leaves):
+        src = ROOT / "src" / f"{a.leaves[i]}.c"
+        if src.exists():
+            for c in sorted(set(re.findall(r"func_[0-9A-F]{8}", src.read_text(errors="replace")))):
+                if c not in a.leaves:
+                    a.leaves.append(c)
+        i += 1
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     prof = json.loads(PROFILES.read_text())
     sp = spans()
     with tempfile.TemporaryDirectory(prefix="pe-oracle-") as t:
         t = Path(t)
-        profiles = {n: compile_leaf(n, prof, t) for n in a.leaves}
+        profiles, bad = {}, {}
+        for n in a.leaves:
+            try:
+                profiles[n] = compile_leaf(n, prof, t)
+            except SystemExit as e:
+                bad[n] = str(e)
+        # leaves that need retail-only data (external jump tables etc.)
+        for n in list(profiles):
+            for line in run(["mips-linux-gnu-nm", str(t / f"{n}.o")]).stdout.decode().splitlines():
+                parts = line.split()
+                if (len(parts) == 2 and parts[0] == "U"
+                        and not re.fullmatch(r"(D|func)_[0-9A-Fa-f]{8}", parts[1])):
+                    bad[n] = f"needs external {parts[1]}"
+                    del profiles[n]
+                    break
+        # drop failed leaves and (transitively) every leaf that calls one
+        changed = True
+        while changed:
+            changed = False
+            for n in list(profiles):
+                txt = (ROOT / "src" / f"{n}.c").read_text(errors="replace")
+                if any(c in bad for c in re.findall(r"func_[0-9A-F]{8}", txt) if c != n):
+                    bad[n] = "calls a dropped leaf"
+                    del profiles[n]
+                    changed = True
+        for n, why in bad.items():
+            print(f"  dropped {n}: {why.splitlines()[-1] if why else ''}")
+        a.leaves = [n for n in a.leaves if n in profiles]
         objs = [str(t / f"{n}.o") for n in a.leaves]
         undef = set()
         for o in objs:
@@ -148,7 +200,11 @@ def main():
             if not m:
                 raise SystemExit(f"build_leaf_oracle: {u} is called but not in the leaf set; add it")
             defs += ["--defsym", f"{u}=0x{m.group(1)}"]
-        run([LD, "-EL", "-Ttext", f"0x{ORACLE_BASE:08X}", "-e", a.leaves[0], *defs,
+        (t / "oracle.ld").write_text(
+            "SECTIONS { . = 0x%08X; .text : { *(.text) . = ALIGN(4); "
+            "*(.rodata) *(.rodata.*) *(.rdata) } /DISCARD/ : { *(.reginfo) "
+            "*(.MIPS.abiflags) *(.pdr) *(.comment) *(.gnu.attributes) } }\n" % ORACLE_BASE)
+        run([LD, "-EL", "-T", str(t / "oracle.ld"), "-e", a.leaves[0], *defs,
              "-o", str(t / "image.elf"), *objs])
         run([OBJCOPY, "-O", "binary", "-j", ".text", str(t / "image.elf"), str(out / "image.bin")])
         syms = {}

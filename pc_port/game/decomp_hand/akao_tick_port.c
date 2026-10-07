@@ -792,6 +792,12 @@ void func_8008DB7C(void)
     func_80089784();
 }
 
+/* Test hook (pe-akao-tick-oracle-tests coverage report). */
+void PE_AkaoTick_Counters(unsigned long out[4])
+{
+    out[0] = g_ak_ne8d0; out[1] = g_ak_n87aa8; out[2] = g_ak_n88980; out[3] = g_ak_nkon;
+}
+
 /* ── PE_AKAO_VERIFY: native vs retail differential ───────────────────────
  * Called from PE_Event_ServiceAudioCommands (pe_libetc.c) once per frame
  * wait when the retail RCNT2 event is armed and the audio lane's driver is

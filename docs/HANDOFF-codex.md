@@ -304,3 +304,12 @@ emulation fallback; a missing function STOPs.
   (`PORTABSENT_guestcode`, `PORTABSENT_room_dedupe_dispatch`; both fail
   identically on the unmodified base without `build/extracted`, because the
   overlay fingerprints are 0). Psy-Q guard PASS, retail-data guard OK.
+- **Disc-free oracles** (see docs/evidence/akao-seq-hand/REPORT.md):
+  - `pe-leaf-oracle-tests` checks the hand adapters against the matched C
+    compiled with the era toolchain.
+  - `pe-akao-tick-oracle-tests` checks the whole native AKAO tick
+    (`func_8008DB7C` graph, 241-function image): 8785 judged random cases,
+    0 mismatched.
+  - Build the images with `pc_port/tools/build_leaf_oracle.py` (default
+    leaves) and with `--out build/leaf-oracle-akao --range 0x80085000
+    0x80092000 func_8008DB7C`.
