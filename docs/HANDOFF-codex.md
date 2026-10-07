@@ -304,6 +304,20 @@ emulation fallback; a missing function STOPs.
   (`PORTABSENT_guestcode`, `PORTABSENT_room_dedupe_dispatch`; both fail
   identically on the unmodified base without `build/extracted`, because the
   overlay fingerprints are 0). Psy-Q guard PASS, retail-data guard OK.
+- **Boundaries removed in this pass:**
+  - five `func_8008A92C` calls in the AKAO opcode ports;
+  - `func_8008D610` (SpuClearReverbWorkArea, from `func_8008CF70`), now host
+    backend `PE_SpuReverb_ClearWorkArea` in `pe_stream.c`;
+  - four BIOS `printf` (0x80071A74) calls in `absent_sdk_port.c`, now
+    `PE_Bios_Printf` (host TTY, `[TTY] ...` on stderr).
+
+  Still a boundary, and so a STOP under the new policy:
+  - `func_80074384` ReturnFromException (unset-guard IRQ path);
+  - other BIOS vectors 0x80074354/6C/94/A4 and `func_80072A64`;
+  - `func_80038D74`, `func_8001D170`, `func_8005A318`, `func_80080E34`,
+    `func_80048918`, `func_8007E1E4`/`E1F4`, `func_80073A34`;
+  - overlay `func_800D27FC`/`800D0E88`/`800DB25C`;
+  - the divide traps, which also trap on retail.
 - **Disc-free oracles** (see docs/evidence/akao-seq-hand/REPORT.md):
   - `pe-leaf-oracle-tests` checks the hand adapters against the matched C
     compiled with the era toolchain.
