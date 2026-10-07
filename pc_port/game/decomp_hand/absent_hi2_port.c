@@ -18,6 +18,7 @@ void func_80089960(void);
 void func_80089B28(void);
 void func_80089CF0(void);
 int func_80085BB4(unsigned int a0);
+int func_8008D610(int mode);   /* pe_stream.c */
 void func_8007DAE0(int a0, unsigned int a1, int a2);
 
 /* ── src/func_800878F0.c ───────────────────────────────────────────────
@@ -230,7 +231,8 @@ static void hi2_stop(pe_addr_t base, unsigned int mask)
  * else 0/0.  With SPUCNT (D_8009B3FC[0xD5], +0x1AA) bit 7 set it is
  * cleared around the update; reverb depth registers +0x184/+0x186 and the
  * RevAttr depths are zeroed; func_8008D140(&entry); func_8008D610(a0) when
- * clearing (no pc_port implementation: loud boundary); func_8007DAE0(0xD1,
+ * clearing (native: pe_stream.c, DMA4 + WaitEvent via the host event
+ * model); func_8007DAE0(0xD1,
  * D_8009B398, 0).  D_8009B3FC holds the SPU register base; register
  * accesses go through the pc_port SPU register model exactly as
  * func_8007D614 (absent_cd_port.c) does — a RAM base stays guest RAM. */
@@ -304,7 +306,7 @@ int func_8008CF70(int a0)
     PE_StoreU16(0x8009B39Cu + 0xAu, 0u);
     func_8008D140(entry);
     if (clear)
-        PE_D_COMP_BOUNDARY1("func_8008D610", 0x8008D610u, a0);
+        (void)func_8008D610(a0);
     func_8007DAE0(0xD1, PE_LoadU32(0x8009B398u), 0);
     if (on)
         hi2_spu_store(0xD5u * 2u, (uint16_t)(hi2_spu_load(0xD5u * 2u) | 0x80u));

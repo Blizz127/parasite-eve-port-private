@@ -160,6 +160,14 @@ static int stream_mode_clear(uint32_t mode)
     return result;
 }
 
+/* src/func_8008D610.c (libspu SpuClearReverbWorkArea): native entry for
+ * callers outside this file (func_8008CF70, absent_hi2_port.c), which used
+ * to reach it only as a loud boundary.  Same host model as the AKAO path. */
+int func_8008D610(int mode)
+{
+    return stream_mode_clear((uint32_t)mode);
+}
+
 /* Original 8CF70: mode table, depth state, reverb registers and RAM clear. */
 static int stream_mode_configure(uint32_t mode)
 {
