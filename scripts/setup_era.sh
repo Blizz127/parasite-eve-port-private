@@ -19,6 +19,11 @@ GCC_RELEASE="https://github.com/decompals/old-gcc/releases/download/0.17"
 GCC_URL="$GCC_RELEASE/gcc-2.7.2-psx.tar.gz"
 GCC_DIR="$ERA/gcc-2.7.2-psx"
 MASPSX_REPO="https://github.com/mkst/maspsx"
+# Pinned: upstream 025620f (2026-08-24, "--passthrough mode") made maspsx.py
+# import PassthroughProcessor, which the locally patched (tracked)
+# maspsx/__init__.py does not define, so an unpinned clone cannot run.
+# 42b862c is the last upstream commit whose maspsx.py works with it.
+MASPSX_COMMIT="42b862c988fe7a13fe4e7ac0ebec90ed6b9fb763"
 
 mkdir -p "$ERA"
 
@@ -123,7 +128,8 @@ if [[ -f "$ERA/maspsx/maspsx.py" ]]; then
 else
     echo "Cloning maspsx ..."
     tmp="$(mktemp -d)"
-    git clone -q --depth 1 "$MASPSX_REPO" "$tmp/maspsx"
+    git clone -q "$MASPSX_REPO" "$tmp/maspsx"
+    git -C "$tmp/maspsx" checkout -q "$MASPSX_COMMIT"
     mkdir -p "$ERA/maspsx"
     excludes=(--exclude='./.git')
     for f in "${MASPSX_TRACKED[@]}"; do excludes+=("--exclude=./$f"); done
