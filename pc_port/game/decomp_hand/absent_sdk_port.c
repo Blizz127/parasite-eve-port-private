@@ -33,6 +33,7 @@
  */
 #include "pe_guest_decomp.h"
 #include "pe_sdk.h"
+#include "pe_bios_string.h"
 #include "pe_irq.h"
 #include "pe_gpu.h"
 #include "pe_timer1.h"
@@ -94,10 +95,12 @@ void func_80038954(pe_addr_t a0, pe_addr_t a1, pe_addr_t a2, int a3)
 {
     unsigned char i = (unsigned char)a3;
 
-    (void)PE_D_COMP_BOUNDARY3("func_80071A74", 0x80071A74u, 0x80010EB0u,
-                              PE_LoadU32(0x80091A2Cu + (uint32_t)i * 4u), a0);
-    (void)PE_D_COMP_BOUNDARY3("func_80071A74", 0x80071A74u, 0x80010EC8u,
-                              a1, a2);
+    {
+        const uint32_t x[2] = {PE_LoadU32(0x80091A2Cu + (uint32_t)i * 4u), a0};
+        const uint32_t y[2] = {a1, a2};
+        (void)PE_Bios_Printf(0x80010EB0u, x, 2);   /* printf, 0x80071A74 */
+        (void)PE_Bios_Printf(0x80010EC8u, y, 2);
+    }
     if (i == 1)
         PE_Port_RequestStop(PE_PORT_STOP_EXPLICIT);
 }
@@ -308,8 +311,10 @@ void func_80073F00(void)
     pe_addr_t pa, pb;
 
     if (PE_LoadU16(b) == 0u) {
-        (void)PE_D_COMP_BOUNDARY2("func_80071A74", 0x80071A74u, 0x80011740u,
-                                  pa_mmio_load16(PE_LoadU32(0x80095670u)));
+        {
+            const uint32_t x[1] = {pa_mmio_load16(PE_LoadU32(0x80095670u))};
+            (void)PE_Bios_Printf(0x80011740u, x, 1);   /* printf, 0x80071A74 */
+        }
         (void)PE_D_COMP_BOUNDARY0("func_80074384", 0x80074384u);
     }
     pa = PE_LoadU32(0x80095670u);
@@ -351,9 +356,10 @@ void func_80073F00(void)
 
         PE_StoreU32(0x8009567Cu, (uint32_t)(c + 1));
         if (c >= 0x801) {
-            (void)PE_D_COMP_BOUNDARY3("func_80071A74", 0x80071A74u,
-                                      0x8001175Cu, pa_mmio_load16(pa),
-                                      pa_mmio_load16(pb));
+            {
+                const uint32_t x[2] = {pa_mmio_load16(pa), pa_mmio_load16(pb)};
+                (void)PE_Bios_Printf(0x8001175Cu, x, 2);   /* printf, 0x80071A74 */
+            }
             PE_StoreU32(0x8009567Cu, 0u);
             pa_mmio_store16(PE_LoadU32(0x80095670u), 0u);
         }

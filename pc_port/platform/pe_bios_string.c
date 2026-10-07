@@ -2,6 +2,8 @@
  * pe_bios_string.h.  Quotes are verbatim from psx-spx "BIOS String
  * Functions" / "BIOS Memory Fill/Copy/Compare". */
 #include "pe_bios_string.h"
+#include <stdio.h>
+#include <string.h>
 
 /* Byte values are compared as loaded unsigned bytes; psx-spx specifies the
  * result as "[str1+N]-[str2+N]" without stating signedness, and every
@@ -192,5 +194,29 @@ int32_t PE_Bios_Sprintf(pe_addr_t dst, pe_addr_t fmt, const uint32_t *args, int 
     uint32_t len = (uint32_t)n < sizeof buf ? (uint32_t)n : (uint32_t)sizeof buf - 1u;
     for (uint32_t i = 0; i < len; i++) PE_StoreU8(dst + i, (uint8_t)buf[i]);
     PE_StoreU8(dst + len, 0u);
+    return n;
+}
+
+static struct { unsigned n; pe_addr_t fmt; uint32_t args[4]; } g_printf_log;
+
+unsigned PE_Bios_PrintfLog(pe_addr_t *last_fmt, uint32_t last_args[4])
+{
+    if (last_fmt) *last_fmt = g_printf_log.fmt;
+    if (last_args) memcpy(last_args, g_printf_log.args, sizeof g_printf_log.args);
+    return g_printf_log.n;
+}
+
+void PE_Bios_PrintfLogReset(void) { memset(&g_printf_log, 0, sizeof g_printf_log); }
+
+int32_t PE_Bios_Printf(pe_addr_t fmt, const uint32_t *args, int nargs)
+{
+    char buf[1024];
+    g_printf_log.n++;
+    g_printf_log.fmt = fmt;
+    memset(g_printf_log.args, 0, sizeof g_printf_log.args);
+    for (int i = 0; i < nargs && i < 4; i++) g_printf_log.args[i] = args[i];
+    int32_t n = PE_Bios_SprintfHost(buf, sizeof buf, fmt, args, nargs);
+    size_t len = strlen(buf);
+    fprintf(stderr, "[TTY] %s%s", buf, (len && buf[len - 1u] == '\n') ? "" : "\n");
     return n;
 }
