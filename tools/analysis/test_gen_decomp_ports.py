@@ -1012,3 +1012,37 @@ class GuestCallArgWidthTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RoomIdiomRewriteTests(unittest.TestCase):
+    def test_array_address_cast_becomes_literal(self):
+        src = "extern char D_80192BE8[];\nint f(void) { return (int)D_80192BE8; }\n"
+        out = g.rewrite_array_address_casts(src)
+        self.assertIn("(int)0x80192BE8u", out)
+
+    def test_indexed_array_cast_is_left_alone(self):
+        src = "extern char D_80192BE8[];\nint f(int i) { return (int)D_80192BE8[i]; }\n"
+        self.assertEqual(g.rewrite_array_address_casts(src), src)
+
+    def test_callee_word_store_and_load(self):
+        src = ("extern int *func_800C22F8();\nint f(int s) {\n"
+               "    *func_800C22F8(s) = 5;\n    return *func_800C22F8(s) == 0;\n}\n")
+        out = g.rewrite_callee_word_stores(src)
+        self.assertIn("PE_StoreU32((pe_addr_t)func_800C22F8(s), (uint32_t)(5));", out)
+        self.assertIn("return ((int)PE_LoadU32((pe_addr_t)func_800C22F8(s)))", out)
+
+    def test_multiply_is_not_a_deref(self):
+        src = "extern int *func_800C22F8();\nint f(int a) { return a * func_800C22F8(a); }\n"
+        self.assertEqual(g.rewrite_callee_word_stores(src), src)
+
+    def test_code_pointer_member_retyped(self):
+        src = ("typedef struct Obj { int a; void (*fn)(); } Obj;\nextern void func_80190390();\n"
+               "int f(Obj *o) { o->fn = func_80190390; return 0; }\n")
+        out = g.rewrite_code_pointer_members(src)
+        self.assertIn("unsigned int fn;", out)
+        self.assertIn("o->fn = 0x80190390u;", out)
+
+    def test_call_through_member_is_left_alone(self):
+        src = ("typedef struct Obj { int a; void (*fn)(); } Obj;\n"
+               "int f(Obj *o) { o->fn(o); return 0; }\n")
+        self.assertEqual(g.rewrite_code_pointer_members(src), src)

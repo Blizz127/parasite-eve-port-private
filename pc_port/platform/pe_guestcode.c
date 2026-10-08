@@ -154,9 +154,16 @@ const PeGuestCodeEntry *PE_GuestCode_Resolve(pe_addr_t addr)
             /* The same resident bytes at the same address are the same
              * code whichever room table lists them: the 8-byte `return 0`
              * behaviour-table stubs every room carries count as one match.
-             * Longer bodies stay ambiguous (their callees are room-local). */
-            if (!by_fp || e->size != 8u || by_fp->size != e->size ||
-                by_fp->fingerprint != e->fingerprint)
+             * Longer bodies stay ambiguous (their callees are room-local),
+             * unless both tables list the same generated TU: the generator
+             * emits one TU per masked-body group and names every member room
+             * in it ("this TU is room_m0022i, room_m0428i's func_..."), so the
+             * same symbol over the same bytes is the same native code. */
+            int same = by_fp && by_fp->size == e->size &&
+                       by_fp->fingerprint == e->fingerprint &&
+                       (e->size == 8u ||
+                        (by_fp->symbol && e->symbol && strcmp(by_fp->symbol, e->symbol) == 0));
+            if (!same)
                 fp_matches++;
             if (!by_fp) by_fp = e;
         }

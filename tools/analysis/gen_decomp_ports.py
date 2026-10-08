@@ -793,6 +793,9 @@ def analyze(name: str, src_text: str, matched: dict,
                     "reason": f"pinned register {m.group(1)} read before written"}
     src_text = rewrite_code_addresses(strip_era_asm(src_text))
     src_text = neutralize_host_typedefs(src_text)
+    src_text = rewrite_array_address_casts(src_text)
+    src_text = rewrite_callee_word_stores(src_text)
+    src_text = rewrite_code_pointer_members(src_text)
     src_text, why = rewrite_guest_calls(src_text, name)
     if why:
         return {"eligible": False, "reason": why}
@@ -1298,6 +1301,100 @@ def neutralize_declarations(body: str, shimmed_data: set[str],
         pos = end
     out.append(body[pos:])
     return "".join(out)
+
+
+ARRAY_EXTERN_RE = re.compile(
+    r"^[ \t]*extern\b[^;()]*?\b(D_[0-9A-Fa-f]{8})\s*\[[^\]]*\]\s*;", re.M)
+
+
+def rewrite_array_address_casts(text: str) -> str:
+    """`(int)D_X` on an extern *array* is the array's guest address.
+
+    In retail C the array name decays to its address, and the integer cast
+    keeps the 32-bit value.  Host-side the name is a 64-bit host pointer, so
+    E16 would reject the cast as a narrowing.  The address is the symbol's
+    own VMA, so substitute the literal.  Only a bare symbol is rewritten: an
+    indexed `(int)D_X[k]` casts the element, and a call or member access is
+    left for the other rules.
+    """
+    arrays = set(ARRAY_EXTERN_RE.findall(strip_comments(text)))
+    if not arrays:
+        return text
+    cast = re.compile(
+        r"\(\s*((?:(?:unsigned|signed)[ \t]+)?(?:int|long)|unsigned|uint32_t|pe_addr_t)\s*\)"
+        r"\s*(D_[0-9A-Fa-f]{8})\b(?!\s*[\[(.]|\s*->)")
+
+    def sub(m: re.Match) -> str:
+        sym = m.group(2)
+        if sym not in arrays:
+            return m.group(0)
+        return f"({m.group(1)})0x{sym[2:].upper()}u /* guest address of {sym} */"
+    return cast.sub(sub, text)
+
+
+def rewrite_callee_word_stores(text: str) -> str:
+    """`*func_X(args) = v;` where func_X is declared to return `int *`.
+
+    The callee returns a 32-bit guest address (the host prototype is
+    pe_addr_t), so the store goes through the guest-RAM accessor:
+    `PE_StoreU32(func_X(args), (uint32_t)(v));`.  This is the effect-slot
+    init idiom `*func_800C22F8() = (int)D_X;` (slot reset, then install the
+    slot's script).  Only word pointees (int / unsigned int) are rewritten.
+    """
+    stripped = strip_comments(text)
+    word_ret = set(re.findall(
+        r"extern\s+(?:unsigned\s+)?int\s*\*\s*(func_[0-9A-Fa-f]{8})\s*\(", stripped))
+    if not word_ret:
+        return text
+    stmt = re.compile(
+        r"(?m)^([ \t]*)\*\s*(func_[0-9A-Fa-f]{8})\s*\(([^;()]*)\)\s*=\s*([^;=][^;]*);")
+
+    def sub(m: re.Match) -> str:
+        if m.group(2) not in word_ret:
+            return m.group(0)
+        return (f"{m.group(1)}PE_StoreU32((pe_addr_t){m.group(2)}({m.group(3)}), "
+                f"(uint32_t)({m.group(4).strip()}));")
+    text = stmt.sub(sub, text)
+    # Reads: a unary `*func_X(args)` (after an operator / open paren / return,
+    # never a binary multiply) loads the word at the returned guest address.
+    load = re.compile(
+        r"((?:[(=,!?:;{}&|]|\breturn\b)\s*)\*\s*(func_[0-9A-Fa-f]{8})\s*\(([^;()]*)\)")
+
+    def lsub(m: re.Match) -> str:
+        if m.group(2) not in word_ret:
+            return m.group(0)
+        return f"{m.group(1)}((int)PE_LoadU32((pe_addr_t){m.group(2)}({m.group(3)})))"
+    return load.sub(lsub, text)
+
+
+def rewrite_code_pointer_members(text: str) -> str:
+    """Function-pointer members of a leaf struct hold 32-bit guest code
+    addresses (`void (*fn)();` in the room Obj records).  Retyped as
+    `unsigned int`, the struct has the guest layout on the host too.  An
+    assignment `x = func_X;` of a code address becomes the literal VMA, which
+    the native dispatch later resolves through the guest-code registry.
+    A leaf that *calls* through such a member is left unchanged (E18/indirect
+    call still reject it): that call has to go through PE_GuestCall.
+    """
+    members: set[str] = set()
+    member_re = re.compile(
+        r"(?<![\w*])(?:const\s+)?[A-Za-z_][\w \t]*?\(\s*\*\s*([A-Za-z_]\w*)\s*\)\s*\([^;{}()]*\)\s*;")
+
+    def body_sub(m: re.Match) -> str:
+        def msub(mm: re.Match) -> str:
+            members.add(mm.group(1))
+            return f"unsigned int {mm.group(1)}; /* guest code address */"
+        return m.group(0)[: m.start(1) - m.start(0)] + member_re.sub(msub, m.group(1)) + \
+            m.group(0)[m.end(1) - m.start(0):]
+    out = re.sub(r"\bstruct\s*\w*\s*\{([^{}]*)\}", body_sub, text)
+    if not members:
+        return text
+    stripped = strip_comments(out)
+    if any(re.search(rf"(?:->|\.)\s*{re.escape(n)}\s*\(", stripped) for n in members):
+        return text
+    return re.sub(r"=\s*(func_([0-9A-Fa-f]{8}))\s*;",
+                  lambda m: f"= 0x{m.group(2).upper()}u; /* guest code address of {m.group(1)} */",
+                  out)
 
 
 def guest_address_expr(sym: str, decl: str, index: str | None,
