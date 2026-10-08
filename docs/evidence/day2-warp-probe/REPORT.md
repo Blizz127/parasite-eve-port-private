@@ -253,10 +253,11 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
 `EXACT_REBUILD_GATE` PASS.
 
 - m0256i: `func_80193BFC` (0x4B4) and its particle callback `func_8019377C`
-  (0x480, GTE rotation-matrix asm) done. The room now runs further and stops
-  on the next effect callback `func_801934AC` (0x2D0). That one is matched
-  too (scratch `build/tmp/m5/func_801934AC.final.c`, next increment). After
-  it comes its callback `func_80192844` (0xC68).
+  (0x480, GTE rotation-matrix asm) done (`e6711341`). Then `func_801934AC`
+  (0x2D0) matched and carved; m0256i now stops on its particle callback
+  `func_80192844` (0xC68, 5 motion kinds plus GTE draw; no near twin). m2c
+  needs the rodata jump table with `.word .L8019xxxx` labels (raw words make
+  m2c assert): scratch `build/tmp/m5/rodata_l.s`, output `m2c_28.c`.
 - Still to do: m0432i 0x80193414 (0x52C), m0349i 0x8018F7C4 (0x90C),
   m0159i 0x8018F3A4 (0xA54; needs a room config first).
 - Matching notes: gcc 2.7 assumes a struct-member access never aliases a
