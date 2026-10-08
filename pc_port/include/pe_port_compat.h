@@ -456,6 +456,9 @@ extern int func_8006F9F0(unsigned int index);
 extern int func_8006DC18(uint32_t code);
 extern int PE_EffectCallback(pe_addr_t fn, int32_t mode, pe_addr_t data, pe_addr_t extra);
 extern void PE_EffectCallback_SetExtra1(uint32_t extra1);
+/* Next PE_EffectCallback is a per-slot draw/update dispatch: the generic
+ * guest call passes the retail a0 = slot, a1 = `a1` (func_800D413C_port.c). */
+extern void PE_EffectCallback_SlotAbi(uint32_t a1);
 extern int PE_MirrorOverlay(void);
 extern int PE_MirrorInit(pe_addr_t slot);
 extern int PE_MirrorCommand(pe_addr_t slot, uint32_t mode, uint32_t command, uint32_t x, uint32_t z);

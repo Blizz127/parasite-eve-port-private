@@ -11,6 +11,14 @@
  * D4698 publishes it here before dispatching (SEW12). */
 static uint32_t g_pe_effect_extra1;
 void PE_EffectCallback_SetExtra1(uint32_t extra1) { g_pe_effect_extra1 = extra1; }
+/* The per-slot draw/update dispatchers (func_8006F8EC / func_8006F9F0) call
+ * the descriptor callback as retail `jalr fn` with a0 = slot (draw: a1 =
+ * min(code, 85)), not (mode, data).  `mode` 1/2 only selects the hand ports
+ * below; the generic guest-code call must use the retail registers, or a
+ * native callee that reads a0 sees 1/2 instead of the slot address. */
+static int g_pe_effect_slot_abi;
+static uint32_t g_pe_effect_slot_a1;
+void PE_EffectCallback_SlotAbi(uint32_t a1) { g_pe_effect_slot_abi = 1; g_pe_effect_slot_a1 = a1; }
 
 /* Six original stack bytes shared by M0023I callbacks in the 69594 pump.
  * Track their writers, including the retained joint Z on paused frames.
@@ -86,6 +94,9 @@ static int m0023i_code(void)
 
 int PE_EffectCallback(pe_addr_t fn, int32_t mode, pe_addr_t data, pe_addr_t extra)
 {
+    const int slot_abi = g_pe_effect_slot_abi;
+    const uint32_t slot_a1 = g_pe_effect_slot_a1;
+    g_pe_effect_slot_abi = 0;
     PE_M34StackCallback(fn);
     (void)data; (void)extra;
     int rehearsal=m0023i_code();
@@ -199,12 +210,16 @@ int PE_EffectCallback(pe_addr_t fn, int32_t mode, pe_addr_t data, pe_addr_t extr
         return (int32_t)0x80190B80u;
     }
     if (PE_GuestCode_Resolve(fn))   /* generated overlay / EXE TU (pe_guestcode.h) */
-        return PE_GuestCall("@800D413C:effect", fn, 2u, (uintptr_t)(uint32_t)mode, (uintptr_t)data, 0, 0);
+        return slot_abi
+            ? PE_GuestCall("@800D413C:effect", fn, 2u, (uintptr_t)data, (uintptr_t)slot_a1, 0, 0)
+            : PE_GuestCall("@800D413C:effect", fn, 2u, (uintptr_t)(uint32_t)mode, (uintptr_t)data, 0, 0);
     if (PE_Decomp_BoundaryStopEnabled())
         /* Native-only: an unported effect callback is a CPU_BOUNDARY/REFUSED
          * STOP under the port binary's stop policy; the skip below is
          * record-policy only. */
-        return PE_GuestCall("@800D413C:effect", fn, 2u, (uintptr_t)(uint32_t)mode, (uintptr_t)data, 0, 0);
+        return slot_abi
+            ? PE_GuestCall("@800D413C:effect", fn, 2u, (uintptr_t)data, (uintptr_t)slot_a1, 0, 0)
+            : PE_GuestCall("@800D413C:effect", fn, 2u, (uintptr_t)(uint32_t)mode, (uintptr_t)data, 0, 0);
     if (g_pe_strict_effect_stack) {
         fprintf(stderr,"[EFFECT] Unported callback %08X mode %d\n",fn,mode);
         Bootstrap_ReturnVoid("PE_EffectCallback", "room effect callback");
@@ -504,7 +519,7 @@ int func_8006F9F0(unsigned index)
     fn=PE_LoadU32(entry+16u);if (!fn) return -1;
     if (fn==0x800D413Cu) result=func_800D413C(slot);
     else if (fn==0x800C9B90u || fn==0x800CD8F0u || fn==0x800CE16Cu) result=PE_EffectStackWeaponUpdate(fn,slot);
-    else {PE_EffectStackInvalidate();result=PE_EffectCallback(fn,1,slot,0u);}
+    else {PE_EffectStackInvalidate();PE_EffectCallback_SlotAbi(0u);result=PE_EffectCallback(fn,1,slot,0u);}
     PE_StoreU32(slot+4u,PE_LoadU32(slot+4u)+1u);
     return result;
 }
