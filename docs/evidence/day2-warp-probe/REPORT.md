@@ -337,3 +337,20 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
   for later `mflo`. A bare `p[0]` store folds to `*p`, which gcc 2.7 does not
   mark as in-struct, so global loads cannot move above it. Writing it as a
   member store (`((EffectHead *)p)->x = ...`) lets them move, as retail does.
+- EXE `func_800D1384` (gradient trail ribbon: shifts the trail, then per
+  segment RTPT + RTPS, AVSZ3 depth, a POLY_G4 with a colour fade and an
+  optional draw-mode word) is now a hand port
+  (`pc_port/game/boot/func_800D1384_port.c`, from the retail asm, with a
+  unit test) plus a shim prototype. m0432i runs past it and now stops at its
+  effect callback `0x801931B8` (asm in the 3560 block). Gates (tag e22g):
+  Day 1 route PASS (story 80), Day 2 movies PASS, 1638/1638 tests, both
+  guards PASS, both `--verify` 0 drift.
+- m0256i (still `GUEST_TRAP` in `func_80192680`): the durations it divides by
+  (+0x28/+0x2A/+0x2C, heights at +0x22/+0x24) are written only by messages
+  0x100/0x101 to the 6-argument handler `func_801925AC` (uses a3, a4, a5).
+  `PE_GuestCall` carries at most 4 arguments, so that handler has no dispatch
+  thunk, and no STOP is seen before the trap. So the message is most likely
+  never delivered in the warp probe (or a4/a5 are lost). Open; the trap
+  stops the run, so nothing is skipped.
+- m0050i still hangs in the probe (no final token, no stop reason). Not yet
+  investigated this round.
