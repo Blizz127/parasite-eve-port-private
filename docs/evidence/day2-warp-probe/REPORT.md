@@ -362,3 +362,22 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
   callback `0x80192AF0` (asm block 3560). Gates (tag e22h): Day 1 route PASS
   (story 80), Day 2 movies PASS, 1638/1638 tests, both guards PASS, both
   `--verify` 0 drift, unit tests OK, EXACT_REBUILD_GATE PASS.
+- m0050i hang found and turned into a STOP. A gdb backtrace of the hung run
+  showed `func_8001220C` spinning. m0050i's script raises the story word
+  persist[74] (`D_800A7918`) to 0x2F2. The main loop's disc gate needs the
+  disc-1 flag below story 0x258 and the disc-2 flag (`D_800B0DCD` bit 2)
+  from 0x258 up, so it calls `func_80069B08(2)`, the retail disc-swap screen
+  ("insert disc 2", drive polling, then `D_800B0DCD = 2`). That function was
+  a `Bootstrap_ReturnVoid` stub returning without doing anything (a silent
+  skip). Later the script's New Game init token (0xAA108448) asked for disc 2
+  again; with bit 2 never set, the loop never ended. `func_80069B08` is now an
+  honest boundary (`PE_Port_DiscSwapBoundary`): `CPU_BOUNDARY/REFUSED
+  func_80069B08 disc swap (insert disc N; story ..., D_800B0DCD ...)` and an
+  `unresolved-boundary` STOP, with a unit test. The Day 1 route never calls
+  it. Probe: m0050i, m0049i, m0196i, m0226i, m0236i, m0237i, m0238i,
+  m0246i, m0248i, m0273i, m0340i, m0343i, m0373i and m0428i all stop there
+  (their scripts move the story to 0x260-0x2F2, disc-2 content); before, the
+  skip let them run on. m0273i was listed clean above only because of
+  that skip. A real port needs the disc-swap screen plus a disc-2 image in
+  the host drive model. Gates (tag e22i): Day 1 route PASS (story 80), Day 2
+  movies PASS, 1639/1639 tests, both guards PASS, both `--verify` 0 drift.
