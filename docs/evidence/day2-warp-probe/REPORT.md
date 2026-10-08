@@ -809,3 +809,12 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
     Day 2 movies PASS, 1645/1645 tests, both guards PASS, both
     `--verify` 0 drift, exact rebuild PASS (sha1 452fb033). Next: probe
     m0430i at 0x90/0x140, then clear m0437i 0x80192500.
+  - Probe: m0430i clean at story 0x90, 0x140, and 0x300 (PE_WARP_DISC=2);
+    stop_reason=frame-limit on all three. Room's asm span is fully carved.
+  - 14:50 CT: m0437i 0x80192500 down to 40 words (from 48). Case 2 now
+    keeps `$16` as the f8 base via a do{}while(0) after `s = &D_800F3368.f8`
+    (the asm pin alone was not enough once case 1 already pinned it).
+    Still open: `beq $3,$7` (mode-1, p[8]==mode) vs our `$19`; head slot
+    `$3` vs `$2`; `mfhi`/`mflo $8` vs `$9` (the `register asm("$8")` on the
+    matrix pointer); case 1 `la $16` placement; case 2 absolute vs
+    `-6($16)` for the f2 read and absolute vs `-4($16)` for the f4 store.
