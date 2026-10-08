@@ -615,3 +615,24 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
   4000 frames, binary 065723a3): 376 clean, 6 stopping, 20 unused. The
   stops are the same effect callbacks as at story 0x90 (m0349i/m0429i,
   m0427i/m0428i, m0430i, m0437i).
+- Three more matched room leaves (LINK_EXACT, written from the retail asm):
+  - m0428i `func_80193018`, the effect callback m0428i and m0427i stopped
+    at (ring radius from the story frame counter, a proximity trigger that
+    sets the player flag 0x4000, two rings via func_800D0728). It was the
+    whole 0x4030 asm span. m0428i and m0427i now run clean.
+  - m0429i `func_80199684` (effect callback: three bone points, two
+    gradient segments, a 20-entry particle pool) and `func_801991F8` (its
+    particle callback). m0429i and m0349i now run past both and stop at
+    the next callback, 0x8019A054.
+  - preflight PASS for both rooms (m0429i 76 c / 4 asm / 1 rodata, m0428i
+    59 c / 3 asm / 1 rodata), EXACT_REBUILD_GATE PASS for both; room
+    bodies 2721 -> 2724, registry 5365 -> 5368 thunks.
+  - Gates (tag k12): Day 1 route PASS (story 80, frame 67186), Day 2
+    movies PASS, 1645/1645 tests, both guards PASS, both `--verify` 0
+    drift.
+- Disc 2 sweep (story 0x300, PE_WARP_DISC=2 so Disc 2 is in the drive at
+  the warp, 402 slots, 3 at a time, 4000 frames, binary before the three
+  leaves above): 377 clean, 5 stopping, 20 unused. Stops: m0349i/m0429i
+  (0x80199684), m0427i/m0428i (0x80193018), m0437i (0x80192D74). m0430i
+  is clean at this story point. With the leaves above, m0427i/m0428i are
+  clean and m0349i/m0429i move on to 0x8019A054.
