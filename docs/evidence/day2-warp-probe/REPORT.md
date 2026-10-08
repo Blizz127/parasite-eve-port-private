@@ -354,3 +354,11 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
   stops the run, so nothing is skipped.
 - m0050i still hangs in the probe (no final token, no stop reason). Not yet
   investigated this round.
+- m0432i `func_801931B8` (0x25C, the particle callback 80193414 starts:
+  damped drift with a floor bounce, then the rotating sprite draw) matched
+  and carved (default `era_o2_g0`). Matching notes: `p[9] * 32` (not `<< 5`)
+  gives retail's `lh`, and the clut offset written as one ternary keeps the
+  early constant 4. m0432i now runs past it and stops at the next effect
+  callback `0x80192AF0` (asm block 3560). Gates (tag e22h): Day 1 route PASS
+  (story 80), Day 2 movies PASS, 1638/1638 tests, both guards PASS, both
+  `--verify` 0 drift, unit tests OK, EXACT_REBUILD_GATE PASS.
