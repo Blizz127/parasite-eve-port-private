@@ -763,3 +763,20 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
     array element. Loop notes and volatile asm are full sched barriers.
     Remaining work: the scheduling order of that case 1 head (search
     running).
+  - 13:45 CT: no asm pins left in the case 1 head; down to 16 words.
+    Retail never pinned the pointers. `sp = &D_800F3368; sp->f0 = 32;`
+    stays in `$16` because the later read is written `D_800F3368.f2`:
+    expand puts that constant address through a pseudo, and CSE's
+    related-value lookup rewrites it as `sp+2` (`lh $3,2($16)`). The
+    absolute stores go to the standalone symbols (`D_800F336A`,
+    `D_800F3376`, `D_800F3378`, `D_800F336C/E`, `D_800F3370`); written
+    as struct fields they would also turn into `2($16)` etc. The same
+    holds for `ix = &D_800E11E4[3]`, with the post-call read written
+    `D_800E11E4[11]`, which gives `16($21)`. One loop note
+    (`do {} while (0)`) after the f2 store is needed, so combine can't
+    fold either pointer back into an absolute address. With no asm in
+    the block, reorg fills the AA4 delay slot with `$4 = 0` as retail
+    does (reorg's backward delay-slot search stops at any asm insn).
+    Left: the order of the `x`/`d` loads in the top block, the `vz`
+    store in the bottom block, and a `$21`/`$22` swap between `ix` and
+    the shared constant 3.
