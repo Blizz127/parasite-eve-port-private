@@ -671,3 +671,40 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
   - Gates (tag k14): Day 1 route PASS (story 80, frame 67186), Day 2
     movies PASS, 1645/1645 tests, both guards PASS, both `--verify` 0
     drift.
+- 0x80192500 progress (no code change in this push; draft kept in box
+  scratch, not in git). Word mismatches 520 -> 48, diff lines 139 -> 34.
+  What the remaining gap taught us about gcc 2.7.2 (checked against its
+  `cse.c` / `sched.c` / `local-alloc.c` sources):
+  - The colour-address hoist comes from CSE path following: the prologue
+    pseudo for the struct-copy destination `(plus fp 64)` is reused along
+    the followed path prologue -> mode 2 -> inner case, and combine then
+    cannot fold the single-use copy address. Retail breaks that path with a
+    loop note in the mode-2 head (a `do { ... } while (0)` around the
+    `gte_SetRotMatrix`, i.e. a macro). That removes the hoist and gives
+    retail's 104-byte frame and its `$19`/`$7` compare registers.
+  - Retail's case 1/2 stores run after the table loads because the
+    D_800F3368..78 block is a struct (the scheduler treats a fixed struct
+    field and a varying array element as possibly aliasing). Case 0 keeps
+    plain scalars. Case 0 uses its own value/clut variables, and each
+    matrix-slot load uses its own pointer variable.
+  - Still open: retail's `$8` for the matrix pointer while `mfhi`/`mflo`
+    also use `$8` (any `register asm("$8")` keeps the allocator off `$8`
+    for the whole function), the mode-1 `p[8] == 1` compare register, and
+    where the `la $16` of the case 1/2 sprite pointer is scheduled.
+  - Follow-up: dropping the register variable and passing `*matrix_slot`
+    straight to the macro reproduces retail's head exactly (`la $3` /
+    `lw $8,0($3)`). The `$8` is a reload register (reload hands out hard
+    registers no pseudo uses first), and `mfhi`/`mflo` go back to `$8`.
+    The cost is case 0's first `gte_SetRotMatrix`: retail reuses `$8`
+    without a reload, but reload inheritance and `find_equiv_reg` both stop
+    at the case label. So retail must hold the pointer in a real pseudo
+    that global-alloc put on `$8`. An ordinary pseudo lands on `$3`, and
+    forcing conflicts with an empty clobber asm moves `mode` off `$7`
+    instead (the pointer outranks `mode` in allocation priority).
+  - Gates (tag k15, docs-only push): Day 1 route PASS (story 80, frame
+    67186), Day 2 movies PASS, 1645/1645 tests, both guards PASS, both
+    `--verify` 0 drift, exact rebuild PASS (sha1 452fb033).
+- m0430i 0x8018F750 (0xF9C bytes, 1000 instructions) is the same callback
+  family (mode 0/1/2 switch, four CVECTOR copies). Not started beyond the
+  disassembly. No twin exists in any matched room (best jal-multiset
+  similarity 0.46).
