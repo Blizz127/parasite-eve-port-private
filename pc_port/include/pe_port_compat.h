@@ -1090,6 +1090,8 @@ void func_800CEE20(pe_addr_t position, pe_addr_t angles, int32_t sx, int32_t sy,
     int32_t texture, uint32_t clut, int32_t abr, int32_t brightness, pe_addr_t color);
 /* Ring/ribbon glow renderer (hand port in func_800C9C20_port.c). */
 void func_800C4FC4(pe_addr_t r, pe_addr_t matrix, unsigned billboard);
+/* Glow point sprite (hand port in func_800D2104_port.c). */
+void func_800D2104(pe_addr_t pos, pe_addr_t color, int32_t scale, int32_t abr);
 int PE_M0023I_Main(int32_t mode, pe_addr_t data);
 int PE_M0023I_Particle(int32_t mode, pe_addr_t data);
 int PE_M0023I_Beam(int32_t mode, pe_addr_t data);

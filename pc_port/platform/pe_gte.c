@@ -662,6 +662,12 @@ void PE_GTE_Command(uint32_t cmd)
         (void)PE_GTE_NCLIP();
         return;
     }
+    if (op == 0x01u && (cmd & (1u << 19)) && !(cmd & (1u << 10))) {
+        /* RTPS sf=1 lm=0: projects V0 into the SXY/SZ FIFOs, MAC/IR, IR0, FLAG. */
+        uint32_t xy, z;
+        PE_GTE_RTPS_coordinates(&xy, &z);
+        return;
+    }
     if (op == 0x30u && (cmd & (1u << 19)) && !(cmd & (1u << 10))) {
         /* RTPT sf=1 lm=0: projects V0-V2 into the SXY/SZ FIFOs, MAC/IR, IR0, FLAG. */
         uint32_t xy[3], z[3];

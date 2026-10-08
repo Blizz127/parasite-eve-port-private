@@ -35775,6 +35775,7 @@ static void test_ATK3_retail_attack_initialization(void)
 #include "test_anchor_attachment.h"
 #include "test_ncct.h"
 #include "test_m0348i_gte.h"
+#include "test_d2104_glow.h"
 #include "test_gte_regs.h"
 #include "test_m0034i_model.h"
 #include "test_m0034i_setup.h"
@@ -40789,6 +40790,7 @@ int main(void)
     test_GTE_regs_rtv0_sequence();
     test_M348G_comp_matrix();
     test_M348G_c4fc4_ring();
+    test_D2104_glow_point();
     test_DAY1_m0034i_model();
     test_DAY1_m0034i_setup();
     test_DAY1_m0034i_delivery();

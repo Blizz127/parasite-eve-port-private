@@ -391,9 +391,14 @@ class Refusals(unittest.TestCase):
         self.assertRefused('int func_80190000(int a) { __asm__("syscall"); return a; }', "asm")
 
     def test_unsupported_cop2_command(self):
-        # RTPS (0x4A180001) has no register-level native implementation yet.
-        self.assertRefused('int func_80190000(int a) { __asm__ volatile(".word 0x4A180001"); '
+        # NCDS (0x4AE80413) has no register-level native implementation yet.
+        self.assertRefused('int func_80190000(int a) { __asm__ volatile(".word 0x4AE80413"); '
                            'return a; }', "cop2 command")
+
+    def test_rtps_lowered(self):
+        res = lower('int func_80190000(int a) { __asm__ volatile("nop\\n\\tnop\\n\\t.word 0x4A180001"); '
+                    'return a; }')
+        self.assertIn("PE_GTE_Command(0x0180001u)", res["body"])
 
     VOID_SIG = {"func_800CEE20": {"ret": "void", "params": ["int32_t a"]}}
 

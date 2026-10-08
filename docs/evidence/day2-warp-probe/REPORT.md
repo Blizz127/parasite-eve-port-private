@@ -323,6 +323,13 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
   side-effect-free inputs only (an `"m"` fence) is dropped (m0418i); and an
   `asm("SYM")` label on a plain function declaration counts as extern
   (m0418i). m0141i, m0273i and m0418i run clean to the frame limit.
+- EXE `func_800D2104` (0x26C, glow point sprite: RTPS, TILE_1 with the
+  colour scaled by scale/128, optional draw-mode word) is now a hand port
+  (`pc_port/game/boot/func_800D2104_port.c`, written from the retail asm,
+  with a unit test on analytic GTE inputs) plus a shim prototype. The
+  lowering and `PE_GTE_Command` also accept RTPS (cop2 0x0180001, sf=1 lm=0).
+  m0159i now runs clean to the frame limit (it takes its scripted exit), and
+  m0104i, m0263i, m0391i and m0392i, which call it too, stay clean.
 - Matching notes: gcc 2.7 assumes a struct-member access never aliases a
   fixed-address scalar, so `short *p` indexing (not a struct) plus an array
   global (`D_800942EC[0]`) is what keeps the retail store/load order. Use the
