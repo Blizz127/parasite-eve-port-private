@@ -381,3 +381,15 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
   that skip. A real port needs the disc-swap screen plus a disc-2 image in
   the host drive model. Gates (tag e22i): Day 1 route PASS (story 80), Day 2
   movies PASS, 1639/1639 tests, both guards PASS, both `--verify` 0 drift.
+- m0432i `func_80192AF0` (0x6C8, effect callback: arm with the particle
+  pool, three particle bursts, then the camera-RT sprite and two rings)
+  matched and carved (default `era_o2_g0`). Matching notes: one variable for
+  both cosines; `w = s / 2` assigned inside the func_800CEE20 call so it
+  follows func_80077AA4; the palette index (pre-scaled) and the 0x20
+  constant read before an `"r"(p)` barrier, and the table load behind a
+  second barrier, keep retail's store order. m0432i now stops at its
+  particle task `0x80192548` (asm, 0x5A8). That one calls the EXE helpers
+  `func_800D2B58` and `func_800D0E88`, which have no native port yet, so
+  m0432i will stop at those next. Gates (tag e22j): Day 1 route PASS (story
+  80), Day 2 movies PASS, 1639/1639 tests, both guards PASS, both `--verify`
+  0 drift, unit tests OK, EXACT_REBUILD_GATE PASS.
