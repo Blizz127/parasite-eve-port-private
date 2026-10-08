@@ -743,3 +743,23 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
     merge it with the first read. `D_800E120A` is read into a local at the
     top of case 1 (retail keeps it in `$5`). Left: scheduling order in the
     case 1 head (search running) and two `$2`/`$3` swaps elsewhere.
+  - 0x8018F028 progress (1:10 PM CT, docs-only): 33 -> 12 word mismatches,
+    all in the first 30 insns of mode 2 case 1. Everything outside that
+    window now matches retail. Fixes, all gcc 2.7 allocator or scheduler
+    effects:
+    `matrix_slot` split into one block-local pointer per case (shared, it
+    was a global pseudo that lost `$2` to a local), one `value` local for
+    case 1 apart from case 0's (global vs local `$2`), and a block-local
+    asm-seeded copy of `a` at the top of the `p[9] < 8` branch. That copy
+    keeps `$4` live across the sign temp, so the temp lands in `$5` and
+    reorg can pull `addu $4,$20,$0` into the `beq` delay slot as retail
+    does.
+    Scheduler notes from the gcc 2.7.2 sources: `schedule_select` breaks
+    equal-priority ties by potential function-unit hazard, so loads sink
+    as far as their dependences allow in the backward list scheduler. A
+    load stays high only if a later store may alias it, and a fixed-address
+    scalar never aliases a struct field written through a pointer
+    (MEM_IN_STRUCT_P rule), so retail's early `D_800E120A` read is an
+    array element. Loop notes and volatile asm are full sched barriers.
+    Remaining work: the scheduling order of that case 1 head (search
+    running).
