@@ -731,3 +731,15 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
   - Gates (tag k16): Day 1 route PASS (story 80, frame 67186), Day 2
     movies PASS, 1645/1645 tests, both guards PASS, both `--verify` 0
     drift, exact rebuild PASS (sha1 452fb033).
+  - 0x8018F028 progress (12:30 PM CT, docs-only): 39 -> 33 word mismatches
+    left, every global-alloc register now matches retail (`p` $18, `b`
+    $19, `c` $17, `a`/the 64 local $20, the `D_800E11EA` table pointer
+    and the reused 4 constant $21). Findings: a pin written
+    `x = K; asm("" : "=r"(x) : "0"(x))` counts as 5 refs in the flow dump,
+    which lifts the pointer above `a` in allocation priority. Seeding the
+    asm directly (`asm("" : "=r"(ix) : "0"(&K[3]))`) leaves 3 refs and gives
+    retail's order. Retail's signed `lh` for `rot.vz` means `p[9]` is read
+    a second time into an int local after a stack store, so CSE cannot
+    merge it with the first read. `D_800E120A` is read into a local at the
+    top of case 1 (retail keeps it in `$5`). Left: scheduling order in the
+    case 1 head (search running) and two `$2`/`$3` swaps elsewhere.
