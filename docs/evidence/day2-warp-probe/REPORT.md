@@ -433,3 +433,32 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
   runs on. Without `--disc2-image` it still stops at the disc-swap boundary. Gates (tag k2): Day 1 route PASS
   (story 80), Day 2 movies PASS, 1640/1640 tests, both guards PASS, both
   `--verify` 0 drift, unit tests OK.
+- m0432i is clean. Three steps:
+  - The effect callback `func_80192548` (0x3A4, three effect kinds:
+    a bouncing drift spark plus a scaled blade, an orbiting blade and a
+    streak) is matched and carved (`EXACT_REBUILD_GATE` PASS). Matching
+    notes: the `D_800F33xx` / `D_800942EC` globals declared as arrays keep
+    retail's load order. A second `matrix_slot` barrier sits on the
+    case 2/2 path. `break` out of the outer switch flips the mode-1 tail.
+  - EXE `func_800D0E88` (shaded blade, POLY_G3) is now a native port of
+    its matched C (`func_800D0E88_port.c`, unit test `D0E88_blade`) with a
+    shim prototype. The lowered room code and `func_800DAF8C` (batch 21)
+    call it directly instead of through a boundary.
+  - EXE `func_800D2B58` (streak: LINE_G2 plus a POLY_GT4 glow quad
+    oriented by ratan2) is split out of its asm block, matched
+    (LINK_EXACT, `docs/evidence/func-800D2B58/REPORT.md`, EXE gate
+    sha1 452fb033 unchanged) and ported natively (`func_800D2B58_port.c`,
+    unit test `D2B58_streak`). The retail quirk where point 1's blue
+    channel is scaled by the first brightness is kept. So is the read of
+    a NULL second colour (kuseg 0 = RAM).
+  - `warp_probe.sh m0432i 90 6000` now runs clean to the frame limit
+    (token A8000148, no stop).
+  - `warp_probe.sh` passes `DISC2` as `--disc2-image`.
+  - Gates (tag k3): Day 1 route PASS (story 80), Day 2 movies PASS,
+    1642/1642 tests, both guards PASS, both `--verify` 0 drift, unit
+    tests OK.
+- m0256i root cause found (fix in progress): the hand port of the message
+  dispatcher `func_8006F6D4` calls only a few known handler addresses. For
+  any other handler it returned 0 without calling it. That is a silent
+  skip, so messages 0x100/0x101 never reached the 6-argument handler
+  `func_801925AC`, and its durations stayed 0.

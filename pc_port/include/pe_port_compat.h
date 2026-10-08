@@ -1030,6 +1030,7 @@ extern void func_8006A8D4(void);
 extern void func_80077B64(pe_addr_t pe_arg0);
 extern void func_80077BA4(pe_addr_t pe_arg0);
 extern void func_80077BC4(pe_addr_t pe_arg0);
+extern void func_80077B84(pe_addr_t pe_arg0); /* setPolyG3 header (len 6, code 0x30) */
 extern void func_80077BE4(pe_addr_t pe_arg0);
 extern void func_80077C44(pe_addr_t pe_arg0);
 extern void func_80077C64(pe_addr_t pe_arg0);
@@ -1093,9 +1094,16 @@ void func_800CEE20(pe_addr_t position, pe_addr_t angles, int32_t sx, int32_t sy,
 void func_800C4FC4(pe_addr_t r, pe_addr_t matrix, unsigned billboard);
 /* Glow point sprite (hand port in func_800D2104_port.c). */
 void func_800D2104(pe_addr_t pos, pe_addr_t color, int32_t scale, int32_t abr);
+/* Shaded blade, one POLY_G3 (native port in func_800D0E88_port.c). */
+void func_800D0E88(pe_addr_t pos, pe_addr_t ang, int32_t len, int32_t width, pe_addr_t c0,
+    pe_addr_t c1, pe_addr_t c2, int16_t bright, int32_t abr);
 /* Gradient trail ribbon (hand port in func_800D1384_port.c). */
 void func_800D1384(pe_addr_t head0, pe_addr_t head1, uint32_t n, pe_addr_t col0,
     pe_addr_t col1, int32_t scale, pe_addr_t trail, int32_t abr);
+/* Streak: LINE_G2 + oriented POLY_GT4 glow quad (native port in
+ * func_800D2B58_port.c). */
+void func_800D2B58(pe_addr_t p0, pe_addr_t p1, pe_addr_t c0, pe_addr_t c1,
+    int32_t b0, int32_t b1, int32_t abr);
 int PE_M0023I_Main(int32_t mode, pe_addr_t data);
 int PE_M0023I_Particle(int32_t mode, pe_addr_t data);
 int PE_M0023I_Beam(int32_t mode, pe_addr_t data);

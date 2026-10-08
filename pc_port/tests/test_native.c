@@ -35777,6 +35777,8 @@ static void test_ATK3_retail_attack_initialization(void)
 #include "test_m0348i_gte.h"
 #include "test_d2104_glow.h"
 #include "test_d1384_trail.h"
+#include "test_d0e88_blade.h"
+#include "test_d2b58_streak.h"
 #include "test_disc_swap.h"
 #include "pe_drive_tray.h"
 #include "test_drive_tray.h"
@@ -40796,6 +40798,8 @@ int main(void)
     test_M348G_c4fc4_ring();
     test_D2104_glow_point();
     test_D1384_trail();
+    test_D0E88_blade();
+    test_D2B58_streak();
     test_disc_swap_boundary_stops();
     test_drive_tray_swap();
     test_DAY1_m0034i_model();

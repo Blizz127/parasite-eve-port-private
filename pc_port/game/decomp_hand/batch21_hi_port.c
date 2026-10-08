@@ -59,8 +59,8 @@ int func_800DAB98(int a0, pe_addr_t a1)
 /* src/func_800DAF8C.c: spiral flare.  Mode 1: y += a1[7], z += 8,
  * a1[0] = A - A * f / 64 (A = a1[6]), a1[4] = sin(f * 32) / 64,
  * a1[5] = 0x640 - f * 1000 / 64; 0x40 frames.  Mode 2: colour curve
- * D_800E1C2C, drawn by func_800D0E88(D_800E221C, a1, a1[5], a1[4], ...) —
- * boundary. */
+ * D_800E1C2C, drawn by func_800D0E88(D_800E221C, a1, a1[5], a1[4], buf,
+ * 0, 0, 0x80, 1) (native port, func_800D0E88_port.c). */
 int func_800DAF8C(int a0, pe_addr_t a1)
 {
     int f = (int)PE_LoadU32(0x800E27ECu);
@@ -79,9 +79,8 @@ int func_800DAF8C(int a0, pe_addr_t a1)
         return 1;
     case 2:
         func_800CF3AC(0x800E1C2Cu, S21_BUF, f);
-        PE_D_COMP_BOUNDARY4("func_800D0E88", 0x800D0E88u, 0x800E221Cu, a1,
-                            (int16_t)PE_LoadU16(a1 + 0xAu), (int16_t)PE_LoadU16(a1 + 8u));
-        /* remaining arguments: colour block, 0, 0, 0x80, 1 */
+        func_800D0E88(0x800E221Cu, a1, (int16_t)PE_LoadU16(a1 + 0xAu),
+                      (int16_t)PE_LoadU16(a1 + 8u), S21_BUF, 0, 0, 0x80, 1);
         break;
     default:
         return 0;
