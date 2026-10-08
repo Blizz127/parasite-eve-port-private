@@ -162,7 +162,8 @@ asm templates -> `PE_GTE_ReadData/WriteData/ReadCtrl/WriteCtrl/Command` in
 `pe_gte.c`). Room asm refusals 305 -> 20, room TUs 2257 -> 2583. Gates: Day 1
 PASS (67186), MOVIES_DAY2 PASS, suite 1636/1636, guards OK, verify 0 drift,
 e21_diff 631 ok / 0 mismatch (32 GTE TUs).
-Next: twin-group ambiguity (m0437i, see "Round 4" below).
+Done: registry `closure` fingerprint resolves byte-identical room twins
+(m0437i clean). Remaining 4 stops have no matched C (decomp work).
 No release (waiting on Will).
 
 Changes:
@@ -235,3 +236,11 @@ m0434i, m0435i and m0436i now run clean. Still stopping:
 m0050i still returns to the title (story 0x2F2 -> TOK_NEWGAME) and then waits
 on DMA, as before. Story-0x90 total: 376 clean, 5 STOP, 1 scripted exit,
 20 unused slots.
+
+Twin ambiguity fix: registry entries now carry a `closure` FNV-1a (the leaf
+plus every same-room function reached by `jal`, transitively, from the
+extracted blob). `PE_GuestCode_Resolve` treats two different generated TUs
+as the same code when both their leaf fingerprint and closure match. m0437i
+now runs clean (and m0413i still does). Story-0x90 total: 377 clean, 4 STOP
+(m0159i, m0256i, m0349i, m0432i, all on room functions with no matched C),
+1 scripted exit (m0050i), 20 unused slots.

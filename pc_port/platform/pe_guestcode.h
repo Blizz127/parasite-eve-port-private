@@ -38,6 +38,8 @@ typedef struct {
     uint32_t fingerprint;  /* FNV-1a of the retail bytes, 0 = none */
     PeGuestThunk thunk;
     const char *symbol;    /* host symbol, for diagnostics */
+    uint32_t closure;      /* room entries: FNV-1a over the bytes of this leaf and
+                            * every same-room function it reaches by jal (0 = none) */
 } PeGuestCodeEntry;
 
 typedef struct {

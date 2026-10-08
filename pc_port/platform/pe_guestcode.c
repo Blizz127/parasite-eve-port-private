@@ -159,10 +159,15 @@ const PeGuestCodeEntry *PE_GuestCode_Resolve(pe_addr_t addr)
              * emits one TU per masked-body group and names every member room
              * in it ("this TU is room_m0022i, room_m0428i's func_..."), so the
              * same symbol over the same bytes is the same native code. */
+            /* Two different TUs (room twins whose matched sources differ in
+             * text) are also the same native code when their retail closures
+             * (this leaf plus every same-room jal callee, transitively) are
+             * byte-identical: the generator records that as `closure`. */
             int same = by_fp && by_fp->size == e->size &&
                        by_fp->fingerprint == e->fingerprint &&
                        (e->size == 8u ||
-                        (by_fp->symbol && e->symbol && strcmp(by_fp->symbol, e->symbol) == 0));
+                        (by_fp->symbol && e->symbol && strcmp(by_fp->symbol, e->symbol) == 0) ||
+                        (e->closure != 0u && by_fp->closure == e->closure));
             if (!same)
                 fp_matches++;
             if (!by_fp) by_fp = e;

@@ -532,6 +532,36 @@ def fnv1a(data: bytes) -> int:
     return h
 
 
+def closure_fp(ovl: dict, data: bytes, name: str) -> int:
+    """FNV-1a over (vma, bytes) of a leaf and every same-room function its
+    retail code reaches by `jal` (transitively).  Two registry entries with
+    the same closure run byte-identical code all the way down, so either
+    generated TU is the same native code for them (pe_guestcode.c)."""
+    by_vma = {lf["vram"]: lf for lf in ovl["leaves"].values()}
+    lo, hi = ovl["vram"], ovl["vram"] + len(data)
+    seen: set[int] = set()
+    todo = [ovl["leaves"][name]["vram"]]
+    parts = []
+    while todo:
+        v = todo.pop()
+        if v in seen:
+            continue
+        seen.add(v)
+        lf = by_vma.get(v)
+        if lf is None:                      # unmatched same-room callee: its address only
+            parts.append(v.to_bytes(4, "little"))
+            continue
+        body = data[lf["file_offset"]:lf["file_offset"] + lf["file_size"]]
+        parts.append(v.to_bytes(4, "little") + body)
+        for k in range(0, len(body) - 3, 4):
+            w = int.from_bytes(body[k:k + 4], "little")
+            if w >> 26 == 3:                # jal
+                t = (v & 0xF0000000) | ((w & 0x3FFFFFF) << 2)
+                if lo <= t < hi:
+                    todo.append(t)
+    return fnv1a(b"".join(sorted(parts)))
+
+
 def main_checkout(root: Path) -> Path | None:
     """The main checkout of the repository that `root` belongs to.
 
@@ -665,7 +695,7 @@ def render_dispatch(tables: list[dict]) -> str:
         out.append(f"static const PeGuestCodeEntry {cname}_e[] = {{")
         for e in sorted(t["entries"], key=lambda e: e["vma"]):
             out.append(f"    {{0x{e['vma']:08X}u, 0x{e['size']:X}u, 0x{e['fp']:08X}u, "
-                       f"{e['thunk']}, \"{e['symbol']}\"}},")
+                       f"{e['thunk']}, \"{e['symbol']}\", 0x{e.get('closure', 0):08X}u}},")
         if not t["entries"]:
             out.append("    {0u, 0u, 0u, 0, 0},")
         out.append("};")
@@ -758,9 +788,10 @@ def build_dispatch(args) -> tuple[int, list[str]]:
                                  f"[{off:#x},+{size:#x}) lies past the end of {blob} "
                                  f"({len(data):#x} bytes)")
             fp = fnv1a(data[off:off + size])
+            cl = closure_fp(ovl, data, name) if ovl_id.startswith("room_") else 0
             sym = sig.get("sym") or symbol(ovl_id, name)
             params = ", ".join(sig["params"]) or "void"
-            ents.append({"vma": leaf["vram"], "size": leaf["file_size"], "fp": fp,
+            ents.append({"vma": leaf["vram"], "size": leaf["file_size"], "fp": fp, "closure": cl,
                          "symbol": sym, "types": types, "ret": sig["ret"].strip(),
                          "decl": f"{sig['ret']} {sym}({params});"})
         tables.append({"id": ovl_id, "lo": lo, "hi": hi, "sha1": sha,

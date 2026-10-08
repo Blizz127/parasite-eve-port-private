@@ -283,5 +283,29 @@ class E21FallbackTests(unittest.TestCase):
                                       "pointer parameter: x", set(), {}, {}), "float")
 
 
+
+class ClosureFingerprintTests(unittest.TestCase):
+    """Registry `closure`: leaf + same-room jal callees, transitively."""
+
+    @staticmethod
+    def room(callee_word: int, far_word: int = 0) -> tuple[dict, bytes]:
+        jal = (3 << 26) | ((0x80190010 >> 2) & 0x3FFFFFF)
+        words = [jal, 0, 0x03E00008, 0, callee_word, 0x03E00008, 0, far_word]
+        data = b"".join(w.to_bytes(4, "little") for w in words)
+        ovl = {"vram": 0x80190000, "leaves": {
+            "func_80190000": {"vram": 0x80190000, "file_offset": 0, "file_size": 16},
+            "func_80190010": {"vram": 0x80190010, "file_offset": 16, "file_size": 12}}}
+        return ovl, data
+
+    def test_identical_closures_match(self):
+        a = o.closure_fp(*self.room(0x24020001), "func_80190000")
+        b = o.closure_fp(*self.room(0x24020001, far_word=0x12345678), "func_80190000")
+        self.assertEqual(a, b)          # bytes outside the closure do not count
+
+    def test_callee_difference_splits(self):
+        a = o.closure_fp(*self.room(0x24020001), "func_80190000")
+        b = o.closure_fp(*self.room(0x24020002), "func_80190000")
+        self.assertNotEqual(a, b)       # same leaf bytes, different jal callee
+
 if __name__ == "__main__":
     unittest.main()
