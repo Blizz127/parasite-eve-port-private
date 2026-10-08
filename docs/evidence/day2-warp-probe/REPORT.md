@@ -780,3 +780,21 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
     Left: the order of the `x`/`d` loads in the top block, the `vz`
     store in the bottom block, and a `$21`/`$22` swap between `ix` and
     the shared constant 3.
+  - 13:55 CT: the `d` load now lands where retail has it (15 words, 8
+    diff lines). In retail, `lh $17,18($18)` (`p[9]`) is scheduled above
+    the `rot.vx` stack store. Under gcc 2.7.2's alias rules that is only
+    possible if the store is not MEM_IN_STRUCT (a varying in-struct
+    read never aliases a fixed non-struct write). So the case 1 `rot`
+    stores are written `*(short *)&rot.vx = ...`; the inner object is a
+    scalar field, so the MEM isn't flagged in-struct. Left: the
+    `D_800E120A` (`x`) load still sinks below `lh $6` (in sched1 it births
+    a pseudo, so it gets max priority and sinks), and the bottom-block
+    `addiu $22,3` and `vz` store are out of order. Order search running.
+  - m0437i 0x80192500 (still stopping): best draft is 48 words. Retail
+    keeps `mode` in `$7` (copied in the prologue, then reused for the
+    constants 1/2 in the dispatch compares), keeps the head matrix
+    pointer in `$8` (`lw $8,0($3)`, reused by case 0's first GTE op),
+    and points `$16` at `D_800F3368+8` (f8) in cases 1/2, with
+    `lh -6($16)` for the post-call read. Not matched yet: `$8`
+    allocation (a register asm variable forces `mfhi $9`) and the
+    case 2 f8 base pointer.
