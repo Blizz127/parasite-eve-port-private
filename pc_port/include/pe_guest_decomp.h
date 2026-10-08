@@ -118,6 +118,13 @@ int PE_Decomp_BoundaryFrom(const char *caller, const char *symbol, unsigned vma,
                            unsigned arity, uintptr_t a0, uintptr_t a1,
                            uintptr_t a2, uintptr_t a3);
 void PE_Decomp_SetBoundaryStop(int stop);
+/* A generated TU's runtime division hit a zero divisor (the pe_low_divs/divu/mods/modu helpers).
+ * Retail's divide check executes `break 7` there, so under the STOP policy
+ * this prints "GUEST_TRAP break 7 (integer divide by zero) in <fn>" and
+ * stops the run; the caller then returns the R3000 div result.  Counted
+ * either way (PE_Decomp_GuestTrapCount). */
+void PE_Decomp_GuestTrapDivZero(const char *fn);
+unsigned PE_Decomp_GuestTrapCount(void);
 int  PE_Decomp_BoundaryStopEnabled(void);
 
 /* Argument pickers: the generated `#define callee(...) PE_D_COMP_BOUNDARYn(

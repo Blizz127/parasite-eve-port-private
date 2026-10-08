@@ -699,6 +699,13 @@ class Lowerer:
         if op in ("+", "-", "*") and rt.signed:   # wrap like the guest ALU
             ut = TInt(rt.size, False)
             return f"(({htype(rt)})(({htype(ut)})({a}) {op} ({htype(ut)})({b})))", rt
+        if op in ("/", "%") and rt.size == 4 and not safe_divisor(b):
+            # R3000 div/divu never fault the host: a zero divisor is retail's
+            # break-7 divide check (a loud guest trap here), INT_MIN / -1
+            # wraps like the hardware.  Constant non-zero divisors stay plain.
+            kind = ("div" if op == "/" else "mod") + ("s" if rt.signed else "u")
+            self.helpers.add(kind)
+            return f"pe_low_{kind}(({htype(rt)})({a}), ({htype(rt)})({b}), __func__)", rt
         return f"(({htype(rt)})({a}) {op} ({htype(rt)})({b}))", rt
 
     def assign(self, e, want: bool) -> tuple[str, T]:
@@ -1584,6 +1591,19 @@ def extract_asm(text: str) -> tuple[str, list[dict]]:
     return "".join(out), table
 
 
+_INT_LIT = re.compile(r"\(*\s*(-?)\s*(0[xX][0-9A-Fa-f]+|\d+)[uUlL]*\s*\)*")
+
+
+def safe_divisor(b: str) -> bool:
+    """True when the lowered divisor is an integer literal other than 0 and -1
+    (no zero trap and no INT_MIN / -1 overflow possible)."""
+    m = _INT_LIT.fullmatch(b.strip())
+    if not m:
+        return False
+    v = int(m.group(2), 0)
+    return v != 0 and not (m.group(1) and v == 1)
+
+
 def host_pointer_param(decl: str) -> bool:
     d = decl.strip()
     return "*" in d or "[" in d
@@ -1598,6 +1618,17 @@ HELPERS = {
     "copy_bg": "static inline void pe_low_copy_bg(uint8_t *d, uint32_t s, uint32_t n) { uint32_t i; for (i = 0; i < n; i++) d[i] = PE_LoadU8(s + i); }",
     "copy_bb": "static inline void pe_low_copy_bb(uint8_t *d, const uint8_t *s, uint32_t n) { __builtin_memmove(d, s, n); }",
 }
+# Runtime division (see arith_op): R3000 results, zero divisor = guest trap.
+HELPERS["divs"] = ("static inline int32_t pe_low_divs(int32_t a, int32_t b, const char *fn) "
+                   "{ if (b == 0) { PE_Decomp_GuestTrapDivZero(fn); return a < 0 ? 1 : -1; } "
+                   "if (b == -1) return (int32_t)(0u - (uint32_t)a); return a / b; }")
+HELPERS["mods"] = ("static inline int32_t pe_low_mods(int32_t a, int32_t b, const char *fn) "
+                   "{ if (b == 0) { PE_Decomp_GuestTrapDivZero(fn); return a; } "
+                   "if (b == -1) return 0; return a % b; }")
+HELPERS["divu"] = ("static inline uint32_t pe_low_divu(uint32_t a, uint32_t b, const char *fn) "
+                   "{ if (b == 0) { PE_Decomp_GuestTrapDivZero(fn); return 0xFFFFFFFFu; } return a / b; }")
+HELPERS["modu"] = ("static inline uint32_t pe_low_modu(uint32_t a, uint32_t b, const char *fn) "
+                   "{ if (b == 0) { PE_Decomp_GuestTrapDivZero(fn); return a; } return a % b; }")
 for _n in (1, 2, 4, 8):
     HELPERS[f"hld{_n}"] = (f"static inline uint{_n * 8}_t pe_low_hld{_n}(const uint8_t *p) "
                            f"{{ uint{_n * 8}_t v; __builtin_memcpy(&v, p, {_n}); return v; }}")

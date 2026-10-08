@@ -91,6 +91,30 @@ int PE_Decomp_BoundaryFrom(const char *caller, const char *symbol, unsigned vma,
     return 0;
 }
 
+static unsigned g_guest_traps;
+
+void PE_Decomp_GuestTrapDivZero(const char *fn)
+{
+    g_guest_traps++;
+    if (g_boundary_stop) {
+        static unsigned printed;
+        if (printed < 8u) {
+            printed++;
+            fprintf(stderr,
+                    "GUEST_TRAP break 7 (integer divide by zero) in %s "
+                    "(native only: retail's divide check traps here; run "
+                    "stopped)\n", fn ? fn : "?");
+            fflush(stderr);
+        }
+        PE_Port_RequestStop(PE_PORT_STOP_GUEST_TRAP);
+    }
+}
+
+unsigned PE_Decomp_GuestTrapCount(void)
+{
+    return g_guest_traps;
+}
+
 int PE_Decomp_Boundary(const char *symbol, unsigned vma, unsigned arity,
                        uintptr_t a0, uintptr_t a1, uintptr_t a2, uintptr_t a3)
 {

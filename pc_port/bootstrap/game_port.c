@@ -284,7 +284,8 @@ void PE_Port_RequestStop(PEPortStopReason reason)
 {
     if (!g_port_stop_requested) {
         g_port_stop_reason = reason;
-        if (reason == PE_PORT_STOP_UNRESOLVED_BOUNDARY) {
+        if (reason == PE_PORT_STOP_UNRESOLVED_BOUNDARY ||
+            reason == PE_PORT_STOP_GUEST_TRAP) {
             port_stop_report(reason);
         }
     }
@@ -355,6 +356,7 @@ const char *PE_Port_StopReasonName(PEPortStopReason reason)
     case PE_PORT_STOP_FRAME_LIMIT:          return "frame-limit";
     case PE_PORT_STOP_MAIN_ITERATION_LIMIT: return "main-iteration-limit";
     case PE_PORT_STOP_UNRESOLVED_BOUNDARY:  return "unresolved-boundary";
+    case PE_PORT_STOP_GUEST_TRAP:           return "guest-trap";
     }
     return "unknown";
 }

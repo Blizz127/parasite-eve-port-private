@@ -254,14 +254,29 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
 
 - m0256i: `func_80193BFC` (0x4B4) and its particle callback `func_8019377C`
   (0x480, GTE rotation-matrix asm) done (`e6711341`). Then `func_801934AC`
-  (0x2D0) matched and carved; m0256i now stops on its particle callback
-  `func_80192844` (0xC68, 5 motion kinds plus GTE draw; no near twin). m2c
-  needs the rodata jump table with `.word .L8019xxxx` labels (raw words make
-  m2c assert): scratch `build/tmp/m5/rodata_l.s`, output `m2c_28.c`.
+  (0x2D0) matched and carved (`ab6de50b`). Then the particle callback
+  `func_80192844` (0xC68, 5 motion kinds plus GTE draw) matched and carved;
+  it needs a local dispatch-fold profile
+  (`room_m0256i_dispatch_8018F1DC_8018F1F4`: `MASPSX_DISPATCH_FOLD` for its
+  two jump tables). m2c needs the rodata jump table with `.word .L8019xxxx`
+  labels (raw words make m2c assert).
+- m0256i then ran into a host SIGFPE: the existing door/lift step
+  `func_80192680` divides by its duration field (+0x34), which is 0 in the
+  warp probe. The lowering emitted a plain C `/`, which is undefined on a zero
+  divisor and traps on x86. Fix: runtime `/` and `%` in lowered TUs now go
+  through `pe_low_divs/divu/mods/modu`, which give the R3000 results
+  (INT_MIN / -1 wraps) and treat a zero divisor as what retail's divide check
+  does there (`break 7`): `GUEST_TRAP break 7 (integer divide by zero) in
+  <fn>` and a `guest-trap` STOP. Constant non-zero divisors stay plain.
+  m0256i now stops cleanly with
+  `GUEST_TRAP ... in room_6bdd1ee9__func_80192680`. Why the duration is 0
+  (warp-skipped setup or wrong upstream state) is still open.
 - Still to do: m0432i 0x80193414 (0x52C), m0349i 0x8018F7C4 (0x90C),
   m0159i 0x8018F3A4 (0xA54; needs a room config first).
 - Matching notes: gcc 2.7 assumes a struct-member access never aliases a
   fixed-address scalar, so `short *p` indexing (not a struct) plus an array
   global (`D_800942EC[0]`) is what keeps the retail store/load order. Use the
   PsyQ `gte_SetRotMatrix` macro, not register-asm locals, so `$8` stays free
-  for later `mflo`.
+  for later `mflo`. A bare `p[0]` store folds to `*p`, which gcc 2.7 does not
+  mark as in-struct, so global loads cannot move above it. Writing it as a
+  member store (`((EffectHead *)p)->x = ...`) lets them move, as retail does.

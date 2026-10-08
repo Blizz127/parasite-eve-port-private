@@ -196,6 +196,45 @@ class Runtime(CRunner):
         # n = 0x8004 * 0x10000 wraps to 0x80040000; k: 255 + 1 -> 0, ++ -> 1
         self.assertEqual(out.strip(), "256 80040000 01 FFFD")
 
+    def test_runtime_division_r3000_semantics_and_trap(self):
+        # func_80192680's shape: a runtime divisor read from guest memory.
+        # Zero is retail's break-7 divide check (a guest trap, never a host
+        # SIGFPE); INT_MIN / -1 wraps like the R3000; constants stay plain.
+        src = """
+        typedef struct O { int a; int b; unsigned u; unsigned v; int q, r; unsigned uq, ur; int c; } O;
+        void func_80190000(O *o) {
+            o->q = o->a / o->b;
+            o->r = o->a % o->b;
+            o->uq = o->u / o->v;
+            o->ur = o->u % o->v;
+            o->c = o->a / 24;
+        }"""
+        code = tu(src, extra="static unsigned traps;\n"
+                  "static void PE_Decomp_GuestTrapDivZero(const char *fn) { (void)fn; traps++; }\n")
+        # helper definition + the one runtime `/` (o->a / 24 stays plain)
+        self.assertEqual(code.count("pe_low_divs("), 2)
+        out = self.run_c(code, """
+            PE_StoreU32(0x80100000u, 100u); PE_StoreU32(0x80100004u, 0u);
+            PE_StoreU32(0x80100008u, 7u);   PE_StoreU32(0x8010000Cu, 0u);
+            func_80190000(0x80100000u);
+            printf("%d %d %08X %u %d %u\\n", (int32_t)PE_LoadU32(0x80100010u),
+                   (int32_t)PE_LoadU32(0x80100014u), PE_LoadU32(0x80100018u),
+                   PE_LoadU32(0x8010001Cu), (int32_t)PE_LoadU32(0x80100020u), traps);
+            PE_StoreU32(0x80100000u, 0x80000000u); PE_StoreU32(0x80100004u, 0xFFFFFFFFu);
+            PE_StoreU32(0x80100008u, 7u);   PE_StoreU32(0x8010000Cu, 2u);
+            func_80190000(0x80100000u);
+            printf("%08X %d %u %u %u\\n", PE_LoadU32(0x80100010u),
+                   (int32_t)PE_LoadU32(0x80100014u), PE_LoadU32(0x80100018u),
+                   PE_LoadU32(0x8010001Cu), traps);""")
+        lines = out.split()
+        # 100/0 -> -1, 100%0 -> 100, 7u/0 -> FFFFFFFF, 7u%0 -> 7, 100/24 -> 4; 4 traps
+        self.assertEqual(lines[:6], ["-1", "100", "FFFFFFFF", "7", "4", "4"])
+        # INT_MIN / -1 -> INT_MIN, % -> 0; 7u/2 = 3, 7u%2 = 1; no new trap
+        self.assertEqual(lines[6:], ["80000000", "0", "3", "1", "4"])
+        # constant non-zero divisor stays a plain host division
+        self.assertTrue(gl.safe_divisor("24") and gl.safe_divisor("(0x18)"))
+        self.assertFalse(gl.safe_divisor("0") or gl.safe_divisor("-1") or gl.safe_divisor("v_n"))
+
     def test_packed_struct_and_init_list(self):
         src = """
         typedef struct P { char a; int b; } __attribute__((packed)) P;
