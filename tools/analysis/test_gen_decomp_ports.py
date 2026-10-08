@@ -81,6 +81,42 @@ class EraAsmTests(unittest.TestCase):
         same = 'void f(int *p) { asm volatile("" : "=r"(p) : "0"(p)); }'
         self.assertNotIn("p = p", g.strip_era_asm(same))
 
+    def test_multi_output_tied_move_is_a_parallel_assignment(self):
+        # asm("" : "=r"(a), "=r"(b) : "0"(c), "1"(d)) computes a = c; b = d.
+        src = ('int func_80099990(int *owner, int state) {\n'
+               '    register int *callOwner asm("$17");\n'
+               '    register int workState asm("$18");\n'
+               '    asm("" : "=r"(callOwner), "=r"(workState) : "0"(owner), "1"(state));\n'
+               '    return *callOwner + workState;\n}\n')
+        self.assertTrue(analyze(src)["eligible"])
+        self.assertIn("callOwner = owner; workState = state; /* E2b: tied register move */",
+                      g.strip_era_asm(src))
+        # An output that is also an input is not a plain sequence of
+        # assignments: it stays a fence, and the pin it reads stays refused.
+        swap = ('int func_80099990(void) {\n'
+                '    register int a asm("$4");\n'
+                '    register int b asm("$5");\n'
+                '    asm("" : "=r"(a), "=r"(b) : "0"(b), "1"(a));\n'
+                '    return a + b;\n}\n')
+        self.assertNotIn("a = b", g.rewrite_tied_moves(swap))
+        self.assertIn("read before written", analyze(swap)["reason"])
+
+    def test_asm_output_operand_writes_the_pin(self):
+        # `mfc2 %0,$9 : "=r"(x)` writes the pin; the guard must not call that
+        # a read.  (The EXE path still refuses the real instruction as asm;
+        # the room lowering turns it into PE_GTE reads, E21b.)
+        src = ('int func_80099990(short *out) {\n'
+               '    register int x asm("$12");\n'
+               '    asm volatile("mfc2 %0,$9" : "=r"( x ));\n'
+               '    out[0] = x;\n    return 0;\n}\n')
+        self.assertEqual(analyze(src)["reason"], "asm")
+        # The same operand that is also an input is a read.
+        rd = ('int func_80099990(void) {\n'
+              '    register int x asm("$12");\n'
+              '    asm volatile("addu %0,%1,$0" : "=r"(x) : "r"(x));\n'
+              '    return x;\n}\n')
+        self.assertIn("read before written", analyze(rd)["reason"])
+
     def test_pin_read_before_write_is_rejected(self):
         src = ('int func_80099990(void) {\n'
                '    register int live asm("$4");\n'

@@ -179,10 +179,66 @@ ASM_TIED_MOVE_RE = re.compile(
     r"\(\s*([A-Za-z_]\w*)\s*\)\s*:\s*\"0\"\s*\(\s*([A-Za-z_]\w*)\s*\)\s*\)\s*;")
 
 
+# The same with several outputs, each tied to its own input:
+# `asm("" : "=r"(a), "=r"(b) : "0"(c), "1"(d))` computes `a = c; b = d;` (a
+# parallel move).  It is rewritten only when no output is also an input, so
+# the sequential assignments equal the parallel move; anything else stays a
+# fence (and a pin it reads stays refused by the E2b guard).
+ASM_TIED_MULTI_RE = re.compile(
+    r"(?:__asm__|\basm)\s*(?:__volatile__|volatile)?\s*\(\s*\"\"\s*:"
+    r"((?:\s*\"=r\"\s*\(\s*[A-Za-z_]\w*\s*\)\s*,)+\s*\"=r\"\s*\(\s*[A-Za-z_]\w*\s*\)\s*)"
+    r":((?:\s*\"\d\"\s*\(\s*[A-Za-z_]\w*\s*\)\s*,)+\s*\"\d\"\s*\(\s*[A-Za-z_]\w*\s*\)\s*)\)\s*;")
+TIED_OUT_RE = re.compile(r"\"=r\"\s*\(\s*([A-Za-z_]\w*)\s*\)")
+TIED_IN_RE = re.compile(r"\"(\d)\"\s*\(\s*([A-Za-z_]\w*)\s*\)")
+
+
+def _tied_multi(m: re.Match) -> str:
+    outs = TIED_OUT_RE.findall(m.group(1))
+    ins = TIED_IN_RE.findall(m.group(2))
+    if (len(ins) != len(outs) or [int(k) for k, _ in ins] != list(range(len(outs)))
+            or set(outs) & {v for _, v in ins} or len(set(outs)) != len(outs)):
+        return m.group(0)
+    return " ".join(f"{a} = {v};" for a, (_, v) in zip(outs, ins)) + \
+        " /* E2b: tied register move */"
+
+
 def rewrite_tied_moves(text: str) -> str:
+    text = ASM_TIED_MULTI_RE.sub(_tied_multi, text)
     return ASM_TIED_MOVE_RE.sub(
         lambda m: (m.group(0) if m.group(1) == m.group(2)
                    else f"{m.group(1)} = {m.group(2)}; /* E2b: tied register move */"), text)
+
+
+ASM_OUT_BEFORE_RE = re.compile(r"\"=&?r\"\s*\(\s*$")
+
+
+def asm_output_write(text: str, pos: int, var: str) -> bool:
+    """True when the use of `var` at text[pos] is an asm output operand
+    (`"=r"(var)`) of a statement that does not also take `var` as an input:
+    the asm writes it there, it does not read it."""
+    if not ASM_OUT_BEFORE_RE.search(text[max(0, pos - 24):pos]):
+        return False
+    head = None
+    for h in re.finditer(r"\b(?:__asm__|asm)\s*(?:__volatile__|volatile)?\s*\(", text[:pos]):
+        head = h
+    if head is None:
+        return False
+    depth, i = 1, head.end()
+    while i < len(text) and depth:
+        if text[i] == '"':
+            i += 1
+            while i < len(text) and text[i] != '"':
+                i += 2 if text[i] == "\\" else 1
+        elif text[i] == "(":
+            depth += 1
+        elif text[i] == ")":
+            depth -= 1
+        i += 1
+    if not (head.end() <= pos < i):
+        return False
+    secs = re.split(r":(?![^(]*\))", re.sub(r'"(?:[^"\\]|\\.)*"', '""', text[head.end():i - 1]))
+    inputs = secs[2] if len(secs) > 2 else ""
+    return not re.search(rf"\b{re.escape(var)}\b", inputs)
 
 
 def strip_era_asm(text: str) -> str:
@@ -815,7 +871,8 @@ def analyze(name: str, src_text: str, matched: dict,
         rest = pin_text[m.end():]
         # A struct member of the same name (`a.w.lo`, `p->lo`) is not the pin.
         use = re.search(rf"(?<![.\w])(?<!->)\s*\b{re.escape(m.group(1))}\b", rest)
-        if use and not re.match(r"\s*=(?!=)", rest[use.end():]):
+        if use and not re.match(r"\s*=(?!=)", rest[use.end():]) and \
+                not asm_output_write(rest, use.end() - len(m.group(1)), m.group(1)):
             return {"eligible": False,
                     "reason": f"pinned register {m.group(1)} read before written"}
     src_text = rewrite_code_addresses(strip_era_asm(src_text))

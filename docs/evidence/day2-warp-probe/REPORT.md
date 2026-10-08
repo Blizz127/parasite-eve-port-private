@@ -572,3 +572,27 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
   - Gates (tag k9): Day 1 route PASS (story 80, same frame 67186), Day 2
     movies PASS, 1645/1645 tests, both guards PASS, both `--verify` 0
     drift, unit tests OK.
+- Story-0x90 sweep on `cb84e7ef` with Disc 2 in the tray (402 slots, 3 at
+  a time, 4000 frames): 374 clean, 8 stopping, 20 unused. m0256i is clean.
+  Stops: m0259i (fixed above), m0350i, and the effect callbacks below.
+- E2b asm outputs. 26 vendor room leaves were refused as "pinned register
+  x read before written". Their first use of the pin is an asm output
+  operand, which writes it: `mfc2 %0,$9 : "=r"(x)` (GTE reads, 20
+  leaves), or a two-output tied move
+  `asm("" : "=r"(a), "=r"(b) : "0"(c), "1"(d))` (6 leaves). The guard now
+  treats an `"=r"` output as a write unless the same asm also takes the
+  variable as an input. Multi-output tied moves are rewritten to
+  `a = c; b = d;` when no output is also an input; anything else stays a
+  fence and stays refused. Room bodies: 2693 -> 2719 eligible; registry
+  5337 -> 5363 thunks; no EXE TU changed. New unit tests.
+  - m0350i's effect callback `func_801958DC` (vendor-matched, GTE stsv
+    through pinned $12-$14) is one of them. m0350i now runs clean. The 18
+    other rooms with newly lowered leaves (m0065i, m0087i, m0107i, m0111i,
+    m0122i, m0141i, m0146i, m0153i, m0167i, m0186i, m0391i, m0393i,
+    m0399i, m0401i, m0412i, m0414i, m0421i, m0424i) stay clean.
+  - Gates (tag k10): Day 1 route PASS (story 80, frame 67186), Day 2
+    movies PASS, 1645/1645 tests, both guards PASS, both `--verify` 0
+    drift, unit tests OK (196).
+- Remaining story-0x90 stops (all effect callbacks with no matched C):
+  m0429i 0x8019AE8C (also reached from m0349i), m0428i 0x80193018 (also
+  from m0427i), m0430i 0x8018F750, m0437i 0x80192D74.
