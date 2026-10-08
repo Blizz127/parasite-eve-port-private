@@ -704,7 +704,30 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
   - Gates (tag k15, docs-only push): Day 1 route PASS (story 80, frame
     67186), Day 2 movies PASS, 1645/1645 tests, both guards PASS, both
     `--verify` 0 drift, exact rebuild PASS (sha1 452fb033).
-- m0430i 0x8018F750 (0xF9C bytes, 1000 instructions) is the same callback
-  family (mode 0/1/2 switch, four CVECTOR copies). Not started beyond the
-  disassembly. No twin exists in any matched room (best jal-multiset
-  similarity 0.46).
+- m0430i `func_8018F750` (0xF9C bytes, the story 0x90/0x140 stop) is
+  matched from the retail asm: LINK_EXACT under a local profile
+  `room_m0430i_dispatch_8018F00C_expand_div` (header jump table
+  0x8018F00C folded through a new `[0x24, rodata]` subsegment, plus
+  retail's divide-by-zero / overflow checks). It is the 3-mode effect
+  callback: arm (anchor copy, model 0xC5543704, paired sprite), a 7-state
+  per-frame update (random heading, ease out, hold, ease to the slot
+  target, spark burst and 12-spark ring, floor-hit test, fade) and draw.
+  Matching levers, all gcc 2.7 scheduler / allocator effects:
+  `D_800F3368` is a struct only where a store must stay after a table
+  load; `D_800B0E64` is read as an array element for the same reason;
+  one local doubles as the draw flag so the 1024 scale constant lands in
+  `$17`; the mode-0 statement order came from a 720-permutation search.
+  Overlay EXACT_REBUILD_GATE[room_m0430i] PASS (sha1 475d8d7b), preflight
+  PASS; registry 5416 -> 5417 thunks.
+  - Probe (4000 frames): m0430i now runs past it at story 0x90 and 0x140
+    and stops at its particle callback `0x8018F028` (mode 1, 0x728 bytes,
+    the last unmatched function in the room's asm span). Draft in box
+    scratch: structure right, register assignment not yet (see below).
+  - 0x8018F028 notes so far: the struct-copy address hoist from
+    0x80192500 shows up here too (the `&col1` copy address lands in
+    `$fp`), and a loop note in mode 2 case 1 removes it. The `bgez` delay
+    slot `addiu $20,$0,64` means the 64 is its own variable set before the
+    `func_80077DC4` call (sched1 sinks it), not a reuse of `a`.
+  - Gates (tag k16): Day 1 route PASS (story 80, frame 67186), Day 2
+    movies PASS, 1645/1645 tests, both guards PASS, both `--verify` 0
+    drift, exact rebuild PASS (sha1 452fb033).
