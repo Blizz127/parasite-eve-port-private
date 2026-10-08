@@ -818,3 +818,23 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
     `$3` vs `$2`; `mfhi`/`mflo $8` vs `$9` (the `register asm("$8")` on the
     matrix pointer); case 1 `la $16` placement; case 2 absolute vs
     `-6($16)` for the f2 read and absolute vs `-4($16)` for the f4 store.
+  - 15:25 CT: m0437i 0x80192500 down to 26 words. Case 2 now uses a
+    loop note after `s = &D_800F3368.f8` plus a second one before the
+    f10 store (hill climb over statement order and struct vs standalone
+    symbols), so `$4 = 0` fills the dispatch delay slot and the f8 store
+    and `-6($16)` read go through the base as retail does. Left: mode-1
+    `p[8] == 1` compare (`$7` vs our `$19`), head slot register, the
+    `$8` matrix pointer vs `mfhi`/`mflo $8`, case 1 `la $16` placement,
+    and case 2's shared constant 2 (`$3`, first in the block).
+  - `$8` analysis (gcc 2.7.2 reload1.c): the `mfhi`/`mflo` moves are
+    reloads (the high-part pattern leaves the value in HI), and
+    `order_regs_for_reload` hands out the lowest call-clobbered register
+    no pseudo uses. A `register asm("$8")` variable marks `$8` explicitly
+    used, so the reloads move to `$9`. Dropping the register variable
+    gets `mfhi`/`mflo $8` back, and an empty `asm volatile` clobbering
+    `$3`-`$7` in case 0 (where `mode` is already dead) puts the matrix
+    pointer on `$8` as an ordinary pseudo. That matches the head and
+    case 0, but then `$8` has pseudo uses and the reloads take `$9`
+    again. `spill_hard_reg` only leaves a pseudo in place if it is local
+    to one block, and this pointer spans head -> case 0, so retail's
+    exact mechanism for sharing `$8` is still open.
