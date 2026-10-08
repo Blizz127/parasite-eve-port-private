@@ -556,3 +556,19 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
   - Gates (tag k8/k8b): Day 1 route PASS (story 80), Day 2 movies PASS,
     1644/1644 tests, both guards PASS, both `--verify` 0 drift, rebuild
     check no work, unit tests OK (194).
+- m0259i FATAL (`PE_StoreU16 0x80200000` after its swap) fixed. At story
+  0x2A6 the room's script exits the field with the destination unchanged
+  (A80454C8 again), and the volume gate swaps to Disc 2. Retail's next
+  `func_8003F3C4` entry runs `func_8003F074`, which loads D280 again. The
+  host calls `func_8003F3C4` once per tick and change-gates that load, so
+  the reload was skipped. The bone walk (`func_8003A088`) then read a
+  model header from clobbered memory (count 20152) and its output cursor
+  ran off the end of RAM. Fix: a real field exit (the epilogue) clears the
+  host's loaded-dest gate, so the next entry loads as retail does. The
+  one-pass ticks inside retail's loop keep the gate. New unit test
+  `FLD1_3F3C4_exit_reloads_dest`. With Disc 2 in the tray, m0259i now
+  reloads from Disc 2, reaches story 0x2A8 and room A80470C8, and runs
+  clean to the frame limit.
+  - Gates (tag k9): Day 1 route PASS (story 80, same frame 67186), Day 2
+    movies PASS, 1645/1645 tests, both guards PASS, both `--verify` 0
+    drift, unit tests OK.

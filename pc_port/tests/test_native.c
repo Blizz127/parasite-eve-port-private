@@ -12450,6 +12450,30 @@ static void test_BTL79_70e54_resetgraph1(void) {
     PASS();
 }
 
+static void test_FLD1_3F3C4_exit_reloads_dest(void) {
+    /* A real field exit with D280 unchanged (m0259i: same room re-entered
+     * after the disc swap) must not leave the host load gate set: retail's
+     * next 3F074 loads D280 again. */
+    TEST("FLD1_3F3C4_exit_reloads_dest");
+    ResetTestState();
+    HostFB_Init();
+    D_8009D280 = 0xA80454C8u;
+    D_8009D1A0 = 1u;                        /* skip update/draw */
+    PE_StoreU32(0x800B0CD8u, 0x40000100u);  /* skip 6A0E8 */
+    Test_SeedDigitalController();
+    func_8003F3C4();
+    ASSERT(PE_Field_PassContinues == 1, "pass continues");
+    ASSERT(PE_Field_LoadedDestForTest() == 0xA80454C8u, "gate holds inside the loop");
+    D_8009D1A0 = 0x2001u;                   /* bit 13 + overlay bit 11 exit */
+    PE_StoreU32(0x800B0CD8u, 0x40000900u);
+    Test_SeedDigitalController();
+    func_8003F3C4();
+    ASSERT(PE_Field_PassContinues == 0, "real exit");
+    ASSERT(D_8009D280 == 0xA80454C8u, "same dest");
+    ASSERT(PE_Field_LoadedDestForTest() == 0u, "exit forgets the loaded dest");
+    PASS();
+}
+
 static void test_BTL80_70e54_putdispenv(void) {
     int p0;
     int p1;
@@ -39829,6 +39853,7 @@ int main(void)
     test_BTL78_3F3C4_70e54_prefix();
     test_BTL79_70e54_resetgraph1();
     test_BTL80_70e54_putdispenv();
+    test_FLD1_3F3C4_exit_reloads_dest();
     test_BTL81_6ec08_status();
     test_BTL82_19728_ae();
     test_BTL83_70e54_cddc_flip();

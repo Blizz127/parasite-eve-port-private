@@ -361,6 +361,11 @@ static void pe_3f3c4_host_pad(void)
  * runs only after the field exits (the volume gate) at that point. */
 int PE_Field_PassContinues;
 
+uint32_t PE_Field_LoadedDestForTest(void)
+{
+    return pe_3f3c4_loaded_dest;
+}
+
 void func_8003F3C4(void)
 {
     uint32_t bits;
@@ -488,6 +493,11 @@ loop_tail:
     }
 
 epilogue:
+    /* A real field exit.  Retail's next entry runs 3F074, which loads D280
+     * again (6B4F8) even when the destination is unchanged, e.g. the same
+     * room re-entered after a disc swap.  The host change gate (one pass
+     * per tick) must not skip that load, so forget the loaded dest here. */
+    pe_3f3c4_loaded_dest = 0u;
     /* .L8003F68C */
     if ((PE_LoadU32(0x800B0CD8u) & 0x200u) != 0u) {
         RECT rect;
