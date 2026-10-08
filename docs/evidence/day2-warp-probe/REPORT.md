@@ -155,8 +155,8 @@ Done and pushed: `e2cc954f` (generator E21 lowering + tests + e21_diff),
 binary: Day 1 route PASS (frame 67186), MOVIES_DAY2 PASS, suite 1634/1634
 with disc, psyq guard PASS (allowlist), retail_data_guard OK, generator
 `--verify` 0 drift, unit tests 14 + 24 OK, e21_diff 594 ok / 0 mismatch.
-In progress: full re-sweep at story 0x90 (`build/lanes/warp/sweep4_e21_abi.txt`,
-git-ignored). Next: Day 3 story probes, then GTE inline-asm lowering.
+Done: full re-sweep (`build/lanes/warp/sweep4_e21_abi.txt`, git-ignored) and Day 3
+probes, results below. Next: GTE inline-asm lowering (gen_overlay_ports E21).
 No release (waiting on Will).
 
 Changes:
@@ -177,3 +177,38 @@ Changes:
   with a0 = slot; `func_8006F8EC` calls draw with a0 = slot,
   a1 = min(code, 85). The port passed (mode, data), so E21 callees read
   a0 = 1/2 (m0049i/m0050i FATAL 0xFB0001F4 in `func_8018F0BC`). Fixed.
+
+Full re-sweep at story 0x90 (402 slots, binary at `47d6c84d`):
+
+| | before (round 2) | after (round 3) |
+|---|---|---|
+| clean (4000+ frames, no stop) | 357 | 370 |
+| STOP on unported room code | 25 | 11 |
+| scripted exit (m0050i: story 0x2F2, return to title) | - | 1 |
+| unused slot (no code chunk, FATAL 0xFC913DA8) | 20 | 20 |
+
+m0049i, m0050i, m0089i, m0090i, m0123i, m0157i, m0158i, m0199i, m0272i,
+m0350i, m0427i, m0428i, m0429i and m0430i now run clean. Remaining stops:
+
+| room | missing function | caller | why |
+|---|---|---|---|
+| m0159i | 0x8018F3A4 | `@800D413C:effect` | no matched C |
+| m0256i | 0x80193BFC | `@800D413C:effect` | no matched C |
+| m0349i | 0x8018F7C4 | `@800D413C:effect` | no matched C |
+| m0207i, m0232i, m0436i | 0x80190370 | `@func_80190240:jalr` | GTE inline asm |
+| m0434i, m0435i | 0x80190384 | `@func_80190254:jalr` | GTE inline asm |
+| m0437i | 0x80190388 | `@func_80190258:jalr` | GTE inline asm |
+| m0295i | 0x8019100C | `@func_80190EDC:jalr` | GTE inline asm |
+| m0432i | 0x801903D0 | `@func_801902A0:jalr` | GTE inline asm |
+
+The six Obj-family rooms (m0207i ...) looked clean before the slot-ABI fix
+only because their update callback got a0 = 1 and took an early exit; with
+the retail a0 they reach the room's movement handler, which uses inline GTE
+asm (`ctc2`/`lwc2`/`.word 0x4A...`/`swc2`). 305 room leaves are refused for
+asm; that is the next generator feature (lower the GTE asm templates onto
+the native GTE model in `pe_gte.c`).
+
+Day 3 probes (story 0x140 = Day 3 start, M0092I entry; 0x150/0x160 later):
+m0092i..m0098i @0x140, m0092i @0x150, m0191i and m0360i @0x160 all ran
+5000 frames clean. Same caveat: only the story word is set and nothing is
+walked beyond X presses.
