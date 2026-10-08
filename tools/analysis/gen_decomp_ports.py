@@ -163,9 +163,18 @@ ASM_FENCE_RE = re.compile(
     r"\(\s*\"\"\s*(?::[^;()]*(?:\([^;()]*\)[^;()]*)*)?\)\s*;")
 
 
+# A declarator list (`register int x asm("$12"), y asm("$13");`) carries one
+# pin per declarator; ASM_PIN_RE only reaches the first.
+ASM_PIN_DECL_RE = re.compile(r"\bregister\b[^;{}]*;")
+ASM_PIN_ONLY_RE = re.compile(r"\s*(?:__asm__|asm)\s*\(\s*\"\$[0-9A-Za-z]+\"\s*\)")
+
+
 def strip_era_asm(text: str) -> str:
     """Remove E2b register pins and empty-template asm fences (see above)."""
     text = ASM_PIN_RE.sub(r"\1", text)
+    text = ASM_PIN_DECL_RE.sub(
+        lambda m: (ASM_PIN_ONLY_RE.sub("", m.group(0))
+                   if len(ASM_PIN_ONLY_RE.findall(m.group(0))) >= 2 else m.group(0)), text)
     return ASM_FENCE_RE.sub("/* era asm fence removed (E2b) */", text)
 NUM_RE = re.compile(r"0x[0-9A-Fa-f]{8}\b")
 FUNC_NAME_RE = re.compile(r"\b(func_[0-9A-Fa-f]{8})\b")

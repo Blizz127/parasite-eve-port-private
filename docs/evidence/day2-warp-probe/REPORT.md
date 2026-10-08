@@ -314,6 +314,15 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
   m0174i, m0263i, m0348i, m0391i, m0392i, m0421i, m0424i and m0005i all run
   clean to the frame limit. m0159i now runs past its F008 callback and stops
   at the EXE helper `func_800D2104` (called from F008's rise draw).
+- The last 5 asm refusals now lower (room TUs 2610 -> 2615, no compile-gate
+  drops, no asm refusals left): comments are stripped before the asm passes
+  (m0141i quoted an `asm(...)` in its header comment); a `register`
+  declarator list with several pins (`register int m0 asm("$12"), m1
+  asm("$13")`) loses all of them, not just the first (m0273i; single pins are
+  unchanged, so no EXE TU drifts); an empty-template asm with
+  side-effect-free inputs only (an `"m"` fence) is dropped (m0418i); and an
+  `asm("SYM")` label on a plain function declaration counts as extern
+  (m0418i). m0141i, m0273i and m0418i run clean to the frame limit.
 - Matching notes: gcc 2.7 assumes a struct-member access never aliases a
   fixed-address scalar, so `short *p` indexing (not a struct) plus an array
   global (`D_800942EC[0]`) is what keeps the retail store/load order. Use the

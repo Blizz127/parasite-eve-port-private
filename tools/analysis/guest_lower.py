@@ -208,6 +208,31 @@ ATTR_PACKED_RE = re.compile(r"__attribute__\s*\(\(\s*packed\s*\)\)")
 ATTR_RE = re.compile(r"__attribute__\s*\(\((?:[^()]|\([^()]*\))*\)\)")
 
 
+def strip_c_comments(text: str) -> str:
+    """Drop /* */ and // comments, leaving string and char literals intact."""
+    out, i, n = [], 0, len(text)
+    while i < n:
+        ch = text[i]
+        if ch in "\"'":
+            j = i + 1
+            while j < n and text[j] != ch:
+                j += 2 if text[j] == "\\" else 1
+            out.append(text[i:j + 1])
+            i = j + 1
+        elif text.startswith("/*", i):
+            j = text.find("*/", i + 2)
+            j = n if j < 0 else j + 2
+            out.append(" " + "\n" * text.count("\n", i, j))
+            i = j
+        elif text.startswith("//", i):
+            j = text.find("\n", i)
+            i = n if j < 0 else j
+        else:
+            out.append(ch)
+            i += 1
+    return "".join(out)
+
+
 def preprocess(text: str) -> str:
     try:
         out = subprocess.run(["cpp", "-P", "-undef", "-nostdinc", "-"], input=text,
@@ -1540,7 +1565,9 @@ def apply_asm_labels(text: str) -> tuple[str, dict[str, str]]:
         start = max(text.rfind(";", 0, m.start()), text.rfind("}", 0, m.start()),
                     text.rfind("{", 0, m.start())) + 1
         decl = text[start:m.start()].rstrip()
-        if not re.match(r"\s*extern\b", decl):
+        # A function declarator is extern by default (C89 6.1.2.2) unless static.
+        if not (re.match(r"\s*extern\b", decl)
+                or (decl.endswith(")") and not re.search(r"\bstatic\b", decl))):
             raise LowerError("asm: label on a non-extern declaration")
         core, is_fn = decl, False
         if core.endswith(")"):                      # function declarator
@@ -1592,6 +1619,15 @@ def extract_asm(text: str) -> tuple[str, list[dict]]:
         secs += [""] * (4 - len(secs))
         tpl = _template(secs[0])
         outs, ins = _operands(secs[1]), _operands(secs[2])
+        if (not tpl.strip() and not outs
+                and all(c in ("m", "r", "i") and not re.search(r"\+\+|--|[^=!<>]=[^=]|\w\s*\(", " " + e)
+                        for c, e in ins)):
+            # Empty template with side-effect-free inputs only (e.g. an "m"
+            # fence that pins a store's position for cc1): nothing to run.
+            out.append(text[pos:m.start()])
+            out.append(";")
+            pos = end + tail.end()
+            continue
         ops = compile_asm(tpl, outs, ins)
         table.append({"outs": outs, "ins": ins, "ops": ops})
         args = "".join(f", ({e})" for _, e in outs + ins)
@@ -1650,6 +1686,9 @@ for _n in (1, 2, 4, 8):
 def lower_leaf(name: str, text: str, known: set[str], sigs: dict[str, dict],
                strip_asm=None) -> dict:
     """Lower one matched leaf.  Returns {'sig','body','helpers','callees'}."""
+    # cpp drops comments too, but the asm passes below run first and would
+    # read an `asm(...)` quoted in a comment as code.
+    text = strip_c_comments(text)
     if strip_asm is not None:
         text = strip_asm(text)
     text = preprocess(text)

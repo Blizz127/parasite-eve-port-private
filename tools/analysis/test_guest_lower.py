@@ -339,6 +339,29 @@ class GteAsm(CRunner):
         self.assertIn("PE_GTE_Command(0x0280030u)", res["body"])
         self.assertIn("PE_GTE_ReadData(19", res["body"])
 
+    def test_asm_quoted_in_comment_ignored(self):
+        src = ('/* lever: asm("" : "=r"(r) : "0"(x)) keeps x live */\n'
+               'int func_80190000(int a) { return a + 1; /* asm( // */ }')
+        self.assertIn("return", lower(src)["body"])
+
+    def test_register_pin_list_stripped(self):
+        import gen_decomp_ports as gdp
+        src = ('int func_80190000(int *t) {\n'
+               '    register int m0 asm("$12"), m1 asm("$13"), m2 asm("$14");\n'
+               '    m0 = t[0]; m1 = t[1]; m2 = t[2];\n'
+               '    return m0 + m1 + m2;\n}')
+        out = gdp.strip_era_asm(src)
+        self.assertNotIn("asm", out)
+        self.assertIn("register int m0, m1, m2;", out)
+        self.assertIn("return", lower(out)["body"])
+
+    def test_plain_function_declaration_label(self):
+        src = r'''
+        int Engine_Random(void) __asm__("func_80071A54");
+        int func_80190000(int a) { return Engine_Random() + a; }'''
+        res = lower(src)
+        self.assertIn('"func_80071A54"', res["body"])
+
     def test_set_alias_renames_function(self):
         src = r"""
         asm(".set RoomLib_Helper, func_80190100");
@@ -395,7 +418,17 @@ class Refusals(unittest.TestCase):
                            'return a; }', "cop2 command")
 
     def test_memory_constraint(self):
-        self.assertRefused('int func_80190000(int *p) { __asm__ volatile("" : : "m"(*p)); '
+        # A non-empty template with an "m" operand is still refused.
+        self.assertRefused('int func_80190000(int *p) { __asm__ volatile("mtc2 $0,$9" : : "m"(*p)); '
+                           'return 0; }', "input constraint m")
+
+    def test_empty_template_memory_fence_dropped(self):
+        res = lower('int func_80190000(short *p) { p[3] = 7; '
+                    '__asm__ volatile("" : : "m"(*(short *)(p + 3))); return p[3]; }')
+        self.assertNotIn("__pe_asm", res["body"])
+
+    def test_empty_template_with_side_effect_refused(self):
+        self.assertRefused('int func_80190000(int *p) { __asm__ volatile("" : : "m"(*p++)); '
                            'return 0; }', "input constraint m")
 
     def test_output_read_before_written(self):
