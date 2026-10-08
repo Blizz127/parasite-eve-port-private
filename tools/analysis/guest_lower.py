@@ -832,11 +832,22 @@ class Lowerer:
     def ret_of(self, ft) -> T:
         return ft.ret if isinstance(ft, TFunc) else S32
 
+    GUEST_CALL_MAX_ARGS = 8   # PE_GUESTCALL_MAX_ARGS (pe_guestcode.h)
+
     def guest_call(self, fcode, args, ft) -> tuple[str, T]:
-        if len(args) > 4:
-            raise LowerError("indirect call with more than 4 arguments")
-        a = self.scalar_args(args) + ["0"] * (4 - len(args))
+        if len(args) > self.GUEST_CALL_MAX_ARGS:
+            raise LowerError(f"indirect call with more than {self.GUEST_CALL_MAX_ARGS} arguments")
         rt = self.ret_of(ft)
+        if len(args) > 4:
+            # O32 stack arguments (sp+16...): PE_GuestCallN carries them to a
+            # 5..8-parameter thunk; a callee taking more than the site passes
+            # is a loud boundary there.
+            a = self.scalar_args(args)
+            call = (f"PE_GuestCallN(\"@{self.site}:jalr\", (pe_addr_t)({fcode}), {len(args)}u, "
+                    "(const uintptr_t[]){"
+                    + ", ".join(f"(uintptr_t)(uint32_t)({x})" for x in a) + "})")
+            return self.typed_ret(call, rt)
+        a = self.scalar_args(args) + ["0"] * (4 - len(args))
         call = (f"PE_GuestCall(\"@{self.site}:jalr\", (pe_addr_t)({fcode}), {len(args)}u, "
                 + ", ".join(f"(uintptr_t)(uint32_t)({x})" for x in a) + ")")
         return self.typed_ret(call, rt)
@@ -857,6 +868,29 @@ class Lowerer:
             call = f'PE_D_COMP_BOUNDARY{n}("{name}", 0x{name[5:]}u, {", ".join(a)})'
         return self.typed_ret(call, self.ret_of(ft))
 
+    def unread_args_droppable(self, args, ft, sig, n) -> bool:
+        """E21c: retail passes more arguments than the callee takes.  Under
+        O32 the callee never reads the extra argument registers or the
+        caller's stack slots past its own parameters.  So dropping them is
+        exact when (a) the leaf declares the callee without a prototype
+        (`extern void f();`, K&R: the call site fixes no count), (b) the
+        callee's matched retail definition takes exactly the host
+        prototype's n parameters, and (c) every dropped argument is free of
+        side effects (a constant or a named local/parameter).  Fewer
+        arguments than parameters is never droppable: the callee would read
+        slots the caller never wrote."""
+        if len(args) <= n or not (isinstance(ft, TFunc) and ft.params is None):
+            return False
+        if sig.get("retail_nparams") != n:
+            return False
+        for a in args[n:]:
+            if isinstance(a, c_ast.Constant):
+                continue
+            if isinstance(a, c_ast.ID) and self.lookup(a.name) is not None:
+                continue
+            return False
+        return True
+
     def direct_call(self, name, args, ft, sig, discard=False) -> tuple[str, T]:
         self.callees.add(name)
         rt = self.ret_of(ft)
@@ -867,7 +901,9 @@ class Lowerer:
         if any(p.strip() == "..." for p in params):
             raise LowerError(f"variadic callee {name}")
         if len(params) != len(args):
-            raise LowerError(f"call arity {name} {len(args)}!={len(params)}")
+            if not self.unread_args_droppable(args, ft, sig, len(params)):
+                raise LowerError(f"call arity {name} {len(args)}!={len(params)}")
+            args = args[:len(params)]
         out = []
         for a, p in zip(args, params):
             c, t = self.rv(a)

@@ -176,13 +176,42 @@ const PeGuestCodeEntry *PE_GuestCode_Resolve(pe_addr_t addr)
     return fp_matches == 1 ? by_fp : NULL;
 }
 
-int PE_GuestCall(const char *site, pe_addr_t fn, unsigned arity,
-                 uintptr_t a0, uintptr_t a1, uintptr_t a2, uintptr_t a3)
+/* a[] holds all PE_GUESTCALL_MAX_ARGS slots (unused ones as the site left
+ * them: PE_GuestCall forwards all four registers, as the retail jalr does). */
+static int guest_call(const char *site, pe_addr_t fn, unsigned arity,
+                      const uintptr_t a[PE_GUESTCALL_MAX_ARGS])
 {
     const PeGuestCodeEntry *e = fn ? PE_GuestCode_Resolve(fn) : NULL;
     if (e && e->thunk)
-        return e->thunk(a0, a1, a2, a3);
+        return e->thunk(a[0], a[1], a[2], a[3]);
+    if (e && e->thunk8) {
+        if (arity >= e->nargs)
+            return e->thunk8(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7]);
+        fprintf(stderr, "[GUESTCALL] %s: 0x%08X (%s) takes %u arguments but the site "
+                "passes %u (stack arguments unset)\n", site, (unsigned)fn,
+                e->symbol ? e->symbol : "?", (unsigned)e->nargs, arity);
+    }
     /* No native thunk for this guest code pointer: a boundary (STOP in the
      * native-only port binary), never interpreted. */
-    return PE_Decomp_BoundaryFrom(site, site, fn, arity, a0, a1, a2, a3);
+    return PE_Decomp_BoundaryFrom(site, site, fn, arity, a[0], a[1], a[2], a[3]);
+}
+
+int PE_GuestCallN(const char *site, pe_addr_t fn, unsigned arity, const uintptr_t *args)
+{
+    uintptr_t a[PE_GUESTCALL_MAX_ARGS] = {0};
+    unsigned i, n = arity > PE_GUESTCALL_MAX_ARGS ? PE_GUESTCALL_MAX_ARGS : arity;
+    for (i = 0; i < n; i++) a[i] = args[i];
+    if (arity > PE_GUESTCALL_MAX_ARGS) {
+        fprintf(stderr, "[GUESTCALL] %s: %u arguments to 0x%08X exceed the %u the "
+                "port carries\n", site, arity, (unsigned)fn, PE_GUESTCALL_MAX_ARGS);
+        return PE_Decomp_BoundaryFrom(site, site, fn, n, a[0], a[1], a[2], a[3]);
+    }
+    return guest_call(site, fn, arity, a);
+}
+
+int PE_GuestCall(const char *site, pe_addr_t fn, unsigned arity,
+                 uintptr_t a0, uintptr_t a1, uintptr_t a2, uintptr_t a3)
+{
+    const uintptr_t a[PE_GUESTCALL_MAX_ARGS] = {a0, a1, a2, a3, 0, 0, 0, 0};
+    return guest_call(site, fn, arity, a);
 }

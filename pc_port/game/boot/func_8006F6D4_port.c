@@ -17,10 +17,13 @@
  * exports, so M0005 now supplies descriptor 80190B44 and
  * callback 80190A6C, now native through the effect callback dispatcher.
  *
- * Unknown jalr targets are not invented.
+ * Any other handler goes through PE_GuestCallN with all six arguments
+ * (the registry thunk, or a loud boundary); unknown jalr targets are not
+ * invented and never skipped.
  */
 #include "psx_compat.h"
 #include "pe_port_compat.h"
+#include "pe_guestcode.h"
 
 #define GA_D_800942E0 0x800942E0u
 #define GA_D_800942E4 0x800942E4u
@@ -103,5 +106,13 @@ int func_8006F6D4(unsigned int index, unsigned int mode, unsigned int a2,
         (void)func_800D4698(slot, mode, a2, out0, out1, out2);
     else if (fn==0x800C9B3Cu || fn==0x800CD89Cu || fn==0x800CE118u)
         (void)func_800C2AF0(slot,(int32_t)mode,(int32_t)a2,out0);
+    else {
+        /* Any other handler: the retail jalr with all six arguments (a4/a5
+         * are O32 stack arguments) through the guest-code registry; the
+         * handler's result is returned as in retail.  Unresolved -> loud
+         * boundary (STOP), never a silent skip. */
+        const uintptr_t args[6] = {slot, mode, a2, out0, out1, out2};
+        return PE_GuestCallN("@8006F6D4:handler+8", fn, 6u, args);
+    }
     return 0;
 }

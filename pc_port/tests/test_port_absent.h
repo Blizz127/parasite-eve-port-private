@@ -634,6 +634,52 @@ static void test_PORTABSENT_room_dedupe_dispatch(void)
     PASS();
 }
 
+/* O32 stack arguments through the registry: room_m0256i's 6-parameter
+ * message handler func_801925AC (src/overlays/room_m0256i/func_801925AC.c:
+ * 0x101 stores a3/a4/a5 as shorts at +0x28/+0x2A/+0x2C) reached by the
+ * EXE dispatcher func_8006F6D4 (record -> handler table +8 -> jalr with
+ * a4/a5 on the stack), by PE_GuestCallN directly, and refused (loud) when
+ * a 4-argument site would leave its stack arguments unset. */
+static void test_PORTABSENT_stack_args(void)
+{
+    const pe_addr_t pool = PA_E9 + 0x7C00u, table = PA_E9 + 0x7B00u, ent = PA_E9 + 0x7B80u;
+    const pe_addr_t o = PA_E9 + 0x7E00u;
+    TEST("PORTABSENT_stack_args");
+    ResetTestState();
+    PE_Overlay_ResetResidency();
+    PE_Decomp_ResetBoundaries();
+    ASSERT(PE_Overlay_SetResident("room_m0256i") == 0, "room_m0256i resident");
+    {
+        const PeGuestCodeEntry *e = PE_GuestCode_Resolve(0x801925ACu);
+        ASSERT(e && !e->thunk && e->thunk8 && e->nargs == 6u, "6-parameter handler: thunk8 entry");
+    }
+    {
+        const uintptr_t a[6] = {o, 0u, 0x101u, 5u, 6u, 7u};
+        ASSERT(PE_GuestCallN("t:n", 0x801925ACu, 6u, a) == 0 && PE_Decomp_BoundaryCount() == 0,
+               "PE_GuestCallN reaches the handler");
+        ASSERT(PE_LoadU16(o + 0x28u) == 5u && PE_LoadU16(o + 0x2Au) == 6u &&
+               PE_LoadU16(o + 0x2Cu) == 7u, "a3, a4, a5 (stack) delivered");
+    }
+    /* func_8006F6D4(0, 0, 0x100, 0x30, 0x40, 0): record 0 in D_800942E4, handler byte 0x10. */
+    PE_StoreU32(0x800942E4u, pool);
+    PE_StoreU8(pool + 1u, 0x10u);
+    PE_StoreU32(0x800942E0u, table);
+    PE_StoreU32(table + 0x10u * 4u, ent);
+    PE_StoreU32(ent + 8u, 0x801925ACu);
+    ASSERT(func_8006F6D4(0u, 0u, 0x100u, 0x30u, 0x40u, 0u) == 0 && PE_Decomp_BoundaryCount() == 0,
+           "dispatcher calls the room handler");
+    ASSERT(PE_LoadU16(pool + 0x22u) == 0x30u && PE_LoadU16(pool + 0x24u) == 0x40u,
+           "message 0x100 heights (a3, stack a4) delivered");
+    /* A 4-argument site cannot supply a4/a5: loud boundary, nothing stored. */
+    PE_StoreU16(o + 0x2Cu, 0u);
+    (void)PE_GuestCall("t:4", 0x801925ACu, 4u, o, 0u, 0x101u, 9u);
+    ASSERT(PE_Decomp_BoundaryCount() == 1 && PE_LoadU16(o + 0x2Cu) == 0u,
+           "4-argument call to a 6-parameter handler is a boundary");
+    PE_Decomp_ResetBoundaries();
+    PE_Overlay_ResetResidency();
+    PASS();
+}
+
 static void test_PORTABSENT_all(void)
 {
     test_PORTABSENT_host_to_guest();
@@ -649,6 +695,7 @@ static void test_PORTABSENT_all(void)
     test_PORTABSENT_overlay_namespaced();
     test_PORTABSENT_guestcode();
     test_PORTABSENT_room_dedupe_dispatch();
+    test_PORTABSENT_stack_args();
     test_PA_handhi_all();
     test_PA_sdk_all();
     test_PA_cd_all();

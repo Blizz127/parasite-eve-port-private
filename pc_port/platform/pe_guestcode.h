@@ -31,6 +31,12 @@
 #include "pe_guest_ram.h"
 
 typedef int (*PeGuestThunk)(uintptr_t a0, uintptr_t a1, uintptr_t a2, uintptr_t a3);
+/* Callees with 5..8 integer parameters: O32 passes a0-a3 in registers and the
+ * rest in the caller's outgoing stack slots (sp+16, sp+20, ...).  A host call
+ * carries them all as plain arguments. */
+typedef int (*PeGuestThunk8)(uintptr_t a0, uintptr_t a1, uintptr_t a2, uintptr_t a3,
+                             uintptr_t a4, uintptr_t a5, uintptr_t a6, uintptr_t a7);
+#define PE_GUESTCALL_MAX_ARGS 8u
 
 typedef struct {
     uint32_t vma;          /* retail entry address */
@@ -40,6 +46,8 @@ typedef struct {
     const char *symbol;    /* host symbol, for diagnostics */
     uint32_t closure;      /* room entries: FNV-1a over the bytes of this leaf and
                             * every same-room function it reaches by jal (0 = none) */
+    PeGuestThunk8 thunk8;  /* set instead of `thunk` for 5..8-parameter callees */
+    uint8_t nargs;         /* parameter count of a thunk8 callee */
 } PeGuestCodeEntry;
 
 typedef struct {
@@ -77,6 +85,13 @@ const PeGuestCodeEntry *PE_GuestCode_Resolve(pe_addr_t addr);
  * registers.  Unresolved -> loud boundary (site, fn, args), returns 0. */
 int PE_GuestCall(const char *site, pe_addr_t fn, unsigned arity,
                  uintptr_t a0, uintptr_t a1, uintptr_t a2, uintptr_t a3);
+/* The same with up to PE_GUESTCALL_MAX_ARGS arguments: args[4..] are the
+ * O32 stack arguments.  A <= 4-parameter callee gets args[0..3] (it never
+ * reads the caller's stack slots).  A 5..8-parameter callee is called only
+ * when the site passes at least its parameter count; a site that passes
+ * fewer would leave the callee reading stack slots the caller never wrote,
+ * so that is a loud boundary (STOP), never a zero fill. */
+int PE_GuestCallN(const char *site, pe_addr_t fn, unsigned arity, const uintptr_t *args);
 
 /* Exposed for tests. */
 uint32_t PE_GuestCode_Fnv1a(pe_addr_t addr, uint32_t size);

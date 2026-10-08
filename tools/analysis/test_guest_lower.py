@@ -372,9 +372,9 @@ class GteAsm(CRunner):
 
 
 class Refusals(unittest.TestCase):
-    def assertRefused(self, src, why):
+    def assertRefused(self, src, why, **kw):
         with self.assertRaises(gl.LowerError) as cm:
-            lower(src)
+            lower(src, **kw)
         self.assertIn(why, str(cm.exception))
 
     def test_float(self):
@@ -441,8 +441,57 @@ class Refusals(unittest.TestCase):
                            '"mtc2 %0,$9" : "=r"(x)); return x; }', "read before written")
 
     def test_indirect_call_arity(self):
-        self.assertRefused("int func_80190000(void (*f)(int,int,int,int,int)) "
-                           "{ f(1,2,3,4,5); return 0; }", "more than 4")
+        self.assertRefused("int func_80190000(void (*f)(int,int,int,int,int,int,int,int,int)) "
+                           "{ f(1,2,3,4,5,6,7,8,9); return 0; }", "more than 8")
+
+    def test_indirect_call_stack_args(self):
+        # 5..8 arguments: O32 stack arguments ride PE_GuestCallN.
+        res = lower("int func_80190000(int (*f)(int,int,int,int,int,int), int x) "
+                    "{ return f(1,2,3,4,x,6); }")
+        self.assertIn("PE_GuestCallN(", res["body"])
+        self.assertIn("6u, (const uintptr_t[]){", res["body"])
+        self.assertIn("(uintptr_t)(uint32_t)(a_x)", res["body"])
+        self.assertNotIn("PE_GuestCall(", res["body"])
+
+
+    # E21c: extra arguments the callee never reads (m0348i func_8018F098 ->
+    # func_800C2AF0: 6 passed, 4 taken by both the retail and host callee).
+    C2AF0 = {"func_800C2AF0": {"ret": "int", "params": ["pe_addr_t slot", "int32_t unused",
+                                                        "int32_t index", "uint32_t value"],
+                               "retail_nparams": 4}}
+    WRAP = ("extern void func_800C2AF0();\n"
+            "int func_8018F098(int a0, int a1, int a2, int a3, int a4, int a5)\n"
+            "{ func_800C2AF0(a0, a1, a2, a3, a4, a5); return 0; }")
+
+    def test_unread_stack_args_dropped(self):
+        res = lower(self.WRAP, "func_8018F098", known={"func_800C2AF0"}, sigs=self.C2AF0)
+        self.assertIn("func_800C2AF0(a_a0, a_a1, a_a2, a_a3)", res["body"])
+        self.assertNotIn("a_a4", res["body"].split("func_800C2AF0(")[1].split(")")[0])
+
+    def test_unread_args_need_unprototyped_decl(self):
+        src = self.WRAP.replace("extern void func_800C2AF0();",
+                                "extern void func_800C2AF0(int, int, int, int, int, int);")
+        self.assertRefused(src, "call arity", name="func_8018F098", known={"func_800C2AF0"},
+                           sigs=self.C2AF0)
+
+    def test_unread_args_need_retail_count(self):
+        sigs = {"func_800C2AF0": {**self.C2AF0["func_800C2AF0"], "retail_nparams": 6}}
+        self.assertRefused(self.WRAP, "call arity", name="func_8018F098",
+                           known={"func_800C2AF0"}, sigs=sigs)
+        sigs = {"func_800C2AF0": {k: v for k, v in self.C2AF0["func_800C2AF0"].items()
+                                  if k != "retail_nparams"}}
+        self.assertRefused(self.WRAP, "call arity", name="func_8018F098",
+                           known={"func_800C2AF0"}, sigs=sigs)
+
+    def test_unread_args_must_be_pure(self):
+        src = self.WRAP.replace("a4, a5)", "a4++, a5)")
+        self.assertRefused(src, "call arity", name="func_8018F098", known={"func_800C2AF0"},
+                           sigs=self.C2AF0)
+
+    def test_too_few_args_refused(self):
+        src = self.WRAP.replace("a0, a1, a2, a3, a4, a5)", "a0, a1, a2)")
+        self.assertRefused(src, "call arity", name="func_8018F098", known={"func_800C2AF0"},
+                           sigs=self.C2AF0)
 
 
 if __name__ == "__main__":

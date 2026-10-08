@@ -457,8 +457,46 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
   - Gates (tag k3): Day 1 route PASS (story 80), Day 2 movies PASS,
     1642/1642 tests, both guards PASS, both `--verify` 0 drift, unit
     tests OK.
-- m0256i root cause found (fix in progress): the hand port of the message
-  dispatcher `func_8006F6D4` calls only a few known handler addresses. For
-  any other handler it returned 0 without calling it. That is a silent
-  skip, so messages 0x100/0x101 never reached the 6-argument handler
-  `func_801925AC`, and its durations stayed 0.
+- m0256i is clean: the root cause is fixed generally.
+  - Cause: the hand port of the message dispatcher `func_8006F6D4` called
+    only a few known handler addresses. For any other handler it returned
+    0 without calling it, a silent skip. So messages 0x100/0x101 never
+    reached the 6-argument handler `func_801925AC`, and the durations that
+    `func_80192680` divides by stayed 0.
+  - Call mechanism: `PE_GuestCallN` carries up to 8 arguments. a4..a7 are
+    the O32 stack arguments, which the old 4-argument `PE_GuestCall`
+    dropped.
+  - Registry: the generator emits 8-argument `thunk8` entries, with their
+    parameter count, for callees with 5..8 integer parameters. 245 new
+    thunks; Psy-Q-classified EXE bodies are excluded so the registry links
+    no Psy-Q code.
+  - A site that passes fewer arguments than the callee takes is a loud
+    boundary, never a zero fill.
+  - The lowering turns 5..8-argument indirect calls into `PE_GuestCallN`.
+  - `func_8006F6D4` now forwards every other handler through
+    `PE_GuestCallN` with all six arguments and returns the handler's
+    result.
+  - E21c in the lowering: unread arguments. A leaf that calls an
+    unprototyped callee with more arguments than it takes, e.g. the
+    6-argument message wrappers `return func_800C2AF0(a0..a5)` that m0034i,
+    m0348i and others carry, is lowered with the extras dropped. All three
+    conditions must hold: the callee's matched retail definition takes
+    exactly the host prototype's count, the dropped arguments are side
+    effect free, and the leaf's declaration is unprototyped. The
+    analyzer's "call arity" refusal now routes to the lowering, which
+    still refuses every other mismatch, including too few arguments.
+    About 75 more room TUs are lowered.
+  - Day 1 shows why this matters: the M34 boss fight sends messages 4..7 to
+    m0348i's `func_8018F098`, which used to be skipped silently. With the
+    dispatcher fixed and before E21c, that was an honest STOP on the Day 1
+    route. With E21c it runs natively, and Day 1 still ends at the same
+    frame and token.
+  - New tests: native `PORTABSENT_stack_args` (the m0256i handler through
+    `PE_GuestCallN` and through `func_8006F6D4`; a 4-argument site is
+    refused), lowering tests (stack-argument call; E21c drop and its four
+    refusals), and generator tests (thunk limits, thunk8 entry).
+  - `warp_probe.sh m0256i 90 6000` and `m0348i 90 4000` now run clean to
+    the frame limit.
+  - Gates (tag k6): Day 1 route PASS (story 80), Day 2 movies PASS,
+    1643/1643 tests, both guards PASS, both `--verify` 0 drift, unit
+    tests OK (191).

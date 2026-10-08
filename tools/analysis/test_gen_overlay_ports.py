@@ -261,7 +261,7 @@ class E21FallbackTests(unittest.TestCase):
         self.assertIn("PE_StoreU32(((uint32_t)PE_LoadU32((a_o + 4u))), (uint32_t)(1))", txt)
 
     def test_other_reasons_stay_refused(self):
-        for why in ("call arity func_80012345 2!=1", "pinned register x read before written",
+        for why in ("pinned register x read before written",
                     "hardware/BIOS literal 0x1F801070"):
             self.assertIsNone(o.lowered_tu("func_80190000", self.SRC, self.LEAF, why, set(), {}, {}))
 
@@ -306,6 +306,35 @@ class ClosureFingerprintTests(unittest.TestCase):
         a = o.closure_fp(*self.room(0x24020001), "func_80190000")
         b = o.closure_fp(*self.room(0x24020002), "func_80190000")
         self.assertNotEqual(a, b)       # same leaf bytes, different jal callee
+
+class DispatchThunkTests(unittest.TestCase):
+    """Registry thunks: <= 4 params -> PeGuestThunk; 5..8 (O32 stack args) ->
+    PeGuestThunk8 plus the parameter count; more -> not thunkable."""
+
+    def sig(self, n):
+        return {"ret": "int", "params": [f"int32_t a{i}" for i in range(n)]}
+
+    def test_thunkable_limits(self):
+        self.assertEqual(o.thunkable(self.sig(4)), ["int32_t"] * 4)
+        self.assertEqual(o.thunkable(self.sig(6)), ["int32_t"] * 6)
+        self.assertEqual(o.thunkable(self.sig(8)), ["int32_t"] * 8)
+        self.assertIsNone(o.thunkable(self.sig(9)))
+
+    def test_render_thunk8_entry(self):
+        ents = [{"vma": 0x801925AC, "size": 0x78, "fp": 0x1234, "closure": 0, "symbol": "room_x__f6",
+                 "types": ["uint32_t", "int32_t", "uint32_t", "int32_t", "int32_t", "int32_t"],
+                 "ret": "int32_t", "decl": None},
+                {"vma": 0x80190000, "size": 8, "fp": 0x99, "closure": 0, "symbol": "room_x__f1",
+                 "types": ["uint32_t"], "ret": "int32_t", "decl": None}]
+        txt = o.render_dispatch([{"id": "room_x", "lo": 0x8018F000, "hi": 0x801A0000, "sha1": None,
+                                  "load_size": 0, "entries": ents}])
+        self.assertIn("static int pe_gct_0(uintptr_t a0, uintptr_t a1, uintptr_t a2, uintptr_t a3, "
+                      "uintptr_t a4, uintptr_t a5, uintptr_t a6, uintptr_t a7) { (void)a6; (void)a7; "
+                      "return (int)room_x__f6((uint32_t)a0, (int32_t)a1, (uint32_t)a2, (int32_t)a3, "
+                      "(int32_t)a4, (int32_t)a5); }", txt)
+        self.assertIn('{0x801925ACu, 0x78u, 0x00001234u, 0, "room_x__f6", 0x00000000u, pe_gct_0, 6u},', txt)
+        self.assertIn('{0x80190000u, 0x8u, 0x00000099u, pe_gct_1, "room_x__f1", 0x00000000u, 0, 0u},', txt)
+
 
 if __name__ == "__main__":
     unittest.main()

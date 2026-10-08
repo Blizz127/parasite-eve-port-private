@@ -327,7 +327,35 @@ LOWER_REASONS = ("pointer parameter", "leaf struct with pointer members",
                  # scratchpad (0x1F800000-0x1F8003FF) is guest memory; MMIO/BIOS
                  # literals are re-refused by the lowering itself.
                  "hardware/BIOS literal 0x1F8000", "hardware/BIOS literal 0x1F8001",
-                 "hardware/BIOS literal 0x1F8002", "hardware/BIOS literal 0x1F8003")
+                 "hardware/BIOS literal 0x1F8002", "hardware/BIOS literal 0x1F8003",
+                 # E21c: extra arguments the callee never reads (guest_lower
+                 # unread_args_droppable); any other arity mismatch is
+                 # re-refused by the lowering.
+                 "call arity")
+
+
+_RETAIL_NPARAMS: dict[str, int] | None = None
+_DEF_RE = r"\b{}\s*\(((?:[^()]|\([^()]*\))*)\)\s*\{{"
+
+
+def retail_nparams() -> dict[str, int]:
+    """func_* -> parameter count of its matched EXE definition (src/func_*.c),
+    the retail authority E21c compares the host prototype against."""
+    global _RETAIL_NPARAMS
+    if _RETAIL_NPARAMS is None:
+        out: dict[str, int] = {}
+        for pth in sorted((REPO_ROOT / "src").glob("func_*.c")):
+            n = pth.stem
+            txt = g.strip_comments(pth.read_text(encoding="utf-8", errors="replace"))
+            m = re.search(_DEF_RE.format(re.escape(n)), txt)
+            if not m:
+                continue
+            prm = [x for x in g.split_top(m.group(1)) if x.strip() not in ("", "void")]
+            if any(x.strip() == "..." for x in prm):
+                continue
+            out[n] = len(prm)
+        _RETAIL_NPARAMS = out
+    return _RETAIL_NPARAMS
 
 
 def lowered_tu(n: str, text: str, leaf: dict, reason: str | None, known: set[str],
@@ -404,6 +432,10 @@ def run_rooms(args, windows) -> tuple[int, int, dict, dict]:
             for a, b in dsigs.items():
                 protos.setdefault(a, len(b["params"]))
                 sigs.setdefault(a, {"ret": b["ret"], "params": b["params"]})
+            rnp = retail_nparams()
+            for a in list(sigs):
+                if a in rnp:
+                    sigs[a] = {**sigs[a], "retail_nparams": rnp[a]}
             g._ADDR_SIGS.clear(); g._ADDR_SIGS.update(sigs)
             g._ADDR_KNOWN.clear(); g._ADDR_KNOWN.update(known)
             text = (OVL_SRC_DIR / r / f"{n}.c").read_text(encoding="utf-8", errors="replace")
@@ -510,18 +542,31 @@ def param_type(p: str) -> str | None:
     return " ".join(w for w in words if w not in ("const", "volatile", "register"))
 
 
+THUNK_MAX_ARGS = 8   # PE_GUESTCALL_MAX_ARGS: a0-a3 plus four O32 stack arguments
+
+
 def thunkable(sig: dict) -> list[str] | None:
-    """Parameter types of an all-integer host signature (<= 4 params), or None."""
+    """Parameter types of an all-integer host signature (<= 8 params), or None.
+
+    Up to 4 parameters get a PeGuestThunk; 5..8 (O32 stack arguments) get a
+    PeGuestThunk8, which PE_GuestCallN calls only when the site passes them."""
     ret = sig["ret"].replace("extern", "").replace("static", "").strip()
     if ret != "void" and (("*" in ret) or any(w not in INT_TYPE_WORDS for w in ret.split())):
         return None
     params = [p for p in sig["params"] if p.strip() not in ("", "void")]
-    if len(params) > 4:
+    if len(params) > THUNK_MAX_ARGS:
         return None
     types = [param_type(p) for p in params]
     if any(t is None for t in types):
         return None
     return types
+
+
+def psyq_addresses() -> set[int]:
+    """EXE addresses classified as Psy-Q (configs/USA/psyq_classification.tsv,
+    the psyq_port_guard authority)."""
+    import psyq_port_guard as pg
+    return set(pg.load_classification(REPO_ROOT / "configs/USA/psyq_classification.tsv"))
 
 
 def fnv1a(data: bytes) -> int:
@@ -686,18 +731,27 @@ def render_dispatch(tables: list[dict]) -> str:
             body = (f"{call}; return 0;" if e["ret"] == "void"
                     else f"return (int){call};")
             e["thunk"] = f"pe_gct_{n}"
-            out.append(f"static int pe_gct_{n}(uintptr_t a0, uintptr_t a1, uintptr_t a2, uintptr_t a3)"
-                       f" {{ (void)a0; (void)a1; (void)a2; (void)a3; {body} }}")
+            if len(e["types"]) <= 4:
+                out.append(f"static int pe_gct_{n}(uintptr_t a0, uintptr_t a1, uintptr_t a2, uintptr_t a3)"
+                           f" {{ (void)a0; (void)a1; (void)a2; (void)a3; {body} }}")
+            else:
+                prm = ", ".join(f"uintptr_t a{i}" for i in range(THUNK_MAX_ARGS))
+                unused = " ".join(f"(void)a{i};" for i in range(len(e["types"]), THUNK_MAX_ARGS))
+                out.append(f"static int pe_gct_{n}({prm}) {{ {unused} {body} }}")
             n += 1
     out.append("")
     for t in tables:
         cname = "pe_gc_" + re.sub(r"\W", "_", t["id"])
         out.append(f"static const PeGuestCodeEntry {cname}_e[] = {{")
         for e in sorted(t["entries"], key=lambda e: e["vma"]):
+            if len(e["types"]) <= 4:
+                t4, t8, na = e["thunk"], "0", 0
+            else:
+                t4, t8, na = "0", e["thunk"], len(e["types"])
             out.append(f"    {{0x{e['vma']:08X}u, 0x{e['size']:X}u, 0x{e['fp']:08X}u, "
-                       f"{e['thunk']}, \"{e['symbol']}\", 0x{e.get('closure', 0):08X}u}},")
+                       f"{t4}, \"{e['symbol']}\", 0x{e.get('closure', 0):08X}u, {t8}, {na}u}},")
         if not t["entries"]:
-            out.append("    {0u, 0u, 0u, 0, 0},")
+            out.append("    {0u, 0u, 0u, 0, 0, 0u, 0, 0u},")
         out.append("};")
         sha = f'"{t["sha1"]}"' if t["sha1"] else "0"
         out.append(f"static const PeGuestCodeTable {cname} = {{\"{t['id']}\", "
@@ -727,6 +781,7 @@ def build_dispatch(args) -> tuple[int, list[str]]:
     canon = g.canonical_signatures()
     dsigs = g.derived_signatures()
     entries = []
+    psyq = psyq_addresses()
     for name in sorted(set(defs)):
         a = int(name[5:], 16)
         if not (0x80010000 <= a < exe_hi):
@@ -736,6 +791,11 @@ def build_dispatch(args) -> tuple[int, list[str]]:
             continue
         types = thunkable(sig)
         if types is None or static_defined(name, defs[name]):
+            continue
+        if len(types) > 4 and a in psyq:
+            # A thunk links its target: a Psy-Q-classified body must not be
+            # pulled into the port by the registry (psyq_port_guard); a guest
+            # call through a pointer to it stays a loud boundary.
             continue
         decl = None if name in canon else dsigs[name]["decl"]
         size = matched[name]["file_size"] if name in matched else 4
