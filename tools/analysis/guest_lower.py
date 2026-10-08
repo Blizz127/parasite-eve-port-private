@@ -769,6 +769,8 @@ class Lowerer:
 
     # calls -----------------------------------------------------------
     def call(self, e) -> tuple[str, T]:
+        discard = getattr(self, "_discard_call", False)
+        self._discard_call = False      # nested argument calls are value uses
         args = list(e.args.exprs) if e.args is not None else []
         fn = e.name
         if isinstance(fn, c_ast.UnaryOp) and fn.op == "*":
@@ -780,7 +782,7 @@ class Lowerer:
                 return self.direct_call(name, args, ft or self.self_ty, self.self_sig)
             if FUNC_NAME_RE.fullmatch(name):
                 if name in self.known:
-                    return self.direct_call(name, args, ft, self.sigs.get(name))
+                    return self.direct_call(name, args, ft, self.sigs.get(name), discard)
                 return self.boundary_call(name, args, ft)
             if DATA_NAME_RE.fullmatch(name) and ft is not None:
                 return self.guest_call(f"0x{data_address(name):08X}u", args, ft)
@@ -830,7 +832,7 @@ class Lowerer:
             call = f'PE_D_COMP_BOUNDARY{n}("{name}", 0x{name[5:]}u, {", ".join(a)})'
         return self.typed_ret(call, self.ret_of(ft))
 
-    def direct_call(self, name, args, ft, sig) -> tuple[str, T]:
+    def direct_call(self, name, args, ft, sig, discard=False) -> tuple[str, T]:
         self.callees.add(name)
         rt = self.ret_of(ft)
         if sig is None:
@@ -866,7 +868,9 @@ class Lowerer:
         if "*" in hret:
             call = f"PE_HostToGuest({call})"
         elif hret == "void" and not isinstance(rt, TVoid):
-            raise LowerError(f"value of void callee {name} used")
+            if not discard:
+                raise LowerError(f"value of void callee {name} used")
+            return f"((void){call})", TVoid()
         return self.typed_ret(call, rt)
 
     # statements ------------------------------------------------------
@@ -1064,6 +1068,10 @@ class Lowerer:
             return self.incdec(e, False)[0]
         if isinstance(e, c_ast.ExprList):
             return ", ".join(f"({self.ex(x)})" for x in e.exprs)
+        if isinstance(e, c_ast.FuncCall):
+            # A call statement discards its value, so a guest prototype that
+            # says int for a host void function is harmless here.
+            self._discard_call = True
         c, t = self.rv(e)
         return f"(void)({c})"
 

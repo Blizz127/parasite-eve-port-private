@@ -1088,6 +1088,8 @@ void PE_EffectSpriteCEE20(pe_addr_t position, const int16_t angles[4], int32_t s
     const uint8_t color[3]);
 void func_800CEE20(pe_addr_t position, pe_addr_t angles, int32_t sx, int32_t sy,
     int32_t texture, uint32_t clut, int32_t abr, int32_t brightness, pe_addr_t color);
+/* Ring/ribbon glow renderer (hand port in func_800C9C20_port.c). */
+void func_800C4FC4(pe_addr_t r, pe_addr_t matrix, unsigned billboard);
 int PE_M0023I_Main(int32_t mode, pe_addr_t data);
 int PE_M0023I_Particle(int32_t mode, pe_addr_t data);
 int PE_M0023I_Beam(int32_t mode, pe_addr_t data);

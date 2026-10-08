@@ -299,6 +299,21 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
   variants (lm=1) stay refused. m0159i now runs past F3A4 and stops at the
   effect callback `0x8018F008`: its group (twin of m0104i) was refused by the
   lowering ("value of void callee func_800CEE20 used"), so no TU exists yet.
+- m0349i `func_8018F010` (0x7B4, the particle task the emitter starts)
+  matched and carved; m0349i is now all C and runs clean to the frame limit
+  (it takes its scripted exit; the token moves on). Matching notes:
+  `p[9]++` first, `p[5] *= -1` (keeps retail's sign-extend before the
+  negate), and D_800F3374 as an array keeps its store after the p[7] load.
+- Lowering: a call used as a statement no longer refuses when the guest
+  prototype says `int` but the host function is `void` (vendor TUs declare
+  `int func_800CEE20();`); using the value is still refused. And
+  `func_800C4FC4` (ring glow renderer, hand port) now has a shim-header
+  prototype, so callers can lower. That clears 15 of the 20 asm refusals
+  (8 void-callee, 7 no-prototype). Room TUs 2590 -> 2610; no compile-gate
+  drops. Probes: m0104i, m0107i, m0111i, m0113i, m0116i, m0122i, m0156i,
+  m0174i, m0263i, m0348i, m0391i, m0392i, m0421i, m0424i and m0005i all run
+  clean to the frame limit. m0159i now runs past its F008 callback and stops
+  at the EXE helper `func_800D2104` (called from F008's rise draw).
 - Matching notes: gcc 2.7 assumes a struct-member access never aliases a
   fixed-address scalar, so `short *p` indexing (not a struct) plus an array
   global (`D_800942EC[0]`) is what keeps the retail store/load order. Use the

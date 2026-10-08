@@ -372,6 +372,23 @@ class Refusals(unittest.TestCase):
         self.assertRefused('int func_80190000(int a) { __asm__ volatile(".word 0x4A180001"); '
                            'return a; }', "cop2 command")
 
+    VOID_SIG = {"func_800CEE20": {"ret": "void", "params": ["int32_t a"]}}
+
+    def test_void_callee_value_used_refused(self):
+        src = ("int func_800CEE20();\n"
+               "int func_80190000(int a) { return func_800CEE20(a); }")
+        with self.assertRaises(gl.LowerError) as cm:
+            lower(src, known={"func_800CEE20"}, sigs=self.VOID_SIG)
+        self.assertIn("value of void callee", str(cm.exception))
+
+    def test_void_callee_as_statement_lowered(self):
+        # Vendor TUs declare `int func_800CEE20();` and only call it as a
+        # statement; that discards the value, so it lowers.
+        src = ("int func_800CEE20();\n"
+               "int func_80190000(int a) { func_800CEE20(a + 1); return a; }")
+        res = lower(src, known={"func_800CEE20"}, sigs=self.VOID_SIG)
+        self.assertIn("func_800CEE20(", res["body"])
+
     def test_rtpt_lm1_refused(self):
         # RTPT with lm=1 is not modelled by PE_GTE_RTPT_coordinates.
         self.assertRefused('int func_80190000(int a) { __asm__ volatile(".word 0x4A280430"); '
