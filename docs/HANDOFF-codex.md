@@ -296,6 +296,27 @@ emulation fallback; a missing function STOPs.
   `parasite-eve-port` turns it on by default (`[NATIVE] boundary policy=stop`);
   `PE_BOUNDARY_POLICY=record` restores log-and-continue for diagnosis. The
   library default stays record, so the suite is unchanged.
+- **Disc gate (2026-10-07 evening, discs on the box):**
+  - The native-only build at 2918a7f0, including public release
+    `native-only-2918a7f0`, boots and plays, then **stops at Day 1 frame
+    ~42000** (story 0x54, token A80614C8, before the M0023I Eve fight).
+    Cause: the hand-written audio command consumer `func_8008CA84`
+    (`pe_stream_commands.c`) had no case for command 0x9B -> `func_8008C720`
+    and requested a silent stop. The interpreter used to run the whole tick,
+    so nothing reached it before.
+  - Fix: commands without a hand case dispatch through the guest-code
+    registry to their matched C (all 50 `D_8009C0C0` targets have thunks).
+    A target without C stops with `CPU_BOUNDARY/REFUSED`.
+  - `PE_Port_RequestStop(unresolved-boundary)` now prints
+    `[STOP] ... requested by: +0x..`. Resolve with `addr2line -f -e <binary>`.
+    Most libcd/libgpu/boot stop sites print nothing themselves.
+  - After the fix: `day1_route_regress.sh --until day1_end_80` PASS at frame
+    67186; `movies_day2_check.sh` MOVIES_DAY2=PASS; suite 1634/1634 with the
+    disc (0 skipped).
+  - The recorded `--route-pad` sequence ends at Day 2: from frame 69088 it
+    idles in A80040C8 (story 0x90) with no STOP up to frame 250000. Getting
+    toward Day 3 needs a recorded Day 2 pad route; the warp menu only lists
+    Day 1 rooms.
 - **Not yet gated on a real disc** (the box has no disc): the Day 1 route
   (`day1_route_regress.sh`) and `movies_day2_check.sh` must be re-run; any
   boundary on those paths now ends the run with the STOP line above, which

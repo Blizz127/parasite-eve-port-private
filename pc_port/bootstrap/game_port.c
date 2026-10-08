@@ -15,6 +15,11 @@
 #include "pe_irq_delivery.h"
 #include <stddef.h>
 #include <string.h>
+#include <stdio.h>
+#if defined(__GLIBC__) && !defined(_WIN32)
+#include <execinfo.h>
+#define PE_STOP_BACKTRACE 1
+#endif
 
 int g_port_stop_requested = 0;
 int g_port_main_iterations = 0;
@@ -254,10 +259,34 @@ void PE_Port_InvokePresentHook(void)
     if (g_port_present_hook) g_port_present_hook();
 }
 
+/* The first unresolved-boundary stop names its native requester, because
+ * most stop sites (libcd/libgpu/boot ports) do not print their own line.
+ * Frames are module offsets: `addr2line -f -e <unstripped binary> 0x<off>`. */
+static __attribute__((noinline)) void port_stop_report(PEPortStopReason reason)
+{
+#ifdef PE_STOP_BACKTRACE
+    extern char __executable_start[]; /* linker-provided image base */
+    void *frames[8];
+    int n = backtrace(frames, 8);
+    int i;
+    fprintf(stderr, "[STOP] reason=%s requested by:", PE_Port_StopReasonName(reason));
+    for (i = 1; i < n; i++) {
+        fprintf(stderr, " +0x%lx",
+                (unsigned long)((char *)frames[i] - __executable_start));
+    }
+    fputc('\n', stderr);
+#else
+    fprintf(stderr, "[STOP] reason=%s\n", PE_Port_StopReasonName(reason));
+#endif
+}
+
 void PE_Port_RequestStop(PEPortStopReason reason)
 {
     if (!g_port_stop_requested) {
         g_port_stop_reason = reason;
+        if (reason == PE_PORT_STOP_UNRESOLVED_BOUNDARY) {
+            port_stop_report(reason);
+        }
     }
     g_port_stop_requested = 1;
     g_port_stop_epoch++;
