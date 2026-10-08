@@ -72,6 +72,9 @@ int  pe_plat_cheats_area_kit(uint32_t lo, uint32_t hi);
 int  pe_plat_cheats_warp_count(void);
 const char *pe_plat_cheats_warp_name(int index);
 int pe_plat_cheats_warp_day(int index); /* warp lane: 1..6, 0 invalid */
+/* Dev-only env warp (PE_WARP_ROOM/PE_WARP_STORY/PE_WARP_AT, needs PE_DEV_MENU=1).
+ * Room slot name (m0041i) or hex token -> room token; 0 if not understood. */
+uint32_t pe_plat_cheats_room_token(const char *room);
 
 #ifdef __cplusplus
 }

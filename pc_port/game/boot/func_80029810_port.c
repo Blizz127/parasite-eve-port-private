@@ -1059,6 +1059,12 @@ static void func_8006914C_module_init(pe_addr_t table, unsigned int code)
     if (PE_RangeIsRam(fn, 8u) && PE_LoadU32(fn) == 0x03E00008u &&
         PE_LoadU32(fn + 4u) == 0x00001021u)
         return;
+    if (PE_Decomp_BoundaryStopEnabled()) {
+        /* Native-only: an unported module init is a CPU_BOUNDARY/REFUSED STOP
+         * under the port binary's stop policy; the skip below is record-only. */
+        (void)PE_GuestCall("@8006914C:module-init", fn, 0u, 0, 0, 0, 0);
+        return;
+    }
     {
         static pe_addr_t seen[16]; static unsigned n;
         unsigned k;

@@ -59,6 +59,10 @@ int32_t func_8006FC18(uint32_t index, pe_addr_t owner, uint32_t force)
         unsigned epoch=PE_Port_StopEpoch();
         result=PE_GuestCall("func_8006FC18",fn,3u,slot,code,force,0u);
         if (PE_Port_StopEpoch()!=epoch) return result;
+    } else if (PE_Decomp_BoundaryStopEnabled()) {
+        /* Native-only: an unported destroy callback is a CPU_BOUNDARY/REFUSED
+         * STOP under the port binary's stop policy (skip = record-only). */
+        return PE_GuestCall("func_8006FC18",fn,3u,slot,code,force,0u);
     } else {
         if (g_pe_strict_effect_stack) {
             (void)Bootstrap_ReturnInt4Indirect("effect_destroy_callback", "func_8006FC18",

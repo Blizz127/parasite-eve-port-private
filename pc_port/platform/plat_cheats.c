@@ -23,6 +23,7 @@
 #include "pe_plat/mods.h"
 #include "pe_plat/enhance.h"
 #include "pe_guest_ram.h"
+#include "host_framebuffer.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -70,6 +71,9 @@ static struct {
     int god, ammo, help, menu, menu_index, ff_index;
     int dev_page, dev_index, dev_day;
     int pending_win, pending_kit, pending_warp;
+    int env_warp;                       /* PE_WARP_ROOM armed, not yet done */
+    uint32_t env_token, env_story, env_at;
+    int env_set_story;
     unsigned wins, kits, warps;
     uint32_t ammo_gun, ammo_loaded_max, ammo_pool_max[3];
     char toast[64]; int toast_frames;
@@ -117,6 +121,48 @@ static void load_script(void)
     }
 }
 
+/* Dev-only env warp (PE_DEV_MENU=1): start a run in any room, e.g. to probe
+ * Day 2/3 rooms headless for CPU_BOUNDARY/REFUSED stops.
+ *   PE_WARP_ROOM   m0041i (room package slot) or a raw token (A80040C8)
+ *   PE_WARP_STORY  persist[74] story value in hex (default: unchanged)
+ *   PE_WARP_AT     earliest host frame for the transfer (default 0)
+ * The warp goes through the same field-VM room_transfer as the F8 warp menu,
+ * once the field is idle.  Room token = 0xA8000048 | v << 7 with
+ * v = hundreds * 0x400 + tens * 0x20 + units of the slot number (checked
+ * against every Day 1 checkpoint token, e.g. m0359i -> A80654C8). */
+uint32_t pe_plat_cheats_room_token(const char *room)
+{
+    unsigned n;
+    char *end;
+    if (!room || !*room) return 0u;
+    if ((room[0] == 'm' || room[0] == 'M') && room[1]) {
+        n = (unsigned)strtoul(room + 1, &end, 10);
+        if (end == room + 1 || n == 0u || n > 999u) return 0u;
+        return 0xA8000048u | (((n / 100u) * 0x400u + ((n / 10u) % 10u) * 0x20u + n % 10u) << 7);
+    }
+    n = (unsigned)strtoul(room, &end, 16);
+    return (end != room && *end == '\0') ? (uint32_t)n : 0u;
+}
+
+static void load_env_warp(void)
+{
+    const char *r = getenv("PE_WARP_ROOM"), *st = getenv("PE_WARP_STORY"), *at = getenv("PE_WARP_AT");
+    if (!r || !*r) return;
+    if (!pe_plat_cheats_dev_menu_enabled()) {
+        fprintf(stderr, "[WARP] PE_WARP_ROOM ignored: dev-only (needs PE_DEV_MENU=1)\n");
+        return;
+    }
+    C.env_token = pe_plat_cheats_room_token(r);
+    if (!C.env_token) { fprintf(stderr, "[WARP] PE_WARP_ROOM=%s not understood\n", r); return; }
+    C.env_set_story = st && *st;
+    C.env_story = C.env_set_story ? (uint32_t)strtoul(st, NULL, 16) : 0u;
+    C.env_at = at ? (uint32_t)strtoul(at, NULL, 10) : 0u;
+    C.env_warp = 1;
+    fprintf(stderr, "[WARP] armed room=%s token=%08X story=%s%X at>=%u\n", r,
+            (unsigned)C.env_token, C.env_set_story ? "" : "(unchanged) ",
+            (unsigned)C.env_story, (unsigned)C.env_at);
+}
+
 static void frame_hook(const PePlatModEventData *ev, void *user)
 {
     (void)ev; (void)user;
@@ -132,6 +178,7 @@ void pe_plat_cheats_init(void)
     C.enabled = !(e && e[0] == '0');
     if (!C.enabled) return;
     load_script();
+    load_env_warp();
     C.hook = pe_plat_mods_subscribe(PE_PLAT_EVENT_FRAME_TICK, frame_hook, NULL);
 }
 
@@ -387,9 +434,8 @@ static int in_field(uint32_t tok)
 
 /* 1 = transfer requested, 0 = wait (field running but busy),
  * -1 = no room_transfer linked, -2 = not in the field (refused). */
-static int warp_pass(int index)
+static int warp_to(uint32_t token, int set_story, uint32_t story)
 {
-    const CheatWarp *w = &k_warps[index];
     uint32_t d1a0 = PE_LoadU32(GA_D1A0);
     uint32_t tok = PE_LoadU32(GA_TOKEN);
     if (!func_80017BB4) return -1;
@@ -404,11 +450,16 @@ static int warp_pass(int index)
      * PE_LoadU32 fatal).  Wait for func_80121A00 to clear the flag, and let
      * the prologue hand over to its first room before warping. */
     if (PE_LoadU8(GA_MOVIE) || tok == TOK_PROLOGUE) return 0;
-    PE_StoreU32(GA_STORY, w->story);
-    PE_StoreU32(PE_CHEAT_STACK + 8u, w->token);
+    if (set_story) PE_StoreU32(GA_STORY, story);
+    PE_StoreU32(PE_CHEAT_STACK + 8u, token);
     PE_StoreU32(PE_CHEAT_STACK + 0u, PE_CHEAT_STACK + 8u);
     (void)func_80017BB4(PE_CHEAT_STACK);                 /* the field VM's room_transfer */
     return 1;
+}
+
+static int warp_pass(int index)
+{
+    return warp_to(k_warps[index].token, 1, k_warps[index].story);
 }
 
 void pe_plat_cheats_apply(void)
@@ -429,6 +480,24 @@ void pe_plat_cheats_apply(void)
         snprintf(msg, sizeof msg, "AREA KIT: %d KEY ITEMS ADDED", n);
         toast(msg);
         C.pending_kit = 0;
+    }
+    if (C.env_warp) {
+        int presented = 0;
+        HostFB_GetState(NULL, NULL, &presented, NULL);
+        if ((uint32_t)presented >= C.env_at) {
+            uint32_t tok = PE_LoadU32(GA_TOKEN);
+            int r = in_field(tok) ? warp_to(C.env_token, C.env_set_story, C.env_story) : 0;
+            if (r > 0) {
+                C.env_warp = 0;
+                C.warps++;
+                fprintf(stderr, "[WARP] env transfer %08X -> %08X story=%08X frame=%d\n",
+                        (unsigned)tok, (unsigned)C.env_token,
+                        (unsigned)PE_LoadU32(GA_STORY), presented);
+            } else if (r < 0) {
+                C.env_warp = 0;
+                fprintf(stderr, "[WARP] env transfer unavailable (%d)\n", r);
+            }
+        }
     }
     if (C.pending_warp) {
         int r = warp_pass(C.pending_warp - 1);

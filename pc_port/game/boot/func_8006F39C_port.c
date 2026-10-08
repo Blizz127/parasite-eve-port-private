@@ -216,6 +216,10 @@ int func_8006F39C(unsigned int code, pe_addr_t userdata)
     else if (PE_GuestCode_Resolve(fn))
         /* Generated overlay / EXE TU at that address (pe_guestcode.h). */
         (void)PE_GuestCall("@8006F39C:init", fn, 1u, (uintptr_t)slot, 0, 0, 0);
+    else if (PE_Decomp_BoundaryStopEnabled())
+        /* Native-only: an unported init is a CPU_BOUNDARY/REFUSED STOP under
+         * the port binary's stop policy; the skip below is record-policy only. */
+        (void)PE_GuestCall("@8006F39C:init", fn, 1u, (uintptr_t)slot, 0, 0, 0);
     else if (g_pe_strict_effect_stack) {
         fprintf(stderr, "[func_8006F39C] unresolved init fn=%08X code=%02X token=%08X slot=%08X\n",
                 fn, code, (unsigned)PE_LoadU32(0x8009D280u), slot);

@@ -1029,7 +1029,8 @@ static void WatchdogArm(void)
  *    A second signal, or 5 s without reaching exit, terminates at once.
  *  - SIGPIPE ignored: if tee goes away first, stderr writes fail with EPIPE
  *    instead of killing the game.
- *  - SIGSEGV/SIGBUS/SIGILL/SIGFPE: one line + backtrace, then the default
+ *  - SIGSEGV/SIGBUS/SIGILL/SIGFPE/SIGABRT (e.g. a FATAL guest address):
+ *    one line + backtrace, then the default
  *    action, so a crash is distinguishable from a kill in a user's log. */
 static volatile sig_atomic_t g_host_term_sig;
 
@@ -1043,6 +1044,7 @@ static const char *HostSigName(int sig)
     case SIGBUS:  return "SIGBUS";
     case SIGILL:  return "SIGILL";
     case SIGFPE:  return "SIGFPE";
+    case SIGABRT: return "SIGABRT";
     default:      return "signal";
     }
 }
@@ -1083,7 +1085,7 @@ static void HostSignalsInstall(void)
 {
     static char altstack[64 * 1024];
     static const int term[] = {SIGTERM, SIGINT, SIGHUP};
-    static const int crash[] = {SIGSEGV, SIGBUS, SIGILL, SIGFPE};
+    static const int crash[] = {SIGSEGV, SIGBUS, SIGILL, SIGFPE, SIGABRT};
     struct sigaction sa;
     stack_t ss;
     void *warm[1];

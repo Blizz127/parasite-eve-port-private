@@ -100,6 +100,12 @@ void PE_WeaponCallback(pe_addr_t fn,pe_addr_t slot,pe_addr_t rec,pe_addr_t data)
         (void)PE_GuestCall("@800C2414:weapon", fn, 3u, (uintptr_t)slot, (uintptr_t)rec, (uintptr_t)data, 0);
         return;
     }
+    if (PE_Decomp_BoundaryStopEnabled()) {
+        /* Native-only: an unported weapon callback is a CPU_BOUNDARY/REFUSED
+         * STOP under the port binary's stop policy (skip = record-only). */
+        (void)PE_GuestCall("@800C2414:weapon", fn, 3u, (uintptr_t)slot, (uintptr_t)rec, (uintptr_t)data, 0);
+        return;
+    }
     if (g_pe_strict_effect_stack) {
         fprintf(stderr,"[EFFECT] Unported weapon callback %08X slot %08X record %08X\n",fn,slot,rec);
         Bootstrap_ReturnVoid("PE_WeaponCallback","weapon effect callback");

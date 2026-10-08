@@ -200,6 +200,11 @@ int PE_EffectCallback(pe_addr_t fn, int32_t mode, pe_addr_t data, pe_addr_t extr
     }
     if (PE_GuestCode_Resolve(fn))   /* generated overlay / EXE TU (pe_guestcode.h) */
         return PE_GuestCall("@800D413C:effect", fn, 2u, (uintptr_t)(uint32_t)mode, (uintptr_t)data, 0, 0);
+    if (PE_Decomp_BoundaryStopEnabled())
+        /* Native-only: an unported effect callback is a CPU_BOUNDARY/REFUSED
+         * STOP under the port binary's stop policy; the skip below is
+         * record-policy only. */
+        return PE_GuestCall("@800D413C:effect", fn, 2u, (uintptr_t)(uint32_t)mode, (uintptr_t)data, 0, 0);
     if (g_pe_strict_effect_stack) {
         fprintf(stderr,"[EFFECT] Unported callback %08X mode %d\n",fn,mode);
         Bootstrap_ReturnVoid("PE_EffectCallback", "room effect callback");
