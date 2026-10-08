@@ -157,12 +157,12 @@ with disc, psyq guard PASS (allowlist), retail_data_guard OK, generator
 `--verify` 0 drift, unit tests 14 + 24 OK, e21_diff 594 ok / 0 mismatch.
 Done: full re-sweep (`build/lanes/warp/sweep4_e21_abi.txt`, git-ignored) and Day 3
 probes, results below.
-In progress: E21b inline GTE asm lowering (`guest_lower.py` asm templates ->
-`PE_GTE_ReadData/WriteData/ReadCtrl/WriteCtrl/Command` in `pe_gte.c`, native
-tests `test_gte_regs.h`). Room asm refusals 305 -> 20, room TUs 2257 -> 2583.
-If uncommitted after a restart: rebuild with `scripts/build_pc_port.sh`, run the
-gates, then re-probe the GTE stop rooms (m0207i m0232i m0295i m0432i
-m0434i-m0437i) with `build/lanes/warp/probe.sh <room> 90`.
+Done and pushed: `4df41140` E21b inline GTE asm lowering (`guest_lower.py`
+asm templates -> `PE_GTE_ReadData/WriteData/ReadCtrl/WriteCtrl/Command` in
+`pe_gte.c`). Room asm refusals 305 -> 20, room TUs 2257 -> 2583. Gates: Day 1
+PASS (67186), MOVIES_DAY2 PASS, suite 1636/1636, guards OK, verify 0 drift,
+e21_diff 631 ok / 0 mismatch (32 GTE TUs).
+Next: twin-group ambiguity (m0437i, see "Round 4" below).
 No release (waiting on Will).
 
 Changes:
@@ -218,3 +218,20 @@ Day 3 probes (story 0x140 = Day 3 start, M0092I entry; 0x150/0x160 later):
 m0092i..m0098i @0x140, m0092i @0x150, m0191i and m0360i @0x160 all ran
 5000 frames clean. Same caveat: only the story word is set and nothing is
 walked beyond X presses.
+
+## Round 4: GTE asm lowering (E21b) re-probe
+
+Re-probe of the 11 stopping rooms on `4df41140`: m0207i, m0232i, m0295i,
+m0434i, m0435i and m0436i now run clean. Still stopping:
+
+| room | missing function | caller | why |
+|---|---|---|---|
+| m0159i | 0x8018F3A4 | `@800D413C:effect` | no matched C |
+| m0256i | 0x80193BFC | `@800D413C:effect` | no matched C |
+| m0349i | 0x8018F7C4 | `@800D413C:effect` | no matched C |
+| m0432i | 0x80193414 | `@800D413C:effect` | no matched C (got past 0x801903D0) |
+| m0437i | 0x80190388 | `@func_80190258:jalr` | two generated TUs (m0413i, m0245i twins) match the same bytes, so the resolver refuses to pick |
+
+m0050i still returns to the title (story 0x2F2 -> TOK_NEWGAME) and then waits
+on DMA, as before. Story-0x90 total: 376 clean, 5 STOP, 1 scripted exit,
+20 unused slots.
