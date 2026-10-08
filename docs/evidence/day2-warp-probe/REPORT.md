@@ -244,3 +244,23 @@ as the same code when both their leaf fingerprint and closure match. m0437i
 now runs clean (and m0413i still does). Story-0x90 total: 377 clean, 4 STOP
 (m0159i, m0256i, m0349i, m0432i, all on room functions with no matched C),
 1 scripted exit (m0050i), 20 unused slots.
+
+## Round 5: hand-matched C for the 4 stopping rooms (2026-10-08)
+
+**Progress note (for restarts).** Working through the 4 rooms one function at
+a time, each written from the retail asm until `era_link_check` prints
+LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
+`EXACT_REBUILD_GATE` PASS.
+
+- m0256i: `func_80193BFC` (0x4B4) and its particle callback `func_8019377C`
+  (0x480, GTE rotation-matrix asm) done. The room now runs further and stops
+  on the next effect callback `func_801934AC` (0x2D0). That one is matched
+  too (scratch `build/tmp/m5/func_801934AC.final.c`, next increment). After
+  it comes its callback `func_80192844` (0xC68).
+- Still to do: m0432i 0x80193414 (0x52C), m0349i 0x8018F7C4 (0x90C),
+  m0159i 0x8018F3A4 (0xA54; needs a room config first).
+- Matching notes: gcc 2.7 assumes a struct-member access never aliases a
+  fixed-address scalar, so `short *p` indexing (not a struct) plus an array
+  global (`D_800942EC[0]`) is what keeps the retail store/load order. Use the
+  PsyQ `gte_SetRotMatrix` macro, not register-asm locals, so `$8` stays free
+  for later `mflo`.
