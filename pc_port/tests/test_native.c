@@ -37417,6 +37417,28 @@ static void test_INIT1_rotation_retail_vectors(void)
     PASS();
 }
 
+/* PE_RotMatrixYXZ_Guest (host replacement for func_80079754 in lowered room
+ * code): guest SVECTOR angles in, the same 3x3 as PE_RotMatrix79754, the
+ * translation left alone, m returned. */
+static void test_INIT1_rotmatrix_guest(void)
+{
+    const int16_t angles[3] = {1, -2, 3};
+    unsigned j;
+    TEST("INIT1_rotmatrix_guest");
+    ResetTestState();
+    INIT1_SeedTrig();
+    PE_StoreU16(0x80140100u, 1u); PE_StoreU16(0x80140102u, (uint16_t)-2);
+    PE_StoreU16(0x80140104u, 3u);
+    PE_Fill(0x80140000u, 32u, 0xA5u);
+    PE_Fill(0x80140040u, 32u, 0xA5u);
+    ASSERT(PE_RotMatrixYXZ_Guest(0x80140100u, 0x80140000u) == 0x80140000u, "returns m");
+    PE_RotMatrix79754(angles, 0x80140040u);
+    for (j = 0; j < 32u; j++)
+        ASSERT(PE_LoadU8(0x80140000u + j) == PE_LoadU8(0x80140040u + j),
+               "same matrix, translation untouched");
+    PASS();
+}
+
 static void test_INIT1_clip_formats_and_joint_override(void)
 {
     const pe_addr_t dest=0x80130000u, clip=0x80131000u, matrices=0x80140000u;
@@ -40738,6 +40760,7 @@ int main(void)
     test_POSE1_branch_stack_and_bone_offsets();
     test_PKT1_retail_packet_bytes();
     test_INIT1_rotation_retail_vectors();
+    test_INIT1_rotmatrix_guest();
     test_INIT1_clip_formats_and_joint_override();
     test_SKIP2_script_movie_and_nop();
     test_SKIP2_media_wait_retry();

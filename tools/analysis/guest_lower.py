@@ -924,7 +924,7 @@ class Lowerer:
                 if isinstance(t, THostPtr):
                     raise LowerError(f"host pointer passed to {name} parameter {p.strip()}")
                 out.append(c)
-        call = f"{name}({', '.join(out)})"
+        call = f"{sig.get('host') or name}({', '.join(out)})"
         hret = sig["ret"].replace("extern", "").replace("static", "").strip()
         if "*" in hret:
             call = f"PE_HostToGuest({call})"

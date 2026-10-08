@@ -190,6 +190,13 @@ def run_overlay(ovl: dict, args, windows) -> tuple[int, int, list, dict, dict]:
         for n, s in dsigs.items():
             protos.setdefault(n, len(s["params"]))
             sigs.setdefault(n, {"ret": s["ret"], "params": s["params"]})
+        # header `static inline` shims are implementations (gen_decomp_ports)
+        for n, s in g.inline_shims().items():
+            if not in_window(ovl, n):
+                known.add(n)
+                protos.setdefault(n, len([p for p in s["params"]
+                                          if p.strip() not in ("", "void")]))
+                sigs.setdefault(n, s)
         g._ADDR_SIGS.clear()
         g._ADDR_SIGS.update(sigs)
         g._ADDR_KNOWN.clear()
@@ -334,6 +341,27 @@ LOWER_REASONS = ("pointer parameter", "leaf struct with pointer members",
                  "call arity")
 
 
+# A Psy-Q SDK entry the port reimplements on the host under its own name
+# (psyq_port_guard forbids defining func_<psyq address>).  pe_port_compat.h
+# marks it `/* host-replacement: func_X ... */` right before the host
+# prototype; lowered room code then calls the host function directly.
+HOST_REPL_RE = re.compile(
+    r"/\*\s*host-replacement:\s*(func_[0-9A-Fa-f]{8})\b.*?\*/\s*"
+    r"([A-Za-z_][\w \t\*]*?)\b(PE_\w+)\s*\(([^;{}()]*)\)\s*;", re.S)
+
+
+def host_replacements() -> dict[str, dict]:
+    """func_X -> host signature plus {'host': PE_name, 'decl': prototype}."""
+    text = (REPO_ROOT / "pc_port/include/pe_port_compat.h").read_text(
+        encoding="utf-8", errors="replace")
+    out: dict[str, dict] = {}
+    for m in HOST_REPL_RE.finditer(text):
+        ret, host, prm = m.group(2).strip(), m.group(3), m.group(4).strip()
+        out[m.group(1)] = {"ret": ret, "params": g.split_top(prm), "host": host,
+                           "decl": f"{ret} {host}({prm or 'void'});"}
+    return out
+
+
 _RETAIL_NPARAMS: dict[str, int] | None = None
 _DEF_RE = r"\b{}\s*\(((?:[^()]|\([^()]*\))*)\)\s*\{{"
 
@@ -432,16 +460,31 @@ def run_rooms(args, windows) -> tuple[int, int, dict, dict]:
             for a, b in dsigs.items():
                 protos.setdefault(a, len(b["params"]))
                 sigs.setdefault(a, {"ret": b["ret"], "params": b["params"]})
+            # header `static inline` shims (VSync -> HostFB_VSync, ...) are
+            # implementations, as gen_decomp_ports already treats them
+            for a, b in g.inline_shims().items():
+                if not in_window(ovl, a):
+                    known.add(a)
+                    protos.setdefault(a, len([p for p in b["params"]
+                                              if p.strip() not in ("", "void")]))
+                    sigs.setdefault(a, b)
             rnp = retail_nparams()
             for a in list(sigs):
                 if a in rnp:
                     sigs[a] = {**sigs[a], "retail_nparams": rnp[a]}
+            # host replacements: the lowering only (a verbatim TU would call
+            # func_X by name, which the port never defines)
+            repl = host_replacements()
+            low_known = known | set(repl)
+            low_sigs = {**sigs, **{a: {**b, "retail_nparams": rnp.get(a)} for a, b in repl.items()}}
+            low_dsigs = {**dsigs, **repl}
             g._ADDR_SIGS.clear(); g._ADDR_SIGS.update(sigs)
             g._ADDR_KNOWN.clear(); g._ADDR_KNOWN.update(known)
             text = (OVL_SRC_DIR / r / f"{n}.c").read_text(encoding="utf-8", errors="replace")
             plan = g.analyze(n, text, ovl["leaves"][n], known, g.pc_port_macros(), protos, sigs)
             if not plan["eligible"]:
-                txt = lowered_tu(n, text, ovl["leaves"][n], plan["reason"], known, sigs, dsigs)
+                txt = lowered_tu(n, text, ovl["leaves"][n], plan["reason"], low_known,
+                                 low_sigs, low_dsigs)
                 if isinstance(txt, str) and txt.startswith("/*"):
                     lowered += 1
                     if args.check:

@@ -145,3 +145,15 @@ void PE_RotMatrix79754(const int16_t angles[3], pe_addr_t out)
     PE_RotMatrix79754_values(angles, rotation);
     for (i = 0; i < 9; i++) PE_StoreU16(out + i * 2u, (uint16_t)rotation[i]);
 }
+
+/* Host replacement for the Psy-Q libgte entry func_80079754 (RotMatrixYXZ),
+ * called with guest pointers by lowered room code: r = SVECTOR angles
+ * (vx, vy, vz), m = MATRIX.  Writes m's 3x3 rotation only (translation and
+ * padding kept) and returns m, as src/func_80079754.c does. */
+pe_addr_t PE_RotMatrixYXZ_Guest(pe_addr_t r, pe_addr_t m)
+{
+    const int16_t angles[3] = {(int16_t)PE_LoadU16(r), (int16_t)PE_LoadU16(r + 2u),
+                               (int16_t)PE_LoadU16(r + 4u)};
+    PE_RotMatrix79754(angles, m);
+    return m;
+}

@@ -336,5 +336,14 @@ class DispatchThunkTests(unittest.TestCase):
         self.assertIn('{0x80190000u, 0x8u, 0x00000099u, pe_gct_1, "room_x__f1", 0x00000000u, 0, 0u},', txt)
 
 
+class HostReplacementTests(unittest.TestCase):
+    def test_header_annotation_parsed(self):
+        r = o.host_replacements()
+        self.assertEqual(r["func_80079754"]["host"], "PE_RotMatrixYXZ_Guest")
+        self.assertEqual(r["func_80079754"]["params"], ["pe_addr_t r", "pe_addr_t m"])
+        self.assertEqual(r["func_80079754"]["decl"],
+                         "pe_addr_t PE_RotMatrixYXZ_Guest(pe_addr_t r, pe_addr_t m);")
+
+
 if __name__ == "__main__":
     unittest.main()

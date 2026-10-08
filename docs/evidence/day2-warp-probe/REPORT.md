@@ -537,3 +537,22 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
     (m0272i).
   - Disc swap without a Disc 2 image: m0259i, m0288i, m0373i, m0425i and
     m0427i, plus m0049i and m0050i after this fix.
+- Host replacements for Psy-Q entries in lowered room code. 54 room call
+  sites (m0434i, m0435i, m0436i and others) stopped at `func_80079754`
+  (libgte RotMatrixYXZ). The port already has the math
+  (`PE_RotMatrix79754`). The guard forbids defining a
+  `func_<psyq address>`, so pe_port_compat.h now marks a host function
+  `/* host-replacement: func_80079754 */ PE_RotMatrixYXZ_Guest(r, m)`.
+  The overlay generator gives such replacements to the room lowering only,
+  and the lowering calls the host name. The 54 boundaries are gone, the
+  guard stays clean, and there is a new unit test
+  (`INIT1_rotmatrix_guest`).
+- The overlay generator now treats header `static inline` shims (VSync
+  `func_80073A44` -> `HostFB_VSync`) as implementations, as
+  gen_decomp_ports already did. That removes m0272i's VSync boundary and 4
+  subsystem-overlay VSync boundaries.
+  - m0434i, m0435i and m0436i run clean. m0272i reaches its scripted disc
+    swap (Disc 1 only).
+  - Gates (tag k8/k8b): Day 1 route PASS (story 80), Day 2 movies PASS,
+    1644/1644 tests, both guards PASS, both `--verify` 0 drift, rebuild
+    check no work, unit tests OK (194).

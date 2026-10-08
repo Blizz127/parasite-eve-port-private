@@ -494,5 +494,17 @@ class Refusals(unittest.TestCase):
                            sigs=self.C2AF0)
 
 
+    def test_host_replacement_called_by_host_name(self):
+        # A Psy-Q entry reimplemented on the host (pe_port_compat.h
+        # host-replacement) is called by its host name; func_X is never named.
+        sigs = {"func_80079754": {"ret": "pe_addr_t", "params": ["pe_addr_t r", "pe_addr_t m"],
+                                  "host": "PE_RotMatrixYXZ_Guest"}}
+        res = lower("extern void *func_80079754();\n"
+                    "int func_80190000(short *r, short *m) { func_80079754(r, m); return 0; }",
+                    known={"func_80079754"}, sigs=sigs)
+        self.assertIn("PE_RotMatrixYXZ_Guest(a_r, a_m)", res["body"])
+        self.assertNotIn("func_80079754(", res["body"])
+
+
 if __name__ == "__main__":
     unittest.main()
