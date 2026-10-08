@@ -156,7 +156,13 @@ binary: Day 1 route PASS (frame 67186), MOVIES_DAY2 PASS, suite 1634/1634
 with disc, psyq guard PASS (allowlist), retail_data_guard OK, generator
 `--verify` 0 drift, unit tests 14 + 24 OK, e21_diff 594 ok / 0 mismatch.
 Done: full re-sweep (`build/lanes/warp/sweep4_e21_abi.txt`, git-ignored) and Day 3
-probes, results below. Next: GTE inline-asm lowering (gen_overlay_ports E21).
+probes, results below.
+In progress: E21b inline GTE asm lowering (`guest_lower.py` asm templates ->
+`PE_GTE_ReadData/WriteData/ReadCtrl/WriteCtrl/Command` in `pe_gte.c`, native
+tests `test_gte_regs.h`). Room asm refusals 305 -> 20, room TUs 2257 -> 2583.
+If uncommitted after a restart: rebuild with `scripts/build_pc_port.sh`, run the
+gates, then re-probe the GTE stop rooms (m0207i m0232i m0295i m0432i
+m0434i-m0437i) with `build/lanes/warp/probe.sh <room> 90`.
 No release (waiting on Will).
 
 Changes:
