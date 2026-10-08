@@ -326,6 +326,19 @@ class GteAsm(CRunner):
         # x = 100; y = -vz = -(40000 as s16 = -25536) = 25536; z = vy = -200
         self.assertEqual(out.strip(), "25436 100 25536 -200 | 100 25536 -200 | 1 1")
 
+    def test_rtpt_and_sz3_read_lowered(self):
+        src = r"""
+        int func_80190000(int *otz)
+        {
+            __asm__ volatile("nop\n\tnop\n\t.word 0x4A280030");
+            __asm__ volatile("mfc2 $12,$19\n\tnop\n\tsra $12,$12,2\n\tsw $12,0(%0)"
+                             : : "r"(otz) : "$12", "memory");
+            return 0;
+        }"""
+        res = lower(src)
+        self.assertIn("PE_GTE_Command(0x0280030u)", res["body"])
+        self.assertIn("PE_GTE_ReadData(19", res["body"])
+
     def test_set_alias_renames_function(self):
         src = r"""
         asm(".set RoomLib_Helper, func_80190100");
@@ -357,6 +370,11 @@ class Refusals(unittest.TestCase):
     def test_unsupported_cop2_command(self):
         # RTPS (0x4A180001) has no register-level native implementation yet.
         self.assertRefused('int func_80190000(int a) { __asm__ volatile(".word 0x4A180001"); '
+                           'return a; }', "cop2 command")
+
+    def test_rtpt_lm1_refused(self):
+        # RTPT with lm=1 is not modelled by PE_GTE_RTPT_coordinates.
+        self.assertRefused('int func_80190000(int a) { __asm__ volatile(".word 0x4A280430"); '
                            'return a; }', "cop2 command")
 
     def test_memory_constraint(self):

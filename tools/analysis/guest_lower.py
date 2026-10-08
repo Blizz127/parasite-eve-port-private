@@ -1297,9 +1297,10 @@ def parse_const(e) -> tuple[int, T]:
 
 ASM_HEAD_RE = re.compile(r"\b(?:__asm__|asm)\s*(?:__volatile__|volatile)?\s*\(")
 # COP2 commands with a native implementation: MVMVA (mx=RT, v in {V0, IR},
-# cv in {TR, none}) and NCLIP.
+# cv in {TR, none}), NCLIP and RTPT (sf=1, lm=0: PE_GTE_RTPT_coordinates).
+# Readable data registers include the SZ0-SZ3 FIFO ($16-$19, gte_stszotz).
 GTE_DATA_W = set(range(0, 15)) | {24, 25, 26, 27, 30}
-GTE_DATA_R = set(range(0, 15)) | {24, 25, 26, 27, 31}
+GTE_DATA_R = set(range(0, 15)) | {16, 17, 18, 19, 24, 25, 26, 27, 31}
 GTE_CTRL = set(range(0, 24))
 
 
@@ -1317,6 +1318,8 @@ def gte_command_ok(word: int) -> bool:
     if op == 0x12:
         mx, v, cv = (cmd >> 17) & 3, (cmd >> 15) & 3, (cmd >> 13) & 3
         return mx == 0 and v in (0, 3) and cv in (0, 3)
+    if op == 0x30:
+        return (cmd >> 19) & 1 == 1 and (cmd >> 10) & 1 == 0   # RTPT sf=1 lm=0
     return False
 
 

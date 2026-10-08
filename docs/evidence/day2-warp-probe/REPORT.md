@@ -289,6 +289,16 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
   needs RTPT (GTE op 0x30) in the lowering and in `PE_GTE_Command`.
 - Gates for this increment (tag e22b): Day 1 route PASS (story 80), Day 2
   movies PASS, 1636/1636 tests, both guards PASS, unit tests OK.
+- m0159i `func_8018F3A4` (0xA54, burst effect with a GTE line) carved
+  (`era_o2_g0_expand_div`). Matching notes: `if (!x) return 1; break;` keeps
+  retail's branchy tails (gcc otherwise uses store-flag or cross-jumps two
+  identical tails), and a barrier after the D_800F3370 store keeps the
+  `p[0x10]` reload after it. The lowering now also accepts RTPT (cop2
+  0x0280030, sf=1 lm=0) and reads of SZ0-SZ3 (`mfc2 $19` in `gte_stszotz`);
+  `PE_GTE_Command` runs RTPT through `PE_GTE_RTPT_coordinates`. Other RTPT
+  variants (lm=1) stay refused. m0159i now runs past F3A4 and stops at the
+  effect callback `0x8018F008`: its group (twin of m0104i) was refused by the
+  lowering ("value of void callee func_800CEE20 used"), so no TU exists yet.
 - Matching notes: gcc 2.7 assumes a struct-member access never aliases a
   fixed-address scalar, so `short *p` indexing (not a struct) plus an array
   global (`D_800942EC[0]`) is what keeps the retail store/load order. Use the
