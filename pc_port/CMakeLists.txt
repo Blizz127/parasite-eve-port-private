@@ -41,6 +41,7 @@ set(PLATFORM_SRCS
     platform/pe_bios_card.c
     platform/pe_cdreg.c
     platform/pe_libcd.c
+    platform/pe_drive_tray.c
     platform/pe_disc.c
     platform/pe_disc_check.c
     platform/pe_disc_cache.c
@@ -97,6 +98,7 @@ set(GAME_SRCS
     game/boot/func_800C2414_port.c
     game/boot/func_800C3B04_port.c
     game/boot/func_800C9C20_port.c
+    game/boot/func_80069B08_port.c
     game/boot/func_800D1384_port.c
     game/boot/func_800D2104_port.c
     game/boot/func_800CEE20_port.c

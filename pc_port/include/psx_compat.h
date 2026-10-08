@@ -122,9 +122,10 @@ extern pe_addr_t func_800755F0(pe_addr_t env);
  * func_80190660 and reaches its first DrawPrim call at retail 0x80190860. */
 extern int func_8006ECEC(void);
 void func_8006F044(void);   /* game/boot/func_8006F044_port.c (matched C port) */
-/* func_80069B08 (disc-swap screen) has no port: an honest STOP, not a
- * silent return (see PE_Port_DiscSwapBoundary in pe_bootstrap.h). */
-static inline void func_80069B08(int d)  { PE_Port_DiscSwapBoundary(d); }
+/* func_80069B08 (disc-swap screen) is a hand port
+ * (game/boot/func_80069B08_port.c); the other disc comes from the host tray
+ * (platform/pe_drive_tray.h), otherwise it is a CPU_BOUNDARY STOP. */
+void func_80069B08(int a0);
 /* func_8003F3C4 / func_80066B60 / func_80068E24 are REAL native ports
  * (game/boot/func_8003F3C4_port.c, func_80066B60_port.c,
  * func_80068E24_port.c). Prototypes live in pe_port_compat.h. */

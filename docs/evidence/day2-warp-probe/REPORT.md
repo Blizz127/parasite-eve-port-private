@@ -393,3 +393,43 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
   m0432i will stop at those next. Gates (tag e22j): Day 1 route PASS (story
   80), Day 2 movies PASS, 1639/1639 tests, both guards PASS, both `--verify`
   0 drift, unit tests OK, EXACT_REBUILD_GATE PASS.
+- Native disc swap (Disc 2 handoff). `func_80069B08` is now a hand port of
+  the retail swap screen (`pc_port/game/boot/func_80069B08_port.c`, from
+  `src/func_80069B08.c`): message graphics read into the two buffers named
+  by the mount record, CdlStop, then the state machine that waits for the lid
+  (status 0x10), waits for it to close, re-mounts (`func_800698D4`) until the
+  wanted `PEDISC0N.IDF` answers, sets `D_800B0DCD` to 1 or 2 and waits for
+  CdReady. The drive side is a host tray model
+  (`pc_port/platform/pe_drive_tray.c`). A second image goes in with
+  `--disc2-image` (identified like disc 1). On the swap screen the lid opens
+  60 frames after the prompt and closes 60 frames later on the other disc,
+  which becomes the active disc. CdlStop uses the SDK queue when the
+  register-level CD device is on. With the device off it completes on the
+  host (status 2 in the completion ring, the `func_80080DC4` precedent).
+  With no image for the wanted disc, the screen is still the STOP above
+  (`CPU_BOUNDARY/REFUSED func_80069B08 disc swap ...`). New unit test
+  `drive_tray_swap` covers the lid timing, the swap and the CdlStop
+  completion that `func_8007F418` reads back.
+- First runs crashed after the swap (FATAL invalid guest address in
+  `func_8003D050_packets`). Cause: a port divergence in the main loop, not in
+  the swap. The swap screen loads its message graphics at 0x8018EFE8, inside
+  the room overlay. Retail only reaches the disc gate after `func_8003F3C4`
+  returns, at a room exit. The port's `func_8003F3C4` returns once per frame
+  (one pass of the retail `D1C4 == D280` loop), so the gate ran every frame.
+  A story bump past 0x258 inside a room then started the swap over the live
+  room. Fix: `func_8003F3C4` sets `PE_Field_PassContinues` when it returns
+  only because of that one-pass rule. The main loop skips the volume gate on
+  those ticks and still runs it on every real retail return. The skip chain
+  and the 0x100 restart are unchanged. Result: m0050i's bump to 0x2F2 at
+  frame 1306 swaps at the room exit (frame 2624), and the next room loads
+  from Disc 2.
+- Dev warp harness: `PE_WARP_DISC=2` puts Disc 2 in the drive and mounts it
+  at the warp, as if the player had already swapped (needs `--disc2-image`).
+- Probe with Disc 2 (warp story = each room's own disc-2 story value):
+  m0050i, m0049i, m0196i, m0226i, m0236i, m0237i, m0238i, m0246i, m0248i,
+  m0273i, m0340i, m0343i, m0373i and m0428i all run clean to the frame limit
+  (no FATAL, boundary or trap). m0050i without `PE_WARP_DISC` (Disc 1 in the
+  drive, warp story 0x2F2) runs the swap screen at the warp transition and
+  runs on. Without `--disc2-image` it still stops at the disc-swap boundary. Gates (tag k2): Day 1 route PASS
+  (story 80), Day 2 movies PASS, 1640/1640 tests, both guards PASS, both
+  `--verify` 0 drift, unit tests OK.

@@ -118,6 +118,7 @@ void func_8001220C(void)
             }
 
             func_8006AD40();
+            PE_Field_PassContinues = 0;
             /* B53I-B2 deterministic hardware opportunity.  It deliberately
              * runs before the sticky host stop is honored: the admitted
              * retail prefix may have issued one DMA whose hardware/IRQ
@@ -191,9 +192,15 @@ void func_8001220C(void)
             if (v == 0xA80661C8u) continue;
             if (v == 0xA8066348u) continue;
 
-            /* volume gate */
+            /* volume gate.  Retail reaches it only once 3F3C4 returns (field
+             * exit at 3F68C); a host one-pass field tick that retail would
+             * still be looping in does not raise the disc-swap request, so
+             * a story bump past 0x258 inside a room swaps at the next room
+             * transition, not over the live room overlay.  Same as retail. */
             v = D_800A7918;
-            if (v < 0x258u) {
+            if (PE_Field_PassContinues) {
+                /* retail is still inside the 3F3C4 inner loop */
+            } else if (v < 0x258u) {
                 if (!(*flagbyte & 0x1)) {
                     dispatch = 1;
                     *data |= bitmask;

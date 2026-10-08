@@ -24,6 +24,8 @@
 #include "pe_plat/enhance.h"
 #include "pe_guest_ram.h"
 #include "host_framebuffer.h"
+#include "pe_drive_tray.h"
+extern int func_800698D4(void);   /* retail disc mount (bootstrap) */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -74,6 +76,7 @@ static struct {
     int env_warp;                       /* PE_WARP_ROOM armed, not yet done */
     uint32_t env_token, env_story, env_at;
     int env_set_story;
+    int env_disc;                       /* PE_WARP_DISC (dev harness) */
     unsigned wins, kits, warps;
     uint32_t ammo_gun, ammo_loaded_max, ammo_pool_max[3];
     char toast[64]; int toast_frames;
@@ -157,6 +160,10 @@ static void load_env_warp(void)
     C.env_set_story = st && *st;
     C.env_story = C.env_set_story ? (uint32_t)strtoul(st, NULL, 16) : 0u;
     C.env_at = at ? (uint32_t)strtoul(at, NULL, 10) : 0u;
+    {
+        const char *dsc = getenv("PE_WARP_DISC");
+        C.env_disc = dsc ? atoi(dsc) : 0;
+    }
     C.env_warp = 1;
     fprintf(stderr, "[WARP] armed room=%s token=%08X story=%s%X at>=%u\n", r,
             (unsigned)C.env_token, C.env_set_story ? "" : "(unchanged) ",
@@ -486,7 +493,21 @@ void pe_plat_cheats_apply(void)
         HostFB_GetState(NULL, NULL, &presented, NULL);
         if ((uint32_t)presented >= C.env_at) {
             uint32_t tok = PE_LoadU32(GA_TOKEN);
-            int r = in_field(tok) ? warp_to(C.env_token, C.env_set_story, C.env_story) : 0;
+            int r;
+            /* PE_WARP_DISC=2: the player swapped to disc 2 before the warp
+             * (disc-2-story rooms).  The tray inserts the --disc2-image and
+             * retail's own mount (func_800698D4) finds PEDISC02.IDF; the
+             * disc-swap screen then leaves D_800B0DCD = 2, as here. */
+            if (in_field(tok) && C.env_disc == 2 && PE_Tray_ActiveNumber() != 2) {
+                if (PE_Tray_InsertNow(2) && func_800698D4() == 0 &&
+                    (PE_LoadU8(0x800B0DCDu) & 2u)) {
+                    PE_StoreU8(0x800B0DCDu, 2u);
+                    fprintf(stderr, "[WARP] disc 2 in the drive (mounted)\n");
+                } else {
+                    fprintf(stderr, "[WARP] disc 2 handoff unavailable\n");
+                }
+            }
+            r = in_field(tok) ? warp_to(C.env_token, C.env_set_story, C.env_story) : 0;
             if (r > 0) {
                 C.env_warp = 0;
                 C.warps++;

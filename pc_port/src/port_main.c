@@ -21,6 +21,7 @@
 #include "pe_disc.h"
 #include "pe_guest_image.h"
 #include "pe_disc_check.h"
+#include "pe_drive_tray.h"
 #include "pe_route_pad.h"
 #include "pe_plat/enhance.h"
 #include "pe_port_compat.h"
@@ -50,6 +51,7 @@ static struct {
     const char *stop_after_event;
     int max_frames, max_main_iterations;
     const char *disc_image;
+    const char *disc2_image;
     int disc_load_test;
     int rng_oracle_dump;
     int lzcr_oracle_dump;
@@ -704,6 +706,7 @@ static void ParseArgs(int argc, char **argv) {
         else if (i+1<argc && !strcmp(a, "--max-main-iterations"))
             g_opts.max_main_iterations = ParsePositiveLimit(a, argv[++i]);
         else if (i+1<argc && !strcmp(a, "--disc-image"))      g_opts.disc_image = argv[++i];
+        else if (i+1<argc && !strcmp(a, "--disc2-image"))     g_opts.disc2_image = argv[++i];
         else { fprintf(stderr, "Unknown: %s\n", a); exit(1); }
     }
     if (g_opts.hold_ms > 0) g_opts.hold_until_close = 0;
@@ -1213,6 +1216,33 @@ int main(int argc, char **argv) {
         fprintf(stderr, "[DISC] boot executable loaded into guest RAM\n");
     }
 
+    /* Disc 2 (the user's own dump, read-only): held by the host drive tray
+     * as the spare disc for the retail disc-swap screen (func_80069B08). */
+    PE_Disc *disc2 = NULL;
+    PE_Tray_Reset();
+    if (g_opts.disc2_image) {
+        char err[256];
+        PE_DiscIdentity id2;
+        char why2[384];
+        if (!disc) {
+            fprintf(stderr, "--disc2-image requires --disc-image\n");
+            return 1;
+        }
+        disc2 = PE_Disc_Open(g_opts.disc2_image, err, sizeof(err));
+        if (!disc2) {
+            fprintf(stderr, "[DISC] failed to open disc 2 image: %s\n", err);
+            return 1;
+        }
+        if (PE_DiscCheck_Identify(disc2, 2u, &id2, why2, sizeof(why2)) != 0) {
+            fprintf(stderr, "[DISC] %s: %s\n", g_opts.disc2_image, why2);
+            PE_Disc_Close(disc2);
+            return 1;
+        }
+        PE_Tray_SetSpare(disc2, 2);
+        fprintf(stderr, "[DISC] disc 2 '%s' identified (%s); held in the tray for the disc swap\n",
+                g_opts.disc2_image, id2.known->serial);
+    }
+
     TraceEvent("native_executable_start");
 
     if (g_opts.lzcr_oracle_dump) {
@@ -1478,7 +1508,9 @@ int main(int argc, char **argv) {
     }
 
     TraceEvent("shutdown_end"); TraceClose();
+    PE_Disc_SetActive(NULL);
     PE_Disc_Close(disc);
+    PE_Disc_Close(disc2);
     PE_RamDestroy();
     HostSignalsExit();
     return 0;

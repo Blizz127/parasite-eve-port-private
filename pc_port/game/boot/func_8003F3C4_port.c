@@ -355,6 +355,12 @@ static void pe_3f3c4_host_pad(void)
 #define GA_D_800BCFE8 0x800BCFE8u
 #define GA_OT_TABLE   0x800B0E38u   /* s0 + 0x160 */
 
+/* 1 when the last call returned only because of the one-pass host
+ * adaptation (retail would still be inside its D1C4 == D280 loop at 3F684);
+ * 0 for every real retail return.  1220C uses it to keep code that retail
+ * runs only after the field exits (the volume gate) at that point. */
+int PE_Field_PassContinues;
+
 void func_8003F3C4(void)
 {
     uint32_t bits;
@@ -362,6 +368,8 @@ void func_8003F3C4(void)
     uint32_t d1a0;
     uint32_t a1;
     uint32_t a0;
+
+    PE_Field_PassContinues = 0;
 
     /* A destination cached against a previous RAM image is not loaded
      * after reset, even when New Game chooses the same token. */
@@ -474,8 +482,10 @@ after_draw:
     /* .L8003F678: retail loops to 3F404 while D1C4 == D280 (host: one
      * pass per 1220C tick, see header).  Entry D1C4 == dest0. */
 loop_tail:
-    if (dest0 == D_8009D280)
+    if (dest0 == D_8009D280) {
+        PE_Field_PassContinues = 1;
         return;
+    }
 
 epilogue:
     /* .L8003F68C */

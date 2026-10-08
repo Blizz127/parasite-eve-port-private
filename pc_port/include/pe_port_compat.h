@@ -214,6 +214,7 @@ extern int  func_80017764(pe_addr_t args);
 extern void func_80065400(void);
 extern int func_80068E24(void);
 extern void func_8003F3C4(void);
+extern int PE_Field_PassContinues; /* host one-pass field tick still inside retail loop */
 extern pe_addr_t func_80012700(pe_addr_t entry, unsigned int a1);
 void func_80012774(void);
 void func_80035F54(pe_addr_t actor);
