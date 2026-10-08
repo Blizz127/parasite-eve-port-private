@@ -596,3 +596,22 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
 - Remaining story-0x90 stops (all effect callbacks with no matched C):
   m0429i 0x8019AE8C (also reached from m0349i), m0428i 0x80193018 (also
   from m0427i), m0430i 0x8018F750, m0437i 0x80192D74.
+- m0429i (also reached from m0349i): two more matched room leaves, both
+  LINK_EXACT and written from the retail asm. `func_8019AE8C` is the effect
+  callback the stop named: mode 0 opens a 20-entry particle pool, mode 1
+  spawns up to 3 sparks around the player actor, mode 2 sets the sprite
+  globals. `func_8019AC30` is the spark callback it registers (drift,
+  63/64 damping, floor bounce, jitter, rotating sprite). Carved out of the
+  asm span 0x3FB4-0xC1F0; preflight PASS (74 c / 3 asm / 1 rodata),
+  EXACT_REBUILD_GATE[room_m0429i] PASS (sha1 unchanged). m0429i and m0349i
+  now run past both and stop at the next effect callback, 0x80199684.
+  - Gates (tag k11): Day 1 route PASS (story 80, frame 67186), Day 2
+    movies PASS, 1645/1645 tests, both guards PASS, both `--verify` 0
+    drift. The full `unittest discover` has two failures in areas this
+    change does not touch (the m0123i coverage bucket in
+    test_pc_port_coverage, and the YAML-syntax case in
+    test_disc1_preflight); they are listed as known, not fixed here.
+- Day 3 sweep (story 0x140, Disc 2 in the tray, 402 slots, 3 at a time,
+  4000 frames, binary 065723a3): 376 clean, 6 stopping, 20 unused. The
+  stops are the same effect callbacks as at story 0x90 (m0349i/m0429i,
+  m0427i/m0428i, m0430i, m0437i).
