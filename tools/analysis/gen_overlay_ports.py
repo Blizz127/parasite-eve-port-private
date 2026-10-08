@@ -40,6 +40,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import gen_decomp_ports as g  # noqa: E402
+import guest_lower as gl  # noqa: E402
 
 REPO_ROOT = g.REPO_ROOT
 OVL_CONFIG_DIR = REPO_ROOT / "configs/USA/overlays"
@@ -314,6 +315,36 @@ def group_symbol(key: str, name: str) -> str:
     return f"room_{key[:8]}__{name}"
 
 
+# E21: refusal reasons that are about the host/guest pointer model, not about
+# the leaf itself.  Such a leaf is lowered to explicit guest-memory C instead
+# (tools/analysis/guest_lower.py); anything the lowering cannot express keeps
+# the original refusal (plus the lowering's own reason).
+LOWER_REASONS = ("pointer parameter", "leaf struct with pointer members",
+                 "callee result dereferenced", "guest-address result of",
+                 "pointer-to-pointer cast", "pointer cast of non-D_",
+                 "host pointer", "relational compare of pointers",
+                 "function address value")
+
+
+def lowered_tu(n: str, text: str, leaf: dict, reason: str | None, known: set[str],
+               sigs: dict[str, dict], dsigs: dict[str, dict]) -> str | None:
+    """Rendered E21 TU text, the lowering's refusal reason, or None."""
+    if reason is not None and not reason.startswith(LOWER_REASONS):
+        return None
+    try:
+        res = gl.lower_leaf(n, text, known, sigs, strip_asm=g.strip_era_asm)
+    except gl.LowerError as exc:
+        return str(exc)
+    protos = []
+    for c in res["callees"]:
+        sg = dsigs.get(c) or sigs.get(c)
+        if sg is None:
+            return f"no host prototype for {c}"
+        prm = ", ".join(sg["params"]) or "void"
+        protos.append(sg.get("decl") or f"{sg['ret']} {c}({prm});")
+    return gl.render_lowered(n, leaf, res, protos, f"docs/evidence/{n}/REPORT.md")
+
+
 def run_rooms(args, windows) -> tuple[int, int, dict, dict]:
     rooms = [parse_overlay(r) for r in room_ids()]
     by_id = {o["id"]: o for o in rooms}
@@ -346,6 +377,8 @@ def run_rooms(args, windows) -> tuple[int, int, dict, dict]:
                         "decl": f"{ret} {nm}({prm or 'void'});"}
         rendered = []
         plans_emit = 0
+        lowered = 0
+        verbatim: dict[str, tuple] = {}
         skipped = {}
         for gk, members in sorted(groups.items()):
             r, n = min(members)
@@ -372,7 +405,17 @@ def run_rooms(args, windows) -> tuple[int, int, dict, dict]:
             text = (OVL_SRC_DIR / r / f"{n}.c").read_text(encoding="utf-8", errors="replace")
             plan = g.analyze(n, text, ovl["leaves"][n], known, g.pc_port_macros(), protos, sigs)
             if not plan["eligible"]:
-                skipped[f"{r}/{n}"] = plan["reason"]
+                txt = lowered_tu(n, text, ovl["leaves"][n], plan["reason"], known, sigs, dsigs)
+                if isinstance(txt, str) and txt.startswith("/*"):
+                    lowered += 1
+                    if args.check:
+                        plans_emit += 1
+                        continue
+                    mem_rooms = sorted({m[0] for m in members})
+                    rendered.append((f"{n}__{gk[:8]}", post_process(
+                        ovl, n, txt, set(), windows, rename=rename, members=mem_rooms)))
+                    continue
+                skipped[f"{r}/{n}"] = plan["reason"] + (f"; E21: {txt}" if txt else "")
                 continue
             stripped = g.strip_comments(text)
             override = [c for c in plan["callees"] if c in dsigs and c != n
@@ -387,6 +430,7 @@ def run_rooms(args, windows) -> tuple[int, int, dict, dict]:
             mem_rooms = sorted({m[0] for m in members})
             rendered.append((f"{n}__{gk[:8]}", post_process(
                 ovl, n, txt, set(), windows, rename=rename, members=mem_rooms)))
+            verbatim[f"{n}__{gk[:8]}"] = (n, text, ovl, rename, mem_rooms, known, sigs, dsigs)
         if args.check:
             return plans_emit, 0, skipped, {}
         uncompilable = {}
@@ -395,6 +439,22 @@ def run_rooms(args, windows) -> tuple[int, int, dict, dict]:
             if cc:
                 uncompilable = g.compile_check(cc, rendered)
                 rendered = [(k, c) for k, c in rendered if k not in uncompilable]
+                # A verbatim TU the host compiler rejects gets one E21 try.
+                retry = []
+                for k in sorted(uncompilable):
+                    if k not in verbatim:
+                        continue
+                    n, text, ovl, rename, mem_rooms, known, sigs, dsigs = verbatim[k]
+                    txt = lowered_tu(n, text, ovl["leaves"][n], None, known, sigs, dsigs)
+                    if isinstance(txt, str) and txt.startswith("/*"):
+                        retry.append((k, post_process(ovl, n, txt, set(), windows,
+                                                      rename=rename, members=mem_rooms)))
+                if retry:
+                    unc2 = g.compile_check(cc, retry)
+                    for k, c in retry:
+                        if k not in unc2:
+                            rendered.append((k, c))
+                            uncompilable.pop(k, None)
         new_keys = {k.split("__")[1] for k, _ in rendered}
         out_dir.mkdir(parents=True, exist_ok=True)
         changed = written = 0

@@ -203,6 +203,38 @@ silently wrong at run time. E17 exists because no static rule set can anticipate
 every shape a newly matched leaf takes — it keeps `pc_port/game/decomp/`
 buildable by construction.
 
+### E21 guest-memory lowering (room TUs, 2026-10-07)
+
+E13–E16/E18 refuse a leaf because *copying* its body would let a host pointer
+stand in for a guest address.  For room leaves (`gen_overlay_ports.py`
+`run_rooms`) such a refusal is no longer final: `tools/analysis/guest_lower.py`
+parses the matched C (pycparser, after the era cpp) and **lowers** it instead.
+Every pointer value becomes a 32-bit guest address (`uint32_t`); struct, array
+and global layout is computed with the O32 guest rules (4-byte pointers,
+natural alignment, `__attribute__((packed))` honoured, plain `char` unsigned as
+in gcc-2.7.2-psx); every access is an explicit `PE_LoadU8/16/32` /
+`PE_StoreU8/16/32` at the retail offset; signed `+ - * <<` wrap like the guest
+ALU (computed unsigned, no host UB).  A call through a code pointer held in
+guest RAM (`o->fn(o)`) is the retail `jalr`: `PE_GuestCall`, which resolves to
+native C through the guest-code registry or STOPs loudly.  A direct call to a
+callee with native code goes through its host prototype (a guest address is
+translated only where that prototype takes a host pointer; a host-pointer
+result goes back through `PE_HostToGuest`); a callee with no native code is a
+`PE_D_COMP_BOUNDARYn` STOP.  A local aggregate or address-taken local lives in
+a **native guest frame** (`PE_GuestFrame_Enter/Leave`, a LIFO arena in the
+unused bottom of the retail stack, `[0x801FE000, 0x801FEC00)`), so `&local`
+is a real guest address exactly as on the PS1.
+
+Only refusals about the pointer model fall back to E21 (`LOWER_REASONS`);
+`asm`, call-arity, pinned-register and hardware-literal refusals stay refused,
+as does anything the lowering cannot express (floats, bitfields, string
+literals, designated initialisers, >4-argument code-pointer calls, a callee
+without a host prototype).  A verbatim TU that fails the E17 compile gate gets
+one E21 try.  E21 TUs still pass E17.  Checks: `test_guest_lower.py` (runtime
+cases against a mock guest RAM) and `e21_diff.py`, which runs every E21 room TU
+whose only calls are boundaries/`jalr`s against the retail bytes in a MIPS-I
+interpreter on seeded RAM images and compares RAM, return value and call log.
+
 **Orphan pruning.** The generator owns every `func_XXXXXXXX_port.c` in
 `pc_port/game/decomp/`, and CMake globs that directory, so a TU left behind
 after its leaf became ineligible (or started colliding with a hand port) would
