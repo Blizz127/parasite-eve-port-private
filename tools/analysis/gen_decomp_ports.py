@@ -169,8 +169,25 @@ ASM_PIN_DECL_RE = re.compile(r"\bregister\b[^;{}]*;")
 ASM_PIN_ONLY_RE = re.compile(r"\s*(?:__asm__|asm)\s*\(\s*\"\$[0-9A-Za-z]+\"\s*\)")
 
 
+# E2b tied register move: `asm("" : "=r"(a) : "0"(b))` with a != b is not a
+# fence — the output is tied to the input, so it computes `a = b` (vendor
+# leaves use it to copy a parameter into a pinned register).  It is rewritten
+# to that assignment before the fences are removed; with a == b it stays a
+# fence.
+ASM_TIED_MOVE_RE = re.compile(
+    r"(?:__asm__|\basm)\s*(?:__volatile__|volatile)?\s*\(\s*\"\"\s*:\s*\"=r\"\s*"
+    r"\(\s*([A-Za-z_]\w*)\s*\)\s*:\s*\"0\"\s*\(\s*([A-Za-z_]\w*)\s*\)\s*\)\s*;")
+
+
+def rewrite_tied_moves(text: str) -> str:
+    return ASM_TIED_MOVE_RE.sub(
+        lambda m: (m.group(0) if m.group(1) == m.group(2)
+                   else f"{m.group(1)} = {m.group(2)}; /* E2b: tied register move */"), text)
+
+
 def strip_era_asm(text: str) -> str:
     """Remove E2b register pins and empty-template asm fences (see above)."""
+    text = rewrite_tied_moves(text)
     text = ASM_PIN_RE.sub(r"\1", text)
     text = ASM_PIN_DECL_RE.sub(
         lambda m: (ASM_PIN_ONLY_RE.sub("", m.group(0))
@@ -791,10 +808,11 @@ def analyze(name: str, src_text: str, matched: dict,
             proto: dict[str, int], sigs: dict[str, dict]) -> dict:
     # E2b guard: a pin *without* an initialiser that is read before it is
     # written captures a live retail register — that is semantics, not a hint.
+    pin_text = rewrite_tied_moves(strip_comments(src_text))
     for m in re.finditer(
             r"\bregister\b[^;{}()=]*?\b([A-Za-z_]\w*)\s*(?:__asm__|asm)\s*"
-            r"\(\s*\"\$[0-9A-Za-z]+\"\s*\)\s*;", strip_comments(src_text)):
-        rest = strip_comments(src_text)[m.end():]
+            r"\(\s*\"\$[0-9A-Za-z]+\"\s*\)\s*;", pin_text):
+        rest = pin_text[m.end():]
         # A struct member of the same name (`a.w.lo`, `p->lo`) is not the pin.
         use = re.search(rf"(?<![.\w])(?<!->)\s*\b{re.escape(m.group(1))}\b", rest)
         if use and not re.match(r"\s*=(?!=)", rest[use.end():]):

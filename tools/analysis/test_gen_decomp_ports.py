@@ -68,6 +68,19 @@ class EraAsmTests(unittest.TestCase):
                '    *ptr |= 0xC0;\n    return 1;\n}\n')
         self.assertTrue(analyze(src)["eligible"])
 
+    def test_tied_move_is_an_assignment(self):
+        # asm("" : "=r"(a) : "0"(b)) with a != b computes a = b (vendor leaves
+        # copy a parameter into a pinned register this way).
+        src = ('int func_80099990(int *effect) {\n'
+               '    register int *initial asm("$16");\n'
+               '    asm("" : "=r"(initial) : "0"(effect));\n'
+               '    return *initial;\n}\n')
+        self.assertTrue(analyze(src)["eligible"])
+        out = g.strip_era_asm(src)
+        self.assertIn("initial = effect; /* E2b: tied register move */", out)
+        same = 'void f(int *p) { asm volatile("" : "=r"(p) : "0"(p)); }'
+        self.assertNotIn("p = p", g.strip_era_asm(same))
+
     def test_pin_read_before_write_is_rejected(self):
         src = ('int func_80099990(void) {\n'
                '    register int live asm("$4");\n'

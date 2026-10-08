@@ -500,3 +500,40 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
   - Gates (tag k6): Day 1 route PASS (story 80), Day 2 movies PASS,
     1643/1643 tests, both guards PASS, both `--verify` 0 drift, unit
     tests OK (191).
+- Story-0x90 regression sweep on `356c83c3` (402 slots, 3 at a time,
+  4000 frames): 365 clean, 17 stopping, 20 unused. Before this round it
+  was about 381 clean. None of the new stops is a wrong result. Each is an
+  honest STOP that a silent skip used to hide: with `func_8006F6D4` now
+  delivering every message (and about 75 more lowered room handlers), room
+  scripts get further and reach code that has no native port yet.
+- E2b tied register move. `asm("" : "=r"(a) : "0"(b))` with a != b is
+  not a fence: the output is tied to the input, so it computes `a = b`. The
+  generator removed it as a fence. Two consequences:
+  - Pinned-register leaves were refused (m0049i's weapon callback
+    `func_801929B0`, plus 5 more room leaves).
+  - Where the target was not a pinned register, the assignment was
+    silently dropped. m0273i `func_80194470` read `r` uninitialised for
+    its sprite brightness, a latent port bug.
+  Fix: such moves are rewritten to `a = b;` before fence removal, and the
+  read-before-write check sees the rewrite. With a == b it stays a fence.
+  New unit test. No EXE TU changed. Six room TUs are new, and m0273i's TU
+  now has `r = t`.
+  - m0049i and m0050i get past the weapon callback and reach their scripted
+    disc swap (story 0x2EC / 0x2F4).
+  - Disc swap rooms with `DISC2` (Disc 2 in the tray): m0049i, m0050i,
+    m0288i, m0373i and m0425i run clean. m0427i stops at effect callback
+    0x80193018 (same as m0428i). m0259i hits
+    `FATAL PE_StoreU16 0x80200000` after its swap (open).
+  - Gates (tag k7): Day 1 route PASS (story 80), Day 2 movies PASS,
+    1643/1643 tests, both guards PASS, both `--verify` 0 drift, unit
+    tests OK (192).
+- Remaining story-0x90 stops (Disc 1 only, before this fix):
+  - Effect callbacks with no matched C: m0349i and m0429i 0x8019AE8C,
+    m0350i 0x801958DC, m0428i and m0427i 0x80193018, m0430i 0x8018F750,
+    m0437i 0x80192D74.
+  - Missing EXE function: `func_80079754` (RotMatrix) called from room
+    `func_8018F644` / `func_8018F630` (m0434i, m0435i, m0436i).
+  - Missing EXE function: `func_80073A44` called from room `func_8018F014`
+    (m0272i).
+  - Disc swap without a Disc 2 image: m0259i, m0288i, m0373i, m0425i and
+    m0427i, plus m0049i and m0050i after this fix.
