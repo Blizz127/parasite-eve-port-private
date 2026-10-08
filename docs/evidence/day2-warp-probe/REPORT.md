@@ -651,3 +651,23 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
   - Gates (tag k13): Day 1 route PASS (story 80, frame 67186), Day 2
     movies PASS, 1645/1645 tests, both guards PASS, both `--verify` 0
     drift.
+- Final story-0x90 sweep with the binary above (402 slots, 2 at a time,
+  4000 frames): 380 clean, 2 stopping, 20 unused, nothing else. Stops:
+  m0430i 0x8018F750, m0437i 0x80192D74.
+- m0437i gets a room config (slot 436, PE.IMG sectors [0x18889,0x18924),
+  size 0x4D800, text window 0x1E4-0x4108, grouped with m0413i). doroom
+  ported 45 leaves as masked twins of matched functions in other rooms
+  (all LINK_EXACT). The stopping effect callback `func_80192D74` is matched
+  from the retail asm (LINK_EXACT, profile era_o2_g0_expand_div because the
+  retail modulo carries the divide-by-zero / overflow break checks).
+  Preflight PASS (46 c / 10 asm / 1 rodata), EXACT_REBUILD_GATE[room_m0437i]
+  PASS; registry 5370 -> 5416 thunks. m0437i now runs past it and stops at
+  its particle callback 0x80192500 (mode 1); m0413i stays clean.
+  - 0x80192500 (0x874 bytes) is not matched yet. The draft is close in
+    shape (mode 1 nearly exact) but gcc 2.7's CSE still hoists the two
+    colour addresses into saved registers, which retail does not do, and
+    the register allocation in mode 2 differs as a result. m0413i carries
+    a byte-identical copy at the same address (also unmatched).
+  - Gates (tag k14): Day 1 route PASS (story 80, frame 67186), Day 2
+    movies PASS, 1645/1645 tests, both guards PASS, both `--verify` 0
+    drift.
