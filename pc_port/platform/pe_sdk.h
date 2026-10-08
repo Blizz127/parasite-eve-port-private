@@ -122,6 +122,15 @@ void PE_GTE_RTPT_coordinates(uint32_t xy[3], uint32_t z[3]);
 void PE_GTE_AVSZ3(const uint32_t z[3]);
 void PE_GTE_AVSZ4(const uint32_t z[4]);
 int32_t PE_GTE_NCLIP(void);
+/* Register-level COP2 access for lowered inline GTE asm (E21b): psx-spx
+ * register semantics over g_pe_gte (data $0-$31 via mtc2/mfc2/lwc2/swc2,
+ * control $0-$31 via ctc2/cfc2).  PE_GTE_Command runs a cop2 command word
+ * (low 25 bits): MVMVA (mx=RT) and NCLIP; anything else is a FATAL stop. */
+uint32_t PE_GTE_ReadData(uint32_t reg);
+void PE_GTE_WriteData(uint32_t reg, uint32_t value);
+uint32_t PE_GTE_ReadCtrl(uint32_t reg);
+void PE_GTE_WriteCtrl(uint32_t reg, uint32_t value);
+void PE_GTE_Command(uint32_t cmd);
 
 /* ── memory-card BIOS / libcard (pc_port/platform/pe_bios_card.c) ──── */
 int  func_800726F4(uint32_t handle);                 /* B(0Bh) TestEvent */

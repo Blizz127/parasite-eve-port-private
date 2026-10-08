@@ -66,8 +66,7 @@ def tu(src: str, name: str = "func_80190000", known=(), sigs=None, extra: str = 
     return MOCK_H + extra + head + "\n" + body
 
 
-@unittest.skipUnless(shutil.which("cc") or shutil.which("gcc"), "no host C compiler")
-class Runtime(unittest.TestCase):
+class CRunner(unittest.TestCase):
     def run_c(self, code: str, main: str) -> str:
         cc = shutil.which("cc") or shutil.which("gcc")
         with tempfile.TemporaryDirectory() as d:
@@ -82,6 +81,9 @@ class Runtime(unittest.TestCase):
             self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
             return r.stdout
 
+
+@unittest.skipUnless(shutil.which("cc") or shutil.which("gcc"), "no host C compiler")
+class Runtime(CRunner):
     def test_pointer_field_chain_and_code_pointer_call(self):
         # func_80190240's shape: o->ctx->fE through a guest pointer in RAM,
         # then the retail jalr through o->fn.
@@ -218,6 +220,82 @@ class Runtime(unittest.TestCase):
         self.assertIn('PE_D_COMP_BOUNDARY1("func_80012340", 0x80012340u, a_a)', res["body"])
 
 
+GTE_MOCK = r"""
+static uint32_t gd[32], gc[32]; static unsigned gcmds;
+static uint32_t PE_GTE_ReadData(uint32_t r) { return gd[r]; }
+static void PE_GTE_WriteData(uint32_t r, uint32_t v)
+{ gd[r] = (r == 1u || (r >= 9u && r <= 11u)) ? (uint32_t)(int32_t)(int16_t)v : v; }
+static uint32_t PE_GTE_ReadCtrl(uint32_t r) { return gc[r]; }
+static void PE_GTE_WriteCtrl(uint32_t r, uint32_t v) { gc[r] = v; }
+static void PE_GTE_Command(uint32_t cmd)
+{   /* independent reference: MVMVA sf=1 mx=RT v=V0 cv=none, lm=0 */
+    int16_t m[9], v[3]; int i;
+    gcmds++;
+    if (cmd != 0x486012u) { printf("CMD %07X\n", cmd); exit(5); }
+    for (i = 0; i < 4; i++) { m[2 * i] = (int16_t)gc[i]; m[2 * i + 1] = (int16_t)(gc[i] >> 16); }
+    m[8] = (int16_t)gc[4];
+    v[0] = (int16_t)gd[0]; v[1] = (int16_t)(gd[0] >> 16); v[2] = (int16_t)gd[1];
+    for (i = 0; i < 3; i++) {
+        int64_t mac = ((int64_t)m[3 * i] * v[0] + (int64_t)m[3 * i + 1] * v[1] + (int64_t)m[3 * i + 2] * v[2]) >> 12;
+        gd[25 + i] = (uint32_t)(int32_t)mac;
+        gd[9 + i] = (uint32_t)(int32_t)(mac < -32768 ? -32768 : mac > 32767 ? 32767 : mac);
+    }
+}
+"""
+
+GTE_SRC = r"""
+typedef struct MATRIX { short m[3][3]; int t[3]; } MATRIX;
+typedef struct SVECTOR { short vx, vy, vz, pad; } SVECTOR;
+typedef struct VECTOR { int vx, vy, vz, pad; } VECTOR;
+extern int g_count asm("D_80180010");
+int func_80190000(MATRIX *mat, SVECTOR *v, VECTOR *out, short *ir)
+{
+    int a, b, c;
+    __asm__ volatile("lw $12,0(%0)\n\tlw $13,4(%0)\n\tctc2 $12,$0\n\tctc2 $13,$1\n\t"
+                     "lw $12,8(%0)\n\tlw $13,12(%0)\n\tlw $14,16(%0)\n\tctc2 $12,$2\n\t"
+                     "ctc2 $13,$3\n\tctc2 $14,$4" : : "r"(mat) : "$12", "$13", "$14");
+    __asm__ volatile("lhu $13,2(%0)\n\tlhu $12,0(%0)\n\tsll $13,$13,16\n\tor $12,$12,$13\n\t"
+                     "mtc2 $12,$0\n\tlwc2 $1,4(%0)" : : "r"(v) : "$12", "$13");
+    __asm__ volatile("nop\n\tnop\n\t.word 0x4A486012");
+    __asm__ volatile("swc2 $25,0(%0)\n\tswc2 $26,4(%0)\n\tswc2 $27,8(%0)" : : "r"(out) : "memory");
+    __asm__ volatile("mfc2 %0,$9\n\tmfc2 %1,$10\n\tmfc2 %2,$11" : "=r"(a), "=r"(b), "=r"(c) : "2"(c));
+    ir[0] = a; ir[1] = b; ir[2] = c;
+    g_count++;
+    return a + b + c;
+}
+"""
+
+
+@unittest.skipUnless(shutil.which("cc") or shutil.which("gcc"), "no host C compiler")
+class GteAsm(CRunner):
+    """Inline PSY-Q GTE macros lowered to register-level native GTE calls."""
+
+    def test_rotmatrix_ldv0_rtv0_stlvnl_mfc2(self):
+        code = tu(GTE_SRC, extra=GTE_MOCK)
+        self.assertIn("PE_GTE_Command(0x0486012u)", code)
+        out = self.run_c(code, r"""
+            static const short R[9] = { 0x1000, 0, 0, 0, 0, -0x1000, 0, 0x1000, 0 };
+            int i;
+            for (i = 0; i < 9; i++) PE_StoreU16(0x80100000u + 2u * i, (uint16_t)R[i]);
+            PE_StoreU16(0x80100100u, 100); PE_StoreU16(0x80100102u, (uint16_t)-200);
+            PE_StoreU16(0x80100104u, 40000u & 0xFFFF);
+            int r = func_80190000(0x80100000u, 0x80100100u, 0x80100200u, 0x80100300u);
+            printf("%d %d %d %d | %d %d %d | %u %u\n", r,
+                   (int)PE_LoadU32(0x80100200u), (int)PE_LoadU32(0x80100204u), (int)PE_LoadU32(0x80100208u),
+                   (short)PE_LoadU16(0x80100300u), (short)PE_LoadU16(0x80100302u), (short)PE_LoadU16(0x80100304u),
+                   gcmds, PE_LoadU32(0x80180010u));""")
+        # x = 100; y = -vz = -(40000 as s16 = -25536) = 25536; z = vy = -200
+        self.assertEqual(out.strip(), "25436 100 25536 -200 | 100 25536 -200 | 1 1")
+
+    def test_set_alias_renames_function(self):
+        src = r"""
+        asm(".set RoomLib_Helper, func_80190100");
+        extern int RoomLib_Helper(int);
+        int func_80190000(int a) { return RoomLib_Helper(a) + 1; }"""
+        res = lower(src)
+        self.assertIn('PE_D_COMP_BOUNDARY1("func_80190100"', res["body"])
+
+
 class Refusals(unittest.TestCase):
     def assertRefused(self, src, why):
         with self.assertRaises(gl.LowerError) as cm:
@@ -235,7 +313,20 @@ class Refusals(unittest.TestCase):
         self.assertRefused("int func_80190000(void) { static int n; return n++; }", "static local")
 
     def test_real_asm(self):
-        self.assertRefused('int func_80190000(int a) { __asm__("nop"); return a; }', "asm")
+        self.assertRefused('int func_80190000(int a) { __asm__("syscall"); return a; }', "asm")
+
+    def test_unsupported_cop2_command(self):
+        # RTPS (0x4A180001) has no register-level native implementation yet.
+        self.assertRefused('int func_80190000(int a) { __asm__ volatile(".word 0x4A180001"); '
+                           'return a; }', "cop2 command")
+
+    def test_memory_constraint(self):
+        self.assertRefused('int func_80190000(int *p) { __asm__ volatile("" : : "m"(*p)); '
+                           'return 0; }', "input constraint m")
+
+    def test_output_read_before_written(self):
+        self.assertRefused('int func_80190000(void) { int x; __asm__ volatile('
+                           '"mtc2 %0,$9" : "=r"(x)); return x; }', "read before written")
 
     def test_indirect_call_arity(self):
         self.assertRefused("int func_80190000(void (*f)(int,int,int,int,int)) "

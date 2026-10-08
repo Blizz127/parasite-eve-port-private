@@ -491,3 +491,178 @@ int32_t PE_GTE_NCLIP(void)
              (int32_t)(int16_t)(g_pe_gte.sxy[(i+2)%3]>>16));
     return g_pe_gte.mac0=(int32_t)value;
 }
+
+/* ── register-level COP2 access (E21b: lowered inline GTE asm) ─────────
+ * psx-spx "GTE Registers": data registers $0-$31 (mtc2/mfc2/lwc2/swc2) and
+ * control registers $0-$31 (ctc2/cfc2) over g_pe_gte.  Matrices are packed
+ * two 16-bit elements per register, the ninth element alone (sign-extended
+ * on read).  H reads back sign-extended (hardware quirk). */
+#include <stdio.h>
+#include <stdlib.h>
+
+static uint32_t g_pe_gte_res1;
+
+static uint32_t pe_gte_pack(int16_t lo, int16_t hi)
+{
+    return (uint32_t)(uint16_t)lo | ((uint32_t)(uint16_t)hi << 16);
+}
+
+static uint32_t pe_gte_sx16(int32_t v)
+{
+    return (uint32_t)(int32_t)(int16_t)v;
+}
+
+static uint32_t pe_gte_orgb(void)
+{
+    uint32_t out = 0;
+    int i;
+    for (i = 0; i < 3; i++) {
+        int32_t c = g_pe_gte.ir[i] >> 7;
+        if (c < 0) c = 0;
+        if (c > 0x1F) c = 0x1F;
+        out |= (uint32_t)c << (5 * i);
+    }
+    return out;
+}
+
+uint32_t PE_GTE_ReadData(uint32_t reg)
+{
+    switch (reg & 31u) {
+    case 0: return pe_gte_pack(g_pe_gte.v0[0], g_pe_gte.v0[1]);
+    case 1: return pe_gte_sx16(g_pe_gte.v0[2]);
+    case 2: return pe_gte_pack(g_pe_gte.v1[0], g_pe_gte.v1[1]);
+    case 3: return pe_gte_sx16(g_pe_gte.v1[2]);
+    case 4: return pe_gte_pack(g_pe_gte.v2[0], g_pe_gte.v2[1]);
+    case 5: return pe_gte_sx16(g_pe_gte.v2[2]);
+    case 6: return g_pe_gte.rgbc;
+    case 7: return g_pe_gte.otz & 0xFFFFu;
+    case 8: return pe_gte_sx16(g_pe_gte.ir0);
+    case 9: case 10: case 11: return pe_gte_sx16(g_pe_gte.ir[reg - 9u]);
+    case 12: case 13: case 14: return g_pe_gte.sxy[reg - 12u];
+    case 15: return g_pe_gte.sxy[2];
+    case 16: case 17: case 18: case 19: return g_pe_gte.sz[reg - 16u] & 0xFFFFu;
+    case 20: case 21: case 22: return g_pe_gte.rgb_fifo[reg - 20u];
+    case 23: return g_pe_gte_res1;
+    case 24: return (uint32_t)g_pe_gte.mac0;
+    case 25: case 26: case 27: return (uint32_t)g_pe_gte.mac[reg - 25u];
+    case 28: case 29: return pe_gte_orgb();
+    case 30: return g_pe_gte.lzcs;
+    default: return g_pe_gte.lzcr;
+    }
+}
+
+void PE_GTE_WriteData(uint32_t reg, uint32_t v)
+{
+    switch (reg & 31u) {
+    case 0: g_pe_gte.v0[0] = (int16_t)v; g_pe_gte.v0[1] = (int16_t)(v >> 16); break;
+    case 1: g_pe_gte.v0[2] = (int16_t)v; break;
+    case 2: g_pe_gte.v1[0] = (int16_t)v; g_pe_gte.v1[1] = (int16_t)(v >> 16); break;
+    case 3: g_pe_gte.v1[2] = (int16_t)v; break;
+    case 4: g_pe_gte.v2[0] = (int16_t)v; g_pe_gte.v2[1] = (int16_t)(v >> 16); break;
+    case 5: g_pe_gte.v2[2] = (int16_t)v; break;
+    case 6: g_pe_gte.rgbc = v; break;
+    case 7: g_pe_gte.otz = v & 0xFFFFu; break;
+    case 8: g_pe_gte.ir0 = (int16_t)v; break;
+    case 9: case 10: case 11: g_pe_gte.ir[reg - 9u] = (int16_t)v; break;
+    case 12: case 13: case 14: g_pe_gte.sxy[reg - 12u] = v; break;
+    case 15:
+        g_pe_gte.sxy[0] = g_pe_gte.sxy[1];
+        g_pe_gte.sxy[1] = g_pe_gte.sxy[2];
+        g_pe_gte.sxy[2] = v;
+        break;
+    case 16: case 17: case 18: case 19: g_pe_gte.sz[reg - 16u] = v & 0xFFFFu; break;
+    case 20: case 21: case 22: g_pe_gte.rgb_fifo[reg - 20u] = v; break;
+    case 23: g_pe_gte_res1 = v; break;
+    case 24: g_pe_gte.mac0 = (int32_t)v; break;
+    case 25: case 26: case 27: g_pe_gte.mac[reg - 25u] = (int32_t)v; break;
+    case 28:
+        g_pe_gte.ir[0] = (int32_t)((v & 0x1Fu) << 7);
+        g_pe_gte.ir[1] = (int32_t)(((v >> 5) & 0x1Fu) << 7);
+        g_pe_gte.ir[2] = (int32_t)(((v >> 10) & 0x1Fu) << 7);
+        break;
+    case 30: PE_GTE_SetLZCS(v); break;
+    default: break;                       /* ORGB / LZCR are read-only */
+    }
+}
+
+static int16_t *pe_gte_matrix(uint32_t base)
+{
+    return base == 0u ? &g_pe_gte.rt[0][0] : base == 8u ? &g_pe_gte.llm[0][0]
+                                                         : &g_pe_gte.lcm[0][0];
+}
+
+static int32_t *pe_gte_vec(uint32_t base)
+{
+    return base == 5u ? g_pe_gte.tr : base == 13u ? g_pe_gte.bk : g_pe_gte.fc;
+}
+
+uint32_t PE_GTE_ReadCtrl(uint32_t reg)
+{
+    reg &= 31u;
+    if (reg < 24u) {
+        uint32_t grp = reg / 8u * 8u, i = reg - grp;
+        if (i < 5u) {
+            int16_t *m = pe_gte_matrix(grp);
+            return i < 4u ? pe_gte_pack(m[2u * i], m[2u * i + 1u]) : pe_gte_sx16(m[8]);
+        }
+        return (uint32_t)pe_gte_vec(grp + 5u)[i - 5u];
+    }
+    switch (reg) {
+    case 24: return (uint32_t)g_pe_gte.ofx;
+    case 25: return (uint32_t)g_pe_gte.ofy;
+    case 26: return pe_gte_sx16(g_pe_gte.h);
+    case 27: return pe_gte_sx16(g_pe_gte.dqa);
+    case 28: return (uint32_t)g_pe_gte.dqb;
+    case 29: return pe_gte_sx16(g_pe_gte.zsf3);
+    case 30: return pe_gte_sx16(g_pe_gte.zsf4);
+    default: return g_pe_gte.projection_flags;
+    }
+}
+
+void PE_GTE_WriteCtrl(uint32_t reg, uint32_t v)
+{
+    reg &= 31u;
+    if (reg < 24u) {
+        uint32_t grp = reg / 8u * 8u, i = reg - grp;
+        if (i < 5u) {
+            int16_t *m = pe_gte_matrix(grp);
+            m[2u * i] = (int16_t)v;
+            if (i < 4u)
+                m[2u * i + 1u] = (int16_t)(v >> 16);
+        } else {
+            pe_gte_vec(grp + 5u)[i - 5u] = (int32_t)v;
+        }
+        return;
+    }
+    switch (reg) {
+    case 24: g_pe_gte.ofx = (int32_t)v; break;
+    case 25: g_pe_gte.ofy = (int32_t)v; break;
+    case 26: g_pe_gte.h = (int32_t)(v & 0xFFFFu); break;
+    case 27: g_pe_gte.dqa = (int16_t)v; break;
+    case 28: g_pe_gte.dqb = (int32_t)v; break;
+    case 29: g_pe_gte.zsf3 = (int16_t)v; break;
+    case 30: g_pe_gte.zsf4 = (int16_t)v; break;
+    default: {
+        uint32_t f = v & 0x7FFFF000u;
+        g_pe_gte.projection_flags = f | ((f & 0x7F87E000u) ? 0x80000000u : 0u);
+        break;
+    }
+    }
+}
+
+void PE_GTE_Command(uint32_t cmd)
+{
+    uint32_t op = cmd & 0x3Fu;
+    if (op == 0x12u && ((cmd >> 17) & 3u) == 0u && (((cmd >> 15) & 3u) == 0u || ((cmd >> 15) & 3u) == 3u)
+        && (((cmd >> 13) & 3u) == 0u || ((cmd >> 13) & 3u) == 3u)) {
+        PE_GTE_MVMVA(cmd);
+        return;
+    }
+    if (op == 0x06u) {
+        (void)PE_GTE_NCLIP();
+        return;
+    }
+    fprintf(stderr, "FATAL: PE_GTE_Command: unsupported cop2 command 0x%07X (native only)\n", cmd);
+    fflush(stderr);
+    abort();
+}

@@ -323,7 +323,11 @@ LOWER_REASONS = ("pointer parameter", "leaf struct with pointer members",
                  "callee result dereferenced", "guest-address result of",
                  "pointer-to-pointer cast", "pointer cast of non-D_",
                  "host pointer", "relational compare of pointers",
-                 "function address value")
+                 "function address value", "asm",
+                 # scratchpad (0x1F800000-0x1F8003FF) is guest memory; MMIO/BIOS
+                 # literals are re-refused by the lowering itself.
+                 "hardware/BIOS literal 0x1F8000", "hardware/BIOS literal 0x1F8001",
+                 "hardware/BIOS literal 0x1F8002", "hardware/BIOS literal 0x1F8003")
 
 
 def lowered_tu(n: str, text: str, leaf: dict, reason: str | None, known: set[str],

@@ -261,8 +261,21 @@ class E21FallbackTests(unittest.TestCase):
         self.assertIn("PE_StoreU32(((uint32_t)PE_LoadU32((a_o + 4u))), (uint32_t)(1))", txt)
 
     def test_other_reasons_stay_refused(self):
-        for why in ("asm", "call arity func_80012345 2!=1", "pinned register x read before written"):
+        for why in ("call arity func_80012345 2!=1", "pinned register x read before written",
+                    "hardware/BIOS literal 0x1F801070"):
             self.assertIsNone(o.lowered_tu("func_80190000", self.SRC, self.LEAF, why, set(), {}, {}))
+
+    def test_asm_and_scratchpad_reasons_go_to_e21(self):
+        # E21b: inline GTE asm and scratchpad literals are lowered (the leaf's
+        # own asm is checked by guest_lower; plain C here simply lowers).
+        for why in ("asm", "hardware/BIOS literal 0x1F800028"):
+            txt = o.lowered_tu("func_80190000", self.SRC, self.LEAF, why, set(), {}, {})
+            self.assertIn("E21 guest-memory", txt)
+
+    def test_mmio_literal_refused_inside_lowering(self):
+        src = "int func_80190000(void) { return *(volatile int *)0x1F801070; }"
+        txt = o.lowered_tu("func_80190000", src, self.LEAF, "asm", set(), {}, {})
+        self.assertIn("hardware/BIOS literal 0x1F801070", txt)
 
     def test_lowering_refusal_is_reported(self):
         src = "int func_80190000(float *f) { return *f > 1; }"

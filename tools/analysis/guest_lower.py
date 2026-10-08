@@ -254,6 +254,8 @@ class Lowerer:
         self.packed_nodes: set[int] = set()
         self.addr_taken: set[str] = set()
         self.frame = 0
+        self.asm_table: list[dict] = []
+        self.aliases: dict[str, str] = {}
         self._parse(text)
 
     # parsing ---------------------------------------------------------
@@ -475,7 +477,7 @@ class Lowerer:
             if v is not None:
                 return LV("g" if v.buf else "v", v.cname, v.ty)
             if e.name in self.globals:
-                addr = data_address(e.name)
+                addr = data_address(self.aliases.get(e.name, e.name))
                 return LV("g", f"0x{addr:08X}u", self.global_ty(e.name))
             raise LowerError(f"unknown object {e.name}")
         if isinstance(e, c_ast.UnaryOp) and e.op == "*":
@@ -874,6 +876,9 @@ class Lowerer:
         elif isinstance(s, c_ast.DeclList):
             for d in s.decls:
                 self.local_decl(d, I, out)
+        elif (isinstance(s, c_ast.FuncCall) and isinstance(s.name, c_ast.ID)
+              and s.name.name == "__pe_asm"):
+            self.asm_stmt(s, I, out)
         elif isinstance(s, c_ast.If):
             c, _ = self.cond(s.cond)
             out.append(f"{I}if ({c}) {{")
@@ -960,6 +965,83 @@ class Lowerer:
             self.scopes.append({})
             self.stmt(s, I + "    ", out)
             self.scopes.pop()
+
+    def asm_stmt(self, s, I, out):
+        args = list(s.args.exprs)
+        spec = self.asm_table[int(args[0].value)]
+        outs, ins, opers = spec["outs"], spec["ins"], args[1:]
+        nout = len(outs)
+        self.tmp += 1
+        tag = f"pe_asm{self.tmp}"
+        reg = {k: k for k in range(nout)}
+        J = I + "    "
+        body = [I + "{   /* inline GTE asm: retail cop2 sequence on the native GTE */"]
+        decl = [f"{tag}_{k}" for k in range(nout)]
+        for j, (c, _) in enumerate(ins):
+            k = nout + j
+            reg[k] = int(c) if c.isdigit() else k
+            if not c.isdigit():
+                decl.append(f"{tag}_{k}")
+        gprs = sorted({o[-1][1] for o in spec["ops"] if o[0] == "load" and o[-1][0] == "gpr"}
+                      | {o[2][1] for o in spec["ops"] if o[0] == "alu" and o[2][0] == "gpr"}
+                      | {o[1][1] for o in spec["ops"] if o[0] in ("cfc2", "mfc2") and o[1][0] == "gpr"})
+        decl += [f"{tag}_r{n}" for n in gprs]
+        if decl:
+            body.append(J + "uint32_t " + ", ".join(f"{d} = 0u" for d in decl) + ";")
+        for j, (c, _) in enumerate(ins):
+            k = nout + j
+            cv, t = self.rv(opers[k])
+            if isinstance(t, THostPtr) or not is_scalar(t):
+                raise LowerError("asm: non-scalar operand")
+            body.append(f"{J}{tag}_{reg[k]} = (uint32_t)({cv});")
+
+        def r(x):
+            return f"{tag}_{reg[x[1]]}" if x[0] == "op" else f"{tag}_r{x[1]}"
+        for o in spec["ops"]:
+            if o[0] == "load":
+                _, mn, off, base, d = o
+                fn = {"lw": "(uint32_t)PE_LoadU32", "lhu": "(uint32_t)PE_LoadU16",
+                      "lh": "(uint32_t)(int32_t)(int16_t)PE_LoadU16", "lbu": "(uint32_t)PE_LoadU8",
+                      "lb": "(uint32_t)(int32_t)(int8_t)PE_LoadU8"}[mn]
+                body.append(f"{J}{r(d)} = {fn}({r(base)} + {off & 0xFFFFFFFF}u);")
+            elif o[0] == "alu":
+                _, mn, d, a, b = o
+                if mn in ("addiu",):
+                    bv = f"{(b[1] if b[1] < 0x8000 or b[1] > 0xFFFF else b[1] - 0x10000) & 0xFFFFFFFF}u"
+                elif b[0] == "imm":
+                    bv = f"{b[1] & (0x1F if mn in ('sll', 'srl', 'sra') else 0xFFFF)}u"
+                else:
+                    bv = r(b)
+                if mn == "sra":
+                    body.append(f"{J}{r(d)} = (uint32_t)((int32_t){r(a)} >> {bv});")
+                else:
+                    body.append(f"{J}{r(d)} = {r(a)} {ALU_OPS[mn]} {bv};")
+            elif o[0] == "store":
+                _, mn, off, base, v = o
+                fn = {"sw": "PE_StoreU32", "sh": "PE_StoreU16", "sb": "PE_StoreU8"}[mn]
+                cast = {"sw": "uint32_t", "sh": "uint16_t", "sb": "uint8_t"}[mn]
+                body.append(f"{J}{fn}({r(base)} + {off & 0xFFFFFFFF}u, ({cast}){r(v)});")
+            elif o[0] == "ctc2":
+                body.append(f"{J}PE_GTE_WriteCtrl({o[2]}u, {r(o[1])});")
+            elif o[0] == "mtc2":
+                body.append(f"{J}PE_GTE_WriteData({o[2]}u, {r(o[1])});")
+            elif o[0] == "cfc2":
+                body.append(f"{J}{r(o[1])} = PE_GTE_ReadCtrl({o[2]}u);")
+            elif o[0] == "mfc2":
+                body.append(f"{J}{r(o[1])} = PE_GTE_ReadData({o[2]}u);")
+            elif o[0] == "lwc2":
+                body.append(f"{J}PE_GTE_WriteData({o[1]}u, PE_LoadU32({r(o[3])} + {o[2] & 0xFFFFFFFF}u));")
+            elif o[0] == "swc2":
+                body.append(f"{J}PE_StoreU32({r(o[3])} + {o[2] & 0xFFFFFFFF}u, PE_GTE_ReadData({o[1]}u));")
+            elif o[0] == "cmd":
+                body.append(f"{J}PE_GTE_Command(0x{o[1]:07X}u);")
+        for k in range(nout):
+            lv = self.lv(opers[k])
+            if not is_scalar(lv.ty):
+                raise LowerError("asm: non-scalar output")
+            body.append(J + self.store(lv, f"{tag}_{k}") + ";")
+        body.append(I + "}")
+        out.extend(body)
 
     def block(self, s, I, out):
         self.scopes.append({})
@@ -1199,6 +1281,309 @@ def parse_const(e) -> tuple[int, T]:
     return v, TInt(4, not unsigned)
 
 
+# ── inline GTE asm (E21b) ───────────────────────────────────────────────
+# The vendor room C keeps PSY-Q's inline COP2 macros (gte_ldv0, gte_SetRotMatrix,
+# gte_rtv0, gte_stlvnl, ...).  Their templates use a small, fixed instruction
+# set; each asm statement becomes the same register-level sequence against the
+# native GTE model (pe_gte.c: PE_GTE_ReadData/WriteData/ReadCtrl/WriteCtrl/
+# Command).  Anything outside this set keeps the "asm" refusal.
+
+ASM_HEAD_RE = re.compile(r"\b(?:__asm__|asm)\s*(?:__volatile__|volatile)?\s*\(")
+# COP2 commands with a native implementation: MVMVA (mx=RT, v in {V0, IR},
+# cv in {TR, none}) and NCLIP.
+GTE_DATA_W = set(range(0, 15)) | {24, 25, 26, 27, 30}
+GTE_DATA_R = set(range(0, 15)) | {24, 25, 26, 27, 31}
+GTE_CTRL = set(range(0, 24))
+
+
+ALU_OPS = {"sll": "<<", "srl": ">>", "sra": ">>", "addu": "+", "addiu": "+", "subu": "-",
+           "or": "|", "ori": "|", "and": "&", "andi": "&", "xor": "^", "xori": "^"}
+
+
+def gte_command_ok(word: int) -> bool:
+    if (word >> 25) != 0x25:            # 0100101 = COP2 + command bit
+        return False
+    cmd = word & 0x1FFFFFF
+    op = cmd & 0x3F
+    if op == 0x06:
+        return True                     # NCLIP
+    if op == 0x12:
+        mx, v, cv = (cmd >> 17) & 3, (cmd >> 15) & 3, (cmd >> 13) & 3
+        return mx == 0 and v in (0, 3) and cv in (0, 3)
+    return False
+
+
+def _scan(text: str, i: int, close: str) -> int:
+    """Index just past the `close` matching the opener before text[i]."""
+    depth = 1
+    while i < len(text):
+        ch = text[i]
+        if ch in "\"'":
+            q = ch
+            i += 1
+            while i < len(text) and text[i] != q:
+                i += 2 if text[i] == "\\" else 1
+        elif ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth -= 1
+            if depth == 0:
+                return i + 1
+        i += 1
+    raise LowerError("asm: unbalanced")
+
+
+def _split_top(s: str, sep: str) -> list[str]:
+    out, depth, cur, i = [], 0, [], 0
+    while i < len(s):
+        ch = s[i]
+        if ch in "\"'":
+            j = i + 1
+            while j < len(s) and s[j] != ch:
+                j += 2 if s[j] == "\\" else 1
+            cur.append(s[i:j + 1])
+            i = j + 1
+            continue
+        if ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth -= 1
+        if ch == sep and depth == 0:
+            out.append("".join(cur))
+            cur = []
+        else:
+            cur.append(ch)
+        i += 1
+    out.append("".join(cur))
+    return out
+
+
+STR_RE = re.compile(r'"((?:[^"\\]|\\.)*)"')
+
+
+def _template(sec: str) -> str:
+    rest = STR_RE.sub("", sec).strip()
+    if rest:
+        raise LowerError("asm: non-literal template")
+    raw = "".join(STR_RE.findall(sec))
+    return raw.replace("\\n", "\n").replace("\\t", " ").replace('\\"', '"')
+
+
+def _operands(sec: str) -> list[tuple[str, str]]:
+    sec = sec.strip()
+    if not sec:
+        return []
+    ops = []
+    for item in _split_top(sec, ","):
+        m = re.fullmatch(r'\s*"([^"]*)"\s*\((.*)\)\s*', item, re.S)
+        if not m:
+            raise LowerError("asm: operand form")
+        ops.append((m.group(1).strip(), m.group(2).strip()))
+    return ops
+
+
+def _reg(tok: str, kind: str):
+    """('gpr', n) / ('op', k) / ('cop', n)."""
+    tok = tok.strip()
+    m = re.fullmatch(r"%(\d+)", tok)
+    if m:
+        return ("op", int(m.group(1)))
+    m = re.fullmatch(r"\$(\d+)", tok)
+    if m:
+        return (kind, int(m.group(1)))
+    raise LowerError(f"asm: register {tok}")
+
+
+def _mem(tok: str):
+    m = re.fullmatch(r"\s*(-?(?:0x[0-9A-Fa-f]+|\d+))?\s*\(\s*([%$]\d+)\s*\)\s*", tok)
+    if not m:
+        raise LowerError(f"asm: memory operand {tok.strip()}")
+    return int(m.group(1) or "0", 0), _reg(m.group(2), "gpr")
+
+
+def compile_asm(tpl: str, outs, ins) -> list[tuple]:
+    """Template -> micro-ops; raises LowerError outside the supported set."""
+    nops = len(outs) + len(ins)
+    for c, _ in outs:
+        if c not in ("=r", "=&r"):
+            raise LowerError(f"asm: output constraint {c}")
+    for c, _ in ins:
+        if not (c in ("r", "i") or (c.isdigit() and int(c) < len(outs))):
+            raise LowerError(f"asm: input constraint {c}")
+    tied = {int(c) for c, _ in ins if c.isdigit()}
+    written = set(tied) | set(range(len(outs), nops))   # operands holding a value
+    gpr_set: set[int] = set()
+    ops: list[tuple] = []
+
+    def src(r):
+        if r[0] == "op":
+            if r[1] >= nops:
+                raise LowerError("asm: operand index")
+            if r[1] not in written:
+                raise LowerError("asm: output read before written")
+        elif r[1] not in gpr_set:
+            raise LowerError(f"asm: ${r[1]} read before written")
+        return r
+
+    def dst(r):
+        if r[0] == "op":
+            if r[1] >= len(outs):
+                raise LowerError("asm: write to input operand")
+            written.add(r[1])
+        else:
+            if r[1] == 0 or r[1] in (29, 31):
+                raise LowerError(f"asm: write to ${r[1]}")
+            gpr_set.add(r[1])
+        return r
+
+    for line in re.split(r"[\n;]", tpl):
+        line = line.strip()
+        if not line or line == "nop":
+            continue
+        mnem, _, rest = line.partition(" ")
+        args = [a.strip() for a in _split_top(rest, ",")] if rest.strip() else []
+        if mnem in ("lw", "lhu", "lh", "lbu", "lb") and len(args) == 2:
+            off, base = _mem(args[1])
+            ops.append(("load", mnem, off, src(base), dst(_reg(args[0], "gpr"))))
+        elif mnem in ALU_OPS and len(args) == 3:
+            a = src(_reg(args[1], "gpr"))
+            if mnem in ("sll", "srl", "sra", "addiu", "ori", "andi", "xori"):
+                b = ("imm", int(args[2], 0) & 0xFFFFFFFF)
+            else:
+                b = src(_reg(args[2], "gpr"))
+            ops.append(("alu", mnem, dst(_reg(args[0], "gpr")), a, b))
+        elif mnem in ("sw", "sh", "sb") and len(args) == 2:
+            off, base = _mem(args[1])
+            ops.append(("store", mnem, off, src(base), src(_reg(args[0], "gpr"))))
+        elif mnem in ("ctc2", "mtc2") and len(args) == 2:
+            r = src(_reg(args[0], "gpr"))
+            n = _reg(args[1], "cop")[1]
+            if n not in (GTE_CTRL if mnem == "ctc2" else GTE_DATA_W):
+                raise LowerError(f"asm: {mnem} ${n}")
+            ops.append((mnem, r, n))
+        elif mnem in ("cfc2", "mfc2") and len(args) == 2:
+            n = _reg(args[1], "cop")[1]
+            if n not in (GTE_CTRL if mnem == "cfc2" else GTE_DATA_R):
+                raise LowerError(f"asm: {mnem} ${n}")
+            ops.append((mnem, dst(_reg(args[0], "gpr")), n))
+        elif mnem in ("lwc2", "swc2") and len(args) == 2:
+            n = _reg(args[0], "cop")[1]
+            off, base = _mem(args[1])
+            if n not in (GTE_DATA_W if mnem == "lwc2" else GTE_DATA_R):
+                raise LowerError(f"asm: {mnem} ${n}")
+            ops.append((mnem, n, off, src(base)))
+        elif mnem == ".word" and len(args) == 1:
+            w = int(args[0], 0)
+            if not gte_command_ok(w):
+                raise LowerError(f"asm: cop2 command 0x{w:08X}")
+            ops.append(("cmd", w & 0x1FFFFFF))
+        else:
+            raise LowerError(f"asm: instruction {mnem}")
+    for k in range(len(outs)):
+        if k not in written:
+            raise LowerError("asm: output never written")
+    return ops
+
+
+ASM_SET_RE = re.compile(r'\b(?:__asm__|asm)\s*\(\s*"\s*\.set\s+([A-Za-z_]\w*)\s*,\s*([A-Za-z_]\w*)\s*"\s*\)\s*;')
+
+
+def apply_asm_sets(text: str, aliases: dict[str, str]) -> str:
+    """File-scope `asm(".set ALIAS, SYM");`: functions are renamed to SYM at
+    every use, objects keep their declaration and resolve to SYM's address."""
+    sets = [(m.group(1), m.group(2)) for m in ASM_SET_RE.finditer(text)]
+    text = ASM_SET_RE.sub("", text)
+    for alias, sym in sets:
+        if FUNC_NAME_RE.fullmatch(sym):
+            text = re.sub(rf"(?<![\w.>])\b{re.escape(alias)}\b", sym, text)
+        elif DATA_NAME_RE.fullmatch(sym):
+            aliases[alias] = sym
+        else:
+            raise LowerError(f"asm: .set target {sym}")
+    return text
+
+
+ASM_LABEL_RE = re.compile(r'\b(?:__asm__|asm)\s*\(\s*"([A-Za-z_]\w*)"\s*\)\s*;')
+
+
+def apply_asm_labels(text: str) -> tuple[str, dict[str, str]]:
+    """Resolve `extern ... name asm("SYM");` symbol labels.
+
+    Objects keep their own declaration (and so its type) and resolve to the
+    retail address of SYM (returned alias map).  Functions are renamed to SYM
+    at every use; a separate declaration of SYM, if any, wins."""
+    aliases: dict[str, str] = {}
+    text = apply_asm_sets(text, aliases)
+    while True:
+        m = ASM_LABEL_RE.search(text)
+        if not m:
+            return text, aliases
+        sym = m.group(1)
+        start = max(text.rfind(";", 0, m.start()), text.rfind("}", 0, m.start()),
+                    text.rfind("{", 0, m.start())) + 1
+        decl = text[start:m.start()].rstrip()
+        if not re.match(r"\s*extern\b", decl):
+            raise LowerError("asm: label on a non-extern declaration")
+        core, is_fn = decl, False
+        if core.endswith(")"):                      # function declarator
+            depth, i = 0, len(core) - 1
+            while i >= 0:
+                depth += core[i] == ")"
+                depth -= core[i] == "("
+                if depth == 0:
+                    break
+                i -= 1
+            core, is_fn = core[:i].rstrip(), True
+        core = re.sub(r"(\s*\[[^\]]*\])+$", "", core)
+        nm = re.search(r"([A-Za-z_]\w*)$", core)
+        if not nm:
+            raise LowerError("asm: label declarator")
+        name = nm.group(1)
+        if not is_fn:
+            if not DATA_NAME_RE.fullmatch(sym):
+                raise LowerError(f"asm: object label {sym}")
+            aliases[name] = sym
+            text = text[:start] + decl + ";" + text[m.end():]
+            continue
+        if not FUNC_NAME_RE.fullmatch(sym):
+            raise LowerError(f"asm: function label {sym}")
+        rest = text[:start] + text[m.end():]
+        if re.search(rf"\b{re.escape(sym)}\b", rest):
+            decl2 = ""                              # SYM declared directly: keep that one
+        else:
+            decl2 = decl[:nm.start()] + sym + decl[nm.start() + len(name):] + ";"
+        body = re.sub(rf"(?<![\w.>])\b{re.escape(name)}\b", sym, rest[start:])
+        text = rest[:start] + decl2 + body
+
+def extract_asm(text: str) -> tuple[str, list[dict]]:
+    """Replace each supported asm statement with `__pe_asm(K, operands...)`."""
+    text, aliases = apply_asm_labels(text)
+    table: list[dict] = [{"aliases": aliases}]
+    out, pos = [], 0
+    while True:
+        m = ASM_HEAD_RE.search(text, pos)
+        if not m:
+            break
+        end = _scan(text, m.end(), ")")
+        tail = re.match(r"\s*;", text[end:])
+        if not tail:
+            raise LowerError("asm: not a statement")
+        secs = _split_top(text[m.end():end - 1], ":")
+        if len(secs) > 4:
+            raise LowerError("asm: goto form")
+        secs += [""] * (4 - len(secs))
+        tpl = _template(secs[0])
+        outs, ins = _operands(secs[1]), _operands(secs[2])
+        ops = compile_asm(tpl, outs, ins)
+        table.append({"outs": outs, "ins": ins, "ops": ops})
+        args = "".join(f", ({e})" for _, e in outs + ins)
+        out.append(text[pos:m.start()])
+        out.append(f"__pe_asm({len(table) - 1}{args});")
+        pos = end + tail.end()
+    out.append(text[pos:])
+    return "".join(out), table
+
+
 def host_pointer_param(decl: str) -> bool:
     d = decl.strip()
     return "*" in d or "[" in d
@@ -1226,9 +1611,18 @@ def lower_leaf(name: str, text: str, known: set[str], sigs: dict[str, dict],
     if strip_asm is not None:
         text = strip_asm(text)
     text = preprocess(text)
+    text, asm_table = extract_asm(text)
     if re.search(r"\b(?:__asm__|asm)\b", text):
         raise LowerError("asm")
+    for lit in re.findall(r"\b0x[0-9A-Fa-f]{8}\b", text):
+        v = int(lit, 16)
+        # MMIO / BIOS spaces stay refused; the scratchpad is guest memory.
+        if (v & 0x1FFFF000) in (0x1F801000, 0x1F802000) or (v & 0xFF000000) in (0xA0000000, 0xB0000000) \
+                or (v & 0x1FF00000) == 0x1FC00000:
+            raise LowerError(f"hardware/BIOS literal {lit}")
     low = Lowerer(name, text, known, sigs)
+    low.asm_table = asm_table
+    low.aliases = asm_table[0]["aliases"]
     sig, body, ret = low.lower()
     return {"sig": sig, "body": body, "ret": ret,
             "helpers": [HELPERS[h] for h in sorted(low.helpers)],
