@@ -146,3 +146,34 @@ Where this stops converging:
 - About 1000 skipped room leaves have the same two reasons (650
   pointer-to-pointer, 384 struct with pointer members). That generator
   feature, not more one-off carving, is the next unit of work.
+
+## Round 3: E21 guest-memory lowering (2026-10-07 night)
+
+**Progress note (for restarts).** Branch `cursor/pe-native-only-akao-6f51`.
+Done and pushed: `e2cc954f` (generator E21 lowering + tests + e21_diff),
+`47d6c84d` (effect-callback slot ABI + warp_probe timeout). Gates on that
+binary: Day 1 route PASS (frame 67186), MOVIES_DAY2 PASS, suite 1634/1634
+with disc, psyq guard PASS (allowlist), retail_data_guard OK, generator
+`--verify` 0 drift, unit tests 14 + 24 OK, e21_diff 594 ok / 0 mismatch.
+In progress: full re-sweep at story 0x90 (`build/lanes/warp/sweep4_e21_abi.txt`,
+git-ignored). Next: Day 3 story probes, then GTE inline-asm lowering.
+No release (waiting on Will).
+
+Changes:
+
+- **`tools/analysis/guest_lower.py`** (new): room functions refused for
+  room-data pointer fields or calls through code pointers are re-emitted
+  from matched C with every pointer as a 32-bit guest address (O32 layout,
+  `packed` honoured, unsigned plain `char`, wrap-safe signed arithmetic,
+  explicit `PE_Load*/PE_Store*`). `o->fn(o)` becomes
+  `PE_GuestCall("@<leaf>:jalr")` native dispatch, unknown callees stay
+  `CPU_BOUNDARY`. Aggregate or address-taken locals live in a native
+  guest-frame arena (`PE_GuestFrame_Enter/Leave`, 0x801FE000-0x801FEC00).
+  Asm (including GTE), arity mismatches, float, bitfields and static locals
+  stay refused.
+- Room TUs 1023 -> 2257 (1250 E21-lowered), 0 uncompilable; dispatch registry
+  4606 thunks.
+- **Effect callback ABI**: retail `func_8006F9F0` calls the update callback
+  with a0 = slot; `func_8006F8EC` calls draw with a0 = slot,
+  a1 = min(code, 85). The port passed (mode, data), so E21 callees read
+  a0 = 1/2 (m0049i/m0050i FATAL 0xFB0001F4 in `func_8018F0BC`). Fixed.
