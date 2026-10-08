@@ -798,3 +798,14 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
     `lh -6($16)` for the post-call read. Not matched yet: `$8`
     allocation (a register asm variable forces `mfhi $9`) and the
     case 2 f8 base pointer.
+  - 14:40 CT: func_8018F028 LINK_EXACT (0x728 bytes, default era_o2_g0).
+    The remaining 7-word mismatch was a `$21`/`$22` swap between `ix` and
+    the shared constant 3. Splitting `i0 = ix[0]` so that load is the
+    first insn after the case-1 loop note pinned it first (retail order),
+    and `register unsigned short *ix asm("$21")` put `ix` back on `$21`
+    (the 3 takes `$22`). Overlay EXACT_REBUILD_GATE[room_m0430i] PASS
+    (sha1 475d8d7b), preflight PASS; rooms registered 5417 -> 5418
+    thunks. Gates (tag k17): Day 1 route PASS (story 80, frame 67186),
+    Day 2 movies PASS, 1645/1645 tests, both guards PASS, both
+    `--verify` 0 drift, exact rebuild PASS (sha1 452fb033). Next: probe
+    m0430i at 0x90/0x140, then clear m0437i 0x80192500.
