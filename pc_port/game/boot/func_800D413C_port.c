@@ -98,7 +98,6 @@ int PE_EffectCallback(pe_addr_t fn, int32_t mode, pe_addr_t data, pe_addr_t extr
     const uint32_t slot_a1 = g_pe_effect_slot_a1;
     g_pe_effect_slot_abi = 0;
     PE_M34StackCallback(fn);
-    (void)data; (void)extra;
     int rehearsal=m0023i_code();
     if(effect_stack.active && (!rehearsal || effect_stack.context==EFFECT_STACK_INIT ||
        effect_stack.context==EFFECT_STACK_NONE))effect_stack.known=0;
@@ -209,17 +208,22 @@ int PE_EffectCallback(pe_addr_t fn, int32_t mode, pe_addr_t data, pe_addr_t extr
         if (mode==1) PE_StoreU16(PE_LoadU32(0x800E2368u)+18u,1u);
         return (int32_t)0x80190B80u;
     }
+    /* Retail D413C calls h(mode, rec->a1, vm->f8): the third argument is the
+     * effect descriptor (`extra` here), which callbacks such as room m0349i's
+     * emitter func_8018F7C4 read in every mode. */
     if (PE_GuestCode_Resolve(fn))   /* generated overlay / EXE TU (pe_guestcode.h) */
         return slot_abi
             ? PE_GuestCall("@800D413C:effect", fn, 2u, (uintptr_t)data, (uintptr_t)slot_a1, 0, 0)
-            : PE_GuestCall("@800D413C:effect", fn, 2u, (uintptr_t)(uint32_t)mode, (uintptr_t)data, 0, 0);
+            : PE_GuestCall("@800D413C:effect", fn, 3u, (uintptr_t)(uint32_t)mode, (uintptr_t)data,
+                           (uintptr_t)extra, 0);
     if (PE_Decomp_BoundaryStopEnabled())
         /* Native-only: an unported effect callback is a CPU_BOUNDARY/REFUSED
          * STOP under the port binary's stop policy; the skip below is
          * record-policy only. */
         return slot_abi
             ? PE_GuestCall("@800D413C:effect", fn, 2u, (uintptr_t)data, (uintptr_t)slot_a1, 0, 0)
-            : PE_GuestCall("@800D413C:effect", fn, 2u, (uintptr_t)(uint32_t)mode, (uintptr_t)data, 0, 0);
+            : PE_GuestCall("@800D413C:effect", fn, 3u, (uintptr_t)(uint32_t)mode, (uintptr_t)data,
+                           (uintptr_t)extra, 0);
     if (g_pe_strict_effect_stack) {
         fprintf(stderr,"[EFFECT] Unported callback %08X mode %d\n",fn,mode);
         Bootstrap_ReturnVoid("PE_EffectCallback", "room effect callback");

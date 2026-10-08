@@ -271,8 +271,24 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
   m0256i now stops cleanly with
   `GUEST_TRAP ... in room_6bdd1ee9__func_80192680`. Why the duration is 0
   (warp-skipped setup or wrong upstream state) is still open.
-- Still to do: m0432i 0x80193414 (0x52C), m0349i 0x8018F7C4 (0x90C),
-  m0159i 0x8018F3A4 (0xA54; needs a room config first).
+- m0432i: `func_80193414` (0x52C) matched and carved. The room now runs
+  past it and stops at the EXE helper `func_800D1384` (called from the
+  lowered 80193414 with a0=0x801FEBC0, a2=0x3F2): needs EXE C next.
+- m0349i: `func_8018F7C4` (0x90C, emitter callback) matched and carved; it
+  has retail's `break 7` divide checks, so it is assigned
+  `era_o2_g0_expand_div`. The first probe then hit
+  `GUEST_TRAP ... in func_8018F7C4` because the effect dispatcher passed only
+  2 arguments: retail D413C calls `h(mode, rec->a1, vm->f8)`, so the third
+  argument (the effect descriptor) is now passed for generated callbacks and
+  boundary STOPs (`func_800D413C_port.c`). m0349i now stops at the next
+  unported effect callback `0x8018F010` (the asm block at blob offset 0x28).
+- m0159i: room config created (`newroom.py`, manifest entry, profiles) with
+  the twin ports `func_8018F008` and `func_8018FDF8` carved
+  (EXACT_REBUILD_GATE PASS). It still stops at `func_8018F3A4`, which is
+  matched (LINK_EXACT, `era_o2_g0_expand_div`) but not yet carved: it also
+  needs RTPT (GTE op 0x30) in the lowering and in `PE_GTE_Command`.
+- Gates for this increment (tag e22b): Day 1 route PASS (story 80), Day 2
+  movies PASS, 1636/1636 tests, both guards PASS, unit tests OK.
 - Matching notes: gcc 2.7 assumes a struct-member access never aliases a
   fixed-address scalar, so `short *p` indexing (not a struct) plus an array
   global (`D_800942EC[0]`) is what keeps the retail store/load order. Use the
