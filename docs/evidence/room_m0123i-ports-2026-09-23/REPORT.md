@@ -72,3 +72,27 @@ Gate line from the last serial run after this YAML's last change (overlays2 pass
 $ scripts/exact_rebuild_overlay.sh room_m0123i
 EXACT_REBUILD_GATE[room_m0123i]=PASS plan=d7e44921bf1e40272842de8c87c344f664b8c333a4178b6f41d27670959fcc14 yaml=9b0e3df6d260887bd3d9ebab6a1f7b3a21ce238d6e23dc5e09962a15a3270b2a spans=[46 c, 11 asm, 1 rodata, 2 bin] sha1_orig=7dbc62ff99461836f22d884ef04718af387e04cd sha1_cand=7dbc62ff99461836f22d884ef04718af387e04cd sha1=7dbc62ff99461836f22d884ef04718af387e04cd
 ```
+
+## Hand-matched Day 3 fight effect (2026-10-09)
+
+The two functions below have no masked twin. Both were hand-written, are `LINK_EXACT` at this room's VMA (`era_link_check.py --target room_m0123i`) and are carved as `c` rows. The Day 3 recorded-input route stopped in the m0123i fight at `CPU_BOUNDARY/REFUSED pc=0x80192F0C` before they were ported.
+
+| offset | leaf | role | profile |
+| 0x3BF4 | `func_80192BDC` | particle callback (age/spin; draw: func_800CEE20 sprite + func_800D1DEC glow, then a func_800D2B58 streak). Inline GTE: SetRot/TransMatrix of the camera slot through the func_800CF5B0 register barrier | era_o2_g0 |
+| 0x3F24 | `func_80192F0C` | effect driver (pool alloc, 16 particle spawns, four func_800D3BC8 billboards, two func_800D004C fans, the func_800D0728 ring in frames 16..32) | era_o2_g0 |
+
+Levers for `func_80192F0C` (the first draft had 226 words off). Most are GCC 2.x alias/scheduling choices, read from which retail loads stay behind which stores:
+- The p00 store of each parameter block is a plain u16 store through `&D_800F3368` (as `(s16 *)&D_800F3368` in room_m0318i `func_80196C48`); the other fields are struct members.
+- The `D_80195690` copy target is an SVECTOR, and `D_80195684 = p[0]` comes first.
+- Case 0 loads `D_800F33E0` into a block temp before `p[0] = 0`.
+- The 16..32 window uses a block-scoped temp.
+- Case 1 ends with `if (D_800E27EC > 32) return 1; break;`.
+
+Their EXE callees `func_800D3BC8` (sprite; LINK residual = prologue save batching, docs/evidence/func-800D3BC8/REPORT.md) and `func_800CF844` (orbit point, inline GTE) are native hand ports in `pc_port/game/boot/`.
+
+```
+$ scripts/exact_rebuild_overlay.sh room_m0123i
+EXACT_REBUILD_GATE[room_m0123i]=PASS plan=fd37e77c088f3b0154d7b815837decb9445b88ae42a325937dffba9480d8826c yaml=3657ba38c58e3a12970046ed739d84f9da765025173681ea763da9eaa79b8044 spans=[64 c, 3 asm, 1 rodata, 2 bin] sha1_orig=7dbc62ff99461836f22d884ef04718af387e04cd sha1_cand=7dbc62ff99461836f22d884ef04718af387e04cd sha1=7dbc62ff99461836f22d884ef04718af387e04cd
+```
+
+`func_8019251C` (0x3534, 0x4E0 bytes) is also hand-matched (LINK_EXACT, no masked twin) and carved. After these three carves the room gate PASSes with spans [65 c, 2 asm, 1 rodata, 2 bin] and the same sha1 7dbc62ff99461836f22d884ef04718af387e04cd (k31, 2026-10-09).

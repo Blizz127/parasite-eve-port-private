@@ -1224,3 +1224,22 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
       - EXE: the sprite draw func_800D3BC8 0x39C, which has no C at all.
       - Next: hand-match these, starting with func_80192F0C (decoded) and
         func_800D3BC8.
+  - 08:24 CT: m0123i stop 0x80192F0C fixed. k31 gates all PASS: Day 1
+    route (story 80), Day 2 movies, tests 1648/1648, retail_data_guard,
+    psyq_port_guard, exact rebuild, gen_decomp_ports --verify,
+    gen_overlay_ports --verify, Day 2 route, Day 3 route (story 1B8).
+    - room_m0123i: func_80192F0C, func_80192BDC and func_8019251C are
+      hand-matched (LINK_EXACT, no masked twins) and carved as c rows. Room
+      exact gate PASS (65 c / 2 asm / 1 rodata), deep preflight PASS.
+    - EXE func_800D3BC8 (sprite billboard) and func_800CF844 (orbit point)
+      are native hand ports with tests (D3BC8_sprite, CF844_orbit).
+      func_800D3BC8 keeps a 24-word prologue save-batching residual, written
+      up in docs/evidence/func-800D3BC8/REPORT.md.
+    - Part of this work came from a parallel session in the same tree. That
+      session finished without committing, so its files were reviewed and
+      gated here (k31) and committed in this push.
+    - The wt2 BFM build (/workspace/scratch/wt2) is not this session's and
+      was left alone.
+    - Walked route: the m0123i fight now runs past 0x80192F0C and stops at
+      CPU_BOUNDARY/REFUSED 0x80193618, the boss-model effect called from
+      the effect system. Next: hand-match it (0xFD4 bytes, no twin).

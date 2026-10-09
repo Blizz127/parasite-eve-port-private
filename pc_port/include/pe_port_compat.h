@@ -1109,6 +1109,14 @@ void func_800D1384(pe_addr_t head0, pe_addr_t head1, uint32_t n, pe_addr_t col0,
  * func_800D2B58_port.c). */
 void func_800D2B58(pe_addr_t p0, pe_addr_t p1, pe_addr_t c0, pe_addr_t c1,
     int32_t b0, int32_t b1, int32_t abr);
+/* Camera-facing textured sprite, one POLY_FT4 (native port in
+ * func_800D3BC8_port.c). */
+void func_800D3BC8(pe_addr_t pos, int32_t sx, int32_t sy, int32_t cell, int32_t clut,
+    int32_t abr, int32_t bright, pe_addr_t color, int32_t lerp);
+/* Orbit point: centre + R(ang)*(Z(yaw)*D_800C2270*(r2,0,0) + (0,0,r)) (native port in
+ * func_800CF844_port.c). */
+void func_800CF844(pe_addr_t center, pe_addr_t out, int32_t r, pe_addr_t ang, int32_t r2,
+    int32_t yaw);
 int PE_M0023I_Main(int32_t mode, pe_addr_t data);
 int PE_M0023I_Particle(int32_t mode, pe_addr_t data);
 int PE_M0023I_Beam(int32_t mode, pe_addr_t data);

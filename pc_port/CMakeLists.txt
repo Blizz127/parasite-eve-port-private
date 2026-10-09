@@ -103,6 +103,8 @@ set(GAME_SRCS
     game/boot/func_800D1384_port.c
     game/boot/func_800D2104_port.c
     game/boot/func_800D2B58_port.c
+    game/boot/func_800CF844_port.c
+    game/boot/func_800D3BC8_port.c
     game/boot/func_800CEE20_port.c
     game/boot/func_8018F330_port.c
     game/boot/m0013i_effect_port.c
