@@ -916,3 +916,18 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
       to the gates script. The PE_WARP_ROUTE dev-harness chain in
       plat_cheats.c ships with it. Full gates (k21) are running before the
       code commit.
+  - 23:26 CT: code commit 1c3aa777: the Day 2 route gate
+    (day2_route_regress.py) and the PE_WARP_ROUTE harness. Gates k21 all
+    PASS:
+    - Day 1 route (story 80, frame 67186) and Day 2 movies;
+    - DAY2_ROUTE (frames 3592 and 18202);
+    - 1645/1645 tests;
+    - both guards, both `--verify` (0 drift) and EXACT_REBUILD_GATE.
+  - 23:52 CT: later-story sweeps (fe6a4f0c binary, 4000 frames):
+    - 0x1B0 (Day 4): 382 clean, 20 unused, 0 stopping.
+    - 0x220 (Day 5): 382 clean, 20 unused, 0 stopping.
+    - 0x2D6 (Day 6): running.
+    Unused slots are now counted by name: the same 20 slots, all faulting
+    in the room loader (func_8006B4F8) on the warp frame. At 0x2D6 the
+    garbage address is 0x8F2ECF29 instead of 0xFC913DA8, but the code
+    path is the same.
