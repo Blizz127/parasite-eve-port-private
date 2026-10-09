@@ -1298,3 +1298,31 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
       mod0/mod7). The gate still covers 1B0 to 1B8 with the day3_end warp.
     - The wt2 BFM build (/workspace/bfm-b28-wt2) is not this session's and
       was left alone.
+  - 10:54 CT: full Day 3 by play. day3_walk runs from the Day 3 start
+    (m0093i@140) to story 0x1B8 (m0098i, frame 65002) in one run, with
+    no warp after the start. k34 gates all PASS (harness PE_* env cleared
+    inside the chain): Day 1 route (story 80), Day 2 movies, tests
+    1649/1649, retail_data_guard, psyq_port_guard, exact rebuild,
+    gen_decomp_ports --verify, gen_overlay_ports --verify, Day 2 route,
+    Day 3 route (day3_start 148, day3_mid 190, day3_end 1B8, day3_walk 1B8).
+    - The 0x1B0 condition was not a port bug. m0044i module 1 at story
+      0x1B0 starts modules 0/4/2/7 only when persist[0x2C] bit 0x400000
+      is set. The m0044i Baker scene before the fight sets that bit
+      (module 2 @801D90BC). Module 7's polygon trigger (x -96..1830,
+      z 912..2541) then posts mailbox payload 0xC to module 4, whose
+      cutscene transfers to m0352i (801DA8D8). m0352i enters m0098i,
+      which writes 0x1B8.
+    - The bit is never cleared, and both doors into m0044i are closed
+      once it is set (m0115i door 3 switches to m0121i; the m0124i door is
+      story < 0x1B0 only). The fight's return is the only way in.
+    - PE_VM_TRACE of the continuous walk confirms the scene, the bit write
+      and the m0044i -> m0123i path at 0x190. The earlier "blocker" runs
+      were warps from m0123i with the bit clear, which correctly replay the
+      Baker scene. Earlier I also misread p2C=044E1800 as bit-clear.
+    - New waypoint entry A8004248@1B0 walks Aya north from the spawn point
+      (249,-1459) into the trigger. day3_walk adds checkpoints m0352i,
+      m0098i and story>=0x1B8, with frames raised to 90000.
+    - 1-Hit Kills stays off by default (assist default 0, unit test
+      ASSIST_option_registry); only the day3_walk segment env sets it.
+    - The wt2 BFM build (/workspace/scratch/wt2, /workspace/bfm-b28-wt2) is
+      not this session's and was left alone.

@@ -16,14 +16,14 @@ so the gate covers the script-driven stretches only:
   day3_end    warp m0352i story 0x1B0 (Day-4 hop): its room_transfer enters
               m0098i (Day 4 entry), whose script writes 0x1B8.
   day3_walk   warp m0093i story 0x140 (Day 3 start), then a recorded walk
-              to story 0x1B0 in one run: the route pilot
+              to story 0x1B8 in one run: the route pilot
               (pc_port/src/route_day3_pilot.h) replays the committed waypoint
               list day3_walk_waypoints.txt (room token, story, optional
               persist[0x2C] mask; world X,Z points, Cross holds, timeouts) and
               fights the random battles (aim shim + Cross). It walks the
               opening rooms (0x148 to 0x178), the precinct and the hospital (two flag examines), wins the
               hospital battles and the m0123i fight, and must reach story
-              0x1B0. Three harness fixtures, because the warp keeps Day-1 stats:
+              0x1B8. Three harness fixtures, because the warp keeps Day-1 stats:
               PE_ROUTE_MAXHP=300 (max HP in battle), cheat F3 (infinite
               ammo) and the 1-Hit Kills assist PE_ONE_HIT_KILLS=1. With the
               Day-1 pistol Aya hits the m0123i Kerberos heads (200/300/400 HP,
@@ -33,9 +33,17 @@ so the gate covers the script-driven stretches only:
               victory path runs (docs/port/ENHANCEMENTS.md). The waypoints are
               the harness's own coordinates; no disc bytes. Runs by default
               since the whole walk passed (2026-10-09: story 0x1B0 at frame
-              ~61700 from 0x140). 0x1B0 to 0x1B8 (talk to Baker, then
-              m0044i's m0352i hop) is not walked yet: day3_end covers it
-              from a warp.
+              ~61700 from 0x140). After the fight it walks on through
+              0x1B8: m0123i returns to m0044i at 0x1B0 with persist[0x2C]
+              bit 0x400000 already set (by the m0044i Baker scene before the
+              fight), so m0044i module 1 starts modules 0/4/2/7. Walking north
+              into module 7's trigger polygon (x -96..1830, z 912..2541)
+              posts mailbox payload 0xC to module 4, whose cutscene transfers
+              to m0352i; m0352i enters m0098i, which writes 0x1B8 (~frame
+              65000). A warp into m0044i at 0x1B0 starts with the bit clear and
+              replays the Baker scene instead, so this stretch is only
+              reachable by the continuous walk. The 1-Hit Kills assist is off
+              by default; only this segment's env sets it.
 A segment fails on a FATAL, CPU_BOUNDARY/REFUSED or [STOP] line, a story drop,
 a checkpoint firing out of order, or a missed checkpoint.
 """
@@ -70,7 +78,7 @@ def walk_waypoints() -> str:
         return "|".join(l.strip() for l in f if l.strip() and not l.startswith("#"))
 
 
-SEGMENTS["day3_walk"] = dict(room="m0093i", story="140", frames=75000, checkpoints=[
+SEGMENTS["day3_walk"] = dict(room="m0093i", story="140", frames=90000, checkpoints=[
     ("token", 0xA80091C8, "m0093i Day 3 start (story 0x140)"),
     ("story>=", 0x148, "m0093i script writes 0x148"),
     ("token", 0xA8009348, "m0096i"),
@@ -94,6 +102,9 @@ SEGMENTS["day3_walk"] = dict(room="m0093i", story="140", frames=75000, checkpoin
     ("token", 0xA8022148, "m0122i"),
     ("token", 0xA80221C8, "m0123i fight"),
     ("story>=", 0x1B0, "m0123i fight won, story 0x1B0"),
+    ("token", 0xA8065148, "m0352i, by m0044i module 4 (bit 0x400000 set, story 0x1B0)"),
+    ("token", 0xA8009448, "m0098i Day 4 entry, by m0352i's room_transfer"),
+    ("story>=", 0x1B8, "m0098i script writes story 0x1B8"),
 ], env_fn=lambda: {"PE_ROUTE_WAYPOINTS": walk_waypoints(), "PE_CHEAT_KEYS": "1010:F3",
                    "PE_ROUTE_MAXHP": "300", "PE_ONE_HIT_KILLS": "1"})
 
