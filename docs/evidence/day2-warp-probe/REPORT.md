@@ -999,3 +999,8 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
     (m0049i, m0089i, m0123i, m0256i, m0272i, m0349i, m0429i, m0437i) at
     0x90 all clean; m0049i and m0437i also clean at 0x2D6. Full 0x2D6
     re-sweep (402 slots, 2 at a time) in progress.
+  - 01:55 CT: full story 0x2D6 re-sweep (new binary with func_80192E4C,
+    402 slots, 2 at a time, 4000 frames): **382 clean, 20 unused, 0
+    stopping**. m0350i is frame-limit (was the sole Day 6 stop). Later-
+    story totals are now all 382/20/0: 0x1B0, 0x220, 0x2D6, 0x2F4.
+    Story 0x90 / 0x140 / 0x300 remain 382/20/0 from earlier sweeps.
