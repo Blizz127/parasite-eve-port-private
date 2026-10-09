@@ -591,6 +591,21 @@ void pe_plat_cheats_apply(void)
             if (r > 0) {
                 C.env_warp = 0;
                 C.warps++;
+                {   /* dev-only exploration aid: PE_WARP_PERSIST_FILE=<dump> loads a persist
+                     * block (0x800A77F0, 0x200 words, as written by the route pilot's
+                     * PE_D3_PERSIST_DUMP) after the warp, keeping the warp's own story
+                     * (slot 74) and entrance (slot 1). Never used by the gates. */
+                    const char *pf = getenv("PE_WARP_PERSIST_FILE");
+                    FILE *f = pf && *pf ? fopen(pf, "rb") : NULL;
+                    if (f) {
+                        uint32_t w[0x200]; size_t n = fread(w, 4u, 0x200u, f);
+                        uint32_t keep1 = PE_LoadU32(0x800A77F4u), keep74 = PE_LoadU32(GA_STORY);
+                        fclose(f);
+                        for (size_t k = 0; k < n; k++) PE_StoreU32(0x800A77F0u + (uint32_t)k * 4u, w[k]);
+                        PE_StoreU32(0x800A77F4u, keep1); PE_StoreU32(GA_STORY, keep74);
+                        fprintf(stderr, "[WARP] persist block loaded from %s (%u words)\n", pf, (unsigned)n);
+                    }
+                }
                 fprintf(stderr, "[WARP] env transfer %08X -> %08X story=%08X frame=%d\n",
                         (unsigned)tok, (unsigned)C.env_token,
                         (unsigned)PE_LoadU32(GA_STORY), presented);

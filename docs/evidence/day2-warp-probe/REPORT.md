@@ -164,7 +164,7 @@ PASS (67186), MOVIES_DAY2 PASS, suite 1636/1636, guards OK, verify 0 drift,
 e21_diff 631 ok / 0 mismatch (32 GTE TUs).
 Done: registry `closure` fingerprint resolves byte-identical room twins
 (m0437i clean). Remaining 4 stops have no matched C (decomp work).
-No release (waiting on Will).
+No release (waiting on Blizz).
 
 Changes:
 
@@ -867,7 +867,7 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
     0 stopping. 0x140 and 0x300 (Disc 2) are running.
   - 22:09 CT: story 0x140 sweep at 373/402 slots: 353 clean, 20 unused,
     0 stopping so far. Gates are being re-run (k19) for a release-candidate
-    stage. Staged only, not published: a public release needs Will's yes.
+    stage. Staged only, not published: a public release needs Blizz's yes.
   - 22:24 CT: story 0x140 full sweep: 382 clean, 20 unused, 0 stopping.
     Gates k19 (same code as fe6a4f0c) all PASS: Day 1 route (story 80,
     frame 67186), Day 2 movies, 1645/1645 tests, retail_data_guard,
@@ -878,7 +878,7 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
   - 22:45 CT: story 0x300 full sweep (PE_WARP_DISC=2, same binary): 382
     clean, 20 unused, 0 stopping. So all three story points are at
     382 / 20 / 0, and no rooms stop.
-  - Release candidate (staged only; publishing needs Will's yes):
+  - Release candidate (staged only; publishing needs Blizz's yes):
     /workspace/pe/rel/outfe6a4f0c/parasite-eve-native-only-fe6a4f0c-linux-x64.tar.gz,
     sha256 1f3e4bfbfc6483aaacb70aadcb4092896a3be441d2c8ca67d8e507d5247ed27b.
     Built by pc_port/package_preview.sh (rel/shim on PATH) from the
@@ -1031,7 +1031,7 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
     All story points are now 382/20/0: 0x90, 0x140, 0x1B0, 0x220, 0x2D6,
     0x2F4, 0x300, 0x3E8, 0x7D0.
   - 02:53 CT: release candidate native-only-72b2325d **staged, not published**
-    (needs Will's yes) in the box's release staging folder:
+    (needs Blizz's yes) in the box's release staging folder:
     - tarball sha256 02a0f45c2830dde6d4fc16fe7c01958983376823c5dd0d2ba5760f2736c775f9;
     - binary sha256 aad7736d7cc01bc3a42c3d0322cc8f9ff45e6a781b14b19e5bc7a6b6788de927;
     - retail-data guard OK on all 4 packaged files, psyq guard 0 new,
@@ -1324,5 +1324,35 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
       m0098i and story>=0x1B8, with frames raised to 90000.
     - 1-Hit Kills stays off by default (assist default 0, unit test
       ASSIST_option_registry); only the day3_walk segment env sets it.
+    - The wt2 BFM build (/workspace/scratch/wt2, /workspace/bfm-b28-wt2) is
+      not this session's and was left alone.
+  - 12:22 CT: Day 4 by play, part 1 (0x1B8 -> 0x1DC and the key hunt). k36
+    gates all PASS (harness PE_* env cleared inside the chain): Day 1 route
+    (story 80), Day 2 movies, tests 1649/1649, retail_data_guard,
+    psyq_port_guard, exact rebuild, gen_decomp_ports --verify,
+    gen_overlay_ports --verify, Day 2 route, Day 3 route (day3_walk 1B8).
+    - Played from warps 0x1B8 -> 1C0 -> 1C8 -> 1CC -> 1D0 -> 1D3 -> 1D6 ->
+      1D9 -> 1DC. Stops fixed by route: the m0127i elevator call panel
+      (press before the door), the m0128i panel (second press after 0x1D3),
+      and the m0320i bin (passed on the north side).
+    - At 0x1DC the m0320i west door is locked: Day 4's basement hunt needs
+      key A (item 0xD1, m0325i, persist[0x41] bit 1) and key B (0xD2,
+      m0328i, bit 2). Key A walk works; m0327i is reached with it.
+    - m0327i battle stop CPU_BOUNDARY/REFUSED pc=0x8019018C
+      ra=@800D413C:effect fixed. m0327i uses room_m0137i's text. Its
+      particle callback func_8019018C is hand-matched (LINK_EXACT, local
+      profile room_m0137i_dispatch_8018F03C_8018F054_div, jump tables split
+      out as [0x54, rodata]). EXACT_REBUILD_GATE[room_m0137i] PASS (sha1
+      6e146c37). The port is generated with no boundaries. The battle now
+      runs and Aya walks on into m0328i. Details:
+      docs/evidence/room_m0137i-ports-2026-09-23/REPORT.md.
+    - Pilot: entries take &SLOT:MASK (any persist slot, e.g. &41:3 for both
+      keys); the plain &MASK form still tests p2C. Dev-only
+      PE_WARP_PERSIST_FILE (load a persist dump at a warp) and
+      PE_D3_PERSIST_DUMP are for scratch probes only and off by default.
+    - pc_port/tools/day4_walk_waypoints.txt: Day 4 waypoints so far
+      (work in progress; no gate segment yet).
+    - Docs: owner is Blizz (four stale "Will" references fixed).
+    - 1-Hit Kills stays off by default; only the harness env sets it.
     - The wt2 BFM build (/workspace/scratch/wt2, /workspace/bfm-b28-wt2) is
       not this session's and was left alone.

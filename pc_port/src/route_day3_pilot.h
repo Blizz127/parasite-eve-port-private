@@ -12,7 +12,8 @@
  * PE_ROUTE_WAYPOINTS = entry|entry|...
  *   entry  = TOKEN[@MINSTORY][#VISIT]=wp;wp;...  (hex token, hex story,
  *            VISIT: only on the VISIT-th entry into that room, 1-based;
- *            TOKEN@MINSTORY&MASK: only while persist[0x2C] has all MASK bits)
+ *            TOKEN@MINSTORY&MASK: only while persist[0x2C] has all MASK bits;
+ *            TOKEN@MINSTORY&SLOT:MASK: the same test on persist[SLOT])
  *   wp     = X,Z[,R][!N]                      (world units; R arrive radius,
  *            default 100; !N: on arrival press Cross for N frames)
  * The entry used is the one for the current token with the highest MINSTORY
@@ -28,7 +29,7 @@
 #define PC_PORT_ROUTE_DAY3_PILOT_H
 
 typedef struct { int x, z, r, act, tmo; } D3Wp;   /* tmo: give up after N frames (~N) */
-typedef struct { uint32_t token, story, flags; int visit, n; D3Wp wp[24]; } D3Entry;
+typedef struct { uint32_t token, story, flags, slot; int visit, n; D3Wp wp[24]; } D3Entry;
 static D3Entry g_d3[160];
 static int g_d3_n = -1;
 
@@ -42,7 +43,11 @@ static void D3Parse(void)
         memset(e, 0, sizeof *e);
         e->token = (uint32_t)strtoul(s, &end, 16); s = end;
         if (*s == '@') { e->story = (uint32_t)strtoul(s + 1, &end, 16); s = end; }
-        if (*s == '&') { e->flags = (uint32_t)strtoul(s + 1, &end, 16); s = end; }
+        e->slot = 0x2Cu;
+        if (*s == '&') {
+            e->flags = (uint32_t)strtoul(s + 1, &end, 16); s = end;
+            if (*s == ':') { e->slot = e->flags & 0x1FFu; e->flags = (uint32_t)strtoul(s + 1, &end, 16); s = end; }
+        }
         if (*s == '#') { e->visit = (int)strtol(s + 1, &end, 10); s = end; }
         if (*s != '=') break;
         s++;
@@ -169,7 +174,7 @@ static uint16_t RouteDay3Pilot(uint16_t script_mask)
         for (int i = 0; i < g_d3_n; i++) {
             if (g_d3[i].token != tok || g_d3[i].story > story) continue;
             if (g_d3[i].visit && g_d3[i].visit != visit) continue;
-            if ((PE_LoadU32(0x800A78A0u) & g_d3[i].flags) != g_d3[i].flags) continue;
+            if ((PE_LoadU32(0x800A77F0u + g_d3[i].slot * 4u) & g_d3[i].flags) != g_d3[i].flags) continue;
             int si = (g_d3[i].visit ? 2 : 0) + (g_d3[i].flags ? 1 : 0);
             int sb = best < 0 ? -1 : (g_d3[best].visit ? 2 : 0) + (g_d3[best].flags ? 1 : 0);
             if (si > sb || (si == sb && g_d3[i].story >= g_d3[best].story)) best = i;
@@ -179,6 +184,18 @@ static uint16_t RouteDay3Pilot(uint16_t script_mask)
             g_m34s_init = 0;              /* new room: reseed the pad map */
             fprintf(stderr, "[D3PILOT] frame=%d token=%08X story=%X visit=%d entry=%d p2C=%08X\n",
                     g_frame, (unsigned)tok, (unsigned)story, visit, ent, (unsigned)PE_LoadU32(0x800A78A0u));
+        }
+        {   /* debug: PE_D3_PERSIST_DUMP=<dir> writes the persist block (0x800A77F0,
+             * 0x200 words) on each story change, for PE_WARP_PERSIST_FILE (scratch only) */
+            const char *pd = getenv("PE_D3_PERSIST_DUMP");
+            if (pd && story != cur_story) {
+                char path[512]; snprintf(path, sizeof path, "%s/persist_%X.bin", pd, (unsigned)story);
+                FILE *f = fopen(path, "wb");
+                if (f) {
+                    for (uint32_t k = 0; k < 0x200u; k++) { uint32_t w = PE_LoadU32(0x800A77F0u + k * 4u); fwrite(&w, 4u, 1u, f); }
+                    fclose(f);
+                }
+            }
         }
         cur_tok = tok; cur_story = story;
     }
