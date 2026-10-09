@@ -77,6 +77,11 @@ static struct {
     uint32_t env_token, env_story, env_at;
     int env_set_story;
     int env_disc;                       /* PE_WARP_DISC (dev harness) */
+    /* PE_WARP_ROUTE (dev harness): legs warped in order, each PE_WARP_DWELL
+     * presents after the previous leg's room is entered. */
+    struct { uint32_t token, story; int set_story; } legs[64];
+    int nlegs, leg;
+    uint32_t dwell, arrive_token, arrive_from;
     unsigned wins, kits, warps;
     uint32_t ammo_gun, ammo_loaded_max, ammo_pool_max[3];
     char toast[64]; int toast_frames;
@@ -147,9 +152,66 @@ uint32_t pe_plat_cheats_room_token(const char *room)
     return (end != room && *end == '\0') ? (uint32_t)n : 0u;
 }
 
+/* PE_WARP_ROUTE="m0351i:80,m0042i:88,m0043i,..." (dev harness): a chain of
+ * env warps.  Each leg goes through the same field-VM room_transfer; a leg
+ * without ":story" keeps the story word.  The next leg is armed
+ * PE_WARP_DWELL presents (default 1500) after the previous leg's room is
+ * entered, and every entry is logged as "[WARP] route arrived".  Returns the
+ * number of legs (0 = not set or malformed). */
+static int load_env_route(void)
+{
+    const char *s = getenv("PE_WARP_ROUTE"), *dw = getenv("PE_WARP_DWELL");
+    char buf[16];
+    if (!s || !*s) return 0;
+    C.nlegs = 0;
+    while (*s) {
+        size_t n = strcspn(s, ",");
+        const char *colon = memchr(s, ':', n);
+        size_t rn = colon ? (size_t)(colon - s) : n;
+        if (rn == 0 || rn >= sizeof buf || C.nlegs == (int)(sizeof C.legs / sizeof C.legs[0])) {
+            fprintf(stderr, "[WARP] PE_WARP_ROUTE malformed at '%s'\n", s);
+            C.nlegs = 0;
+            return 0;
+        }
+        memcpy(buf, s, rn); buf[rn] = '\0';
+        C.legs[C.nlegs].token = pe_plat_cheats_room_token(buf);
+        if (!C.legs[C.nlegs].token) {
+            fprintf(stderr, "[WARP] PE_WARP_ROUTE room %s not understood\n", buf);
+            C.nlegs = 0;
+            return 0;
+        }
+        C.legs[C.nlegs].set_story = colon != NULL && colon + 1 < s + n;
+        C.legs[C.nlegs].story = C.legs[C.nlegs].set_story ? (uint32_t)strtoul(colon + 1, NULL, 16) : 0u;
+        C.nlegs++;
+        s += n;
+        if (*s == ',') s++;
+    }
+    C.dwell = dw && *dw ? (uint32_t)strtoul(dw, NULL, 10) : 1500u;
+    C.leg = 0;
+    C.env_token = C.legs[0].token;
+    C.env_set_story = C.legs[0].set_story;
+    C.env_story = C.legs[0].story;
+    fprintf(stderr, "[WARP] route armed legs=%d dwell=%u\n", C.nlegs, (unsigned)C.dwell);
+    return C.nlegs;
+}
+
 static void load_env_warp(void)
 {
     const char *r = getenv("PE_WARP_ROOM"), *st = getenv("PE_WARP_STORY"), *at = getenv("PE_WARP_AT");
+    if (getenv("PE_WARP_ROUTE") && *getenv("PE_WARP_ROUTE")) {
+        if (!pe_plat_cheats_dev_menu_enabled()) {
+            fprintf(stderr, "[WARP] PE_WARP_ROUTE ignored: dev-only (needs PE_DEV_MENU=1)\n");
+            return;
+        }
+        if (!load_env_route()) return;
+        C.env_at = at ? (uint32_t)strtoul(at, NULL, 10) : 0u;
+        {
+            const char *dsc = getenv("PE_WARP_DISC");
+            C.env_disc = dsc ? atoi(dsc) : 0;
+        }
+        C.env_warp = 1;
+        return;
+    }
     if (!r || !*r) return;
     if (!pe_plat_cheats_dev_menu_enabled()) {
         fprintf(stderr, "[WARP] PE_WARP_ROOM ignored: dev-only (needs PE_DEV_MENU=1)\n");
@@ -488,6 +550,24 @@ void pe_plat_cheats_apply(void)
         toast(msg);
         C.pending_kit = 0;
     }
+    if (C.arrive_token) {
+        /* Arrived = the destination is the current room AND its field loop
+         * has restarted (D_8009CDA4 counts ticks since the room load) and run
+         * >= 30 ticks; the token alone is latched by the transfer request. */
+        int presented = 0;
+        uint32_t ticks = PE_LoadU32(0x8009CDA4u);
+        HostFB_GetState(NULL, NULL, &presented, NULL);
+        if (PE_LoadU32(GA_ROOM_CUR) == C.arrive_token && PE_LoadU32(GA_TOKEN) == C.arrive_token
+            && (uint32_t)presented >= C.arrive_from + 60u && ticks >= 30u
+            && ticks <= (uint32_t)presented - C.arrive_from) {
+            fprintf(stderr, "[WARP] route arrived leg=%d token=%08X story=%08X frame=%d ticks=%u vm=%08X\n",
+                    C.env_warp ? C.leg : C.nlegs, (unsigned)C.arrive_token,
+                    (unsigned)PE_LoadU32(GA_STORY), presented, (unsigned)ticks,
+                    (unsigned)PE_LoadU32(0x8009CE00u));
+            C.arrive_token = 0u;
+            if (C.env_warp) C.env_at = (uint32_t)presented + C.dwell;
+        }
+    }
     if (C.env_warp) {
         int presented = 0;
         HostFB_GetState(NULL, NULL, &presented, NULL);
@@ -514,6 +594,18 @@ void pe_plat_cheats_apply(void)
                 fprintf(stderr, "[WARP] env transfer %08X -> %08X story=%08X frame=%d\n",
                         (unsigned)tok, (unsigned)C.env_token,
                         (unsigned)PE_LoadU32(GA_STORY), presented);
+                if (C.nlegs) {
+                    C.arrive_token = C.env_token;
+                    C.arrive_from = (uint32_t)presented;
+                    if (C.leg + 1 < C.nlegs) {      /* next leg waits for this arrival */
+                        C.leg++;
+                        C.env_token = C.legs[C.leg].token;
+                        C.env_set_story = C.legs[C.leg].set_story;
+                        C.env_story = C.legs[C.leg].story;
+                        C.env_at = 0xFFFFFFFFu;
+                        C.env_warp = 1;
+                    }
+                }
             } else if (r < 0) {
                 C.env_warp = 0;
                 fprintf(stderr, "[WARP] env transfer unavailable (%d)\n", r);
