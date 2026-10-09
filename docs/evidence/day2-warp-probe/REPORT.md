@@ -942,7 +942,7 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
       player is inside, flags the actor.
     A C match is in progress; the GTE loops and structure already line
     up. The 0x2F4 (Disc 2) sweep is running.
-  - 00:45 CT (2026-10-09): story 0x2F4 (Disc 2, PE_WARP_DISC=2) sweep:
+  - 00:41 CT (2026-10-09): story 0x2F4 (Disc 2, PE_WARP_DISC=2) sweep:
     382 clean, 20 unused, 0 stopping. Totals per story point (402 slots
     each, 4000 frames): 0x1B0 382/20/0, 0x220 382/20/0, 0x2D6 381/20/1
     (m0350i), 0x2F4 382/20/0.
@@ -954,7 +954,7 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
       (`MASPSX_NARROW_SHIFTED_ANY_DEST`). Without it, retail's
       `lh $2,2($2)` / `sra $18,$2,5` cannot come out of cc1's
       `lw` / `sra $18,$2,21`.
-      - K3c has a unit test and goes in after the gate run (k22). The other 12 maspsx unit
+      - K3c has a unit test and went in after the k22 gate run. The other 12 maspsx unit
         failures/errors were there before this change.
       - Nothing turns the flag on, so builds don't change:
         EXACT_REBUILD_GATE[room_m0350i] passes at the same sha1 (e9597b00).
@@ -962,3 +962,19 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
       with CPU_BOUNDARY. That is the expected stop, not a crash.
     - 12000-frame soaks of the busy rooms (19 on Disc 1, 4 on Disc 2;
       bosses and cutscene rooms at their own story points) are running.
+  - 01:11 CT: 12000-frame soaks (frozen fe6a4f0c binary, 2 at a time):
+    - Disc 1, 19 busy rooms (bosses and cutscene rooms at their own story
+      points, 0x128 to 0x2E8): 18 clean to frame 12000. m0350i at 0x2DA
+      hits the same known stop (CPU_BOUNDARY pc 0x80192E4C).
+    - Disc 2 (PE_WARP_DISC=2): m0050i 0x2F0, m0373i 0x2EE, m0318i 0x2F4
+      and m0431i 0x2F4: 4/4 clean to frame 12000.
+    - No new stops.
+  - 01:11 CT: maspsx K3c (`MASPSX_NARROW_SHIFTED_ANY_DEST`, opt-in) and
+    its test are in. No build profile turns it on yet. Gates k22 all
+    PASS:
+    - Day 1 route (frame 67186) and MOVIES_DAY2;
+    - DAY2_ROUTE (frame 18202);
+    - 1645/1645 tests;
+    - rdg OK (20439 files) and psyq PASS;
+    - gdp 1013 TUs with 0 drift, gop up to date;
+    - EXACT_REBUILD_GATE PASS (sha1 452fb033).
