@@ -1030,3 +1030,24 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
     0x3E8/0x7D0, m0373i 0x3E8: **10/10 clean to frame 12000**. No new stops.
     All story points are now 382/20/0: 0x90, 0x140, 0x1B0, 0x220, 0x2D6,
     0x2F4, 0x300, 0x3E8, 0x7D0.
+  - 02:53 CT: release candidate native-only-72b2325d **staged, not published**
+    (needs Will's yes) in the box's release staging folder:
+    - tarball sha256 02a0f45c2830dde6d4fc16fe7c01958983376823c5dd0d2ba5760f2736c775f9;
+    - binary sha256 aad7736d7cc01bc3a42c3d0322cc8f9ff45e6a781b14b19e5bc7a6b6788de927;
+    - retail-data guard OK on all 4 packaged files, psyq guard 0 new,
+      build-info contains_game_data false;
+    - the staged fe6a4f0c is marked superseded-by-72b2325d.
+  - 02:53 CT: Day 3 route gate `pc_port/tools/day3_route_regress.py`, using the
+    Day 2 gate's harness (one dev warp, then only the room scripts drive):
+    - day3_start: m0093i at 0x140, which writes 0x148.
+    - day3_mid: m0108i at 0x188, which writes 0x190.
+    - day3_end: the m0352i Day-4 hop at 0x1B0 goes to m0098i, which writes 0x1B8.
+
+    All three pass (DAY3_ROUTE=PASS); DAY2_ROUTE still PASS. Most of Day 3
+    needs walking or fighting, and the mashing pad can't do that:
+    - m0092i and m0360i at 0x140 just wait;
+    - m0123i at 0x190 is a fight that the pad loses, which ends in a game
+      over.
+
+    So the gate covers only the script-driven stretches. A full Day 3
+    route needs recorded pad input, like the Day 1 gate.

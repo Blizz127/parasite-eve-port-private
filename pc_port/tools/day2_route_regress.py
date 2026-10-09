@@ -59,8 +59,8 @@ def pad_script() -> str:
     return ",".join(f"{i * 40}:{seq[i % 4]}" for i in range(1020))
 
 
-def run_segment(name: str, seg: dict, a, disc: str, disc2: str | None) -> bool:
-    log = os.path.join(a.log_dir, f"day2-{name}.log")
+def run_segment(name: str, seg: dict, a, disc: str, disc2: str | None, prefix: str = "day2") -> bool:
+    log = os.path.join(a.log_dir, f"{prefix}-{name}.log")
     env = dict(os.environ, PE_PAD_SCRIPT=pad_script(), PE_DEV_MENU="1",
                PE_WARP_ROOM=seg["room"], PE_WARP_STORY=seg["story"], PE_WARP_AT="1000")
     cmd = [a.bin, "--headless", "--route-pad", "--hand-over-at", "1000",
