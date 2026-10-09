@@ -818,7 +818,7 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
     `$3` vs `$2`; `mfhi`/`mflo $8` vs `$9` (the `register asm("$8")` on the
     matrix pointer); case 1 `la $16` placement; case 2 absolute vs
     `-6($16)` for the f2 read and absolute vs `-4($16)` for the f4 store.
-  - 15:25 CT: m0437i 0x80192500 down to 26 words. Case 2 now uses a
+  - 15:00 CT: m0437i 0x80192500 down to 26 words. Case 2 now uses a
     loop note after `s = &D_800F3368.f8` plus a second one before the
     f10 store (hill climb over statement order and struct vs standalone
     symbols), so `$4 = 0` fills the dispatch delay slot and the f8 store
@@ -838,3 +838,24 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
     again. `spill_hard_reg` only leaves a pseudo in place if it is local
     to one block, and this pointer spans head -> case 0, so retail's
     exact mechanism for sharing `$8` is still open.
+  - 21:20 CT (work done 15:05-15:30 CT, then a 6 h stall): m0437i
+    func_80192500 LINK_EXACT (overlay exact gate PASS, room SHA-1
+    unchanged). The `$8` reuse came from retail's rotation-matrix macro: its
+    asm text loads `$8` in one statement and the next macro reads it, and
+    neither tells cc1. Because cc1 never sees `$8` in use, it gives `$8` to
+    the mfhi/mflo reloads. The last 16 words were constant placement: the
+    2 / 16 stores in cases 1 and 2 are reloads that sched2 hoists ahead of
+    `la $16`, which empty tied asms with constant inputs reproduce
+    (`asm("" : "=r"(k16), "=r"(s) : "0"(16), "1"(&D_800F3368.f8))`).
+    Generator changes (with tests):
+    - guest_lower: a GPR an asm reads without writing or declaring it is
+      carried in a function-scope `pe_hrN`. It is refused unless an
+      earlier asm wrote it with no call in between. Retail is checked:
+      only branches separate the `$8` load from its reuse.
+    - gen_decomp_ports: tied moves with constant or address inputs now
+      become assignments. Before this they were deleted as fences, which
+      left m0348i func_801918E8's `b` uninitialised in its port (stores
+      through `b` went to a garbage address). That port now sets
+      `v_b = 0x80192E8C`.
+    m0437i now runs to the frame limit at story 0x90, 0x140 and 0x300
+    (Disc 2). Full gates running before the code commit.
