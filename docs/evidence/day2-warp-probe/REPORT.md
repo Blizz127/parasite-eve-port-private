@@ -931,3 +931,14 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
     in the room loader (func_8006B4F8) on the warp frame. At 0x2D6 the
     garbage address is 0x8F2ECF29 instead of 0xFC913DA8, but the code
     path is the same.
+  - 00:32 CT: story 0x2D6 (Day 6) sweep: 381 clean, 20 unused, **1
+    stopping**: m0350i, a CPU_BOUNDARY at pc 0x80192E4C. That is an effect
+    callback (`func_800CE560` pool task) still in asm (room span 0x3E64,
+    0x7C0 bytes, inline GTE). Mode 2 does three things:
+    - draws a sprite trail down to the floor (func_800CEE20) and two
+      func_800D0E88 effects;
+    - draws a func_800D0728 model;
+    - runs a 4-edge nclip test on the player's position, and if the
+      player is inside, flags the actor.
+    A C match is in progress; the GTE loops and structure already line
+    up. The 0x2F4 (Disc 2) sweep is running.
