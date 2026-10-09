@@ -1440,7 +1440,10 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
       m0141i copies too). Copied as room_m0152i func_80192D24 with local data
       D_8018F1CC/D_8018F1D4 and a local profile
       room_m0152i_dispatch_8018F1DC_8018F1F4_div. EXACT_REBUILD_GATE PASS.
-      (m0419i 0x4F7C and m0421i 0x1D74 hold the same body, not yet split.)
+      Same body set up for room_m0419i func_80193F64 (D_8018F1E4/D_8018F1EC,
+      jtbl_8018F1F4/jtbl_8018F20C) and room_m0421i func_80190D5C
+      (D_8018F00C/D_8018F014; header split 0x34-0x64 rodata for
+      jtbl_8018F01C/jtbl_8018F034). EXACT_REBUILD_GATE PASS for both.
     - m0152i now runs clean through its battle (win, frame 3741). East
       side: quad 9 (x 920..1050 z -1400..-1185) is a Cross + facing
       A00..E00 interaction (op_5E). The pilot's diagonal stop left rot 0x800
@@ -1448,12 +1451,52 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
       Aya's z (-1399). The press now sends msg 9 and module 0 runs its
       handler (op_B8 to 1422,-1256 on actors 0x15/0x16, op_EA, op_2F 0x12,
       op_4D), then msg 9 to module 3.
-    - Blocker: after that scene Aya is still held at x ~981 at the green
-      cabinet. The east pocket (quad 2, x 1050..1300 -> m0153i) is never
-      reached and no text box shows. Open question: is this a native-op
-      bug (the scene's op_B8/op_EA/op_4D move of actors 0x15/0x16 does
-      nothing visible), or does the scene need a precondition (item or
-      flag) not yet set on this route? Next: trace module 3's msg-9 path
-      and the actor 0x15/0x16 positions through the scene.
+    - Cabinet scene traced (2026-10-09 PM): msg 9 is an examine. Module 0
+      turns the camera (op_B8 is the camera turn-to-point, not a walk; its
+      quick ret=1 is normal), plays anim 0x12, and tells module 3, whose msg-9
+      branch only restarts its quad-9 task (op_12 0x170). No port bug there.
+    - m0152i module 3 layout (op_12 starts a sub-task at 0x801BE154 + 2*arg):
+      0x20E quad 1 (south exit), 0x4AA quad 2 (east pocket -> room_transfer
+      m0153i), 0x2A6 quads 3/4/5 (north desk chain msg 3 -> 4 -> 5 / 0xA),
+      0x170 quad 9 (cabinet examine), 0x5D2 quad 8, 0x51C quad 7. Init:
+      persist[0x41] bit 0x8000000 set -> quad 9 + desk tasks, object 1 pose 5;
+      clear -> object 1 pose 0, then persist[0x42] bit 0x80 clear -> show
+      object 0x13, object 4 pose 5, pocket task. On this route (persist
+      0x41=17C1FFEF, 0x42=23C, 0x43=408D) only quad 1, the pocket and quad 8
+      run. The desk chain is unreachable here, and bit 0x8000000 is set
+      either by the desk chain or from m0153i (801C26D8).
+    - SOLVED (no port bug, missing in-room puzzle): the branch polarity
+      above was backwards (op_09 alu 7 sets var1 = (var0 == 0)). Fresh state
+      = persist[0x41] bit 0x8000000 clear -> op_80 0x13 sets the 0x80
+      "blocked" bit on floor triangle 19 (the pocket mouth; the stop at
+      x ~980 is triangle 19's edge at x ~1046 minus Aya's radius) and starts
+      the north desk chain. Route: quad 3 x 100..250 z 950..1050 Cross facing
+      north -> msg 3; quad 4 x 160..240 Cross facing east -> msg 4 (persist
+      0x41 bit 0x8000000, the scene walks Aya to 380,996); quad 5 Cross facing
+      north -> msg 5 (persist 0x42 bit 0x80, op_81 0x13 clears triangle 19).
+      Then the east pocket -> m0153i (frame 8557 from the m0150i start).
+    - m0153i: 0x80193A70 stop = the same E21 arity skip (func_801941D0 ->
+      (o)); fixed together with its twins m0399i func_80193560 and m0401i
+      func_801946B4. 0x80194810 stop = body twin of m0141i func_80191330;
+      set up in m0153i, m0412i (func_801947C0) and m0414i (func_801912CC).
+      EXACT_REBUILD_GATE PASS for all. Then the east corridor -> m0154i.
+    - m0154i (0x1F0): zones A (x 600..1050 z -1300..-900) -> B (x 1051..1350
+      z -950..-660) send msg 0xB -> story 0x1F4. At 0x1F4: the panel quad
+      x -250..-160 z -820..-700 (Cross facing north, msg 4) opens the way
+      north; quad 2 x -200..200 z -700..-300 -> story 0x1F6, m0271i, which
+      runs through to m0155i at 0x1F8 by itself.
+    - m0155i (0x1F8): the south exit triangle 0xE is blocked; Cross facing
+      south at quad 2 x -250..-167 z -200..-139 (module 2 msg 2, op_81 0xE)
+      opens it -> m0156i (frame 17159).
+    - m0156i: a forced battle in the module 3 encounter zone (battle end, msg
+      0xFD -> payload 1 -> m0380i). BLOCKER: battle effect callback
+      CPU_BOUNDARY/REFUSED pc=0x80190F94 ra=@800D413C:effect = room_m0156i
+      blob 0x1FAC, 0xC00 bytes, still asm and with no body twin in any room
+      (needs a hand match).
+    - Notes: m0157i (sets 0x200) is not named by any room script or blob,
+      so its entry is outside the room scripts (m0380i side or an engine
+      table); still to trace. Other off-route E21 arity skips still open:
+      m0269i 8018F6BC, m0273i 80192D50/80192E64, m0318i 80192560, m0401i
+      8018F214, m0429i 801926B4/80192BC0.
     - Then: m0152i -> m0153i -> m0154i (0x1F4, item 0xDA) -> m0157i (0x200)
       -> 0x220.
