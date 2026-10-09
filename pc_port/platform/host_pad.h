@@ -1,5 +1,7 @@
 /*
- * Host gamepad input — Linux kernel joystick API (/dev/input/js*).
+ * Host gamepad input — SDL2 GameController (host_pad_sdl.h, dlopened) with the
+ * Linux kernel joystick API (/dev/input/js*) as the fallback when SDL2 is
+ * missing or sees no controller.
  *
  * Zero new link dependencies: uses only <linux/joystick.h> and plain
  * open/read/ioctl.  Devices are opened non-blocking and rescanned about once

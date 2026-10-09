@@ -420,6 +420,8 @@ static int resize_image(int width, int height)
     return 0;
 }
 
+static const char *host_env(const char *name) { return getenv(name); }
+
 int HostWindow_Open(const char *display, int width, int height,
                     const char *title, int scale, int fullscreen)
 {
@@ -435,7 +437,9 @@ int HostWindow_Open(const char *display, int width, int height,
     /* Use scale to determine visible size: framebuffer is 320×240, scale × that */
     g_fb_w = PE_PORT_FB_WIDTH;
     g_fb_h = PE_PORT_FB_HEIGHT;
-    g_fullscreen = fullscreen != 0;
+    g_fullscreen = HostWindow_WantFullscreen(fullscreen, host_env);
+    if (g_fullscreen && !fullscreen)
+        fprintf(stderr, "[WINDOW] gamescope/Steam Game Mode detected: fullscreen (PE_FULLSCREEN=0 to disable)\n");
     if (g_fullscreen) {
         /* Size to the screen; HostWindow_Blit/ScaleBGRA letterbox the
          * 320x240 source into whatever the WM/compositor gives us, and
@@ -450,7 +454,7 @@ int HostWindow_Open(const char *display, int width, int height,
 
     g_win = XCreateSimpleWindow(g_dpy, root, g_fullscreen ? 0 : 200,
                                  g_fullscreen ? 0 : 200, g_win_w, g_win_h,
-                                 g_fullscreen ? 0 : 4, 0xFFFFFF, 0x000000);
+                                 0, 0x000000, 0x000000);   /* no X border (was a 4px white one), black background */
     g_fast_forward=0;g_speed_key_held=0;g_ff_active=0;g_pad_hotkeys=0;
     g_vblank_paced=0;g_last_vblank_ns=0;
     ftrace_init();
@@ -458,7 +462,15 @@ int HostWindow_Open(const char *display, int width, int height,
     XSelectInput(g_dpy, g_win, ExposureMask | KeyPressMask | (1L<<1) | StructureNotifyMask | FocusChangeMask);
     g_wm_delete = XInternAtom(g_dpy, "WM_DELETE_WINDOW", 0);
     XSetWMProtocols(g_dpy, g_win, &g_wm_delete, 1);
-    if (g_fullscreen) request_fullscreen(0); /* property, before map */
+    if (g_fullscreen) {
+        /* Motif hints: no decorations, so a WM that ignores
+         * _NET_WM_STATE_FULLSCREEN (or gamescope's XWayland) shows no frame. */
+        Atom motif = XInternAtom(g_dpy, "_MOTIF_WM_HINTS", 0);
+        long hints[5] = {2 /* MWM_HINTS_DECORATIONS */, 0, 0, 0, 0};
+        if (motif) XChangeProperty(g_dpy, g_win, motif, motif, 32, PropModeReplace,
+                                   (const unsigned char *)hints, 5);
+        request_fullscreen(0); /* property, before map */
+    }
     XMapWindow(g_dpy, g_win);
     if (g_fullscreen) request_fullscreen(1); /* ClientMessage, after map */
 

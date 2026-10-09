@@ -2,6 +2,7 @@
  * Host gamepad input via the Linux kernel joystick API.  See host_pad.h.
  */
 #include "host_pad.h"
+#include "host_pad_sdl.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -259,6 +260,7 @@ void HostPad_Poll(void)
         const char *s = getenv("PE_PAD_DEBUG");
         g_debug = (s && *s && *s != '0') ? 1 : 0;
     }
+    HostPadSDL_Poll();   /* SDL2 GameController first; js* below is the fallback */
     if (!g_scanned_once || t - g_last_scan >= HOST_PAD_SCAN_NS) {
         g_scanned_once = 1;
         g_last_scan = t;
@@ -293,9 +295,12 @@ void HostPad_Poll(void)
     }
 }
 
+/* SDL devices win; the js* nodes count only while SDL has none open (the
+ * same physical pad would otherwise be read twice). */
 uint16_t HostPad_Held(void)
 {
-    uint16_t held = 0;
+    uint16_t held = HostPadSDL_Held();
+    if (HostPadSDL_Count() > 0) return held;
     for (int i = 0; i < HOST_PAD_MAX_DEVICES; i++)
         if (g_slots[i].fd >= 0) held |= HostPad_DeviceHeld(&g_slots[i].dev);
     return held;
@@ -303,7 +308,8 @@ uint16_t HostPad_Held(void)
 
 uint8_t HostPad_Hotkeys(void)
 {
-    uint8_t hk = 0;
+    uint8_t hk = HostPadSDL_Hotkeys();
+    if (HostPadSDL_Count() > 0) return hk;
     for (int i = 0; i < HOST_PAD_MAX_DEVICES; i++)
         if (g_slots[i].fd >= 0) hk |= HostPad_DeviceHotkeys(&g_slots[i].dev);
     return hk;
@@ -311,6 +317,7 @@ uint8_t HostPad_Hotkeys(void)
 
 void HostPad_Close(void)
 {
+    HostPadSDL_Close();
     for (int i = 0; i < HOST_PAD_MAX_DEVICES; i++) {
         if (g_slots[i].fd >= 0) close(g_slots[i].fd);
         g_slots[i].fd = -1;

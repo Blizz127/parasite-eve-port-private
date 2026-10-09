@@ -40,3 +40,10 @@ These are needed only once PsyCross is integrated:
 | SDL2 | zlib | PsyCross window and pad backend |
 | OpenAL-soft | LGPL-2.0 | Dynamic link only. The default audio stays in-house (`pe_spu` + `host_audio`). |
 | OpenGL | platform | PsyCross GPU backend |
+
+## Controller input (shipped in the preview package)
+
+| component | licence | note |
+|---|---|---|
+| SDL2 (`libSDL2-2.0.so.0`) | zlib | System library, dlopened at runtime by `platform/host_pad_sdl.c` (GameController + Joystick only, no SDL window). Not bundled; the `/dev/input/js*` path is used when it is missing. |
+| SDL_GameControllerDB (`third_party/SDL_GameControllerDB/gamecontrollerdb.txt`) | zlib | Vendored mapping file, installed as `bin/gamecontrollerdb.txt` by `package_preview.sh`. Source commit in that directory's README.md. |

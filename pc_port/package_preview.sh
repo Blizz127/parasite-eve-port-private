@@ -46,6 +46,9 @@ mkdir -p "$STAGE/bin"
 
 install -m 0755 "$BINARY" "$STAGE/bin/parasite-eve-port"
 strip --strip-unneeded "$STAGE/bin/parasite-eve-port" 2>/dev/null || true
+# SDL_GameControllerDB mappings (zlib), read by the SDL2 pad backend from the exe dir.
+install -m 0644 "$ROOT/pc_port/third_party/SDL_GameControllerDB/gamecontrollerdb.txt" "$STAGE/bin/gamecontrollerdb.txt"
+install -m 0644 "$ROOT/pc_port/third_party/SDL_GameControllerDB/LICENSE" "$STAGE/bin/gamecontrollerdb-LICENSE.txt"
 
 cat > "$STAGE/parasite-eve-preview" <<'LAUNCHER'
 #!/usr/bin/env bash
@@ -133,25 +136,37 @@ Fast-forward while held  -                        R3 (click right stick)
 Quit                     Esc                      -
 
 Keyboard and controller work at the same time. Controllers are read
-through the Linux joystick interface (/dev/input/js*) and may be plugged in
-or removed while the game runs; up to four are merged. This covers Xbox
-pads, Steam Deck / Legion Go built-in controls and anything Steam Input or
-Handheld Daemon (HHD) presents as an Xbox controller.
+through SDL2's GameController API (libSDL2-2.0.so.0, loaded at runtime) with
+the SDL_GameControllerDB mappings (bin/gamecontrollerdb.txt), so Xbox,
+PlayStation, Switch Pro, 8BitDo, Steam Deck / Legion Go / ROG Ally built-in
+controls, Steam Input's virtual pad and Handheld Daemon (HHD) pads all use
+the layout above. Pads may be plugged in or removed while the game runs.
+A device SDL has no mapping for is read as a raw joystick (buttons in Xbox
+order, D-pad hat, left stick). Without SDL2 the game falls back to the Linux
+joystick interface (/dev/input/js*).
+
+Under Steam Game Mode / gamescope the game starts fullscreen (black bars
+keep the 4:3 picture); PE_FULLSCREEN=0 keeps a window, PE_FULLSCREEN=1 or
+--fullscreen forces fullscreen anywhere.
 
 Fast-forward runs the game uncapped and mutes the sound (it fades out and
 back in, so there is no chipmunk audio or static); the window title shows
 the active speed.
 
 Controller environment variables:
-  PE_JOYSTICK=/dev/input/js1   use only this device (default: js0..js7)
-  PE_JOYSTICK=off              ignore controllers
-  PE_PAD_SWAP_XY=1             swap Square/Triangle (pads whose driver
-                               reports X/Y the other way round)
-  PE_PAD_DEBUG=1               print raw controller events and the pad word
+  PE_PAD_SDL=off               skip SDL2, use /dev/input/js* only
+  PE_GAMECONTROLLERDB=file     extra SDL mapping file (also read:
+                               ~/.config/parasite-eve-port/gamecontrollerdb.txt)
+  PE_PAD_RAW_MAP=c,o,s,t,l1,r1,l2,r2,select,start
+                               button indices for an unmapped raw joystick
+                               (Cross,Circle,Square,Triangle,...; -1 = none)
+  PE_JOYSTICK=/dev/input/js1   js fallback: use only this device
+  PE_JOYSTICK=off              js fallback: off
+  PE_PAD_SWAP_XY=1             swap Square/Triangle
+  PE_PAD_DEBUG=1               print controller devices and the pad word
 e.g.  PE_PAD_DEBUG=1 ./parasite-eve-preview disc1.bin
-If no controller is detected, check `ls -l /dev/input/js*` exists and is
-readable by your user. If Steam is running, it may hide the physical pad and
-expose a virtual one instead — either works.
+In Steam, a non-Steam game shortcut gets Steam Input's virtual pad; set the
+controller layout to "Gamepad" if Steam shows a desktop/mouse layout.
 
 KNOWN LIMITS
 ------------
@@ -160,7 +175,8 @@ __LIMITS__
 RUNTIME REQUIREMENTS
 --------------------
 64-bit Linux with glibc and libX11.so.6 (loaded at runtime; present on
-Bazzite / SteamOS / any desktop distro). Sound uses libpulse-simple.so.0
+Bazzite / SteamOS / any desktop distro). Controllers use libSDL2-2.0.so.0
+when present (Bazzite / SteamOS ship it). Sound uses libpulse-simple.so.0
 (PipeWire's pulse compatibility provides it; the game is silent without
 it). No other libraries needed. PE_AUDIO_LATENCY_MS=150 raises the audio
 buffer (default 100 ms) if sound crackles on a busy system.
