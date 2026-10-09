@@ -865,3 +865,6 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
     that binary (402 slots, 2 at a time, 4000 frames), story 0x90: 382
     clean, 20 unused (the same 20 slots fault at 0xFC913DA8 as before),
     0 stopping. 0x140 and 0x300 (Disc 2) are running.
+  - 22:12 CT: story 0x140 sweep at 373/402 slots: 353 clean, 20 unused,
+    0 stopping so far. Gates are being re-run (k19) for a release-candidate
+    stage. Staged only, not published: a public release needs Will's yes.
