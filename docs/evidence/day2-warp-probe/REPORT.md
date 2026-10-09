@@ -1004,7 +1004,7 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
     stopping**. m0350i is frame-limit (was the sole Day 6 stop). Later-
     story totals are now all 382/20/0: 0x1B0, 0x220, 0x2D6, 0x2F4.
     Story 0x90 / 0x140 / 0x300 remain 382/20/0 from earlier sweeps.
-  - 02:02 CT: full gates k23 on the func_80192E4C install (b2dd55a9..e473c197), all PASS:
+  - 02:00 CT: full gates k23 on the func_80192E4C install (b2dd55a9..e473c197), all PASS:
     - Day 1 route (frame 67186) and MOVIES_DAY2;
     - DAY2_ROUTE (frame 18202);
     - 1645/1645 tests;
@@ -1017,3 +1017,5 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
       0x300+ story values are written anywhere (max assigned is 0x2F4), so
       these two are the late-game points. 0x3E8 so far: 272 slots, 262
       clean, 10 unused, 0 stopping.
+  - 02:14 CT: story 0x3E8 (Disc 2, 4000 frames, 402 slots): **382 clean,
+    20 unused, 0 stopping**. 0x7D0 sweep in progress (54/402 clean so far).
