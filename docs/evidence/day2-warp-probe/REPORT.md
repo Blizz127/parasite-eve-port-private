@@ -1023,3 +1023,10 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
     9 unused, 0 stopping. Queued after it: 12000-frame Disc 2 soaks of
     late-game rooms (m0318i/m0431i/m0351i/m0352i/m0050i/m0373i at
     0x2F4/0x3E8/0x7D0, including m0431i, the last story writer at 0x7D0).
+  - 02:41 CT: story 0x7D0 (Disc 2, 4000 frames, 402 slots): **382 clean, 20
+    unused, 0 stopping**. Late-game 12000-frame Disc 2 soaks (pcbuild-disc
+    binary with func_80192E4C, 2 at a time): m0318i 0x3E8, m0431i 0x3E8,
+    m0431i 0x7D0, m0351i 0x2F4/0x3E8, m0352i 0x2F4/0x3E8, m0050i
+    0x3E8/0x7D0, m0373i 0x3E8: **10/10 clean to frame 12000**. No new stops.
+    All story points are now 382/20/0: 0x90, 0x140, 0x1B0, 0x220, 0x2D6,
+    0x2F4, 0x300, 0x3E8, 0x7D0.
