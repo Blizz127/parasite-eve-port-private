@@ -1142,3 +1142,17 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
     - Open: in m0099i, the 0x1000 object at (-494,-321) is examined facing -z
       from the +z side. The diagonal and z=-100/-267 lanes west are walled;
       testing other lanes.
+  - 05:05 CT: Day 3 pilot (harness only, no runtime change).
+    - m0099i solved. The 0x1000 object (-494,-321) is a type-2 actor with a
+      300-unit collision radius, so walking into it from the side never
+      faced it. Touching it from due north while pushing -z, with Cross
+      pulses, sets p2C 0x1000.
+    - Waypoint suffixes now parse in either order (`!N~M`), and a timeout
+      also runs the waypoint's action.
+    - Battle approach fix: Aya (chain type 0) was counted as the nearest live
+      actor, so she never walked toward the enemies. She is now excluded.
+    - New debug switches (scratch output only): PE_D3_FLOOR_DUMP dumps the
+      live floor mesh (0x8009D1FC) for offline path planning, and
+      PE_D3_ACTORS logs the actor chain.
+    - Open: one m0100i formation still stalls at about (-326,-2807) with a
+      full AT bar and no target; diagnosing.

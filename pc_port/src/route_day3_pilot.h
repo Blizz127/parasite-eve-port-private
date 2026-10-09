@@ -51,8 +51,11 @@ static void D3Parse(void)
             w->z = (int)strtol(s + 1, &end, 10); s = end;
             w->r = 100;
             if (*s == ',') { w->r = (int)strtol(s + 1, &end, 10); s = end; }
-            if (*s == '!') { w->act = (int)strtol(s + 1, &end, 10); s = end; }
-            if (*s == '~') { w->tmo = (int)strtol(s + 1, &end, 10); s = end; }
+            while (*s == '!' || *s == '~') {   /* suffixes in either order */
+                int v = (int)strtol(s + 1, &end, 10);
+                if (*s == '!') w->act = v; else w->tmo = v;
+                s = end;
+            }
             e->n++;
             if (*s == ';') s++;
         }
@@ -112,21 +115,32 @@ static uint16_t RouteDay3Pilot(uint16_t script_mask)
                 last_hp = (int)PE_LoadU16(rec + 12u);
             }
             uint16_t m = RouteBattleShim();
+            if (getenv("PE_D3_ACTORS") && (g_frame % 600) == 9) {   /* debug: chain in battle */
+                pe_addr_t a = PE_LoadU32(0x8009D20Cu);
+                for (unsigned i = 0; a && i < 64u && PE_RangeIsRam(a, 64u); i++, a = PE_LoadU32(a + 4u)) {
+                    pe_addr_t b = PE_LoadU32(a);
+                    fprintf(stderr, "[D3BACT] frame=%d a=%08X type=%u pos=%d,%d y=%d body=%08X hp=%d m=%04X\n", g_frame, (unsigned)a,
+                            PE_LoadU16(a + 12u), (int32_t)PE_LoadU32(a + 40u) >> 16, (int32_t)PE_LoadU32(a + 48u) >> 16,
+                            (int32_t)PE_LoadU32(a + 44u) >> 16, (unsigned)b,
+                            b && PE_RangeIsRam(b, 24u) ? (int)PE_LoadU32(b + 16u) : -1, m);
+                }
+            }
             if (m == 0xFFFFu && mode == 0u && !PE_LoadU32(0x8009E000u) && aya) {
                 /* No target in range: close in on the nearest live actor of
-                 * the field chain (0x8009D20C, next at +4, body hp at +16). */
+                 * the field chain (0x8009D20C, next at +4, type at +12 with 0 = Aya,
+                 * body hp at +16). */
                 int ax2 = (int32_t)PE_LoadU32(aya + 40u) >> 16, az2 = (int32_t)PE_LoadU32(aya + 48u) >> 16;
                 long long bd = -1; int bx = 0, bz = 0;
                 pe_addr_t a = PE_LoadU32(0x8009D20Cu);
                 for (unsigned i = 0; a && i < 64u; i++, a = PE_LoadU32(a + 4u)) {
                     pe_addr_t b = PE_LoadU32(a);
-                    if (a == aya || !PE_RangeIsRam(a, 64u) || !b || !PE_RangeIsRam(b, 24u) ||
+                    if (a == aya || !PE_RangeIsRam(a, 64u) || PE_LoadU16(a + 12u) == 0u || !b || !PE_RangeIsRam(b, 24u) ||
                         (int32_t)PE_LoadU32(b + 16u) <= 0) continue;
                     int x = (int32_t)PE_LoadU32(a + 40u) >> 16, z = (int32_t)PE_LoadU32(a + 48u) >> 16;
                     long long d = (long long)(x - ax2) * (x - ax2) + (long long)(z - az2) * (z - az2);
                     if (bd < 0 || d < bd) { bd = d; bx = x; bz = z; }
                 }
-                if (bd > 250000) m = RouteM34ShimMove(ax2, az2, bx - ax2, bz - az2, 0);
+                if (bd > 22500) m = RouteM34ShimMove(ax2, az2, bx - ax2, bz - az2, 0);
                 if (rec && PE_LoadU16(rec + 16u) >= 9000u && (g_frame % 8) == 3) m &= 0xBFFFu;
             }
             return m;
@@ -154,6 +168,41 @@ static uint16_t RouteDay3Pilot(uint16_t script_mask)
                     g_frame, (unsigned)tok, (unsigned)story, visit, ent, (unsigned)PE_LoadU32(0x800A78A0u));
         }
         cur_tok = tok; cur_story = story;
+    }
+    if (getenv("PE_D3_ACTORS") && (g_frame % 600) == 7) {   /* debug: field actor chain */
+        pe_addr_t a = PE_LoadU32(0x8009D20Cu);
+        for (unsigned i = 0; a && i < 64u && PE_RangeIsRam(a, 64u); i++, a = PE_LoadU32(a + 4u))
+            fprintf(stderr, "[D3ACT] frame=%d a=%08X type=%u pos=%d,%d r=%u\n", g_frame, (unsigned)a,
+                    PE_LoadU16(a + 12u), (int32_t)PE_LoadU32(a + 40u) >> 16, (int32_t)PE_LoadU32(a + 48u) >> 16,
+                    PE_RangeIsRam(a, 0x228u) ? PE_LoadU16(a + 0x224u) : 0u);
+    }
+    {   /* debug: PE_D3_FLOOR_DUMP=<dir> writes the live floor mesh per room (scratch only) */
+        static uint32_t dumped; static int seen_at; const char *dd = getenv("PE_D3_FLOOR_DUMP");
+        if (dd && tok != dumped) {
+            if (!seen_at) seen_at = g_frame;
+            pe_addr_t mesh = PE_LoadU32(0x8009D1FCu);
+            if (g_frame - seen_at > 120 && mesh && PE_RangeIsRam(mesh, 32u)) {
+                int dim = PE_LoadU32(0x8009D1D8u) != 0, nv = PE_LoadU16(mesh), nt = PE_LoadU16(mesh + 4u);
+                pe_addr_t vp = PE_LoadU32(mesh + 24u), tp = PE_LoadU32(mesh + 28u);
+                char path[512]; snprintf(path, sizeof path, "%s/floor_%08X.txt", dd, (unsigned)tok);
+                FILE *f = fopen(path, "w");
+                if (f && PE_RangeIsRam(vp, (uint32_t)nv * 6u) && PE_RangeIsRam(tp, (uint32_t)nt * 28u)) {
+                    fprintf(f, "dim %d nv %d nt %d\n", dim, nv, nt);
+                    for (int i = 0; i < nv; i++) {
+                        pe_addr_t v = vp + (uint32_t)i * (dim ? 6u : 4u);
+                        fprintf(f, "v %d %d\n", (int16_t)PE_LoadU16(v), (int16_t)PE_LoadU16(v + (dim ? 4u : 2u)));
+                    }
+                    for (int i = 0; i < nt; i++) {
+                        pe_addr_t t = tp + (uint32_t)i * (dim ? 28u : 22u) + (dim ? 8u : 2u);
+                        fprintf(f, "t %u %u %u n %d %d %d\n", PE_LoadU16(t), PE_LoadU16(t + 2u), PE_LoadU16(t + 4u),
+                                (int16_t)PE_LoadU16(t + 12u), (int16_t)PE_LoadU16(t + 14u), (int16_t)PE_LoadU16(t + 16u));
+                    }
+                }
+                if (f) fclose(f);
+                dumped = tok; seen_at = 0;
+                fprintf(stderr, "[D3PILOT] floor dump %s nv=%d nt=%d dim=%d\n", path, nv, nt, dim);
+            }
+        }
     }
     if (g_frame < act_until) return (g_frame % 8) == 3 ? 0xBFFFu : 0xFFFFu;
     if (tok == 0xA8000048u && ent >= 0 && g_d3[ent].n > 0) {
@@ -197,7 +246,9 @@ static uint16_t RouteDay3Pilot(uint16_t script_mask)
         static int wp_since, wp_key = -1;
         if (wp_key != ent * 64 + idx) { wp_key = ent * 64 + idx; wp_since = g_frame; }
         if (w->tmo && g_frame - wp_since >= w->tmo) {
-            fprintf(stderr, "[D3PILOT] frame=%d token=%08X wp%d timeout at %d,%d\n", g_frame, (unsigned)tok, idx, ax, az);
+            fprintf(stderr, "[D3PILOT] frame=%d token=%08X wp%d timeout at %d,%d p2C=%08X\n", g_frame, (unsigned)tok, idx, ax, az,
+                    (unsigned)PE_LoadU32(0x800A78A0u));
+            if (w->act) act_until = g_frame + w->act;
             idx++;
             return 0xFFFFu;
         }
