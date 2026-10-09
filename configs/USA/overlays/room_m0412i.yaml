@@ -116,7 +116,7 @@ segments:
       - [0x4C2C, asm]
       - [0x5674, c, func_8019465C]
       - [0x5698, c, func_80194680]
-      - [0x57D8, asm]
+      - [0x57D8, c, func_801947C0]
       - [0x60EC, c, func_801950D4]
       - [0x63E0, c, func_801953C8]
       - [0x6484, bin]
