@@ -108,6 +108,20 @@ class Runtime(CRunner):
             printf("%d %u %08X %08X\\n", r, calls, call_fn, (unsigned)call_a0);""")
         self.assertEqual(out.split("\n")[:2], ["1 0", "0 1 80190370 80100000"])
 
+    def test_deref_of_code_pointer_slot_is_a_load(self):
+        # room_m0145i func_80192678: `(*(void (**)())(a0 + 0xC))(a0)` calls the
+        # code pointer stored at a0+0xC, never the slot address itself.
+        src = """
+        int func_80190000(unsigned char *a0) {
+            (*(void (**)())(a0 + 0xC))(a0);
+            return 0;
+        }"""
+        out = self.run_c(tu(src), """
+            PE_StoreU32(0x8010000Cu, 0x80190370u);
+            func_80190000(0x80100000u);
+            printf("%u %08X %08X\\n", calls, call_fn, (unsigned)call_a0);""")
+        self.assertEqual(out.split("\n")[0], "1 80190370 80100000")
+
     def test_o32_layout_pointer_members(self):
         src = """
         typedef struct S { char a; int *p; short s; char c[3]; struct S *next; } S;

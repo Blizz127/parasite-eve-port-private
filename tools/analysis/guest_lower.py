@@ -804,7 +804,15 @@ class Lowerer:
         args = list(e.args.exprs) if e.args is not None else []
         fn = e.name
         if isinstance(fn, c_ast.UnaryOp) and fn.op == "*":
-            fn = fn.expr
+            if isinstance(fn.expr, c_ast.ID):
+                fn = fn.expr                    # (*f)(...) == f(...)
+            else:
+                # `(*(T (**)())(p + k))(...)`: the operand is a pointer to a
+                # code pointer, so the `*` is a real guest load (only a
+                # function-pointer operand makes it a no-op).
+                c, t = self.rv(fn.expr)
+                if isinstance(t, TPtr) and isinstance(t.to, TFunc):
+                    return self.guest_call(c, args, t.to)
         name = fn.name if isinstance(fn, c_ast.ID) else None
         if name and self.lookup(name) is None and name not in self.globals:
             ft = self.funcs.get(name)

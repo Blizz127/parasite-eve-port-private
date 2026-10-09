@@ -74,3 +74,19 @@ Gate line from the last serial run after this YAML's last change (overlays2 pass
 $ scripts/exact_rebuild_overlay.sh room_m0145i
 EXACT_REBUILD_GATE[room_m0145i]=PASS plan=cd0cf7846b6c75b86f4098b3dded7b381b424ce907211035375b3446e239fa58 yaml=be4c0f8b8c2503234cc4ce217bafe4b3710839aa00e00b214e9a959187c1e514 spans=[51 c, 12 asm, 1 rodata, 2 bin] sha1_orig=8bb899c982ce00e9d43ca6807f0f8aa770f36de7 sha1_cand=8bb899c982ce00e9d43ca6807f0f8aa770f36de7 sha1=8bb899c982ce00e9d43ca6807f0f8aa770f36de7
 ```
+
+## func_8019255C call arity (2026-10-09)
+
+`func_8019255C` declared its callee as `extern void func_80192CBC();` and
+called it with no arguments. Retail passes the handler's object in $a0, and
+the callee is `int func_80192CBC(Obj *o)`. Because of that 0 != 1 arity the
+E21 guest lowering skipped the leaf, so m0332i (which uses room_m0145i's text)
+stopped at CPU_BOUNDARY/REFUSED pc=0x8019255C ra=@8006F6D4:handler+8 on Day 4.
+The call is now `func_80192CBC(o)` with the real prototype. The object
+code is unchanged:
+
+```
+$ scripts/exact_rebuild_overlay.sh room_m0145i
+EXACT_REBUILD_GATE[room_m0145i]=PASS plan=b5cdee95b98a5bc5f19e5572a148c9284e2d10f48a5c2cc658d07a4cc1b9c956 yaml=796f13c424324146f3b2d721c46fe94f89e1281df783ad7e86cedf37d8ef19ff spans=[63 c, 1 asm, 1 rodata, 3 bin] sha1_orig=8bb899c982ce00e9d43ca6807f0f8aa770f36de7 sha1_cand=8bb899c982ce00e9d43ca6807f0f8aa770f36de7 sha1=8bb899c982ce00e9d43ca6807f0f8aa770f36de7
+```
+

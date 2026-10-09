@@ -34,3 +34,19 @@ Gate line from the last serial run after this YAML's last change (overlays2 pass
 $ scripts/exact_rebuild_overlay.sh room_m0141i
 EXACT_REBUILD_GATE[room_m0141i]=PASS plan=10366a0162e8321944b7e0b97c9123fa30fd937601b957bbb2d3f05d0e2fbe45 yaml=2324d20d0f088d6e615efb71fa856b473ed591b20f45f79d56e270fcd37abeda spans=[20 c, 7 asm, 0 rodata, 2 bin] sha1_orig=63c6c6ceb406be45d2a1d23a6bc0bb8dcd45b0fc sha1_cand=63c6c6ceb406be45d2a1d23a6bc0bb8dcd45b0fc sha1=63c6c6ceb406be45d2a1d23a6bc0bb8dcd45b0fc
 ```
+
+## Day 4 hand matches (2026-10-09)
+
+Both are hand-matched (LINK_EXACT at the room VMA) and fix Day 4 stops in
+m0328i, which uses room_m0141i's text.
+
+| offset | leaf | profile | notes |
+| --- | --- | --- | --- |
+| 0x1564 | `func_8019054C` | `room_m0141i_dispatch_8018F054_8018F06C_div` (local) | particle callback, body twin of room_m0137i `func_8019018C` (only D_8018F044/D_8018F04C and the jump tables move). Jump tables split out as `[0x6C, rodata]` (pool for MASPSX_DISPATCH_FOLD). |
+| 0x2348 | `func_80191330` | era_o2_g0 | m0328i battle effect (stop pc=0x80191330 ra=@800D413C:effect). Levers: switch(mode) with cases ordered 0, 1, 2; a signed n16 local; `i` reused for rsin, angle and the loop; D_800E11E8 as one struct; D_800F3372/4 separate; `sv` declared block-local; x, y, z store order. |
+
+```
+$ scripts/exact_rebuild_overlay.sh room_m0141i
+EXACT_REBUILD_GATE[room_m0141i]=PASS plan=62032364c2af2647423cf97da8dc00aeb99d1c0fa47d576bf49345a61212d5f1 yaml=0da4f28e71c1354f636f8a1b19a28dc11263370f4628702546fb8fb3d05a5714 spans=[32 c, 0 asm, 1 rodata, 3 bin] sha1_orig=63c6c6ceb406be45d2a1d23a6bc0bb8dcd45b0fc sha1_cand=63c6c6ceb406be45d2a1d23a6bc0bb8dcd45b0fc sha1=63c6c6ceb406be45d2a1d23a6bc0bb8dcd45b0fc
+```
+

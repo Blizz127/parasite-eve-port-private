@@ -15,7 +15,10 @@
  *            TOKEN@MINSTORY&MASK: only while persist[0x2C] has all MASK bits;
  *            TOKEN@MINSTORY&SLOT:MASK: the same test on persist[SLOT])
  *   wp     = X,Z[,R][!N]                      (world units; R arrive radius,
- *            default 100; !N: on arrival press Cross for N frames)
+ *            default 100; !N: on arrival press Cross for N frames;
+ *            ^N: pulse Down for N frames instead, e.g. to move a menu cursor;
+ *            %N: wait N frames with no buttons; *N: pulse Circle (raw 0x2000,
+ *            the field check edge 0x20000000, e.g. the m0129i elevator))
  * The entry used is the one for the current token with the highest MINSTORY
  * <= story; a matching #VISIT entry wins, then a matching &MASK entry. Its waypoints run in order; after the last one the pilot holds
  * still (the pad script resumes) until the room or story changes.
@@ -28,7 +31,7 @@
 #ifndef PC_PORT_ROUTE_DAY3_PILOT_H
 #define PC_PORT_ROUTE_DAY3_PILOT_H
 
-typedef struct { int x, z, r, act, tmo; } D3Wp;   /* tmo: give up after N frames (~N) */
+typedef struct { int x, z, r, act, tmo, dn; } D3Wp;   /* tmo: give up after N frames (~N); dn: 1 = ^N pulses Down, 2 = %N waits, 3 = *N pulses Circle */
 typedef struct { uint32_t token, story, flags, slot; int visit, n; D3Wp wp[24]; } D3Entry;
 static D3Entry g_d3[160];
 static int g_d3_n = -1;
@@ -58,9 +61,11 @@ static void D3Parse(void)
             w->z = (int)strtol(s + 1, &end, 10); s = end;
             w->r = 100;
             if (*s == ',') { w->r = (int)strtol(s + 1, &end, 10); s = end; }
-            while (*s == '!' || *s == '~') {   /* suffixes in either order */
+            while (*s == '!' || *s == '~' || *s == '^' || *s == '%' || *s == '*') {   /* suffixes in any order */
                 int v = (int)strtol(s + 1, &end, 10);
-                if (*s == '!') w->act = v; else w->tmo = v;
+                if (*s == '!') w->act = v; else if (*s == '^') { w->act = v; w->dn = 1; }
+                else if (*s == '%') { w->act = v; w->dn = 2; }
+                else if (*s == '*') { w->act = v; w->dn = 3; } else w->tmo = v;
                 s = end;
             }
             e->n++;
@@ -76,7 +81,7 @@ static void D3Parse(void)
 static uint16_t RouteDay3Pilot(uint16_t script_mask)
 {
     static uint32_t cur_tok = 0, cur_story = 0xFFFFFFFFu;
-    static int ent = -1, idx = 0, act_until = 0, last_log = 0, done_logged = 0;
+    static int ent = -1, idx = 0, act_until = 0, act_dn = 0, last_log = 0, done_logged = 0;
     uint32_t tok = (uint32_t)GA_TOKEN, story = PE_LoadU32(0x800A7918u);
     unsigned mode = PE_LoadU32(0x8009D28Cu), d1a0 = PE_LoadU32(0x8009D1A0u);
     pe_addr_t aya = PE_LoadU32(0x8009D254u);
@@ -162,6 +167,14 @@ static uint16_t RouteDay3Pilot(uint16_t script_mask)
             return m;
         }
     }
+    {   /* log: item/door flag word persist[0x41] (keys, fuses, fuse box) */
+        static uint32_t last41 = 0xFFFFFFFFu;
+        uint32_t p41 = PE_LoadU32(0x800A77F0u + 0x41u * 4u);
+        if (p41 != last41) {
+            fprintf(stderr, "[D3PILOT] frame=%d token=%08X p41=%08X\n", g_frame, (unsigned)tok, (unsigned)p41);
+            last41 = p41;
+        }
+    }
     if (tok != cur_tok || story != cur_story) {
         static uint32_t vtok[64]; static int vcnt[64], nv;
         int best = -1, visit = 0, k;
@@ -234,7 +247,8 @@ static uint16_t RouteDay3Pilot(uint16_t script_mask)
             }
         }
     }
-    if (g_frame < act_until) return (g_frame % 8) == 3 ? 0xBFFFu : 0xFFFFu;
+    if (g_frame < act_until)   /* Cross / Down pulse, or a plain wait (%N) */
+        return (g_frame % 8) == 3 && act_dn != 2 ? (act_dn == 3 ? 0xDFFFu : act_dn ? 0xFFBFu : 0xBFFFu) : 0xFFFFu;
     if (tok == 0xA8000048u && ent >= 0 && g_d3[ent].n > 0) {
         int target = g_d3[ent].wp[0].x, cur = (int16_t)PE_LoadU16(0x8019CC52u);
         uint16_t confirm = g_d3[ent].wp[0].z ? (uint16_t)g_d3[ent].wp[0].z : 0xBFFFu;
@@ -275,8 +289,8 @@ static uint16_t RouteDay3Pilot(uint16_t script_mask)
         int wx = w->x - ax, wz = w->z - az;
         if (g_frame - last_log >= 60) {
             last_log = g_frame;
-            fprintf(stderr, "[D3PILOT] frame=%d token=%08X pos=%d,%d wp%d=%d,%d d1a0=%X held=%08X cam=%d,%d\n",
-                    g_frame, (unsigned)tok, ax, az, idx, w->x, w->z, d1a0,
+            fprintf(stderr, "[D3PILOT] frame=%d token=%08X pos=%d,%d rot=%X wp%d=%d,%d d1a0=%X held=%08X cam=%d,%d\n",
+                    g_frame, (unsigned)tok, ax, az, (unsigned)PE_LoadU16(aya + 0x3Au), idx, w->x, w->z, d1a0,
                     (unsigned)PE_LoadU32(0x8009D26Cu),
                     (int16_t)PE_LoadU16(0x800BD000u), (int16_t)PE_LoadU16(0x800BD004u));
         }
@@ -285,14 +299,14 @@ static uint16_t RouteDay3Pilot(uint16_t script_mask)
         if (w->tmo && g_frame - wp_since >= w->tmo) {
             fprintf(stderr, "[D3PILOT] frame=%d token=%08X wp%d timeout at %d,%d p2C=%08X\n", g_frame, (unsigned)tok, idx, ax, az,
                     (unsigned)PE_LoadU32(0x800A78A0u));
-            if (w->act) act_until = g_frame + w->act;
+            if (w->act) { act_until = g_frame + w->act; act_dn = w->dn; }
             idx++;
             return 0xFFFFu;
         }
         if ((long long)wx * wx + (long long)wz * wz <= (long long)w->r * w->r) {
             fprintf(stderr, "[D3PILOT] frame=%d token=%08X reached wp%d at %d,%d\n",
                     g_frame, (unsigned)tok, idx, ax, az);
-            if (w->act) act_until = g_frame + w->act;
+            if (w->act) { act_until = g_frame + w->act; act_dn = w->dn; }
             idx++;
             return 0xFFFFu;
         }
