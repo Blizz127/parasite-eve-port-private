@@ -890,3 +890,29 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
       only because the binary is stripped; the unstripped binary passes.
     notes.md (with the `--disc2-image` swap) and changelog_entry.md are
     drafts in the same folder.
+  - 23:05 CT: harder testing (private branch, no release; RC fe6a4f0c
+    stays staged, not published).
+    - Story map past Day 3 (from the 247 immediate writers of persist[74]):
+      the m0352i hop sets 0x1B0 (Day 4, then m0098i), 0x220 (Day 5) and
+      0x2D6 (Day 6, then m0425i/m0006i). m0050i/m0373i write 0x2F2/0x2F4
+      at the disc swap. Specials: 0x3E8 (m0318i) and 0x7D0 (m0431i).
+    - PE.IMG is byte-identical on Disc 1 and Disc 2 (same LBA and sha1),
+      so room code is the same on both. Disc 2 only changes movies and
+      the swap. Every earlier PE_WARP_DISC=2 log shows Disc 2 mounted.
+    - Full sweeps (frozen fe6a4f0c binary, 2 at a time, 4000 frames) at
+      0x1B0, 0x220, 0x2D6 (Disc 1) and 0x2F4 (Disc 2) are running. At
+      0x1B0, 168/402 slots are done: no stops apart from the known unused
+      slots that fault at 0xFC913DA8.
+    - New Day 2 multi-room route gate, `pc_port/tools/day2_route_regress.py`.
+      Each segment is one dev warp; after that the game takes its own
+      exits:
+      - day2_start: m0351i (story 0x80) to m0042i, then m0041i.
+      - day2_end: m0090i (0x128) to m0136i, m0126i, m0125i, m0091i,
+        m0351i (end-of-day save screen, cancelled with Circle), then
+        m0092i at Day 3 (story 0x140).
+      Story must never drop. Checkpoints must come in order. Any
+      CPU_BOUNDARY, FATAL or [STOP] fails the gate. Three runs all passed
+      at the same frames (3592 and 18202), so it is deterministic. Added
+      to the gates script. The PE_WARP_ROUTE dev-harness chain in
+      plat_cheats.c ships with it. Full gates (k21) are running before the
+      code commit.
