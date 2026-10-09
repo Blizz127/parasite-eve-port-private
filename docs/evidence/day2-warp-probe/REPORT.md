@@ -890,7 +890,7 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
       only because the binary is stripped; the unstripped binary passes.
     notes.md (with the `--disc2-image` swap) and changelog_entry.md are
     drafts in the same folder.
-  - 23:05 CT: harder testing (private branch, no release; RC fe6a4f0c
+  - 23:01 CT: harder testing (private branch, no release; RC fe6a4f0c
     stays staged, not published).
     - Story map past Day 3 (from the 247 immediate writers of persist[74]):
       the m0352i hop sets 0x1B0 (Day 4, then m0098i), 0x220 (Day 5) and
@@ -923,7 +923,7 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
     - DAY2_ROUTE (frames 3592 and 18202);
     - 1645/1645 tests;
     - both guards, both `--verify` (0 drift) and EXACT_REBUILD_GATE.
-  - 23:52 CT: later-story sweeps (fe6a4f0c binary, 4000 frames):
+  - 23:49 CT: later-story sweeps (fe6a4f0c binary, 4000 frames):
     - 0x1B0 (Day 4): 382 clean, 20 unused, 0 stopping.
     - 0x220 (Day 5): 382 clean, 20 unused, 0 stopping.
     - 0x2D6 (Day 6): running.
@@ -931,7 +931,7 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
     in the room loader (func_8006B4F8) on the warp frame. At 0x2D6 the
     garbage address is 0x8F2ECF29 instead of 0xFC913DA8, but the code
     path is the same.
-  - 00:32 CT: story 0x2D6 (Day 6) sweep: 381 clean, 20 unused, **1
+  - 00:18 CT: story 0x2D6 (Day 6) sweep: 381 clean, 20 unused, **1
     stopping**: m0350i, a CPU_BOUNDARY at pc 0x80192E4C. That is an effect
     callback (`func_800CE560` pool task) still in asm (room span 0x3E64,
     0x7C0 bytes, inline GTE). Mode 2 does three things:
@@ -942,3 +942,23 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
       player is inside, flags the actor.
     A C match is in progress; the GTE loops and structure already line
     up. The 0x2F4 (Disc 2) sweep is running.
+  - 00:45 CT (2026-10-09): story 0x2F4 (Disc 2, PE_WARP_DISC=2) sweep:
+    382 clean, 20 unused, 0 stopping. Totals per story point (402 slots
+    each, 4000 frames): 0x1B0 382/20/0, 0x220 382/20/0, 0x2D6 381/20/1
+    (m0350i), 0x2F4 382/20/0.
+    - m0350i func_80192E4C is still open. The best C draft is 7 words off
+      retail (size exact). What is left is two scheduling placements in
+      the second sprite call. The draft is saved, not installed, at
+      `wip/m0350i_func_80192E4C.c`.
+    - It needs a new opt-in maspsx narrowing, K3c
+      (`MASPSX_NARROW_SHIFTED_ANY_DEST`). Without it, retail's
+      `lh $2,2($2)` / `sra $18,$2,5` cannot come out of cc1's
+      `lw` / `sra $18,$2,21`.
+      - K3c has a unit test and goes in after the gate run (k22). The other 12 maspsx unit
+        failures/errors were there before this change.
+      - Nothing turns the flag on, so builds don't change:
+        EXACT_REBUILD_GATE[room_m0350i] passes at the same sha1 (e9597b00).
+    - Until the match lands, m0350i at Day 6 (0x2D6/0x2DA) stops cleanly
+      with CPU_BOUNDARY. That is the expected stop, not a crash.
+    - 12000-frame soaks of the busy rooms (19 on Disc 1, 4 on Disc 2;
+      bosses and cutscene rooms at their own story points) are running.
