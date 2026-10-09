@@ -962,14 +962,14 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
       with CPU_BOUNDARY. That is the expected stop, not a crash.
     - 12000-frame soaks of the busy rooms (19 on Disc 1, 4 on Disc 2;
       bosses and cutscene rooms at their own story points) are running.
-  - 01:11 CT: 12000-frame soaks (frozen fe6a4f0c binary, 2 at a time):
+  - 01:10 CT: 12000-frame soaks (frozen fe6a4f0c binary, 2 at a time):
     - Disc 1, 19 busy rooms (bosses and cutscene rooms at their own story
       points, 0x128 to 0x2E8): 18 clean to frame 12000. m0350i at 0x2DA
       hits the same known stop (CPU_BOUNDARY pc 0x80192E4C).
     - Disc 2 (PE_WARP_DISC=2): m0050i 0x2F0, m0373i 0x2EE, m0318i 0x2F4
       and m0431i 0x2F4: 4/4 clean to frame 12000.
     - No new stops.
-  - 01:11 CT: maspsx K3c (`MASPSX_NARROW_SHIFTED_ANY_DEST`, opt-in) and
+  - 01:10 CT: maspsx K3c (commit b7bc6434) (`MASPSX_NARROW_SHIFTED_ANY_DEST`, opt-in) and
     its test are in. No build profile turns it on yet. Gates k22 all
     PASS:
     - Day 1 route (frame 67186) and MOVIES_DAY2;
