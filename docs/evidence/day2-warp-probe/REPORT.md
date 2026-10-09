@@ -838,7 +838,7 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
     again. `spill_hard_reg` only leaves a pseudo in place if it is local
     to one block, and this pointer spans head -> case 0, so retail's
     exact mechanism for sharing `$8` is still open.
-  - 21:20 CT (work done 15:05-15:30 CT, then a 6 h stall): m0437i
+  - 21:13 CT (work done 15:05-15:30 CT, then a 6 h stall): m0437i
     func_80192500 LINK_EXACT (overlay exact gate PASS, room SHA-1
     unchanged). The `$8` reuse came from retail's rotation-matrix macro: its
     asm text loads `$8` in one statement and the next macro reads it, and
@@ -859,19 +859,34 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
       `v_b = 0x80192E8C`.
     m0437i now runs to the frame limit at story 0x90, 0x140 and 0x300
     (Disc 2). Full gates running before the code commit.
-  - 21:52 CT: code commit fe6a4f0c (gates k18: Day 1 route PASS, story 80
+  - 21:51 CT: code commit fe6a4f0c (gates k18: Day 1 route PASS, story 80
     frame 67186; Day 2 movies PASS; 1645/1645 tests; both guards PASS;
     EXACT_REBUILD_GATE PASS; both `--verify` 0 drift). Full sweep with
     that binary (402 slots, 2 at a time, 4000 frames), story 0x90: 382
     clean, 20 unused (the same 20 slots fault at 0xFC913DA8 as before),
     0 stopping. 0x140 and 0x300 (Disc 2) are running.
-  - 22:12 CT: story 0x140 sweep at 373/402 slots: 353 clean, 20 unused,
+  - 22:09 CT: story 0x140 sweep at 373/402 slots: 353 clean, 20 unused,
     0 stopping so far. Gates are being re-run (k19) for a release-candidate
     stage. Staged only, not published: a public release needs Will's yes.
-  - 22:43 CT: story 0x140 full sweep: 382 clean, 20 unused, 0 stopping.
+  - 22:24 CT: story 0x140 full sweep: 382 clean, 20 unused, 0 stopping.
     Gates k19 (same code as fe6a4f0c) all PASS: Day 1 route (story 80,
     frame 67186), Day 2 movies, 1645/1645 tests, retail_data_guard,
     psyq_port_guard, both `--verify` 0 drift, EXACT_REBUILD_GATE. A
     release candidate is staged (not published) under
     /workspace/pe/rel/outfe6a4f0c. The story 0x300 (Disc 2) sweep is
     running.
+  - 22:45 CT: story 0x300 full sweep (PE_WARP_DISC=2, same binary): 382
+    clean, 20 unused, 0 stopping. So all three story points are at
+    382 / 20 / 0, and no rooms stop.
+  - Release candidate (staged only; publishing needs Will's yes):
+    /workspace/pe/rel/outfe6a4f0c/parasite-eve-native-only-fe6a4f0c-linux-x64.tar.gz,
+    sha256 1f3e4bfbfc6483aaacb70aadcb4092896a3be441d2c8ca67d8e507d5247ed27b.
+    Built by pc_port/package_preview.sh (rel/shim on PATH) from the
+    build/pcbuild-disc Release binary of fe6a4f0c. The package holds 4
+    files and no disc data (`contains_game_data: false`). Guards on the
+    package:
+    - retail_data_guard: OK, no retail byte runs.
+    - psyq_port_guard: 0 new. The 445 allowlist entries show as stale
+      only because the binary is stripped; the unstripped binary passes.
+    notes.md (with the `--disc2-image` swap) and changelog_entry.md are
+    drafts in the same folder.
