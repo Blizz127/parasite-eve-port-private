@@ -1356,3 +1356,22 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
     - 1-Hit Kills stays off by default; only the harness env sets it.
     - The wt2 BFM build (/workspace/scratch/wt2, /workspace/bfm-b28-wt2) is
       not this session's and was left alone.
+  - 14:40 CT: Day 4 by play, part 2 (0x1E8 elevator, m0146i). k41 gates all
+    PASS (exact m0146i/m0141i, test_guest_lower, both --verify, both guards,
+    build + tests, Day 1 route, Day 2 movies, Day 2 route, day3_walk).
+    - m0129i elevator: the button opens the doors and calls module 2 (msg 1);
+      module 4 runs the bacterium battle and replies 0x72 (won, battle 9) or
+      0x71 (escaped, battle 10 via the Escape command, func_80021DE0/
+      func_800255E4; chance rises per failure). Neither branch transfers:
+      the ride is walking into the car (module 2 quad x -1750..-1450 z
+      300..700, payload 1 -> m0132i). The car panel (x -400..-200 z
+      -300..-160, facing E00+-200) needs a turn in place: new pilot suffix
+      $HEX[:N] (raw pad hold). Floor exit -> m0127i.
+    - Route now m0129i -> m0132i -> m0127i -> m0126i -> m0146i. The m0146i
+      battle stop CPU_BOUNDARY/REFUSED pc=0x8019179C ra=@800D413C:effect is
+      fixed: func_8019179C is a body twin of room_m0141i func_80191330
+      (retail words equal apart from relocations, text +0x46C, data +0x4CC);
+      EXACT_REBUILD_GATE[room_m0146i] PASS.
+    - Harness probe PE_D3_BTL_SEQ (scripted battle pads, env-gated).
+    - Next: m0146i -> m0147i (0x1EB) -> m0127i (0x1EC) -> m0149i (0x1EE) ->
+      m0150i (0x1F0) -> m0154i -> m0157i (0x200) -> ... -> 0x220.

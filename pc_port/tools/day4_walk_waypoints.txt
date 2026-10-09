@@ -50,3 +50,11 @@ A80624C8@1DC=-2850,-2300,80;-2850,-1450,60;-2400,-1420,40   (m0329i, no fuse 0xD
 A8063148@1DC=-550,1300,60;-580,850,60;-300,600,80;300,300,80;400,-250,80;700,-450,60;772,-600,60;772,-760,25!20;700,-450,80;400,-250,80;300,300,80;-300,600,80;-580,850,60;-550,1300,60;-550,2050,40   (m0332i: fuse 0xD0 at 772,-825 (pickup x 672..872 z -925..-725, |= 0x100), back to payload 1 x -700..-400 z 1800..2250 -> m0329i)
 A80624C8@1DC&41:100=-2850,-1500,60;-2850,-1100,80;-2850,0,80;-2740,250,60;-2735,420,40   (m0329i with fuse 0xD0: north along the west side, payload 4 x -2850..-2600 z 300..450 -> m0144i)
 A8024248@1DC=-2710,360,40;-2710,430,20!150;-2710,420,20!150;-2710,430,20!150;-2850,430,20!8;-2850,430,20%90;-2850,430,20^8;-2850,430,20%20;-2850,430,20!120;-2850,420,20!8;-2850,420,20%90;-2850,420,20!120   (m0144i fuse box: right side payload 8 x -2776..-2650 z 380..450 three times (YES: insert fuses CE/CF/D0, persist[0x41] |= 0x200/0x400/0x800), then left side payload 7 x -2900..-2800 with the power off: menu Down + Cross = REPAIR WIRES (|= 0x10000), then the left side again: TOGGLE POWER ON (|= 0x8000))
+A8024148@1E8=-2600,0,60;-2300,0,40   (m0142i after the power: east payload 1 x -2500..-2100 z -300..400 -> m0129i)
+
+
+A80224C8@1E8#1=-1300,0,60;-1161,120,30;-1161,191,6!40;-1161,191,6%500;-1050,150,40;-905,205,30;-905,205,30%600;-1161,191,40;-1600,250,40;-1600,500,40%300   (m0129i at 0x1E8: elevator button (Cross facing north) opens the doors, the bacterium battle in the encounter quad x -980..-761 z 177..352, then walk north into the car (module 2 quad x -1750..-1450 z 300..700, payload 1 -> A8023148))
+A8023148@1E8=-220,-100,20;-240,-190,8~120$FF3F:8;-205,-176,60!40;-205,-176,60%400;0,-200,30;0,-380,40   (m0132i elevator car at 0x1E8: floor panel quad x -400..-200 z -300..-160 (walkable x>=-225), confirm facing rot E00+-200)
+A80223C8@1E8=0,-500,40;0,-959,40;0,-1750,40   (m0127i at 0x1E8, off the elevator: south to the north-quad exit x -450..450 z -1850..-1650, payload 1 -> m0126i)
+A8022348@1E8=-100,700,60;300,1300,60;700,2300,60;700,2600,40   (m0126i at 0x1E8: from the m0127i door up to the north exit x 350..1200 z 2450..2750, payload 3 -> m0146i)
+A8024348@1E8=-1000,-1250,60   (m0146i at 0x1E8: exit x -2000..-150 z -1400..-1100, payload 2 -> m0147i; first guess)
