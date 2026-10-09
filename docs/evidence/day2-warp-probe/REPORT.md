@@ -1019,3 +1019,7 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
       clean, 10 unused, 0 stopping.
   - 02:14 CT: story 0x3E8 (Disc 2, 4000 frames, 402 slots): **382 clean,
     20 unused, 0 stopping**. 0x7D0 sweep in progress (54/402 clean so far).
+  - 02:28 CT: story 0x7D0 sweep (Disc 2) progress: 251/402 slots, 242 clean,
+    9 unused, 0 stopping. Queued after it: 12000-frame Disc 2 soaks of
+    late-game rooms (m0318i/m0431i/m0351i/m0352i/m0050i/m0373i at
+    0x2F4/0x3E8/0x7D0, including m0431i, the last story writer at 0x7D0).
