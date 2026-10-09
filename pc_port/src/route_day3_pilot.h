@@ -233,6 +233,13 @@ static uint16_t RouteDay3Pilot(uint16_t script_mask)
         if (cur != target) return (g_frame % 24) < 4 ? step : 0xFFFFu;
         return (g_frame % 48) < 4 ? confirm : 0xFFFFu;
     }
+    if (getenv("PE_D3_FIELD_ACTORS") && !(d1a0 & 2u) && (g_frame % 300) == 7) {   /* debug: field actor chain */
+        pe_addr_t a = PE_LoadU32(0x8009D20Cu);
+        for (unsigned i = 0; a && i < 64u && PE_RangeIsRam(a, 64u); i++, a = PE_LoadU32(a + 4u))
+            fprintf(stderr, "[D3FACT] frame=%d token=%08X a=%08X type=%u pos=%d,%d y=%d\n", g_frame, (unsigned)tok,
+                    (unsigned)a, PE_LoadU16(a + 12u), (int32_t)PE_LoadU32(a + 40u) >> 16,
+                    (int32_t)PE_LoadU32(a + 48u) >> 16, (int32_t)PE_LoadU32(a + 44u) >> 16);
+    }
     if (ent < 0 && aya && g_frame - last_log >= 120) {   /* no entry: still trace where Aya is */
         last_log = g_frame;
         fprintf(stderr, "[D3PILOT] frame=%d token=%08X idle pos=%d,%d mode=%X d1a0=%X\n", g_frame, (unsigned)tok,

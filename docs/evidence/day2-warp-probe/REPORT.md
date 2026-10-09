@@ -1273,3 +1273,28 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
       entries, so Aya never talks to Baker. The gate covers 1B0 to 1B8
       with the day3_end warp (m0352i).
     - The wt2 BFM build (/workspace/bfm-b28-wt2, srun.sh) was left alone.
+  - 10:06 CT: day3_walk now starts at the Day 3 start (m0093i@140) and plays
+    0x140 to 0x1B0 in one run. k33b gates all PASS: Day 1 route (story 80),
+    Day 2 movies, tests 1649/1649, retail_data_guard, psyq_port_guard,
+    exact rebuild, gen_decomp_ports --verify, gen_overlay_ports --verify,
+    Day 2 route, Day 3 route. Day 3 ran day3_start (148), day3_mid (190),
+    day3_end (1B8) and day3_walk (0x1B0 at frame 61674, 180 s).
+    - New day3_walk checkpoints: m0093i, 0x148, m0096i, m0097i, 0x160,
+      m0191i, 0x170, m0239i, 0x178, then the existing precinct to
+      m0123i-fight-won (0x1B0) ones.
+    - route_day3_pilot.h: env-gated field-actor dump (PE_D3_FIELD_ACTORS)
+      for route debugging. It is off by default and doesn't affect the
+      gates.
+    - Harness note: the first chain (k33) inherited exported pilot env
+      (PE_ONE_HIT_KILLS=1 and waypoints) from the shell, so the Day 1 M34
+      fight and the 7 retail-damage/assist tests failed. That run was
+      thrown out and k33b was re-run with a clean env; all pass.
+    - Open: continuous 0x1B0 to 0x1B8. After the fight, m0044i mod2 plays
+      the Baker scene and returns to m0121i. The m0124i door to m0044i
+      (-1000,0) and the m0122i west doors (about -960,-150) don't open at
+      0x1B0, even with Cross. Warping into m0044i at 0x1B0 replays the
+      scene. The m0044i mod4 hop to m0352i (reads story==1B0 at 801D9960)
+      needs a script condition not yet identified (m0120i reads 1B0 in
+      mod0/mod7). The gate still covers 1B0 to 1B8 with the day3_end warp.
+    - The wt2 BFM build (/workspace/bfm-b28-wt2) is not this session's and
+      was left alone.
