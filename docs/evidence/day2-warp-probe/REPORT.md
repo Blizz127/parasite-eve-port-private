@@ -994,3 +994,8 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
     at story 0x2D6, 0x2DA, 0x90, 0x140, and 0x300. The Day 6
     CPU_BOUNDARY at pc 0x80192E4C is gone. 12000-frame soak at 0x2DA
     and a full 0x2D6 re-sweep (402 slots, 2 at a time) are running.
+  - 01:28 CT: m0350i 12000-frame soak at story 0x2DA: clean to frame-limit
+    (same binary as the match). Spot probes of former stop rooms
+    (m0049i, m0089i, m0123i, m0256i, m0272i, m0349i, m0429i, m0437i) at
+    0x90 all clean; m0049i and m0437i also clean at 0x2D6. Full 0x2D6
+    re-sweep (402 slots, 2 at a time) in progress.
