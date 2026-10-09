@@ -868,3 +868,10 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
   - 22:12 CT: story 0x140 sweep at 373/402 slots: 353 clean, 20 unused,
     0 stopping so far. Gates are being re-run (k19) for a release-candidate
     stage. Staged only, not published: a public release needs Will's yes.
+  - 22:43 CT: story 0x140 full sweep: 382 clean, 20 unused, 0 stopping.
+    Gates k19 (same code as fe6a4f0c) all PASS: Day 1 route (story 80,
+    frame 67186), Day 2 movies, 1645/1645 tests, retail_data_guard,
+    psyq_port_guard, both `--verify` 0 drift, EXACT_REBUILD_GATE. A
+    release candidate is staged (not published) under
+    /workspace/pe/rel/outfe6a4f0c. The story 0x300 (Disc 2) sweep is
+    running.
