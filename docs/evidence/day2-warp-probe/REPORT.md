@@ -1090,3 +1090,20 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
       Unproven halves become unknown digit groups, which stop only if the
       text draws them. With it, the route runs about 11,000 map frames with
       no stop; native tests 1646/1646.
+  - 04:08 CT: k25 full gates PASS on the menu-tail fix (exact rebuild,
+    retail_data_guard, psyq_port_guard, gen_decomp/gen_overlay --verify,
+    Day 1 route, Day 2 movies, tests 1646/1646, Day 2 route, Day 3 route).
+    Committed as c3f63acc. The world-map pad fill (HostPadFill in the M0000I
+    loop) is not in that build. It stays uncommitted until the next gate run.
+    The Day 3 pilot (route_day3_pilot.h) is harness-only and does nothing
+    unless PE_ROUTE_WAYPOINTS is set.
+    - Walked route, continued: at story 0x178, map index 7 takes Aya into the
+      precinct m0037i. Its entry scene writes 0x180. Map index 7 then reaches
+      hospital m0103i. The door to m0100i writes 0x188, and m0100i door 4
+      leads to m0107i.
+    - New stop: a random battle in m0107i calls effect init 0x8018F1D4
+      through 8006F39C, giving CPU_BOUNDARY/REFUSED. The matched leaf
+      src/overlays/room_m0107i/func_8018F1D4.c exists, but gen_overlay_ports
+      skips it ("call arity func_800C22F8 0!=1"): the leaf calls
+      func_800C22F8 bare, and retail passes the caller's live $a0 (the
+      effect slot) through to it.
