@@ -808,6 +808,7 @@ class Lowerer:
         name = fn.name if isinstance(fn, c_ast.ID) else None
         if name and self.lookup(name) is None and name not in self.globals:
             ft = self.funcs.get(name)
+            self._call_node = e
             if name == self.name:
                 return self.direct_call(name, args, ft or self.self_ty, self.self_sig)
             if FUNC_NAME_RE.fullmatch(name):
@@ -898,6 +899,26 @@ class Lowerer:
             return False
         return True
 
+    def live_a0_forwardable(self, args, ft, sig, n) -> bool:
+        """E21d: a bare `f()` to a one-parameter callee reads the leaf's own
+        incoming $a0.  O32 leaves $a0 as it arrived until the leaf writes it.
+        The forward is exact only when nothing runs between the leaf's entry
+        and the jal: (a) the leaf takes no parameters (the C never names
+        $a0); (b) the callee is declared without a prototype (`extern int
+        *f();`, so the call site fixes no count); (c) its matched retail
+        definition takes exactly one parameter; and (d) the call is the
+        leaf's first statement in the form `f();` or `*f() = <constant or
+        global address>` (lower() records it as entry_call).  A value that
+        must outlive the jal sits in a callee-saved register, never $a0, so
+        only the prologue (sp/ra) precedes the call.  Retail evidence:
+        room_m0107i 8018F1D4 is addiu sp / sw ra / jal 800C22F8."""
+        if args or n != 1 or not (isinstance(ft, TFunc) and ft.params is None):
+            return False
+        if sig.get("retail_nparams") != 1:
+            return False
+        return getattr(self, "_call_node", None) is not None and \
+            self._call_node is getattr(self, "entry_call", None)
+
     def direct_call(self, name, args, ft, sig, discard=False) -> tuple[str, T]:
         self.callees.add(name)
         self.hr_valid.clear()
@@ -908,11 +929,16 @@ class Lowerer:
         params = [p for p in sig["params"] if p.strip() not in ("", "void")]
         if any(p.strip() == "..." for p in params):
             raise LowerError(f"variadic callee {name}")
+        live = []
         if len(params) != len(args):
-            if not self.unread_args_droppable(args, ft, sig, len(params)):
+            if self.live_a0_forwardable(args, ft, sig, len(params)):
+                self.live_a0 = True     # E21d: the callee reads the leaf's own live $a0
+                live = ["a_pe_live_a0"]
+                params = params[1:]
+            elif not self.unread_args_droppable(args, ft, sig, len(params)):
                 raise LowerError(f"call arity {name} {len(args)}!={len(params)}")
             args = args[:len(params)]
-        out = []
+        out = list(live)
         for a, p in zip(args, params):
             c, t = self.rv(a)
             if not (is_scalar(t) or isinstance(t, THostPtr)):
@@ -1279,8 +1305,13 @@ class Lowerer:
         self.self_ty = ft
         self.self_sig = {"ret": rett, "params": params or ["void"]}
         self.scopes = [scope]
+        self.live_a0 = False
+        self.entry_call = None if params else entry_call(fd.body)
         body: list[str] = []
         self.block(fd.body, "    ", body)
+        if self.live_a0:
+            params = ["uint32_t a_pe_live_a0"]
+            body.insert(0, "    /* E21d: retail forwards this leaf's live $a0 to its first call */")
         if self.hr_used:
             body.insert(0, "    uint32_t " + ", ".join(f"pe_hr{n} = 0u" for n in sorted(self.hr_used))
                         + ";   /* GPRs carried between asm statements */")
@@ -1303,6 +1334,37 @@ class Lowerer:
         if rett != "void":
             wrapper += ["    return pe_r;"]
         return None, "\n".join(wrapper), rett
+
+
+def _pure_rhs(e) -> bool:
+    """A constant or a global's address/value: needs no argument register."""
+    while isinstance(e, c_ast.Cast):
+        e = e.expr
+    if isinstance(e, c_ast.Constant):
+        return True
+    if isinstance(e, c_ast.UnaryOp) and e.op == "&":
+        e = e.expr
+    return isinstance(e, c_ast.ID) and bool(DATA_NAME_RE.fullmatch(e.name))
+
+
+def entry_call(body):
+    """E21d: the argument-less direct call that is the leaf's first statement
+    (`f();` or `*f() = <pure>;`), else None."""
+    items = body.block_items or []
+    if not items:
+        return None
+    s0 = items[0]
+    call = None
+    if isinstance(s0, c_ast.FuncCall):
+        call = s0
+    elif isinstance(s0, c_ast.Assignment) and s0.op == "=" and \
+            isinstance(s0.lvalue, c_ast.UnaryOp) and s0.lvalue.op == "*" and \
+            isinstance(s0.lvalue.expr, c_ast.FuncCall) and _pure_rhs(s0.rvalue):
+        call = s0.lvalue.expr
+    if call is None or not isinstance(call.name, c_ast.ID) or \
+            (call.args is not None and call.args.exprs):
+        return None
+    return call
 
 
 def walk(node):

@@ -1126,3 +1126,19 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
       Day 1 stats (45 HP) and Day 3 enemies hit for 35-117. Infinite ammo
       (cheat F3): the Day 1 handgun runs dry.
     - Next: m0108i -> m0115i -> m0044i -> m0123i fight (0x1B0).
+  - 04:45 CT: k26 gates all PASS with E21d and the M0000I menu pad fill:
+    Day 1 route, Day 2 movies, tests 1646/1646, retail_data_guard,
+    psyq_port_guard, exact rebuild, gen_decomp_ports --verify,
+    gen_overlay_ports --verify, Day 2 route, Day 3 route. This push commits
+    E21d (guest_lower plus tests), the func_8019234C pad fill
+    (HOST_ADAPTED, only active with a pad source) and the pilot.
+    - Walked route, continued: m0108i (0x190) -> m0107i -> m0111i. Examining
+      the body sets hospital flag persist[0x2C] |= 0x800. The pilot gained
+      per-waypoint push timeouts (`~N`).
+    - m0100i random battle: the AT bar is full but the target list stays
+      empty because the enemies are out of range. The pilot now walks toward
+      the nearest live actor in the 0x8009D20C chain while pulsing Cross. The
+      battle is won (about 5300 frames).
+    - Open: in m0099i, the 0x1000 object at (-494,-321) is examined facing -z
+      from the +z side. The diagonal and z=-100/-267 lanes west are walled;
+      testing other lanes.

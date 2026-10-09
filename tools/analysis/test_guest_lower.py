@@ -541,6 +541,40 @@ class Refusals(unittest.TestCase):
                            sigs=self.C2AF0)
 
 
+    # E21d: a bare call forwarding the leaf's live $a0 (room_m0107i
+    # func_8018F1D4: addiu sp / sw ra / jal 800C22F8 -- a0 untouched).
+    C22F8 = {"func_800C22F8": {"ret": "pe_addr_t", "params": ["pe_addr_t slot"],
+                               "retail_nparams": 1}}
+    SLOT = ("extern int *func_800C22F8();\nextern char D_801935F8[];\n"
+            "int func_8018F1D4(void)\n{\n    *func_800C22F8() = (int)D_801935F8;\n    return 0;\n}\n")
+
+    def test_live_a0_forwarded(self):
+        res = lower(self.SLOT, "func_8018F1D4", known={"func_800C22F8"}, sigs=self.C22F8)
+        self.assertIn("(uint32_t a_pe_live_a0)", res["sig"])
+        self.assertIn("func_800C22F8(a_pe_live_a0)", res["body"])
+
+    def test_live_a0_needs_first_statement(self):
+        src = self.SLOT.replace("{\n    *func_800C22F8()", "{\n    D_801935F8[0] = 1;\n    *func_800C22F8()")
+        self.assertRefused(src, "call arity", name="func_8018F1D4", known={"func_800C22F8"},
+                           sigs=self.C22F8)
+
+    def test_live_a0_needs_paramless_leaf(self):
+        src = self.SLOT.replace("func_8018F1D4(void)", "func_8018F1D4(int a)")
+        self.assertRefused(src, "call arity", name="func_8018F1D4", known={"func_800C22F8"},
+                           sigs=self.C22F8)
+
+    def test_live_a0_needs_unprototyped_decl_and_retail_count(self):
+        src = self.SLOT.replace("extern int *func_800C22F8();", "extern int *func_800C22F8(void);")
+        self.assertRefused(src, "", name="func_8018F1D4", known={"func_800C22F8"}, sigs=self.C22F8)
+        sigs = {"func_800C22F8": {**self.C22F8["func_800C22F8"], "retail_nparams": 2}}
+        self.assertRefused(self.SLOT, "call arity", name="func_8018F1D4",
+                           known={"func_800C22F8"}, sigs=sigs)
+
+    def test_live_a0_needs_pure_rhs(self):
+        src = self.SLOT.replace("= (int)D_801935F8;", "= func_800C22F8();")
+        self.assertRefused(src, "call arity", name="func_8018F1D4", known={"func_800C22F8"},
+                           sigs=self.C22F8)
+
     def test_host_replacement_called_by_host_name(self):
         # A Psy-Q entry reimplemented on the host (pe_port_compat.h
         # host-replacement) is called by its host name; func_X is never named.

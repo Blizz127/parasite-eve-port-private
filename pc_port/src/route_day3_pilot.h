@@ -26,7 +26,7 @@
 #ifndef PC_PORT_ROUTE_DAY3_PILOT_H
 #define PC_PORT_ROUTE_DAY3_PILOT_H
 
-typedef struct { int x, z, r, act; } D3Wp;
+typedef struct { int x, z, r, act, tmo; } D3Wp;   /* tmo: give up after N frames (~N) */
 typedef struct { uint32_t token, story; int visit, n; D3Wp wp[24]; } D3Entry;
 static D3Entry g_d3[160];
 static int g_d3_n = -1;
@@ -52,6 +52,7 @@ static void D3Parse(void)
             w->r = 100;
             if (*s == ',') { w->r = (int)strtol(s + 1, &end, 10); s = end; }
             if (*s == '!') { w->act = (int)strtol(s + 1, &end, 10); s = end; }
+            if (*s == '~') { w->tmo = (int)strtol(s + 1, &end, 10); s = end; }
             e->n++;
             if (*s == ';') s++;
         }
@@ -77,7 +78,60 @@ static uint16_t RouteDay3Pilot(uint16_t script_mask)
         static const uint16_t seq[4] = {0xBFFFu, 0xFFFFu, 0xDFFFu, 0xFFFFu};
         script_mask = seq[((g_frame - g_hand_over_frame) / 40) % 4];
     }
-    if (d1a0 & 2u) return RouteBattleShim();
+    if (d1a0 & 2u) {
+        static int last_dump;
+        if (getenv("PE_D3_ACTOR_DUMP") && g_frame - last_dump >= 120) {   /* battle: actor table */
+            last_dump = g_frame;
+            for (unsigned i = 0; i < 24u; i++) {
+                pe_addr_t p = PE_LoadU32(0x8009E000u + i * 12u);
+                pe_addr_t b = p && PE_RangeIsRam(p, 640u) ? PE_LoadU32(p) : 0u;
+                fprintf(stderr, "[D3ACT] frame=%d i=%u w=%08X,%08X,%08X body=%08X hp=%d type=%u x=%d z=%d\n", g_frame, i,
+                        (unsigned)p, (unsigned)PE_LoadU32(0x8009E004u + i * 12u), (unsigned)PE_LoadU32(0x8009E008u + i * 12u),
+                        (unsigned)b, b && PE_RangeIsRam(b, 24u) ? (int)PE_LoadU32(b + 16u) : -1,
+                        p ? PE_LoadU8(p + 12u) : 0u, p ? (int)((int32_t)PE_LoadU32(p + 40u) >> 16) : 0,
+                        p ? (int)((int32_t)PE_LoadU32(p + 48u) >> 16) : 0);
+                if (!p) break;
+            }
+        }
+        {   /* The shim aims only at actors already in the target list
+             * (0x8009E000), which the game fills when targeting opens.
+             * With no target yet and a full AT bar, Cross opens it. */
+            pe_addr_t rec = PE_LoadU32(0x8009D278u);
+            static int last_hp = -1;
+            /* Harness fixture (opt-in): a warp sets the story but keeps Day-1
+             * stats (45 HP), and Day-3 enemies hit for 35-45+.  PE_ROUTE_MAXHP
+             * raises max HP in battle so the warped route can be fought;
+             * the shim's existing HP refill then tops up to it. */
+            if (rec && getenv("PE_ROUTE_MAXHP")) {
+                unsigned want = (unsigned)atoi(getenv("PE_ROUTE_MAXHP"));
+                if (want > PE_LoadU16(rec + 28u) && want < 1000u) PE_StoreU16(rec + 28u, (uint16_t)want);
+            }
+            if (rec && (int)PE_LoadU16(rec + 12u) != last_hp) {
+                fprintf(stderr, "[D3HP] frame=%d hp=%u/%u mode=%u\n", g_frame,
+                        PE_LoadU16(rec + 12u), PE_LoadU16(rec + 28u), mode);
+                last_hp = (int)PE_LoadU16(rec + 12u);
+            }
+            uint16_t m = RouteBattleShim();
+            if (m == 0xFFFFu && mode == 0u && !PE_LoadU32(0x8009E000u) && aya) {
+                /* No target in range: close in on the nearest live actor of
+                 * the field chain (0x8009D20C, next at +4, body hp at +16). */
+                int ax2 = (int32_t)PE_LoadU32(aya + 40u) >> 16, az2 = (int32_t)PE_LoadU32(aya + 48u) >> 16;
+                long long bd = -1; int bx = 0, bz = 0;
+                pe_addr_t a = PE_LoadU32(0x8009D20Cu);
+                for (unsigned i = 0; a && i < 64u; i++, a = PE_LoadU32(a + 4u)) {
+                    pe_addr_t b = PE_LoadU32(a);
+                    if (a == aya || !PE_RangeIsRam(a, 64u) || !b || !PE_RangeIsRam(b, 24u) ||
+                        (int32_t)PE_LoadU32(b + 16u) <= 0) continue;
+                    int x = (int32_t)PE_LoadU32(a + 40u) >> 16, z = (int32_t)PE_LoadU32(a + 48u) >> 16;
+                    long long d = (long long)(x - ax2) * (x - ax2) + (long long)(z - az2) * (z - az2);
+                    if (bd < 0 || d < bd) { bd = d; bx = x; bz = z; }
+                }
+                if (bd > 250000) m = RouteM34ShimMove(ax2, az2, bx - ax2, bz - az2, 0);
+                if (rec && PE_LoadU16(rec + 16u) >= 9000u && (g_frame % 8) == 3) m &= 0xBFFFu;
+            }
+            return m;
+        }
+    }
     if (tok != cur_tok || story != cur_story) {
         static uint32_t vtok[64]; static int vcnt[64], nv;
         int best = -1, visit = 0, k;
@@ -96,8 +150,8 @@ static uint16_t RouteDay3Pilot(uint16_t script_mask)
         if (tok != cur_tok || best != ent) {
             ent = best; idx = 0; act_until = 0; done_logged = 0;
             g_m34s_init = 0;              /* new room: reseed the pad map */
-            fprintf(stderr, "[D3PILOT] frame=%d token=%08X story=%X visit=%d entry=%d\n",
-                    g_frame, (unsigned)tok, (unsigned)story, visit, ent);
+            fprintf(stderr, "[D3PILOT] frame=%d token=%08X story=%X visit=%d entry=%d p2C=%08X\n",
+                    g_frame, (unsigned)tok, (unsigned)story, visit, ent, (unsigned)PE_LoadU32(0x800A78A0u));
         }
         cur_tok = tok; cur_story = story;
     }
@@ -122,7 +176,7 @@ static uint16_t RouteDay3Pilot(uint16_t script_mask)
         fprintf(stderr, "[D3PILOT] frame=%d token=%08X idle pos=%d,%d mode=%X d1a0=%X\n", g_frame, (unsigned)tok,
                 (int)((int32_t)PE_LoadU32(aya + 40u) >> 16), (int)((int32_t)PE_LoadU32(aya + 48u) >> 16), mode, d1a0);
     }
-    if (ent < 0 || !aya || mode != 0u || (d1a0 & 4u)) return script_mask;   /* window/menu: text pad */
+    if (ent < 0 || !aya || (mode != 0u && mode != 9u) || (d1a0 & 4u)) return script_mask;    /* window/menu: text pad; 9 = field after a battle */
     if (idx >= g_d3[ent].n) {
         if (!done_logged) { done_logged = 1;
             fprintf(stderr, "[D3PILOT] frame=%d token=%08X waypoints done\n", g_frame, (unsigned)tok); }
@@ -139,6 +193,13 @@ static uint16_t RouteDay3Pilot(uint16_t script_mask)
                     g_frame, (unsigned)tok, ax, az, idx, w->x, w->z, d1a0,
                     (unsigned)PE_LoadU32(0x8009D26Cu),
                     (int16_t)PE_LoadU16(0x800BD000u), (int16_t)PE_LoadU16(0x800BD004u));
+        }
+        static int wp_since, wp_key = -1;
+        if (wp_key != ent * 64 + idx) { wp_key = ent * 64 + idx; wp_since = g_frame; }
+        if (w->tmo && g_frame - wp_since >= w->tmo) {
+            fprintf(stderr, "[D3PILOT] frame=%d token=%08X wp%d timeout at %d,%d\n", g_frame, (unsigned)tok, idx, ax, az);
+            idx++;
+            return 0xFFFFu;
         }
         if ((long long)wx * wx + (long long)wz * wz <= (long long)w->r * w->r) {
             fprintf(stderr, "[D3PILOT] frame=%d token=%08X reached wp%d at %d,%d\n",

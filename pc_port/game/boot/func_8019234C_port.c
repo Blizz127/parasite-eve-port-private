@@ -80,6 +80,14 @@ void func_8019234C(void)
         if (PE_Port_ShouldStop()) return;
 
         /* 80192450: input first, or held-mask test sees stale edges. */
+        /* HOST_ADAPTED: retail libpad fills the BIOS pad buffer from the
+         * VSync interrupt; like the field (func_8003F3C4) and title loops,
+         * fill it from the host pad source right before 8003EB04 reads it.
+         * Without this the world map never saw input. */
+        if (PE_Port_HasPadSource()) {
+            PE_StoreU16(0x800BE9A0u, 0x4100u);
+            PE_StoreU16(0x800BE9A2u, PE_Port_ReadPadRaw());
+        }
         align_calls = PE_ControllerAlignCalls;
         func_8003EB04();
         if (PE_Port_ShouldStop()) return;
