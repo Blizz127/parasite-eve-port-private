@@ -1051,3 +1051,26 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
 
     So the gate covers only the script-driven stretches. A full Day 3
     route needs recorded pad input, like the Day 1 gate.
+  - 03:15 CT: Day 3 walked-route attempt (WIP; harness code not committed yet,
+    gates k24 running):
+    - Approach: a harness-only Day 3 pilot (`--route-pad` with
+      PE_PAD_SCRIPT and PE_ROUTE_WAYPOINTS). After one warp to the Day 3
+      start (m0092i, 0x140) it walks per-room waypoints, keyed by room,
+      story and visit number, using the Day 1 learned pad->world map. In
+      battles it uses the Day 1 battle aid (RouteBattleShim). Otherwise it
+      uses the Day 2 gate's Cross/Circle text pad.
+    - Walked natively, no stops: m0092i -> m0093i (story 0x148, Daniel
+      at the car), m0093i -> m0094i -> m0095i (gun shop) -> m0094i,
+      and m0093i -> m0096i.
+    - Day 3 gating found in the room scripts: the car exit to the map at
+      0x148 (m0093i module 6) only exists when persist[0x19] has 0x08
+      (set when the gun shop, m0095i, is entered at 0x148) and 0x10 (set
+      by the pharmacy scene, m0097i). The m0096i street exit to the map
+      needs story > 0x148. So the route has to visit the gun shop and
+      the pharmacy, then go back to the car.
+    - Where it stopped: in m0094i Daniel and the NPC in blue follow and
+      box Aya in at the gun shop front, and the waypoint pilot can't route
+      round moving NPCs yet. Not reached: the pharmacy, the map, the
+      precinct (0x160), the park rooms (0x168-0x178), the hospital
+      (0x180-0x190), the m0123i fight (0x1B0) and the Day 4 hop. No new
+      CPU_BOUNDARY/REFUSED stop so far.
