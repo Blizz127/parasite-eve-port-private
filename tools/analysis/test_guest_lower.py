@@ -326,6 +326,53 @@ class GteAsm(CRunner):
         # x = 100; y = -vz = -(40000 as s16 = -25536) = 25536; z = vy = -200
         self.assertEqual(out.strip(), "25436 100 25536 -200 | 100 25536 -200 | 1 1")
 
+    CARRY_SRC = r"""
+extern int g_slot asm("D_80180010");
+extern void func_80190100(void);
+int func_80190000(int mode)
+{
+    /* vendor macro style: $8 loaded in one asm, read by the next, never
+       declared to cc1 (m0437i func_80192500) */
+    __asm__ volatile("lw $8,0(%0)\n\tnop\n\tlw $12,0($8)\n\tctc2 $12,$0"
+                     : : "r"(&g_slot) : "$12");
+    if (mode)
+        __asm__ volatile("lw $12,4($8)\n\tctc2 $12,$1" : : : "$12");
+    return mode;
+}
+"""
+
+    def test_undeclared_gpr_carried_between_asm(self):
+        code = tu(self.CARRY_SRC, extra=GTE_MOCK)
+        self.assertIn("uint32_t pe_hr8 = 0u;", code)
+        out = self.run_c(code, r"""
+            PE_StoreU32(0x80180010u, 0x80100000u);
+            PE_StoreU32(0x80100000u, 0x11112222u); PE_StoreU32(0x80100004u, 0x33334444u);
+            func_80190000(1);
+            printf("%08x %08x\n", gc[0], gc[1]);""")
+        self.assertEqual(out.strip(), "11112222 33334444")
+
+    def test_carried_gpr_needs_earlier_asm(self):
+        src = self.CARRY_SRC.replace('__asm__ volatile("lw $8,0(%0)\\n\\tnop\\n\\t', '__asm__ volatile("')
+        self.assertNotEqual(src, self.CARRY_SRC)
+        with self.assertRaises(gl.LowerError) as cm:
+            lower(src)
+        self.assertIn("carried $8 not set by an earlier asm", str(cm.exception))
+
+    def test_carried_gpr_killed_by_call(self):
+        src = self.CARRY_SRC.replace("    if (mode)\n", "    func_80190100();\n    if (mode)\n")
+        self.assertNotEqual(src, self.CARRY_SRC)
+        sigs = {"func_80190100": {"ret": "void", "params": ["void"]}}
+        with self.assertRaises(gl.LowerError) as cm:
+            lower(src, known={"func_80190100"}, sigs=sigs)
+        self.assertIn("carried $8 not set by an earlier asm", str(cm.exception))
+
+    def test_clobbered_gpr_never_carried(self):
+        src = self.CARRY_SRC.replace(': : : "$12");', ': : : "$8", "$12");')
+        self.assertNotEqual(src, self.CARRY_SRC)
+        with self.assertRaises(gl.LowerError) as cm:
+            lower(src)
+        self.assertIn("$8 read before written", str(cm.exception))
+
     def test_rtpt_and_sz3_read_lowered(self):
         src = r"""
         int func_80190000(int *otz)

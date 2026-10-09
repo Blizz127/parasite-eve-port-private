@@ -281,6 +281,11 @@ class Lowerer:
         self.frame = 0
         self.asm_table: list[dict] = []
         self.aliases: dict[str, str] = {}
+        # Undeclared GPRs carried from one asm statement to the next (see
+        # compile_asm): function-scope pe_hrN, and the set an earlier asm
+        # has written with no call since.
+        self.hr_used: set[int] = set()
+        self.hr_valid: set[int] = set()
         self._parse(text)
 
     # parsing ---------------------------------------------------------
@@ -835,6 +840,7 @@ class Lowerer:
     GUEST_CALL_MAX_ARGS = 8   # PE_GUESTCALL_MAX_ARGS (pe_guestcode.h)
 
     def guest_call(self, fcode, args, ft) -> tuple[str, T]:
+        self.hr_valid.clear()
         if len(args) > self.GUEST_CALL_MAX_ARGS:
             raise LowerError(f"indirect call with more than {self.GUEST_CALL_MAX_ARGS} arguments")
         rt = self.ret_of(ft)
@@ -860,6 +866,7 @@ class Lowerer:
         return f"(({htype(rt)}){call})", rt
 
     def boundary_call(self, name, args, ft) -> tuple[str, T]:
+        self.hr_valid.clear()
         a = self.scalar_args(args)
         n = min(len(a), 4)
         if n == 0:
@@ -893,6 +900,7 @@ class Lowerer:
 
     def direct_call(self, name, args, ft, sig, discard=False) -> tuple[str, T]:
         self.callees.add(name)
+        self.hr_valid.clear()
         rt = self.ret_of(ft)
         if sig is None:
             if name != self.name:
@@ -1057,7 +1065,19 @@ class Lowerer:
         gprs = sorted({o[-1][1] for o in spec["ops"] if o[0] == "load" and o[-1][0] == "gpr"}
                       | {o[2][1] for o in spec["ops"] if o[0] == "alu" and o[2][0] == "gpr"}
                       | {o[1][1] for o in spec["ops"] if o[0] in ("cfc2", "mfc2") and o[1][0] == "gpr"})
-        decl += [f"{tag}_r{n}" for n in gprs]
+        carried = self.asm_table[0].get("carried", set())
+        for n in sorted(spec.get("carried_in", ())):
+            # Retail reads a register an earlier asm left there (undeclared to
+            # cc1).  Exact only when that asm ran with no call in between (a
+            # call clobbers every caller-saved GPR); refuse otherwise.
+            if n not in self.hr_valid:
+                raise LowerError(f"asm: carried ${n} not set by an earlier asm")
+        decl += [f"{tag}_r{n}" for n in gprs if n not in carried]
+        for n in gprs:
+            if n in carried:
+                self.hr_used.add(n)
+                self.hr_valid.add(n)
+        self.hr_used.update(spec.get("carried_in", ()))
         if decl:
             body.append(J + "uint32_t " + ", ".join(f"{d} = 0u" for d in decl) + ";")
         for j, (c, _) in enumerate(ins):
@@ -1068,7 +1088,9 @@ class Lowerer:
             body.append(f"{J}{tag}_{reg[k]} = (uint32_t)({cv});")
 
         def r(x):
-            return f"{tag}_{reg[x[1]]}" if x[0] == "op" else f"{tag}_r{x[1]}"
+            if x[0] == "op":
+                return f"{tag}_{reg[x[1]]}"
+            return f"pe_hr{x[1]}" if x[1] in carried else f"{tag}_r{x[1]}"
         for o in spec["ops"]:
             if o[0] == "load":
                 _, mn, off, base, d = o
@@ -1259,6 +1281,9 @@ class Lowerer:
         self.scopes = [scope]
         body: list[str] = []
         self.block(fd.body, "    ", body)
+        if self.hr_used:
+            body.insert(0, "    uint32_t " + ", ".join(f"pe_hr{n} = 0u" for n in sorted(self.hr_used))
+                        + ";   /* GPRs carried between asm statements */")
         plist = ", ".join(params) or "void"
         sig = f"{rett} {self.name}({plist})"
         if not self.frame:
@@ -1480,8 +1505,14 @@ def _mem(tok: str):
     return int(m.group(1) or "0", 0), _reg(m.group(2), "gpr")
 
 
-def compile_asm(tpl: str, outs, ins) -> list[tuple]:
-    """Template -> micro-ops; raises LowerError outside the supported set."""
+def compile_asm(tpl: str, outs, ins, clobbers=None, carried_in=None) -> list[tuple]:
+    """Template -> micro-ops; raises LowerError outside the supported set.
+
+    With `carried_in` (a set to fill), a GPR read before this template writes
+    it and not declared clobbered is a register an earlier asm left behind
+    (vendor GTE macros that load $8 in one statement and use it in the next,
+    unseen by cc1): it is recorded there instead of refused, and the lowerer
+    binds it to a function-scope variable.  $0, $29 and $31 never carry."""
     nops = len(outs) + len(ins)
     for c, _ in outs:
         if c not in ("=r", "=&r"):
@@ -1501,7 +1532,10 @@ def compile_asm(tpl: str, outs, ins) -> list[tuple]:
             if r[1] not in written:
                 raise LowerError("asm: output read before written")
         elif r[1] not in gpr_set:
-            raise LowerError(f"asm: ${r[1]} read before written")
+            if (carried_in is None or r[1] in (0, 29, 31)
+                    or r[1] in (clobbers or ())):
+                raise LowerError(f"asm: ${r[1]} read before written")
+            carried_in.add(r[1])
         return r
 
     def dst(r):
@@ -1664,8 +1698,15 @@ def extract_asm(text: str) -> tuple[str, list[dict]]:
             out.append(";")
             pos = end + tail.end()
             continue
-        ops = compile_asm(tpl, outs, ins)
-        table.append({"outs": outs, "ins": ins, "ops": ops})
+        clob = set()
+        for c in _split_top(secs[3], ",") if secs[3].strip() else []:
+            cm = re.fullmatch(r'\s*"\$(\d+)"\s*', c)
+            if cm:          # named / other clobbers only matter to cc1
+                clob.add(int(cm.group(1)))
+        cin: set[int] = set()
+        ops = compile_asm(tpl, outs, ins, clob, cin)
+        table.append({"outs": outs, "ins": ins, "ops": ops, "carried_in": cin})
+        table[0].setdefault("carried", set()).update(cin)
         args = "".join(f", ({e})" for _, e in outs + ins)
         out.append(text[pos:m.start()])
         out.append(f"__pe_asm({len(table) - 1}{args});")

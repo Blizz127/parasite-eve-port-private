@@ -174,39 +174,102 @@ ASM_PIN_ONLY_RE = re.compile(r"\s*(?:__asm__|asm)\s*\(\s*\"\$[0-9A-Za-z]+\"\s*\)
 # leaves use it to copy a parameter into a pinned register).  It is rewritten
 # to that assignment before the fences are removed; with a == b it stays a
 # fence.
-ASM_TIED_MOVE_RE = re.compile(
-    r"(?:__asm__|\basm)\s*(?:__volatile__|volatile)?\s*\(\s*\"\"\s*:\s*\"=r\"\s*"
-    r"\(\s*([A-Za-z_]\w*)\s*\)\s*:\s*\"0\"\s*\(\s*([A-Za-z_]\w*)\s*\)\s*\)\s*;")
+# A tied input may also be a side-effect-free constant: an integer literal or
+# the address of a named object (`"0"(1)`, `"0"(&D_80192E8C)`,
+# `"1"(&D_800F3368.f8)`).  cc1 loads it into the output register (a reload),
+# so the statement computes `out = constant` exactly like a named input.
+# Several outputs, each tied to its own input, are a parallel move
+# (`asm("" : "=r"(a), "=r"(b) : "0"(c), "1"(d))` -> `a = c; b = d;`); an
+# output tied to itself is a pin and assigns nothing.  Untied inputs
+# ("r"/"m"/"i") only order the statement for cc1 and compute nothing.  The
+# rewrite is refused (the statement stays a fence, and a pin it reads stays
+# refused by the E2b guard) when an output is read as another output's input
+# (the sequential assignments would differ from the parallel move), when an
+# output is not tied to any input, or when an operand has another form.
+_TIED_VAL_RE = re.compile(r"[A-Za-z_]\w*|-?\s*(?:0[xX][0-9A-Fa-f]+|\d+)[uUlL]*"
+                          r"|&\s*[A-Za-z_]\w*(?:\s*\.\s*[A-Za-z_]\w*)*")
+_EMPTY_ASM_RE = re.compile(r"(?:__asm__|\basm)\s*(?:__volatile__|volatile)?\s*\(\s*\"\"\s*:")
+_OPERAND_RE = re.compile(r'\s*"([^"]*)"\s*\((.*)\)\s*', re.S)
 
 
-# The same with several outputs, each tied to its own input:
-# `asm("" : "=r"(a), "=r"(b) : "0"(c), "1"(d))` computes `a = c; b = d;` (a
-# parallel move).  It is rewritten only when no output is also an input, so
-# the sequential assignments equal the parallel move; anything else stays a
-# fence (and a pin it reads stays refused by the E2b guard).
-ASM_TIED_MULTI_RE = re.compile(
-    r"(?:__asm__|\basm)\s*(?:__volatile__|volatile)?\s*\(\s*\"\"\s*:"
-    r"((?:\s*\"=r\"\s*\(\s*[A-Za-z_]\w*\s*\)\s*,)+\s*\"=r\"\s*\(\s*[A-Za-z_]\w*\s*\)\s*)"
-    r":((?:\s*\"\d\"\s*\(\s*[A-Za-z_]\w*\s*\)\s*,)+\s*\"\d\"\s*\(\s*[A-Za-z_]\w*\s*\)\s*)\)\s*;")
-TIED_OUT_RE = re.compile(r"\"=r\"\s*\(\s*([A-Za-z_]\w*)\s*\)")
-TIED_IN_RE = re.compile(r"\"(\d)\"\s*\(\s*([A-Za-z_]\w*)\s*\)")
+def _top_split(sec: str, sep: str) -> list[str]:
+    out, depth, cur = [], 0, []
+    for ch in sec:
+        if ch in "([":
+            depth += 1
+        elif ch in ")]":
+            depth -= 1
+        if ch == sep and depth == 0:
+            out.append("".join(cur))
+            cur = []
+        else:
+            cur.append(ch)
+    out.append("".join(cur))
+    return out
 
 
-def _tied_multi(m: re.Match) -> str:
-    outs = TIED_OUT_RE.findall(m.group(1))
-    ins = TIED_IN_RE.findall(m.group(2))
-    if (len(ins) != len(outs) or [int(k) for k, _ in ins] != list(range(len(outs)))
-            or set(outs) & {v for _, v in ins} or len(set(outs)) != len(outs)):
-        return m.group(0)
-    return " ".join(f"{a} = {v};" for a, (_, v) in zip(outs, ins)) + \
-        " /* E2b: tied register move */"
+def _tied_norm(v: str) -> str:
+    return re.sub(r"\s+", "", v)
+
+
+def _tied_rewrite(body: str) -> str | None:
+    secs = _top_split(body, ":")
+    if len(secs) not in (2, 3) or not secs[0].strip():
+        return None
+    outs = []
+    for op in _top_split(secs[0], ","):
+        m = _OPERAND_RE.fullmatch(op)
+        if not m or m.group(1) not in ("=r", "=&r") or not re.fullmatch(r"\s*[A-Za-z_]\w*\s*", m.group(2)):
+            return None
+        outs.append(m.group(2).strip())
+    tied: dict[int, str] = {}
+    for op in _top_split(secs[1], ",") if secs[1].strip() else []:
+        m = _OPERAND_RE.fullmatch(op)
+        if not m:
+            return None
+        c, e = m.group(1), m.group(2).strip()
+        if c.isdigit():
+            k = int(c)
+            if k >= len(outs) or k in tied or not _TIED_VAL_RE.fullmatch(e):
+                return None
+            tied[k] = _tied_norm(e)
+        elif c not in ("r", "m", "i"):
+            return None
+    if len(set(outs)) != len(outs) or set(tied) != set(range(len(outs))):
+        return None
+    for k, v in tied.items():
+        if any(v == o for j, o in enumerate(outs) if j != k):
+            return None
+    moves = [f"{o} = {tied[k]};" for k, o in enumerate(outs) if tied[k] != o]
+    return " ".join(moves) + " /* E2b: tied register move */" if moves else None
 
 
 def rewrite_tied_moves(text: str) -> str:
-    text = ASM_TIED_MULTI_RE.sub(_tied_multi, text)
-    return ASM_TIED_MOVE_RE.sub(
-        lambda m: (m.group(0) if m.group(1) == m.group(2)
-                   else f"{m.group(1)} = {m.group(2)}; /* E2b: tied register move */"), text)
+    out, pos = [], 0
+    for m in _EMPTY_ASM_RE.finditer(text):
+        if m.start() < pos:
+            continue
+        depth, i = 1, text.index("(", m.start()) + 1
+        while i < len(text) and depth:
+            if text[i] == '"':
+                i += 1
+                while i < len(text) and text[i] != '"':
+                    i += 2 if text[i] == "\\" else 1
+            elif text[i] == "(":
+                depth += 1
+            elif text[i] == ")":
+                depth -= 1
+            i += 1
+        tail = re.match(r"\s*;", text[i:])
+        if depth or not tail:
+            continue
+        rep = _tied_rewrite(text[m.end():i - 1])
+        if rep is not None:
+            out.append(text[pos:m.start()])
+            out.append(rep)
+            pos = i + tail.end()
+    out.append(text[pos:])
+    return "".join(out)
 
 
 ASM_OUT_BEFORE_RE = re.compile(r"\"=&?r\"\s*\(\s*$")

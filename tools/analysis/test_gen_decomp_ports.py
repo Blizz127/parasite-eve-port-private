@@ -81,6 +81,26 @@ class EraAsmTests(unittest.TestCase):
         same = 'void f(int *p) { asm volatile("" : "=r"(p) : "0"(p)); }'
         self.assertNotIn("p = p", g.strip_era_asm(same))
 
+    def test_tied_move_constant_inputs_assign(self):
+        # cc1 reloads a constant tied input into the output register, so the
+        # statement assigns it (m0348i func_801918E8, m0437i func_80192500).
+        cases = {
+            'asm volatile("" : "=r"(b) : "0"(&D_80192E8C));': "b = &D_80192E8C;",
+            'asm("" : "=r"(one) : "0"(1));': "one = 1;",
+            'asm("" : "=r"(k16), "=r"(s) : "0"(16), "1"(&D_800F3368.f8));':
+                "k16 = 16; s = &D_800F3368.f8;",
+            # identity half of a parallel move assigns nothing
+            'asm("" : "=r"(m), "=r"(st) : "0"(0x4000000), "1"(st));': "m = 0x4000000;",
+            # untied inputs only order the statement
+            'asm("" : "=r"(m1) : "0"(-1), "r"(result));': "m1 = -1;",
+        }
+        for src, want in cases.items():
+            out = g.strip_era_asm(src)
+            self.assertIn(want + " /* E2b: tied register move */", out, src)
+            self.assertNotIn("asm", out.replace("E2b", ""), src)
+        # an input with a call is not a plain move
+        self.assertIn('"0"(f(y))', g.strip_era_asm('asm("" : "=r"(x) : "0"(f(y)));'))
+
     def test_multi_output_tied_move_is_a_parallel_assignment(self):
         # asm("" : "=r"(a), "=r"(b) : "0"(c), "1"(d)) computes a = c; b = d.
         src = ('int func_80099990(int *owner, int state) {\n'
