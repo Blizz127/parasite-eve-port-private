@@ -64,8 +64,12 @@ int func_80083BB8(pe_addr_t record,pe_addr_t alignment)
     PE_StoreU32(record+0x18u,0x80083C3Cu);
     return 1;
 }
+/* Counts 800828F4 entries: the original always reaches 80083BB8, whose ra
+ * save is stack residue read by the M0000I menu list (func_801942FC). */
+uint32_t PE_ControllerAlignCalls;
 int func_800828F4(uint32_t port,pe_addr_t alignment)
 {
+    PE_ControllerAlignCalls++;
     pe_addr_t p=controller_record(port);if(!p)return 0;
     return func_80083BB8(p,alignment);
 }

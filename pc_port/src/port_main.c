@@ -373,6 +373,8 @@ static int RoutePadClock(void)
     return g_frame - g_pad_offset;
 }
 
+#include "route_day3_pilot.h"
+
 static uint16_t RoutePadSource(void)
 {
     uint16_t mask;
@@ -388,7 +390,7 @@ static uint16_t RoutePadSource(void)
             for (unsigned i = 0; i < g_script_pad_count &&
                  g_frame - g_hand_over_frame >= g_script_pad[i].frame; i++)
                 m = g_script_pad[i].mask;
-            return m;
+            return RouteDay3Pilot(m);
         }
         return HostWindow_PadRaw();
     }
@@ -477,7 +479,7 @@ static void PresentHook_BlitWindow(void)
          * <dir>/p<present>.ppm every N presents (menu / load verification). */
         static const char *sdir = (const char *)1; static int sev;
         if (sdir == (const char *)1) { sdir = getenv("PE_SHOT_DIR"); sev = getenv("PE_SHOT_EVERY") ? atoi(getenv("PE_SHOT_EVERY")) : 60; }
-        if (sdir && sev > 0 && !g_opts.route_pad) {
+        if (sdir && sev > 0 && (!g_opts.route_pad || getenv("PE_ROUTE_SHOTS"))) {
             int presented = 0; HostFB_GetState(NULL, NULL, &presented, NULL);
             if (presented % sev == 0) {
                 char path[512]; snprintf(path, sizeof path, "%s/p%06d.ppm", sdir, presented);

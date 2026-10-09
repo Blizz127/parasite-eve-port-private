@@ -35942,6 +35942,7 @@ static void test_ATK3_retail_attack_initialization(void)
 #include "test_transition_bounds.h"
 #include "test_transition_motion.h"
 #include "test_transition_update.h"
+#include "test_message_partial.h"
 #include "test_transition_visibility.h"
 #include "test_projection.h"
 #include "test_fixed_model.h"
@@ -40947,6 +40948,7 @@ int main(void)
     test_DAY1_transition_bounds();
     test_DAY1_transition_motion();
     test_DAY1_transition_update();
+    test_message_partial_open();
     test_DAY1_transition_visibility();
     test_DAY1_projection();
     test_DAY1_fixed_model();

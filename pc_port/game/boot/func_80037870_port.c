@@ -28,6 +28,7 @@
 #include "psx_compat.h"
 #include "pe_port_compat.h"
 #include "pe_guest_ram.h"
+#include "game_port.h"
 
 #define GA_D_800BCEA8 0x800BCEA8u
 #define GA_D_8009CE90 0x8009CE90u
@@ -239,6 +240,7 @@ static void pe_37870_record(pe_addr_t rec, PeMessageDraw *draw, unsigned int ban
             sub = PE_LoadU8(cursor + 1u);
             if(sub<4u || sub>=10u) {pe_37870_extended(draw,byte,sub,&x,y);cursor+=2u;continue;}
             if(sub==8u) {
+                if(!PE_MessageDigitsKnown(rec,(digits-(rec+0x1Au))/6u)){PE_Port_RequestStop(PE_PORT_STOP_UNRESOLVED_BOUNDARY);return;}
                 for(int count=(int8_t)PE_LoadU8(digits+5u);count>0;count--)
                     pe_37870_extended(draw,0u,PE_LoadU8(digits+(unsigned)count-1u),&x,y);
                 digits+=6u;cursor+=2u;continue;
