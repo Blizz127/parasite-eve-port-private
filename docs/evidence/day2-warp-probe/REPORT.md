@@ -1107,3 +1107,22 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
       skips it ("call arity func_800C22F8 0!=1"): the leaf calls
       func_800C22F8 bare, and retail passes the caller's live $a0 (the
       effect slot) through to it.
+  - 04:27 CT: m0107i stop fixed (gates k26 running). Day 3 walked route now
+    reaches m0108i and story 0x190.
+    - Fix: guest_lower E21d. A bare `f()` to a prototype-less, one-parameter
+      callee forwards the leaf's live $a0. This only applies when the leaf
+      takes no parameters, the callee's matched retail definition takes one,
+      and the call is the first statement (`f();` or `*f() = <constant or
+      global address>`).
+    - Retail bytes of room_m0107i 8018F1D4 confirm it: addiu sp / sw ra /
+      jal 800C22F8, with $a0 untouched.
+    - 5 new guest_lower tests cover the positive case and four refusals. The
+      rule emits 33 room TUs (all the `*func_800C22F8() = D_x` effect inits,
+      including m0087i and m0107i).
+    - Route pilot (harness only): Cross opens targeting when the target list
+      is empty, and mode 9 (field after a battle) counts as walkable.
+    - The m0107i random battle is won by shooting (two enemies, about 10000
+      frames) with two opt-in fixtures. PE_ROUTE_MAXHP=300: the warp keeps
+      Day 1 stats (45 HP) and Day 3 enemies hit for 35-117. Infinite ammo
+      (cheat F3): the Day 1 handgun runs dry.
+    - Next: m0108i -> m0115i -> m0044i -> m0123i fight (0x1B0).
