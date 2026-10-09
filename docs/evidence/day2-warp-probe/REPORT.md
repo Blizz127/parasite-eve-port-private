@@ -1243,3 +1243,33 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
     - Walked route: the m0123i fight now runs past 0x80192F0C and stops at
       CPU_BOUNDARY/REFUSED 0x80193618, the boss-model effect called from
       the effect system. Next: hand-match it (0xFD4 bytes, no twin).
+  - 09:01 CT: m0123i stop 0x80193618 fixed, the m0123i fight is won, and
+    day3_walk reaches story 0x1B0. day3_walk now runs by default. k32
+    gates all PASS: Day 1 route (story 80), Day 2 movies, tests
+    1649/1649, retail_data_guard, psyq_port_guard, exact rebuild,
+    gen_decomp_ports --verify, gen_overlay_ports --verify, Day 2 route,
+    Day 3 route. Day 3 ran day3_start, day3_mid, day3_end (1B8) and
+    day3_walk (0x1B0 at frame 28458, 75 s).
+    - room_m0123i func_80193618 (0xFD4, the boss-model effect) is
+      hand-matched (LINK_EXACT, no masked twin) and carved, so every
+      m0123i row is now C except one asm. Room exact gate PASS (66 c /
+      1 asm / 1 rodata), deep preflight PASS.
+    - Psy-Q MulMatrix0 (func_800785D4) gets the host replacement
+      PE_MulMatrix0_Guest and the test INIT1_mulmatrix0_guest, the same
+      way RotMatrixYXZ was already handled. The generated port of
+      func_80193618 has no boundaries.
+    - The m0123i fight is Kerberos (heads of 200/300/400 HP; the centre
+      head heals the others). With warped Day-1 stats Aya hits for about
+      3 HP, so the shim could not win. day3_walk now also sets the 1-Hit
+      Kills assist PE_ONE_HIT_KILLS=1. Retail still computes every hit and
+      runs its own death and victory path: all three heads die, then
+      0x1B0.
+    - Waypoint fix: the faster m0107i battle leaves Aya west of a blocked
+      line to the door, so the m0107i@188 entry now goes through the open
+      east corridor.
+    - A continuous walk from the Day 3 start (m0093i@140) also reaches
+      0x1B0 (frame 61674) with no stops. It is not in the gate yet.
+    - Open: 0x1B0 to 0x1B8. After the fight the pilot has no 0x1B0
+      entries, so Aya never talks to Baker. The gate covers 1B0 to 1B8
+      with the day3_end warp (m0352i).
+    - The wt2 BFM build (/workspace/bfm-b28-wt2, srun.sh) was left alone.

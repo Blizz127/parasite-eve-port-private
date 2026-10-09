@@ -96,3 +96,24 @@ EXACT_REBUILD_GATE[room_m0123i]=PASS plan=fd37e77c088f3b0154d7b815837decb9445b88
 ```
 
 `func_8019251C` (0x3534, 0x4E0 bytes) is also hand-matched (LINK_EXACT, no masked twin) and carved. After these three carves the room gate PASSes with spans [65 c, 2 asm, 1 rodata, 2 bin] and the same sha1 7dbc62ff99461836f22d884ef04718af387e04cd (k31, 2026-10-09).
+
+### `func_80193618` (0x4630, 0xFD4 bytes, 2026-10-09)
+
+This is the boss-model effect. The effect system (`func_800D413C`) calls it, and it was the next Day 3 fight stop (`CPU_BOUNDARY/REFUSED pc=0x80193618`).
+- Mode 0 arms it: it flags the boss model and loads models 0xC5483704/0xC5883704 into `D_80195698`/`D_8019569C`.
+- Mode 1 runs each frame: it follows model joint 0x17 through three states (grow, pulse, fade). A `func_800CEB8C` hit can flag the actor and switch the model's draw bits.
+- Mode 2 draws: a sprite, two fans and three `func_800D3BC8` billboards, then the two lit models through RotMatrix/MulMatrix0/ScaleMatrix and the `func_800C6xxx` model API.
+
+It is hand-matched (no masked twin) and LINK_EXACT at the room VMA (era_o2_g0). The first draft had 220 diff lines. The levers:
+- `D_800B0E64` and `D_800E11EA` are read as array elements, because retail CSEs their addresses.
+- The palette/p06/tpage triples are written tpage first, which makes `&tpage` the CSE base, as in retail's `-4($s3)`/`-2($s3)` stores.
+- The header block's p00 is a struct store.
+- The `/64` result goes through the shared temp `s`, which retail keeps in `$s3`.
+- The camera slot gets an empty `__asm__ volatile("")` before it is set, so sched1 doesn't hoist `&D_800BCFA4` above the `t[2]` store, plus the `func_80192BDC` register barrier.
+
+Lowering: the Psy-Q `func_800785D4` (MulMatrix0) now has a host replacement, `PE_MulMatrix0_Guest` in `func_800794C4_port.c`, with the test `INIT1_mulmatrix0_guest`. It works the way `func_80079754` → `PE_RotMatrixYXZ_Guest` already did, so the generated port has no boundaries.
+
+```
+$ scripts/exact_rebuild_overlay.sh room_m0123i
+EXACT_REBUILD_GATE[room_m0123i]=PASS plan=38752bc4c3ff908f087ef79a56d4ba8e374ddc60c464a7b7df49f282a3f748b0 yaml=325a06af9054675338ffe90314de05ea812b00b934d9780609fd8639e0cc7c48 spans=[66 c, 1 asm, 1 rodata, 2 bin] sha1_orig=7dbc62ff99461836f22d884ef04718af387e04cd sha1_cand=7dbc62ff99461836f22d884ef04718af387e04cd sha1=7dbc62ff99461836f22d884ef04718af387e04cd
+```

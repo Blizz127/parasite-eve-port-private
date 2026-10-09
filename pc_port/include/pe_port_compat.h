@@ -1082,6 +1082,10 @@ void PE_RotMatrix79754_values(const int16_t angles[3], int16_t out[9]);
  * MATRIX *m -> m).  Lowered room code calls this host function by name
  * (gen_overlay_ports host_replacements); no func_80079754 is defined. */
 pe_addr_t PE_RotMatrixYXZ_Guest(pe_addr_t r, pe_addr_t m);
+/* host-replacement: func_800785D4 (Psy-Q libgte MulMatrix0; guest MATRIX *m0,
+ * *m1, *out -> out = m0*m1 rotation, translation untouched).  Lowered room
+ * code calls this host function by name; no func_800785D4 is defined. */
+pe_addr_t PE_MulMatrix0_Guest(pe_addr_t left, pe_addr_t right, pe_addr_t out);
 void PE_RotMatrix794C4_values(const int16_t angles[3], int16_t out[9]);
 
 void func_800783E4(pe_addr_t a, pe_addr_t b, int32_t wa, int32_t wb, pe_addr_t out);

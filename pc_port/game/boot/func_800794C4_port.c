@@ -157,3 +157,31 @@ pe_addr_t PE_RotMatrixYXZ_Guest(pe_addr_t r, pe_addr_t m)
     PE_RotMatrix79754(angles, m);
     return m;
 }
+
+/* Host replacement for the Psy-Q libgte entry func_800785D4 (MulMatrix0),
+ * called with guest pointers by lowered room code: out = left * right on the
+ * 3x3 rotation parts.  Retail loads left as the GTE rotation and runs MVMVA
+ * (sf=1, lm=0) on each column of right, so every element is the 3-term dot
+ * product >> 12 clamped to int16 (IR saturation).  The translation and
+ * padding of out are not written; out is returned (src/func_800785D4.c). */
+pe_addr_t PE_MulMatrix0_Guest(pe_addr_t left, pe_addr_t right, pe_addr_t out)
+{
+    int16_t l[9], r[9], o[9];
+    unsigned i, j;
+    for (i = 0; i < 9u; i++) {
+        l[i] = (int16_t)PE_LoadU16(left + i * 2u);
+        r[i] = (int16_t)PE_LoadU16(right + i * 2u);
+    }
+    for (j = 0; j < 3u; j++) {
+        for (i = 0; i < 3u; i++) {
+            int64_t mac = (int64_t)l[i * 3u] * r[j] + (int64_t)l[i * 3u + 1u] * r[3u + j]
+                        + (int64_t)l[i * 3u + 2u] * r[6u + j];
+            mac >>= 12;
+            if (mac > 0x7FFF) mac = 0x7FFF;
+            if (mac < -0x8000) mac = -0x8000;
+            o[i * 3u + j] = (int16_t)mac;
+        }
+    }
+    for (i = 0; i < 9u; i++) PE_StoreU16(out + i * 2u, (uint16_t)o[i]);
+    return out;
+}

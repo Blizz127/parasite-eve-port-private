@@ -37466,6 +37466,41 @@ static void test_INIT1_rotmatrix_guest(void)
     PASS();
 }
 
+/* PE_MulMatrix0_Guest (host replacement for func_800785D4 in lowered room
+ * code): out = left*right rotation (>>12, int16 clamp), translation kept. */
+static void test_INIT1_mulmatrix0_guest(void)
+{
+    static const int16_t ident[9] = {4096,0,0, 0,4096,0, 0,0,4096};
+    static const int16_t a[9] = {100,-200,300, 4096,2048,-1024, 7,8,9};
+    static const int16_t big[9] = {0x7FFF,0x7FFF,0x7FFF, 0,0,0, -0x8000,-0x8000,-0x8000};
+    unsigned j;
+    TEST("INIT1_mulmatrix0_guest");
+    ResetTestState();
+    PE_Fill(0x80140000u, 32u, 0xA5u);
+    for (j = 0; j < 9u; j++) {
+        PE_StoreU16(0x80140040u + j*2u, (uint16_t)ident[j]);
+        PE_StoreU16(0x80140080u + j*2u, (uint16_t)a[j]);
+    }
+    ASSERT(PE_MulMatrix0_Guest(0x80140040u, 0x80140080u, 0x80140000u) == 0x80140000u, "returns out");
+    for (j = 0; j < 9u; j++)
+        ASSERT((int16_t)PE_LoadU16(0x80140000u + j*2u) == a[j], "identity*a == a");
+    for (j = 18u; j < 32u; j++)
+        ASSERT(PE_LoadU8(0x80140000u + j) == 0xA5u, "translation untouched");
+    /* a*a row0 col0: (100*100 - 200*4096 + 300*7) >> 12 = -198 (floor). */
+    PE_MulMatrix0_Guest(0x80140080u, 0x80140080u, 0x80140000u);
+    ASSERT((int16_t)PE_LoadU16(0x80140000u) == (int16_t)((100*100 - 200*4096 + 300*7) >> 12), "a*a[0][0]");
+    ASSERT((int16_t)PE_LoadU16(0x80140000u + 8u) == (int16_t)((4096*(-200) + 2048*2048 - 1024*8) >> 12), "a*a[1][1]");
+    for (j = 0; j < 9u; j++) {
+        PE_StoreU16(0x80140080u + j*2u, (uint16_t)big[j]);
+        PE_StoreU16(0x801400C0u + j*2u, (uint16_t)0x7FFF);
+    }
+    PE_MulMatrix0_Guest(0x80140080u, 0x801400C0u, 0x80140000u);
+    ASSERT((int16_t)PE_LoadU16(0x80140000u) == 0x7FFF, "positive saturation");
+    ASSERT((int16_t)PE_LoadU16(0x80140000u + 6u) == 0, "zero row");
+    ASSERT((int16_t)PE_LoadU16(0x80140000u + 12u) == -0x8000, "negative saturation");
+    PASS();
+}
+
 static void test_INIT1_clip_formats_and_joint_override(void)
 {
     const pe_addr_t dest=0x80130000u, clip=0x80131000u, matrices=0x80140000u;
@@ -40789,6 +40824,7 @@ int main(void)
     test_PKT1_retail_packet_bytes();
     test_INIT1_rotation_retail_vectors();
     test_INIT1_rotmatrix_guest();
+    test_INIT1_mulmatrix0_guest();
     test_INIT1_clip_formats_and_joint_override();
     test_SKIP2_script_movie_and_nop();
     test_SKIP2_media_wait_retry();

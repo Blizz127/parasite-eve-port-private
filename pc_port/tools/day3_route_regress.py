@@ -22,10 +22,17 @@ so the gate covers the script-driven stretches only:
               fights the random battles (aim shim + Cross). It walks the
               precinct and the hospital (two flag examines), wins the
               hospital battles and the m0123i fight, and must reach story
-              0x1B0. Two opt-in fixtures, because the warp keeps Day-1 stats:
-              PE_ROUTE_MAXHP=300 (max HP in battle) and cheat F3 (infinite
-              ammo). The waypoints are the harness's own coordinates; no disc
-              bytes. Opt-in (--segment day3_walk) until the whole walk passes.
+              0x1B0. Three harness fixtures, because the warp keeps Day-1 stats:
+              PE_ROUTE_MAXHP=300 (max HP in battle), cheat F3 (infinite
+              ammo) and the 1-Hit Kills assist PE_ONE_HIT_KILLS=1. With the
+              Day-1 pistol Aya hits the m0123i Kerberos heads (200/300/400 HP,
+              the centre heals the others) for ~3 HP, so the fight cannot be
+              won. The assist keeps retail's hit and only raises the final
+              damage to the head's remaining HP, so retail's own death and
+              victory path runs (docs/port/ENHANCEMENTS.md). The waypoints are
+              the harness's own coordinates; no disc bytes. Runs by default
+              since the whole walk passed (2026-10-09: story 0x1B0 at frame
+              ~28500).
 A segment fails on a FATAL, CPU_BOUNDARY/REFUSED or [STOP] line, a story drop,
 a checkpoint firing out of order, or a missed checkpoint.
 """
@@ -75,8 +82,8 @@ SEGMENTS["day3_walk"] = dict(room="m0192i", story="178", frames=90000, checkpoin
     ("token", 0xA8022148, "m0122i"),
     ("token", 0xA80221C8, "m0123i fight"),
     ("story>=", 0x1B0, "m0123i fight won, story 0x1B0"),
-], opt_in=True, env_fn=lambda: {"PE_ROUTE_WAYPOINTS": walk_waypoints(), "PE_CHEAT_KEYS": "1010:F3",
-                   "PE_ROUTE_MAXHP": "300"})
+], env_fn=lambda: {"PE_ROUTE_WAYPOINTS": walk_waypoints(), "PE_CHEAT_KEYS": "1010:F3",
+                   "PE_ROUTE_MAXHP": "300", "PE_ONE_HIT_KILLS": "1"})
 
 
 def main() -> int:
