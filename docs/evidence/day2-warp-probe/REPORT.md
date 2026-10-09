@@ -859,3 +859,9 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
       `v_b = 0x80192E8C`.
     m0437i now runs to the frame limit at story 0x90, 0x140 and 0x300
     (Disc 2). Full gates running before the code commit.
+  - 21:52 CT: code commit fe6a4f0c (gates k18: Day 1 route PASS, story 80
+    frame 67186; Day 2 movies PASS; 1645/1645 tests; both guards PASS;
+    EXACT_REBUILD_GATE PASS; both `--verify` 0 drift). Full sweep with
+    that binary (402 slots, 2 at a time, 4000 frames), story 0x90: 382
+    clean, 20 unused (the same 20 slots fault at 0xFC913DA8 as before),
+    0 stopping. 0x140 and 0x300 (Disc 2) are running.
