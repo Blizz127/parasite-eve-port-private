@@ -1074,3 +1074,19 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
       precinct (0x160), the park rooms (0x168-0x178), the hospital
       (0x180-0x190), the m0123i fight (0x1B0) and the Day 4 hop. No new
       CPU_BOUNDARY/REFUSED stop so far.
+  - 03:44 CT: Day 3 walked route reaches the world map. New stop found, fix
+    staged (runtime code waits on gates k25):
+    - The pilot now walks m0092i -> m0093i (0x148) -> gun shop m0095i ->
+      m0094i -> m0093i -> m0096i -> pharmacy m0097i -> m0096i -> m0093i ->
+      Daniel's car -> world map M0000I (frame ~12973). The z=-850 path gets
+      round Daniel and the NPC.
+    - New stop: `unresolved-boundary` in PE_TransitionUpdate on the first
+      M0000I frame. The menu list (801942FC sp+136) is stack residue, and
+      M0000I runs on the scratchpad stack (8001220C sets sp=1F8003F8). See
+      docs/evidence/transition-menu-tail/REPORT.md and
+      pc_port/tools/pe_menu_tail_audit.py (MENU_TAIL_AUDIT=PASS).
+    - Fix (exact or stop): proven halves come from the constructor locals,
+      the draw pass (80076C34/80076354 saves) and the actuator call.
+      Unproven halves become unknown digit groups, which stop only if the
+      text draws them. With it, the route runs about 11,000 map frames with
+      no stop; native tests 1646/1646.
