@@ -1004,3 +1004,16 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
     stopping**. m0350i is frame-limit (was the sole Day 6 stop). Later-
     story totals are now all 382/20/0: 0x1B0, 0x220, 0x2D6, 0x2F4.
     Story 0x90 / 0x140 / 0x300 remain 382/20/0 from earlier sweeps.
+  - 02:02 CT: full gates k23 on the func_80192E4C install (b2dd55a9..e473c197), all PASS:
+    - Day 1 route (frame 67186) and MOVIES_DAY2;
+    - DAY2_ROUTE (frame 18202);
+    - 1645/1645 tests;
+    - rdg OK (20441 files) and psyq PASS;
+    - gdp 1013 TUs with 0 drift, gop 0 drift (dispatch registry up to date);
+    - EXACT_REBUILD_GATE PASS (sha1 452fb033); room_m0350i overlay
+      exact rebuild PASS (sha1 e9597b00, 113 c / 2 asm).
+    - Late-game sweeps (Disc 2, PE_WARP_DISC=2, 4000 frames, 2 at a time)
+      are running at story 0x3E8 (m0318i writer), then 0x7D0 (m0431i). No
+      0x300+ story values are written anywhere (max assigned is 0x2F4), so
+      these two are the late-game points. 0x3E8 so far: 272 slots, 262
+      clean, 10 unused, 0 stopping.
