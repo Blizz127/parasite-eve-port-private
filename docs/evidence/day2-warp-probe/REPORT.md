@@ -978,3 +978,19 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
     - rdg OK (20439 files) and psyq PASS;
     - gdp 1013 TUs with 0 drift, gop up to date;
     - EXACT_REBUILD_GATE PASS (sha1 452fb033).
+
+  - 01:27 CT: room_m0350i `func_80192E4C` (0x80192E4C, 0x7C0) **LINK_EXACT**.
+    Profile `room_m0350i_narrow_any_dest` (-O2 -G0 + K3/K3b/K3c:
+    `MASPSX_NARROW_SHIFTED_WORD_LOAD`/`REG_LOAD`/`ANY_DEST`). Matching
+    lever for the last 3-word sched window: store sprite param f8 first
+    so CSE relates f2/f4/f6 to the D_800F3368+8 base ($s0); an always-
+    false `if (f6 == 0 && f4 == 3) return 0;` ends cse1's block so cse2
+    rewrites the f2 read as `lh -6($s0)` without refolding, and sched
+    sees no alias with the outgoing-arg `andi`/`sw 20($sp)` (retail
+    order). EXACT_REBUILD_GATE[room_m0350i]=PASS (sha1 e9597b00, spans
+    113 c / 2 asm / 1 rodata / 2 bin). PC port regenerated
+    (`func_80192E4C__ab48ed02_port.c`) and rebuilt.
+  - 01:27 CT: m0350i warp probes (4000 frames) all clean to frame-limit
+    at story 0x2D6, 0x2DA, 0x90, 0x140, and 0x300. The Day 6
+    CPU_BOUNDARY at pc 0x80192E4C is gone. 12000-frame soak at 0x2DA
+    and a full 0x2D6 re-sweep (402 slots, 2 at a time) are running.
