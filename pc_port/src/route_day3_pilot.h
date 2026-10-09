@@ -53,7 +53,11 @@ static void D3Parse(void)
             if (*s == ':') { e->slot = e->flags & 0x1FFu; e->flags = (uint32_t)strtoul(s + 1, &end, 16); s = end; }
         }
         if (*s == '#') { e->visit = (int)strtol(s + 1, &end, 10); s = end; }
-        if (*s != '=') break;
+        if (*s != '=') {   /* malformed entry (e.g. a stray '|'): skip it, keep parsing */
+            while (*s && *s != '|') s++;
+            if (*s) s++;
+            continue;
+        }
         s++;
         while (*s && *s != '|' && e->n < 24) {
             D3Wp *w = &e->wp[e->n];

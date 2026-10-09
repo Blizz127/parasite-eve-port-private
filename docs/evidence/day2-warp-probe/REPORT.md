@@ -1375,3 +1375,61 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
     - Harness probe PE_D3_BTL_SEQ (scripted battle pads, env-gated).
     - Next: m0146i -> m0147i (0x1EB) -> m0127i (0x1EC) -> m0149i (0x1EE) ->
       m0150i (0x1F0) -> m0154i -> m0157i (0x200) -> ... -> 0x220.
+  - 15:20 CT: Day 4 by play, part 3 (0x1E8 -> 0x1EE). One continuous run
+    from m0127i at 0x1E8 reaches 0x1EE at frame 21780 (k42 gates below).
+    - m0146i fix confirmed: the battle completes (mode 9) and the route
+      reaches m0147i.
+    - m0147i: key 0xD3 in the east pocket at 985,-1250 (Cross, op_E8),
+      persist[0x41] bit 4, story 0x1EB. Back via m0146i -> m0126i -> m0127i.
+    - m0127i at 0x1EB: module 1 sends payload 0xC to Aya on entry (walk
+      to 67,-1248, dialogue, op_1C(4,0,0xD)), which sets 0x1EC.
+    - Deadlock, not a port bug: when Aya first enters m0127i FROM m0126i
+      (persist[1] == 0x7E), module 0 init plays the NPC scene while
+      persist[0x43] bit 1 is clear (walk to 0,-920, op_4B turn toward
+      actor 2, talk; the 0xB handler sets bit 1). At 0x1EB the 0xC task
+      starts in parallel on the same actor (task chain +0xA8; op_AA only
+      sets D_800B0CD8|0x2000 and does not suspend anything). Its op_B8
+      (toward 67,-1248, want F7D) and op_4B (toward the NPC, want 758)
+      each step 0x40 from the other's write (7C0 <-> 800), and neither
+      ever lands on its target. All the opcodes involved match retail
+      (op_86/op_B4/op_84/op_40 are instant in src/ too), so the route
+      takes the order a player would: at 0x1E8, m0126i turns straight
+      back into m0127i once, so the NPC scene plays before the key is
+      taken. Entries are selected on persist[0x43] bit 1 (&43:1).
+    - Warp note: PE_WARP_PERSIST_FILE does not carry the inventory. A warp
+      to 0x1EC has no key 0xD3, so the op_A8 check at the m0127i key
+      door fails. Run from 0x1E8 or earlier.
+    - m0127i at 0x1EC: the north door (x -55..55 z -510..-400, payload 9)
+      shows "Door locked." The key door is the panel in x 250..350
+      z -696..-596, facing +x, Cross: payload 7 uses 0xD3, sets
+      persist[0x41] bit 0x20 and [0x42] bit 0x10, and opens the north way.
+      Quad x -300..400 z -350..-200 (payload 4) -> m0148i -> west alcove
+      -> m0149i.
+    - m0149i: Cross facing +z in x 70..180 z 732..902 (persist[0x41] bit
+      0x4000000), story 0x1EE. A furniture block near -404,1461 is
+      bypassed along x -900.
+    - Pilot: a malformed waypoint entry (a '|' inside a comment) used to
+      stop the parse and drop every later entry without a message. The
+      parser now skips to the next '|'. The comments no longer contain '|'.
+    - 0x1EE -> 0x1F0: back to m0127i, then the east elevator. The call
+      panel (x 235..350 z -1296..-1196, payload 6) checks rot A00..E00
+      on the press frame. The pilot steered diagonally there and ended on
+      a Down frame (rot 0), so the approach is now a straight +x line at
+      z -1240 and a no-direction Cross. Car (m0132i) at >= 0x1EE: "Select
+      Floor" (msg 0x75, op_43): Basement / Lobby / 13th Floor -> var 0x13
+      = 0/1/0xD. The options only show after a second Cross on the fully
+      printed prompt (~200 frames). Down twice for 13th Floor, Cross ->
+      m0150i (module 1 sets 0x1F0 on entry).
+    - m0150i -> m0152i (east alcove). m0152i stop CPU_BOUNDARY/REFUSED
+      pc=0x801925A0 (@8006F6D4 handler): gen_overlay_ports skipped
+      room_m0152i/func_801925A0 (E21: call arity func_80192D00 0!=1). Same
+      fix as the m0145i twin: func_80192D00(o).
+      EXACT_REBUILD_GATE[room_m0152i] PASS.
+    - Blocker: m0152i then stops at CPU_BOUNDARY/REFUSED pc=0x80192940
+      (@func_801926BC jalr). func_80192940 (0x3C0, GTE: mvmva + nclip over
+      the scratchpad) is unmatched asm in all five copies (m0145i 0x3914,
+      m0152i 0x3958, m0153i 0x4E28, m0399i 0x4918, m0401i 0x5A6C, masked
+      words equal). It needs a hand match with GTE inline asm. One match
+      covers all five rooms, m0153i (next on the route) included.
+    - Next: match func_80192940, then m0152i -> m0153i -> m0154i (0x1F4,
+      item 0xDA) -> m0157i (0x200) -> 0x220.
