@@ -1156,3 +1156,28 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
       PE_D3_ACTORS logs the actor chain.
     - Open: one m0100i formation still stalls at about (-326,-2807) with a
       full AT bar and no target; diagnosing.
+  - 05:54 CT: k27 gates all PASS: Day 1 route, Day 2 movies, tests 1646/1646,
+    retail_data_guard, psyq_port_guard, exact rebuild, gen_decomp_ports
+    --verify, gen_overlay_ports --verify, Day 2 route, Day 3 route.
+    - Route shim fix (tests/route_reward_sewer_pilot.h): a map reseed now
+      restarts the learning window. Before, the old room's last position vs.
+      the new spawn was learned as a pad displacement. After the m0115i
+      vision returned Aya to m0100i, Up was flipped to point south and Aya
+      could not walk north.
+    - Pilot: the battle "no target" test ignores stale target-list entries
+      (Aya, type 0, seen in m0100i; a bodiless type-4 actor, seen in m0121i).
+      Waypoint entries can require persist[0x2C] bits (`TOKEN@STORY&MASK`).
+    - Walked route (scratch waypoints, warp m0111i 0x190, fixtures F3 +
+      PE_ROUTE_MAXHP=300), with four battles won on the way:
+      1. m0111i body (0x800) -> m0107i battle -> m0100i battle -> m0099i
+         object (0x1000, then 0x4000000) -> m0115i vision (0x20000) ->
+         m0100i.
+      2. m0100i battle -> m0116i -> m0121i scene (0x40000) -> m0115i hall,
+         door 3 -> m0044i scene (0x400000) -> m0121i battle -> m0122i.
+    - New stop: CPU_BOUNDARY/REFUSED at 0x80190444, an m0122i effect called
+      via 800D413C, with no matched leaf. Fix staged (k28 gating):
+      - room_lane/port.py accepts shared global profiles
+        (era_o2_g0_expand_div).
+      - func_80190444 is ported as the masked-body twin of room_m0159i
+        func_8018F3A4. It is LINK_EXACT, carved at 0x145C, deep preflight
+        PASS, and EXACT_REBUILD_GATE[room_m0122i]=PASS (25 c / 0 asm).

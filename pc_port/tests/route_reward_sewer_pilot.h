@@ -83,6 +83,10 @@ static uint16_t RouteM34ShimMove(int ax, int az, int wx, int wz, int stop2)
             g_m34s_vx[i]=g_m34s_vx[i]*1000/n; g_m34s_vz[i]=g_m34s_vz[i]*1000/n;
         }
         g_m34s_init=1;
+        /* A reseed (new room) also restarts the learning window: the old
+         * room's last position vs. the new spawn is not a pad displacement
+         * (Day 3 m0100i after the m0115i vision: it flipped Up to south). */
+        last_dir=-1; hold=0; px=ax; pz=az;
         fprintf(stderr,"M34_SHIM_MAP_SEED c=%d sn=%d U=(%d,%d) R=(%d,%d) D=(%d,%d) L=(%d,%d)\n",
                 c,sn,g_m34s_vx[0],g_m34s_vz[0],g_m34s_vx[1],g_m34s_vz[1],
                 g_m34s_vx[2],g_m34s_vz[2],g_m34s_vx[3],g_m34s_vz[3]);

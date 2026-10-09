@@ -11,11 +11,12 @@
  *
  * PE_ROUTE_WAYPOINTS = entry|entry|...
  *   entry  = TOKEN[@MINSTORY][#VISIT]=wp;wp;...  (hex token, hex story,
- *            VISIT: only on the VISIT-th entry into that room, 1-based)
+ *            VISIT: only on the VISIT-th entry into that room, 1-based;
+ *            TOKEN@MINSTORY&MASK: only while persist[0x2C] has all MASK bits)
  *   wp     = X,Z[,R][!N]                      (world units; R arrive radius,
  *            default 100; !N: on arrival press Cross for N frames)
  * The entry used is the one for the current token with the highest MINSTORY
- * <= story, a matching #VISIT entry winning over one without. Its waypoints run in order; after the last one the pilot holds
+ * <= story; a matching #VISIT entry wins, then a matching &MASK entry. Its waypoints run in order; after the last one the pilot holds
  * still (the pad script resumes) until the room or story changes.
  *
  * World map (token A8000048): the entry's first wp is TARGET,CONFIRM[,STEP]
@@ -27,7 +28,7 @@
 #define PC_PORT_ROUTE_DAY3_PILOT_H
 
 typedef struct { int x, z, r, act, tmo; } D3Wp;   /* tmo: give up after N frames (~N) */
-typedef struct { uint32_t token, story; int visit, n; D3Wp wp[24]; } D3Entry;
+typedef struct { uint32_t token, story, flags; int visit, n; D3Wp wp[24]; } D3Entry;
 static D3Entry g_d3[160];
 static int g_d3_n = -1;
 
@@ -41,6 +42,7 @@ static void D3Parse(void)
         memset(e, 0, sizeof *e);
         e->token = (uint32_t)strtoul(s, &end, 16); s = end;
         if (*s == '@') { e->story = (uint32_t)strtoul(s + 1, &end, 16); s = end; }
+        if (*s == '&') { e->flags = (uint32_t)strtoul(s + 1, &end, 16); s = end; }
         if (*s == '#') { e->visit = (int)strtol(s + 1, &end, 10); s = end; }
         if (*s != '=') break;
         s++;
@@ -125,7 +127,16 @@ static uint16_t RouteDay3Pilot(uint16_t script_mask)
                             b && PE_RangeIsRam(b, 24u) ? (int)PE_LoadU32(b + 16u) : -1, m);
                 }
             }
-            if (m == 0xFFFFu && mode == 0u && !PE_LoadU32(0x8009E000u) && aya) {
+            int no_target = 1;   /* list holds no live enemy; stale entries seen: Aya (type 0),
+                                  * a bodiless type-4 actor (m0121i) */
+            for (unsigned i = 0; i < 24u; i++) {
+                pe_addr_t p = PE_LoadU32(0x8009E000u + i * 12u);
+                if (!p) break;
+                pe_addr_t b = PE_RangeIsRam(p, 64u) ? PE_LoadU32(p) : 0u;
+                if (p != aya && PE_LoadU16(p + 12u) != 0u && b && PE_RangeIsRam(b, 24u) &&
+                    (int32_t)PE_LoadU32(b + 16u) > 0) { no_target = 0; break; }
+            }
+            if (m == 0xFFFFu && mode == 0u && no_target && aya) {
                 /* No target in range: close in on the nearest live actor of
                  * the field chain (0x8009D20C, next at +4, type at +12 with 0 = Aya,
                  * body hp at +16). */
@@ -158,8 +169,10 @@ static uint16_t RouteDay3Pilot(uint16_t script_mask)
         for (int i = 0; i < g_d3_n; i++) {
             if (g_d3[i].token != tok || g_d3[i].story > story) continue;
             if (g_d3[i].visit && g_d3[i].visit != visit) continue;
-            if (best < 0 || (g_d3[i].visit && !g_d3[best].visit) ||
-                (!g_d3[i].visit == !g_d3[best].visit && g_d3[i].story >= g_d3[best].story)) best = i;
+            if ((PE_LoadU32(0x800A78A0u) & g_d3[i].flags) != g_d3[i].flags) continue;
+            int si = (g_d3[i].visit ? 2 : 0) + (g_d3[i].flags ? 1 : 0);
+            int sb = best < 0 ? -1 : (g_d3[best].visit ? 2 : 0) + (g_d3[best].flags ? 1 : 0);
+            if (si > sb || (si == sb && g_d3[i].story >= g_d3[best].story)) best = i;
         }
         if (tok != cur_tok || best != ent) {
             ent = best; idx = 0; act_until = 0; done_logged = 0;
