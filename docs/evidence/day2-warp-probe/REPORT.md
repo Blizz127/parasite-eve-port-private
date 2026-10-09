@@ -1181,3 +1181,25 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
       - func_80190444 is ported as the masked-body twin of room_m0159i
         func_8018F3A4. It is LINK_EXACT, carved at 0x145C, deep preflight
         PASS, and EXACT_REBUILD_GATE[room_m0122i]=PASS (25 c / 0 asm).
+  - 06:23 CT: m0122i stop fixed. k28 gates all PASS: Day 1 route, Day 2
+    movies, tests 1646/1646, retail_data_guard, psyq_port_guard, exact
+    rebuild, gen_decomp_ports --verify, gen_overlay_ports --verify, Day 2
+    route, Day 3 route.
+    - func_80190444 (m0122i effect, via 800D413C) is a masked-body twin of
+      room_m0159i func_8018F3A4. It is LINK_EXACT under the shared profile
+      era_o2_g0_expand_div, carved at 0x145C, and
+      EXACT_REBUILD_GATE[room_m0122i]=PASS (25 c / 0 asm).
+    - room_lane/port.py now accepts shared global -O2 -G0 profiles
+      (EXPAND_DIV / THREE_WORD_SYMBOL_STORE only).
+    - Gate scaffolding:
+      - day3_route_regress.py gains the `day3_walk` segment: warp m0192i
+        0x178, then the recorded walk to the m0123i fight, 0x1B0.
+      - The walk is driven by the committed waypoint list
+        pc_port/tools/day3_walk_waypoints.txt (harness coordinates only).
+      - The segment is opt-in until the whole walk passes.
+      - run_segment takes a per-segment env.
+    - Walked route now reaches m0122i -> m0124i -> m0044i (second scene) ->
+      m0123i.
+    - Next stop: in the m0123i fight, CPU_BOUNDARY/REFUSED at 0x8019537C.
+      The leaf is matched, but gen_overlay_ports refused it ("pointer-global
+      store D_801956B8"). Fix in progress.

@@ -63,6 +63,7 @@ def run_segment(name: str, seg: dict, a, disc: str, disc2: str | None, prefix: s
     log = os.path.join(a.log_dir, f"{prefix}-{name}.log")
     env = dict(os.environ, PE_PAD_SCRIPT=pad_script(), PE_DEV_MENU="1",
                PE_WARP_ROOM=seg["room"], PE_WARP_STORY=seg["story"], PE_WARP_AT="1000")
+    env.update(seg.get("env", {}))               # per-segment harness switches (Day 3 walk)
     cmd = [a.bin, "--headless", "--route-pad", "--hand-over-at", "1000",
            "--max-frames", str(seg["frames"]), "--disc-image", disc]
     if disc2:
