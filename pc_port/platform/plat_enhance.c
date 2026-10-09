@@ -229,6 +229,11 @@ int32_t pe_enh_enemy_damage(uint32_t body, int32_t damage)
      * waiting forever (observed on the Day-1 autopilot).  The assist stays inactive. */
     if (PE_LoadU32(GA_GAME_FLAGS) & 0x800u) return damage;
     hp = (int32_t)PE_LoadU32(body + 0x10u);
+    /* Scripts also make an enemy invulnerable for a scripted phase by adding 1000000
+     * to its HP (rooms test `HP <= 1000000`, e.g. room_m0429i func_801926B4).  Killing
+     * it there skips the script's own exit: the Day-4 m0156i roof fight then sat in
+     * op_C3 forever with "NO TARGET".  Retail damage while the marker is set. */
+    if (hp > 1000000) return damage;
     return (hp > 0 && damage < hp) ? hp : damage;
 }
 

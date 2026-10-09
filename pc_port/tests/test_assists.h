@@ -120,6 +120,13 @@ static void test_ASSIST_one_hit_kills(void)
     func_80028574(AST_ACTOR);
     ASSERT((int32_t)PE_LoadU32(AST_BODY + 0x10u) > 0 && (int32_t)PE_LoadU32(AST_BODY + 0x10u) < 1000,
            "scripted battle (flag 0x800): retail damage, enemy survives");
+    /* Script-invulnerable enemies (HP marked +1000000) are exempt as well. */
+    PE_StoreU32(0x8009D1A0u, PE_LoadU32(0x8009D1A0u) & ~0x800u);
+    PE_StoreU32(AST_BODY + 0x10u, 1000450u);
+    ASSERT(pe_enh_enemy_damage(AST_BODY, 30) == 30, "HP > 1000000 (script-invulnerable): retail damage");
+    PE_StoreU32(AST_BODY + 0x10u, 450u);
+    ASSERT(pe_enh_enemy_damage(AST_BODY, 30) == 450, "marker cleared: the assist kills again");
+    PE_StoreU32(0x8009D1A0u, PE_LoadU32(0x8009D1A0u) | 0x800u);
     /* The kill then awards retail EXP and BP through func_80028E94. */
     c = ast_award_case();
     if (c) {

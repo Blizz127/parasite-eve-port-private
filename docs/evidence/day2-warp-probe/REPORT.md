@@ -1500,3 +1500,24 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
       8018F214, m0429i 801926B4/80192BC0.
     - Then: m0152i -> m0153i -> m0154i (0x1F4, item 0xDA) -> m0157i (0x200)
       -> 0x220.
+
+### Day 4, m0156i battle (2026-10-09)
+
+- Off-route E21 arity skips fixed (they would stop players): m0269i
+  8018F6BC, m0273i 80192D50 + 80192E64, m0318i 80192560 (3rd arg is the
+  out buffer), m0401i 8018F214, m0429i 801926B4 + 80192BC0. Exact gate PASS.
+- 0x80190F94 (blob 0x1FAC) hand-matched as a variant of m0159i
+  func_8018F3A4 (profile era_o2_g0_expand_div; YAML split at 0x2BAC).
+  Exact gate PASS.
+- Soft-lock in the roof fight: the "1-hit kills" assist killed the boss
+  while the script had it invulnerable (HP + 1000000), so its own exit was
+  skipped and op_C3 waited forever ("NO TARGET"). The assist now gives
+  retail damage while HP > 1000000 (test_assists covers it). This is a
+  port bug, not a missing item/flag.
+- 0x8019050C (sparks, blob 0x1524) hand-matched. Exact gate PASS.
+- BLOCKER: the next stop in the same fight is 0x8018F058 (blob 0x70,
+  0x11D8 bytes, a 2-mode particle emitter with no body twin). Mode 1 is
+  byte-exact; mode 2 is still 297 masked words off (register allocation
+  across cases 0-5, plus 0x18 bytes of extra division code). The WIP stays
+  outside the repo until it matches. Still open after it: m0156i -> m0380i,
+  the m0157i entry trace, 0x220.

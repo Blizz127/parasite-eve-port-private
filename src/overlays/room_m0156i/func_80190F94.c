@@ -34,7 +34,7 @@ extern SVECTOR D_8018EFFC;
 typedef struct { short m[3][3]; int t[3]; } MATRIX;
 typedef struct { int vx, vy, vz, pad; } VECTOR;
 extern void *D_80192C30;
-extern void *D_800B0E64;
+extern void *D_800B0E64[];
 extern unsigned short D_800E11EA;
 extern unsigned short D_800E1204[];
 extern void *func_8006E498(void *, int);
@@ -65,7 +65,7 @@ extern unsigned char *D_800F32D0;
 extern unsigned char *D_800F33E0;
 extern short D_800F3368;
 extern short D_800F336A;
-extern short D_800F336C;
+extern unsigned short D_800F336C;
 extern short D_800F336E;
 extern unsigned short D_800F3370;
 extern short D_800F3372;
@@ -108,9 +108,6 @@ int func_80190F94(int mode, short *p, BurstDef *d)
     unsigned char *chan;
     unsigned char *prim;
     int **matrix_slot;
-    MATRIX m;
-    VECTOR sc;
-    int w;
 
     off0 = D_8018F048;
     off1 = D_8018EFFC;
@@ -125,7 +122,7 @@ int func_80190F94(int mode, short *p, BurstDef *d)
         p[9] = d->y;
         p[10] = d->z;
         p[9] = D_800942EC[0];
-        D_80192C30 = func_8006E498(D_800B0E64, 0xC5485704);
+        D_80192C30 = func_8006E498(D_800B0E64[0], 0xC5485704);
         func_800C6D5C(D_80192C30, 0, 0);
         func_800D3F64(0x58A, func_800D3FD8());
         if (D_800E2368[0xD] != 0) {
@@ -137,9 +134,9 @@ int func_80190F94(int mode, short *p, BurstDef *d)
                 }
             }
         }
-        return func_800CE560(*(void **)(D_800F33E0 + 8), 0x14, 0x18, func_80190BF8);
+        return func_800CE560(*(void **)(D_800F33E0 + 8), 0x14, 0x20, func_80190BF8);
     case 1:
-        func_800CE8F0(*(void **)(D_800F32D0 + 8), 0x13, &off0, p);
+        func_800CE8F0(*(void **)(D_800F32D0 + 8), 0x1F, &off0, p);
         func_800CE9D4(*(void **)(D_800F32D0 + 8), 0, &rot);
         ang = -rot.vy + 0x400;
         switch (p[0xC]) {
@@ -152,8 +149,8 @@ int func_80190F94(int mode, short *p, BurstDef *d)
                         e[0] = p[0];
                         e[1] = p[1];
                         e[2] = p[2];
-                        e[4] = func_80077DC4(ang) / 256;
-                        e[6] = func_80077CF4(ang) / 256;
+                        e[4] = func_80077DC4(ang) / 128;
+                        e[6] = func_80077CF4(ang) / 128;
                         e[5] = 0;
                         e[8] = i;
                         e[9] = 0;
@@ -174,7 +171,7 @@ int func_80190F94(int mode, short *p, BurstDef *d)
                     e[0] = p[8];
                     e[1] = p[9];
                     e[2] = p[10];
-                    r = (func_80071A54() & 7) + 0x14;
+                    r = (func_80071A54() & 0x1F) + 0x20;
                     e[4] = func_80077DC4(ang) * r / 4096;
                     e[6] = func_80077CF4(ang) * r / 4096;
                     e[5] = 0;
@@ -200,7 +197,7 @@ int func_80190F94(int mode, short *p, BurstDef *d)
             p[0xC] = 2;
             p[0xD] = 0;
             p[0xE] = 0;
-            for (i = 0; i < 12; i++) {
+            for (i = 0; i < 22; i++) {
                 e = func_800CE610(*(void **)(D_800F33E0 + 8));
                 if (e) {
                     t = func_80071A54() & 0xFFF;
@@ -221,7 +218,7 @@ int func_80190F94(int mode, short *p, BurstDef *d)
             if (p[0x11] != 0) {
                 p[0x11]--;
             }
-            if (func_800C6B90(p + 8, 0x104) && p[0x11] == 0) {
+            if (func_800C6B90(p + 8, 600) && p[0x11] == 0) {
                 if (D_800E2368[0xD] != 0) {
                     chan = D_800F32D0;
                     if ((***(int ***)(chan + 8) & 0x3F000000) == 0x01000000) {
@@ -264,51 +261,73 @@ int func_80190F94(int mode, short *p, BurstDef *d)
             prim[6] = p[0xE];
             gte_stszotz(&otz);
             if (otz > 0 && otz < 0x1000) {
-                gte_stsxy3(prim + 8, prim + 0xC, &t);
+                {
+                    unsigned char *s8 = prim + 8;
+                    unsigned char *s12 = prim + 0xC;
+                    gte_stsxy3(s8, s12, &t);
+                }
                 func_800CF6F8(D_800B0E38.ordering[D_8009CDDC] + otz * 4, prim, 1);
             }
         }
-        D_800F3368 = 0x40;
-        D_800F336A = 4;
-        D_800F3376 = 0x40;
-        D_800F3378 = 0x40;
-        pal = D_800E2850[D_800E11EA];
-        D_800F336C = 3;
-        D_800F336E = 0;
-        D_800F3372 = 5;
-        D_800F3374 = 0;
-        D_800F3370 = pal;
-        if (p[0x10] != 0) {
-            gte_SetRotMatrix(D_800BCFA4);
+        {
+            unsigned short *idx = &D_800E11EA;
+            unsigned short *tab = D_800E2850;
+            unsigned short *q;
+            MATRIX m;
+            VECTOR sc;
+            int w;
+
+            D_800F3368 = 0x40;
+            D_800F336A = 4;
+            D_800F3376 = 0x40;
+            D_800F3378 = 0x40;
+            q = &tab[*idx];
+            pal = *q;
             D_800F336C = 3;
             D_800F336E = 0;
-            D_800F3370 = D_800E2850[D_800E11EA];
-            w = func_80077A64(0, 1, 0, 0);
-            w = (D_800E2850[D_800E11EA] | w) & 0xFFFF;
-            clut = D_800E1204[D_800F336C];
-            if (D_800F336C == 4 && D_800F3428) {
-                clut += 4;
+            D_800F3372 = 5;
+            D_800F3374 = 0;
+            D_800F3370 = pal;
+            asm volatile("" : : : "memory");
+            if (p[0x10] != 0) {
+                matrix_slot = &D_800BCFA4;
+                asm volatile("" : "=r"(matrix_slot) : "0"(matrix_slot));
+                gte_SetRotMatrix(*matrix_slot);
+                asm volatile("" : : "r"(matrix_slot));
+                {
+                    int pal2 = *q;
+                    D_800F336C = 3;
+                    D_800F336E = 0;
+                    D_800F3370 = pal2;
+                }
+                w = func_80077A64(0, 1, 0, 0);
+                w = (tab[*idx] | w) & 0xFFFF;
+                clut = D_800E1204[D_800F336C];
+                if (D_800F336C == 4 && D_800F3428) {
+                    clut += 4;
+                }
+                func_800C6EC0(w, func_80077AA4(0x40, clut) & 0xFFFF);
+                func_800C6ED8(1);
+                func_80079754(&off1, &m);
+                m.t[0] = p[8];
+                m.t[1] = p[9];
+                m.t[2] = p[10];
+                sc.vx = p[0xF] * 3 / 2;
+                sc.vy = p[0xF] * 3 / 2;
+                sc.vz = p[0xF] * 3 / 2;
+                func_80078CC4(&m, &sc);
+                func_800C6EF8(D_80192C30);
+                func_800C6FA0(D_80192C30, (p[0x10] / 2) & 0xFFFF);
+                func_800C71E4(D_80192C30, &m);
+                func_800C6F4C(D_80192C30);
             }
-            func_800C6EC0(w, func_80077AA4(0x40, clut) & 0xFFFF);
-            func_800C6ED8(1);
-            func_80079754(&off1, &m);
-            m.t[0] = p[8];
-            m.t[1] = p[9];
-            m.t[2] = p[10];
-            sc.vx = p[0xF] * 3 / 2;
-            sc.vy = p[0xF] * 3 / 2;
-            sc.vz = p[0xF] * 3 / 2;
-            func_80078CC4(&m, &sc);
-            func_800C6EF8(D_80192C30);
-            func_800C6FA0(D_80192C30, (p[0x10] / 2) & 0xFFFF);
-            func_800C71E4(D_80192C30, &m);
-            func_800C6F4C(D_80192C30);
         }
         D_800F3368 = 0x20;
         D_800F336A = 2;
         D_800F3376 = 0x20;
         D_800F3378 = 0x20;
         pal = D_800E2850[D_800E11EA];
+        asm volatile("" : : : "memory");
         D_800F336C = 3;
         D_800F336E = 0;
         D_800F3372 = 0;
