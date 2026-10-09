@@ -1425,11 +1425,35 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
       room_m0152i/func_801925A0 (E21: call arity func_80192D00 0!=1). Same
       fix as the m0145i twin: func_80192D00(o).
       EXACT_REBUILD_GATE[room_m0152i] PASS.
-    - Blocker: m0152i then stops at CPU_BOUNDARY/REFUSED pc=0x80192940
-      (@func_801926BC jalr). func_80192940 (0x3C0, GTE: mvmva + nclip over
-      the scratchpad) is unmatched asm in all five copies (m0145i 0x3914,
-      m0152i 0x3958, m0153i 0x4E28, m0399i 0x4918, m0401i 0x5A6C, masked
-      words equal). It needs a hand match with GTE inline asm. One match
-      covers all five rooms, m0153i (next on the route) included.
-    - Next: match func_80192940, then m0152i -> m0153i -> m0154i (0x1F4,
-      item 0xDA) -> m0157i (0x200) -> 0x220.
+    - m0152i stop CPU_BOUNDARY/REFUSED pc=0x80192940 (@func_801926BC
+      jalr): func_80192940 (0x3C0, GTE: rtv0 + nclip on the scratchpad) was
+      unmatched asm in all five copies. Hand-matched (written from the
+      retail asm, profile era_o2_g0) as one C body for all five rooms:
+      room_m0145i func_801928FC, room_m0152i func_80192940, room_m0153i
+      func_80193E10, room_m0399i func_80193900, room_m0401i func_80194A54.
+      EXACT_REBUILD_GATE PASS for all five. Levers: scratchpad as a struct
+      (in-struct stores don't alias the D_8009D1CC load), opz assigned inside
+      the outer loop after the mask's first use, i++ before prev = cur, and
+      the table half via an int local (lh).
+    - Next m0152i stop: CPU_BOUNDARY/REFUSED pc=0x80192D24 (@800D413C
+      effect). It is a body twin of room_m0137i func_8019018C (the m0126i and
+      m0141i copies too). Copied as room_m0152i func_80192D24 with local data
+      D_8018F1CC/D_8018F1D4 and a local profile
+      room_m0152i_dispatch_8018F1DC_8018F1F4_div. EXACT_REBUILD_GATE PASS.
+      (m0419i 0x4F7C and m0421i 0x1D74 hold the same body, not yet split.)
+    - m0152i now runs clean through its battle (win, frame 3741). East
+      side: quad 9 (x 920..1050 z -1400..-1185) is a Cross + facing
+      A00..E00 interaction (op_5E). The pilot's diagonal stop left rot 0x800
+      on the press frame, so the approach is now a straight +x line at
+      Aya's z (-1399). The press now sends msg 9 and module 0 runs its
+      handler (op_B8 to 1422,-1256 on actors 0x15/0x16, op_EA, op_2F 0x12,
+      op_4D), then msg 9 to module 3.
+    - Blocker: after that scene Aya is still held at x ~981 at the green
+      cabinet. The east pocket (quad 2, x 1050..1300 -> m0153i) is never
+      reached and no text box shows. Open question: is this a native-op
+      bug (the scene's op_B8/op_EA/op_4D move of actors 0x15/0x16 does
+      nothing visible), or does the scene need a precondition (item or
+      flag) not yet set on this route? Next: trace module 3's msg-9 path
+      and the actor 0x15/0x16 positions through the scene.
+    - Then: m0152i -> m0153i -> m0154i (0x1F4, item 0xDA) -> m0157i (0x200)
+      -> 0x220.
