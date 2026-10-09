@@ -8,6 +8,7 @@
 #   parasite-eve-day1-preview/parasite-eve-preview    launcher script
 #   parasite-eve-day1-preview/README-PREVIEW.txt      controls + known limits
 #   parasite-eve-day1-preview/build-info.json         commit, time, sha256
+#   parasite-eve-day1-preview/bin/gamecontrollerdb.txt SDL_GameControllerDB (+ -LICENSE.txt)
 #
 # Usage:
 #   PE_BINARY=build/pcbuild-preview/parasite-eve-port ./pc_port/package_preview.sh
@@ -218,9 +219,9 @@ with open(out, "w") as f:
 PY
 chmod 0644 "$STAGE/build-info.json"
 
-# Guard: only the four expected payload files, no disc images, nothing from rom/.
+# Guard: only the expected payload files (incl. the SDL_GameControllerDB mapping + licence), no disc images, nothing from rom/.
 mapfile -t files < <(cd "$WORK" && find "$NAME" -type f | LC_ALL=C sort)
-expected=("$NAME/README-PREVIEW.txt" "$NAME/bin/parasite-eve-port" "$NAME/build-info.json" "$NAME/parasite-eve-preview")
+expected=("$NAME/README-PREVIEW.txt" "$NAME/bin/gamecontrollerdb-LICENSE.txt" "$NAME/bin/gamecontrollerdb.txt" "$NAME/bin/parasite-eve-port" "$NAME/build-info.json" "$NAME/parasite-eve-preview")
 [[ "${files[*]}" == "${expected[*]}" ]] || die "unexpected staged files: ${files[*]}"
 for f in "${files[@]}"; do
     case "${f,,}" in
