@@ -1203,3 +1203,24 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
     - Next stop: in the m0123i fight, CPU_BOUNDARY/REFUSED at 0x8019537C.
       The leaf is matched, but gen_overlay_ports refused it ("pointer-global
       store D_801956B8"). Fix in progress.
+  - 06:49 CT: m0123i stop 0x8019537C fixed (E21e). k29 gates all PASS: Day 1
+    route, Day 2 movies, tests 1646/1646, retail_data_guard,
+    psyq_port_guard, exact rebuild, gen_decomp_ports --verify,
+    gen_overlay_ports --verify, Day 2 route, Day 3 route.
+    - gen_overlay_ports routes the "pointer-global store" refusal to
+      guest_lower. Storing an address into a pointer-typed global slot
+      becomes an explicit PE_StoreU32 of the 32-bit guest address. Only one
+      new room TU results: room_m0123i func_8019537C.
+    - Two new tests (test_guest_lower PointerGlobalStore).
+    - Walked route: the m0123i fight now runs past 0x8019537C and stops at
+      CPU_BOUNDARY/REFUSED 0x80192F0C, the fight effect (mode 0 spawns
+      func_80192BDC particles, mode 2 draws four sprites, two rings and a
+      ranged beam).
+    - Blocker for the m0123i fight: no matched C for this cluster, and no
+      masked twin in any room.
+      - room_m0123i: func_80192F0C 0x70C, its particle callback
+        func_80192BDC 0x330, and the unmatched func_80193618 0xFD4 and
+        func_8019251C 0x4E0.
+      - EXE: the sprite draw func_800D3BC8 0x39C, which has no C at all.
+      - Next: hand-match these, starting with func_80192F0C (decoded) and
+        func_800D3BC8.

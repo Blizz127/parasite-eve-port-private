@@ -16,6 +16,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import os
+import sys
 import unittest
 from pathlib import Path
 
@@ -585,6 +587,30 @@ class Refusals(unittest.TestCase):
                     known={"func_80079754"}, sigs=sigs)
         self.assertIn("PE_RotMatrixYXZ_Guest(a_r, a_m)", res["body"])
         self.assertNotIn("func_80079754(", res["body"])
+
+
+
+class PointerGlobalStore(unittest.TestCase):
+    """E21e (gen_overlay_ports): a store to a pointer-typed global slot is a
+    32-bit guest store of the address (room_m0123i func_8019537C)."""
+    SRC = """extern int D_80195594;
+extern int *D_801956B8;
+int **func_8019537C(int a0, unsigned int a1)
+{
+    D_801956B8 = &D_80195594;
+    return &D_801956B8;
+}
+"""
+
+    def test_slot_store_is_guest_store(self):
+        res = lower(self.SRC, "func_8019537C")
+        self.assertIn("PE_StoreU32(0x801956B8u, (uint32_t)(0x80195594u))", res["body"])
+        self.assertIn("return (uint32_t)(0x801956B8u);", res["body"])
+
+    def test_reason_routed_to_lowering(self):
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import gen_overlay_ports as gop
+        self.assertTrue("pointer-global store D_801956B8".startswith(gop.LOWER_REASONS))
 
 
 if __name__ == "__main__":

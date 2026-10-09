@@ -331,6 +331,10 @@ LOWER_REASONS = ("pointer parameter", "leaf struct with pointer members",
                  "pointer-to-pointer cast", "pointer cast of non-D_",
                  "host pointer", "relational compare of pointers",
                  "function address value", "asm",
+                 # E21e: assigning a pointer-typed global slot stores a 32-bit
+                 # guest address; the lowering does that with an explicit
+                 # PE_StoreU32 (m0123i fight effect func_8019537C).
+                 "pointer-global store",
                  # scratchpad (0x1F800000-0x1F8003FF) is guest memory; MMIO/BIOS
                  # literals are re-refused by the lowering itself.
                  "hardware/BIOS literal 0x1F8000", "hardware/BIOS literal 0x1F8001",
