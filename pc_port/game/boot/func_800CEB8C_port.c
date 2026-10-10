@@ -55,6 +55,19 @@ void func_800CE9D4(pe_addr_t actor,uint32_t joint,pe_addr_t out)
     for (i=0;i<3;i++) PE_StoreU16(out+i*2u,(uint16_t)angles[i]);
 }
 
+/* func_800CEAE8 (src/func_800CEAE8.c): rotate a short vector by the 3x3 part
+ * of `matrix` with TR zeroed (rtv0 sf=1), store MAC1..3 as shorts.  Like
+ * retail it leaves RT = matrix and TR = 0 loaded in the GTE. */
+void func_800CEAE8(pe_addr_t matrix,pe_addr_t input,pe_addr_t output)
+{
+    unsigned i;
+    PE_GTE_LoadRT33(matrix);
+    for (i=0;i<3;i++) g_pe_gte.tr[i]=0;
+    PE_GTE_SetV0((int16_t)PE_LoadU16(input),(int16_t)PE_LoadU16(input+2u),(int16_t)PE_LoadU16(input+4u));
+    PE_GTE_MVMVA(0x480012u);
+    for (i=0;i<3;i++) PE_StoreU16(output+i*2u,(uint16_t)g_pe_gte.mac[i]);
+}
+
 void PE_EffectOffsetCFB7C(pe_addr_t angles,int32_t distance,int16_t out[3])
 {
     int16_t rotation[9],a[3];int32_t result[3];unsigned i;

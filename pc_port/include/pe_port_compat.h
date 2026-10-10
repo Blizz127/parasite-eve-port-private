@@ -1399,6 +1399,7 @@ void func_8018F344(pe_addr_t matrix, pe_addr_t eye, pe_addr_t target, pe_addr_t 
 void PE_EffectDirectionCFAA8(const int16_t from[3],const int16_t to[3],pe_addr_t out);
 void func_800CFAA8(pe_addr_t pe_a0, pe_addr_t pe_a1, pe_addr_t pe_a2);
 void func_800CE9D4(pe_addr_t actor,uint32_t joint,pe_addr_t out);
+void func_800CEAE8(pe_addr_t matrix,pe_addr_t input,pe_addr_t output);
 void PE_ActorJointDirectionCE9D4(pe_addr_t actor,uint32_t joint,int16_t out[3]);
 int32_t func_800D3F64(uint32_t id,uint32_t group);
 int func_800C6B90(pe_addr_t pe_a0, int a1);
