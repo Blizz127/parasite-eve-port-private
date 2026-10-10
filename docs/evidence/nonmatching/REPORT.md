@@ -23,8 +23,20 @@ reasonable time, its C is installed as a functionally equivalent native port:
 | room_m0156i func_8018F058 (particle emitter) | 0x70 +0x11D8 | mode 1 exact; mode 2 register allocation / division sequences | 476 ok of 600, 1023/1142 words | 63 ok (m0156i fight), modes 1/2, cases 0,2-5 |
 | room_m0156i func_80192208 (debris effect) | 0x3220 +0x7E0 | written from the asm, not matched | 223 ok of 300, 458/504 words | 36 ok (m0380i fight end) |
 | room_m0156i func_80191B94 (debris particle) | 0x2BAC +0x674 | written from the asm, not matched | 600 ok, 397/413 words | 24 ok, 367/413 words |
+| room_m0162i func_80192A68 (enemy shot effect, m0163i fight) | 0x3A80 +0x6B0 | no mnemonic twin (best 0.46); written from the asm | 377 ok of 600, 401/428 words | - |
+| room_m0162i func_801924FC (shot particle callback) | 0x3514 +0x56C | written from the asm | 1460 ok of 1500, 331/347 words | - |
 
 The same bytes run in room m0380i (no overlay config of its own): the registry
 resolves it there by fingerprint.  The differential test caught one real bug
 in the first 8018F058 draft (mode 2 case 1 reset `pos` once instead of every
 iteration), which the byte diff had only shown as "mismatch".
+
+The two m0162i leaves also run in m0163i by fingerprint.  Uncovered words are
+delay slots after `jal`, and the default arms of the mode/kind switches.
+
+`out=FN:K,...` (an `inputs:` term) marks callee FN as writing 8 bytes through
+stack argument K: the mocks on both sides then write the same seed-derived
+bytes there, so code that reads a mocked callee's output (e.g. the
+func_800CFB7C direction vector) compares instead of reading two different
+uninitialised frames.  Register spills (`sw s0-s7/fp/ra, x(sp)`) no longer
+count as retail-written data in the stack-argument comparison.

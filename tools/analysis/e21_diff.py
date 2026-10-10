@@ -162,7 +162,16 @@ class Gte:
             self.d[9 + i] = min(max(mac, lo), 0x7FFF) & 0xFFFFFFFF
 
 
-def run_mips(ram: bytearray, entry: int, args: list[int], seed: int):
+def out_bytes(fn: int, k: int, seed: int) -> bytes:
+    """The 8 bytes a mocked callee writes through an `out=` stack argument (both sides)."""
+    x, b = (fn * 2654435761 + seed * 40503 + k * 0x9E37) & 0xFFFFFFFF, bytearray()
+    for _ in range(8):
+        x = (x * 1103515245 + 12345) & 0xFFFFFFFF
+        b.append((x >> 16) & 0xFF)
+    return bytes(b)
+
+
+def run_mips(ram: bytearray, entry: int, args: list[int], seed: int, outs: frozenset = frozenset()):
     r = [0] * 32
     r[4:8] = args
     r[29] = SP0
@@ -192,10 +201,10 @@ def run_mips(ram: bytearray, entry: int, args: list[int], seed: int):
 
     written: set[int] = set()
 
-    def st(a, n, v):
+    def st(a, n, v, mark=True):
         off = addr(a, n)
         ram[off:off + n] = (v & ((1 << (8 * n)) - 1)).to_bytes(n, "little")
-        if 0x1FF000 <= off < RAM_SIZE:
+        if mark and 0x1FF000 <= off < RAM_SIZE:   # register spills (sw s0-s7/fp/ra, x(sp)) are not data
             written.update(range(off, off + n))
 
     steps = 0
@@ -280,6 +289,11 @@ def run_mips(ram: bytearray, entry: int, args: list[int], seed: int):
             calls.append((tgt, tuple(("S", bytes(ram[(v & 0x1FFFFFFF):(v & 0x1FFFFFFF) + 16]),
                                       [((v & 0x1FFFFFFF) + j) in written for j in range(16)], v)
                                      if 0x801FF000 <= v < SP0 + 0x100 else v for v in av)))
+            for k in range(len(av)):
+                if (tgt << 4 | k) in outs and 0x801FF000 <= av[k] < SP0 + 0x100:
+                    o_ = av[k] & 0x1FFFFFFF
+                    ram[o_:o_ + 8] = out_bytes(tgt, k, seed)
+                    written.update(range(o_, o_ + 8))
             r[2] = mock_ret(tgt, seed)
             r[31] = cur + 8
             pc, npc = cur + 8, cur + 12
@@ -327,7 +341,7 @@ def run_mips(ram: bytearray, entry: int, args: list[int], seed: int):
             wr = (rt, v)
         elif op == 0x28: st(A + simm, 1, B)
         elif op == 0x29: st(A + simm, 2, B)
-        elif op == 0x2B: st(A + simm, 4, B)
+        elif op == 0x2B: st(A + simm, 4, B, not (rs == 29 and (16 <= rt <= 23 or rt >= 30)))
         elif op in (0x2A, 0x2E):                                # swl / swr
             a = (A + simm) & 0xFFFFFFFF
             al = ld(a & ~3, 4, False)
@@ -381,7 +395,7 @@ def run_slot(ram, r, pc, ld, st):
     elif op == 0x25: v = (rt, ld(A + simm, 2, False))
     elif op == 0x28: st(A + simm, 1, B)
     elif op == 0x29: st(A + simm, 2, B)
-    elif op == 0x2B: st(A + simm, 4, B)
+    elif op == 0x2B: st(A + simm, 4, B, not (rs == 29 and (16 <= rt <= 23 or rt >= 30)))
     else:
         raise Fault(f"delay-slot op {w:08X}")
     if v is not None and v[0]:
@@ -465,6 +479,18 @@ uint32_t mock_args(uint32_t fn, unsigned n, const uint32_t *a)
             fprintf(logf_, " %08X", a[i]);
     }
     fprintf(logf_, "\n");
+    for (i = 0; i < n && i < 12; i++) {
+        unsigned j, q;
+        uint32_t x;
+        for (q = 0; q < sizeof outs_ / sizeof outs_[0]; q++)
+            if (outs_[q] == (fn << 4 | i) && a[i] >= 0x801FE000u && a[i] < 0x801FF000u) {
+                x = fn * 2654435761u + seed_ * 40503u + i * 0x9E37u;
+                for (j = 0; j < 8; j++) {
+                    x = x * 1103515245u + 12345u;
+                    ram[(a[i] & 0x1FFFFFu) + j] = (uint8_t)(x >> 16);
+                }
+            }
+    }
     if (((seed_ * 2654435761u) >> 16) & 1u) return (uint32_t)((int32_t)(h & 0x1FFFu) - 0x1000);
     return 0x80100000u + (h & 0xDFFFCu);
 }
@@ -559,6 +585,9 @@ def directed_specs() -> dict[tuple[str, str], list[tuple[str, int, list[int]]]]:
         for t in m.group(3).split(";"):
             lhs, rhs = (x.strip() for x in t.split("="))
             vals: list[int] = []
+            if lhs == "out":                   # out=FN:K,...: callee FN writes 8 bytes through stack arg K
+                terms.append((lhs, [int(x.split(":")[0], 16) << 4 | int(x.split(":")[1]) for x in rhs.split(",")]))
+                continue
             for v in rhs.split(","):
                 if ".." in v:
                     lo_, hi_ = (int(x, 0) for x in v.split(".."))
@@ -597,6 +626,8 @@ def inputs(name, ov, data, seeds, recorded, spec):
         if spec:
             k = seed
             for lhs, vals in spec:
+                if lhs == "out":
+                    continue
                 v = vals[k % len(vals)]
                 k //= len(vals)
                 mm = re.fullmatch(r"a(\d)", lhs)
@@ -639,7 +670,10 @@ def one(p: Path, name: str, ovl: str, seeds: int, cc: str, cover: bool = False,
     with tempfile.TemporaryDirectory() as d:
         d = Path(d)
         (d / "pe_guest_decomp.h").write_text(MOCK_H)
-        src = t + HARNESS.replace("CALL_LINE", call) + stubs
+        outs = frozenset(v for lhs, vs in directed.get((ovl, name), []) if lhs == "out" for v in vs)
+        harness = HARNESS.replace("static unsigned seed_;", "static unsigned seed_;\nstatic const uint32_t outs_[] = {"
+                                  + ", ".join(f"0x{v:X}u" for v in sorted(outs) or [0xFFFFFFFF]) + "};")
+        src = t + harness.replace("CALL_LINE", call) + stubs
         (d / "t.c").write_text(src)
         (d / "gte_ext.c").write_text(GTE_EXT)
         pc = o.REPO_ROOT / "pc_port"
@@ -658,7 +692,7 @@ def one(p: Path, name: str, ovl: str, seeds: int, cc: str, cover: bool = False,
         for seed, ram, args in inputs(name, ov, data, seeds, recorded, directed.get((ovl, name))):
             r_ram = bytearray(ram)
             try:
-                v0, calls = run_mips(r_ram, leaf["vram"], list(args), seed)
+                v0, calls = run_mips(r_ram, leaf["vram"], list(args), seed, outs)
             except Fault:
                 continue
             (d / "in.bin").write_bytes(ram)

@@ -9,8 +9,12 @@ leaves:
   - [room_m0156i, func_8018F058, 0x70, 0x11D8]   # particle emitter; mode 2 register allocation differs
   - [room_m0156i, func_80192208, 0x3220, 0x7E0]   # debris effect (m0156i / m0380i)
   - [room_m0156i, func_80191B94, 0x2BAC, 0x674]   # debris particle callback (m0156i / m0380i)
+  - [room_m0162i, func_80192A68, 0x3A80, 0x6B0]   # enemy shot effect (m0162i / m0163i)
+  - [room_m0162i, func_801924FC, 0x3514, 0x56C]   # shot particle callback (m0162i / m0163i)
 # Directed differential inputs (seed k takes the k-th combination; see e21_diff.py).
 inputs:
-  - [room_m0156i, func_8018F058, "a0=1,2; h(a1+0x10)=0..5; h(a1+0x12)=0,1,7,8,23; h(0x800F336C)=4,0; w(0x800F3428)=1,0"]
+  - [room_m0156i, func_8018F058, "a0=1,2; h(a1+0x10)=0..5; h(a1+0x12)=0,1,7,8,23; h(0x800F336C)=4,0; w(0x800F3428)=1,0; out=800CFB7C:2,800783E4:4,800CF3AC:1,800CE8F0:3"]
   - [room_m0156i, func_80192208, "a0=0,1,2; w(0x800E27EC)=1,2,3,32,33,0; w(0x800B0E64)=0,0x80100000"]
-  - [room_m0156i, func_80191B94, "a0=1,2,0; h(a1+0x10)=0,1,2,3,-1; h(a1+0x12)=0,5,19,20,31,32; h(a1+0x6)=0,1; h(0x800F336C)=4,1; w(0x800F3428)=1,0"]
+  - [room_m0156i, func_80191B94, "a0=1,2,0; h(a1+0x10)=0,1,2,3,-1; h(a1+0x12)=0,5,19,20,31,32; h(a1+0x6)=0,1; h(0x800F336C)=4,1; w(0x800F3428)=1,0; out=800CFB7C:2,800783E4:4,800CF3AC:1,800CE8F0:3"]
+  - [room_m0162i, func_80192A68, "a0=0,1,2; h(a1+0x10)=0,1,2,3; h(a1+0x12)=0,3,4,15,16; w(0x800E2368)=0x80180000; h(0x80180012)=0,1,2,3; w(0x800F3428)=1,0; h(0x800F336C)=4; out=800CFB7C:2,800783E4:4,800CF3AC:1,800CE8F0:3"]
+  - [room_m0162i, func_801924FC, "a0=1,2,0; h(a1+0x10)=0,1,2,3; w(0x800F32D0)=0x80180000; w(0x80180008)=0x80180100; w(0x80180100)=0x80180200; w(0x80180200)=0x01000000,0x11000000; w(0x800E2368)=0x80180300; w(0x8018030C)=0x100,0; h(a1+0x12)=0,7,8,15,-5; h(a1+0x14)=-1,3; w(0x800E27EC)=1,2,36; h(0x800F336C)=4,1; w(0x800F3428)=1,0; out=800CE870:2,800CFAA8:2,800CFB7C:2"]
