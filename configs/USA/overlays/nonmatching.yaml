@@ -13,7 +13,11 @@ leaves:
   - [room_m0162i, func_801924FC, 0x3514, 0x56C]   # shot particle callback (m0162i / m0163i)
   - [room_m0188i, func_8019251C, 0x3534, 0xB98]   # battle effect pool particle callback (m0188i)
   - [room_m0188i, func_80193300, 0x4318, 0x590]   # battle effect particle callback (m0188i); handwritten cop2 loads
-  - [room_m0188i, func_80193BCC, 0x4BE4, 0x9BC]   # enemy joint glow particle callback (m0188i); handwritten cop2 loads   # battle effect particle callback (m0188i); handwritten cop2 loads
+  - [room_m0188i, func_80193BCC, 0x4BE4, 0x9BC]   # enemy joint glow particle callback (m0188i); handwritten cop2 loads
+  - [room_m0188i, func_8019479C, 0x57B4, 0xA50]   # ground-burst pool particle callback (m0188i); handwritten cop2 loads
+  - [room_m0188i, func_801951EC, 0x6204, 0x3B4]   # ground-burst battle effect main (m0188i)
+  - [room_m0188i, func_801955A0, 0x65B8, 0x474]   # splash pool particle callback (m0188i)
+  - [room_m0188i, func_80195A14, 0x6A2C, 0x360]   # splash battle effect main (m0188i)
 # Directed differential inputs (seed k takes the k-th combination; see e21_diff.py).
 inputs:
   - [room_m0156i, func_8018F058, "a0=1,2; h(a1+0x10)=0..5; h(a1+0x12)=0,1,7,8,23; h(0x800F336C)=4,0; w(0x800F3428)=1,0; out=800CFB7C:2,800783E4:4,800CF3AC:1,800CE8F0:3"]
@@ -24,3 +28,7 @@ inputs:
   - [room_m0188i, func_80193300, "a0=1,2,0,3; h(a1+0x10)=0,1,2,3,-1; h(a1+0x12)=0,1,15,16,23,24,-3; h(a1+0x8)=0,31,-33,100; h(a1+0xC)=0,-64,7; h(a1+0x2)=0,-200,300; h(0x800942EC)=0,-100; w(0x800E27EC)=1,7,36; h(0x800F336C)=4,1; w(0x800F3428)=1,0; w(0x800BCFA4)=0x80180000; out=800CF3AC:1"]
   - [room_m0188i, func_8019251C, "a0=1,2,0; h(a1+0x10)=0,1,2,3,-1; h(a1+0x14)=0,1,2,-1; h(a1+0x12)=0,8,9,15,16,-2; h(a1+0x2)=0,-600,-514,2000; w(0x800E27EC)=1,2,37; h(0x800942EC)=0,100; w(0x800F33E0)=0x80180000; w(0x800F32D0)=0x80180100; w(0x80180108)=0x80180200; w(0x80180200)=0x80180300; w(0x80180300)=0x01000000,0x11000000; w(0x800E2368)=0x80180400; w(0x8018040C)=0x100,0; w(0x8009D254)=0x80180500; w(0x80180500)=0x80180600; h(0x800F336C)=4,1; w(0x800F3428)=1,0; out=800CE870:2"]
   - [room_m0188i, func_80193BCC, "a0=2,1,0; h(a1+0x10)=0,1,2; h(a1+0x14)=0,3,6,7,9,-1; h(a1+0x12)=0,1,3,4,7,8,23,24; h(0x800F336C)=4,1; w(0x800F3428)=1,0; w(0x800BCFA4)=0x80180000; out=800CE8F0:3,800CF3AC:1"]
+  - [room_m0188i, func_8019479C, "a0=1,2,0; h(a1+0x20)=0,1,2,3; h(a1+0x22)=0,1,7,8,15,16,-1; h(a1+0x2)=0,-100,300; h(a1+0xA)=0,5,-9; h(0x800942EC)=0,100; w(0x800F32D0)=0x80180000; w(0x80180008)=0x80180100; w(0x80180100)=0x80180200; w(0x80180200)=0x01000000,0x11000000; w(0x800E2368)=0x80180300; w(0x8018030C)=0x100,0; w(0x8009D254)=0x80180400; w(0x80180400)=0x80180500; h(0x800F336C)=4,1; w(0x800F3428)=1,0; w(0x800BCFA4)=0x80180600; out=800CE8F0:3,800783E4:4,800CF3AC:1"]
+  - [room_m0188i, func_801951EC, "a0=0,1,2,3; h(a1+0x8)=0,1,6,-1; w(0x800E27EC)=0,1,4; w(0x800F32D0)=0x80180000; w(0x80180008)=0x80180100,0; w(0x80180100)=0x80180200,0; w(0x80180218)=0x80180300; w(0x80180300)=1,2; w(0x800E2368)=0x80180400; w(0x8018040C)=0x100,0; w(0x800F33E0)=0x80180500; out=800CE870:2,800CE9D4:2,800CFB7C:2"]
+  - [room_m0188i, func_801955A0, "a0=1,2,0; h(a1+0x10)=0,1,2; h(a1+0x12)=0,1,15,16,23,24,-3; h(a1+0x8)=0,127,-129,300; h(a1+0xC)=0,-64,255; h(a1+0x2)=0,-200,300; h(a1+0xA)=0,7,-9; h(0x800942EC)=0,-100; w(0x800E27EC)=1,7,36; h(0x800F336C)=4,1; w(0x800F3428)=1,0; out=800CF3AC:1"]
+  - [room_m0188i, func_80195A14, "a0=1,0,2,3; w(0x800E27EC)=0,1,2,3,47,48,49,59,60,61; w(0x800F33E0)=0x80180000; w(0x800F32D0)=0x80180100; out=800CE870:2"]

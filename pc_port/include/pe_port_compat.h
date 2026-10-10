@@ -1108,6 +1108,10 @@ void func_800CEE20(pe_addr_t position, pe_addr_t angles, int32_t sx, int32_t sy,
 void func_800C4FC4(pe_addr_t r, pe_addr_t matrix, unsigned billboard);
 /* Glow point sprite (hand port in func_800D2104_port.c). */
 void func_800D2104(pe_addr_t pos, pe_addr_t color, int32_t scale, int32_t abr);
+/* Textured ribbon strip (hand port in func_800D3114_port.c). */
+void func_800D3114(pe_addr_t pts, int32_t n, int32_t width, int32_t u0, int32_t v0,
+                   int32_t du, int32_t dv, int32_t tpage, int32_t clut, int32_t scale,
+                   pe_addr_t col0, pe_addr_t col1, int32_t abr);
 /* Shaded blade, one POLY_G3 (native port in func_800D0E88_port.c). */
 void func_800D0E88(pe_addr_t pos, pe_addr_t ang, int32_t len, int32_t width, pe_addr_t c0,
     pe_addr_t c1, pe_addr_t c2, int16_t bright, int32_t abr);
