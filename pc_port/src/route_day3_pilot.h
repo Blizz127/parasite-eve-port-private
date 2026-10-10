@@ -290,6 +290,14 @@ static uint16_t RouteDay3Pilot(uint16_t script_mask)
                     fclose(f);
                 }
             }
+            if (pd && tok != cur_tok) {   /* and per room: persist_<story>_<token>.bin */
+                char path[512]; snprintf(path, sizeof path, "%s/persist_%X_%08X.bin", pd, (unsigned)story, (unsigned)tok);
+                FILE *f = fopen(path, "wb");
+                if (f) {
+                    for (uint32_t k = 0; k < 0x200u; k++) { uint32_t w = PE_LoadU32(0x800A77F0u + k * 4u); fwrite(&w, 4u, 1u, f); }
+                    fclose(f);
+                }
+            }
         }
         cur_tok = tok; cur_story = story;
     }
