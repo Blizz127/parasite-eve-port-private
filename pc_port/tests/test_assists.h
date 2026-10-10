@@ -124,6 +124,8 @@ static void test_ASSIST_one_hit_kills(void)
     PE_StoreU32(0x8009D1A0u, PE_LoadU32(0x8009D1A0u) & ~0x800u);
     PE_StoreU32(AST_BODY + 0x10u, 1000450u);
     ASSERT(pe_enh_enemy_damage(AST_BODY, 30) == 30, "HP > 1000000 (script-invulnerable): retail damage");
+    PE_StoreU32(AST_BODY + 0x10u, 999999u);
+    ASSERT(pe_enh_enemy_damage(AST_BODY, 30) == 30, "just below the marker (script exit window): retail damage");
     PE_StoreU32(AST_BODY + 0x10u, 450u);
     ASSERT(pe_enh_enemy_damage(AST_BODY, 30) == 450, "marker cleared: the assist kills again");
     PE_StoreU32(0x8009D1A0u, PE_LoadU32(0x8009D1A0u) | 0x800u);

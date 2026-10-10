@@ -232,8 +232,11 @@ int32_t pe_enh_enemy_damage(uint32_t body, int32_t damage)
     /* Scripts also make an enemy invulnerable for a scripted phase by adding 1000000
      * to its HP (rooms test `HP <= 1000000`, e.g. room_m0429i func_801926B4).  Killing
      * it there skips the script's own exit: the Day-4 m0156i roof fight then sat in
-     * op_C3 forever with "NO TARGET".  Retail damage while the marker is set. */
-    if (hp > 1000000) return damage;
+     * op_C3 forever with "NO TARGET".  Retail damage while the marker is set, and
+     * just below it: the script's exit runs once HP drops to <= 1000000 (999999 on
+     * that roof), and a second bullet in that window must not kill it either.  No
+     * ordinary enemy comes near 900000 HP. */
+    if (hp > 900000) return damage;
     return (hp > 0 && damage < hp) ? hp : damage;
 }
 
