@@ -100,6 +100,23 @@ static uint16_t RouteDay3Pilot(uint16_t script_mask)
     unsigned mode = PE_LoadU32(0x8009D28Cu), d1a0 = PE_LoadU32(0x8009D1A0u);
     pe_addr_t aya = PE_LoadU32(0x8009D254u);
     int ax, az;
+    {   /* PE_D3_TASKS="KEY": harness probe, log the VM task list of actor KEY (u16 at +0xC) on change */
+        const char *q = getenv("PE_D3_TASKS");
+        static char last[1024];
+        if (q) {
+            unsigned key = (unsigned)strtoul(q, 0, 16); char cur[1024]; size_t n = 0;
+            for (pe_addr_t a = PE_LoadU32(0x8009D20Cu); a && n < 900; a = PE_LoadU32(a + 4u)) {
+                if (PE_LoadU16(a + 0xCu) != key) continue;
+                for (unsigned i = 0; i < 3u; i++)
+                    for (pe_addr_t t = PE_LoadU32(a + 0xA0u + i * 4u); t && n < 900; t = PE_LoadU32(t + 0x24u))
+                        n += (size_t)snprintf(cur + n, sizeof cur - n, " [%u]%08X pc=%08X f=%X d=%X", i, (unsigned)t,
+                                              (unsigned)PE_LoadU32(t), (unsigned)PE_LoadU16(t + 8u), (unsigned)PE_LoadU32(t + 0x10u));
+                n += (size_t)snprintf(cur + n, sizeof cur - n, " f98=%X d1a0=%X", (unsigned)PE_LoadU32(a + 0x98u), d1a0);
+            }
+            cur[n] = 0;
+            if (strcmp(cur, last)) { fprintf(stderr, "[D3TASK] frame=%d%s\n", g_frame, cur); strcpy(last, cur); }
+        }
+    }
     {   /* PE_D3_RAM_DUMP="FRAME:PATH,...": harness probe, 2 MB guest RAM at those frames */
         const char *q = getenv("PE_D3_RAM_DUMP");
         while (q && *q) {
@@ -208,6 +225,25 @@ static uint16_t RouteDay3Pilot(uint16_t script_mask)
                 }
                 if (bd > 22500) m = RouteM34ShimMove(ax2, az2, bx - ax2, bz - az2, 0);
                 if (rec && PE_LoadU16(rec + 16u) >= 9000u && (g_frame % 8) == 3) m &= 0xBFFFu;
+            }
+            if (story >= 0x220u) {
+                /* Day 5+: an enemy still emerging (m0187i centipede) carries
+                 * +0x98 0x4000 "not targetable".  Opening targeting then sets
+                 * D1A0&4, which pauses every actor script, so it never finishes
+                 * emerging.  Hold Cross until one is targetable; if targeting
+                 * opened on an empty list (D2B0 == 0), back out with Triangle. */
+                int ready = 0;
+                pe_addr_t a = PE_LoadU32(0x8009D20Cu);
+                for (unsigned i = 0; a && i < 64u && PE_RangeIsRam(a, 0xA0u); i++, a = PE_LoadU32(a + 4u)) {
+                    pe_addr_t b = PE_LoadU32(a);
+                    if (a == aya || PE_LoadU16(a + 12u) == 0u || !b || !PE_RangeIsRam(b, 24u) ||
+                        (int32_t)PE_LoadU32(b + 16u) <= 0) continue;
+                    if (!(PE_LoadU32(a + 0x98u) & 0x44000u)) { ready = 1; break; }
+                }
+                if (!ready) {
+                    if (mode == 0u) m |= 0x4000u;
+                    else if (mode == 1u && PE_LoadU32(0x8009D2B0u) == 0u) m = (g_frame & 8) ? 0xEFFFu : 0xFFFFu;
+                }
             }
             return m;
         }

@@ -22,3 +22,4 @@ A80280C8@254=0,1314,40   (m0181i at 0x254: floor path to the quad x -180..180 z 
 A8028148@254=602,-9198,40;-600,-7000,40;-790,-7000,30;-790,-7000,400!40;-790,-7000,400%60;-1029,-6950,40;-1029,-6000,40   (m0182i at 0x254: the subway: to the platform edge (mod0 payload 5 strip x -845..-800), Cross to climb up, then north along the platform)
 A8028248@254=336,-1073,40;816,-1073,40;1800,-1500,40;2500,-1500,60;2500,-3700,60   (m0184i at 0x254: the station: walk off the platform edge (mod3 strips x 1882..2200) onto the tracks, then north up the tunnel (mod2 x 1870..3150 z -3912..-3367))
 A80283C8@254=-125,-3872,40   (m0187i at 0x254: floor path to the quad x -750..500 z -4244..-3500 -> m0188i)
+A8028448@254=853,-6227,40;1677,-8765,40   (m0188i at 0x254: floor path to the quad x 1616..1739 z -8844..-8686 -> m0185i)
