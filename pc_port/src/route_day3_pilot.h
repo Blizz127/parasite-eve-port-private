@@ -20,7 +20,10 @@
  *            %N: wait N frames with no buttons; *N: pulse Circle (raw 0x2000,
  *            the field check edge 0x20000000, e.g. the m0129i elevator);
  *            $HEX[:N]: hold raw pad HEX for N frames (default 12), e.g. turn in place at a wall;
- *            +: run there (hold Circle while walking), e.g. the timed m0381i roof escape)
+ *            +: run there (hold Circle while walking), e.g. the timed m0381i roof escape;
+ *            R >= 5000: chained, its act starts the moment the previous act ends, even
+ *            while a menu window is open (as the first waypoint: from room entry), e.g. Down
+ *            then Cross in the m0176i panel menu)
  * The entry used is the one for the current token with the highest MINSTORY
  * <= story; a matching #VISIT entry wins, then a matching &MASK entry. Its waypoints run in order; after the last one the pilot holds
  * still (the pad script resumes) until the room or story changes.
@@ -288,6 +291,12 @@ static uint16_t RouteDay3Pilot(uint16_t script_mask)
                 fprintf(stderr, "[D3PILOT] floor dump %s nv=%d nt=%d dim=%d\n", path, nv, nt, dim);
             }
         }
+    }
+    if (g_frame >= act_until && ent >= 0 && idx < g_d3[ent].n &&
+        g_d3[ent].wp[idx].r >= 5000 && g_d3[ent].wp[idx].act) {   /* R >= 5000: chained act, runs even inside a window */
+        D3Wp *c = &g_d3[ent].wp[idx];
+        fprintf(stderr, "[D3PILOT] frame=%d token=%08X chained wp%d\n", g_frame, (unsigned)tok, idx);
+        act_until = g_frame + c->act; act_dn = c->dn; act_pm = c->pm; idx++;
     }
     if (g_frame < act_until && act_dn == 4) return (uint16_t)act_pm;   /* $HEX: steady raw hold */
     if (g_frame < act_until)   /* Cross / Down pulse, or a plain wait (%N) */
