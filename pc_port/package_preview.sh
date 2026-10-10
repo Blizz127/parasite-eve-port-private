@@ -18,7 +18,9 @@
 #   PE_SOURCE_COMMIT  source commit recorded in build-info (default: git HEAD)
 #   PE_SOURCE_NOTE    free-text provenance note recorded in build-info
 #   PE_OUTPUT_DIR     output dir (default: build/lanes/preview/dist; must be git-ignored)
-#   PE_PREVIEW_DEV_MENU=1  the launcher exports PE_DEV_MENU=1 (controller dev menu on; checkpoint builds)
+#   PE_PREVIEW_DEV_MENU=1|0  REQUIRED. 1: the launcher exports PE_DEV_MENU=1 (Back+Start / F8 dev
+#                     menu on; owner checkpoint builds). 0: off (public preview). Unset = refuse to
+#                     package (a silent 0 shipped native-only-c062ded9-ctrl with no working dev menu).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -154,6 +156,11 @@ Fast-forward runs the game uncapped and mutes the sound (it fades out and
 back in, so there is no chipmunk audio or static); the window title shows
 the active speed.
 
+Dev menu (cheats, Day warps, Options > Enhancements / Assists): hold Back/View
+and Start/Menu together on a controller, or press F8 on a keyboard. This build
+ships with the dev menu __DEV_MENU_WORD__ (launcher default PE_DEV_MENU=__DEV_MENU__);
+PE_DEV_MENU=1 or PE_DEV_MENU=0 in the environment overrides that default.
+
 Controller environment variables:
   PE_PAD_SDL=off               skip SDL2, use /dev/input/js* only
   PE_GAMECONTROLLERDB=file     extra SDL mapping file (also read:
@@ -188,20 +195,22 @@ VARIANT="${PE_PREVIEW_VARIANT:-current}"
 LIMITS_FILE="${PE_PREVIEW_LIMITS:-}"
 if [[ -n "$LIMITS_FILE" ]]; then LIMITS="$(cat "$LIMITS_FILE")"; else LIMITS="* See build-info.json for the source commit."; fi
 DEFAULT_SKIP="${PE_PREVIEW_DEFAULT_SKIP:-0}"
-DEV_MENU="${PE_PREVIEW_DEV_MENU:-0}"
-python3 - "$STAGE" "$LIMITS" "$DEFAULT_SKIP" "$DEV_MENU" <<'PY'
+DEV_MENU="${PE_PREVIEW_DEV_MENU:-}"
+[[ "$DEV_MENU" == 0 || "$DEV_MENU" == 1 ]] || die "PE_PREVIEW_DEV_MENU must be 1 (owner/checkpoint build: Back+Start / F8 dev menu on) or 0 (public preview: off); it is ${DEV_MENU:-unset}"
+DEV_MENU_WORD=$([[ "$DEV_MENU" == 1 ]] && echo ENABLED || echo DISABLED)
+python3 - "$STAGE" "$LIMITS" "$DEFAULT_SKIP" "$DEV_MENU" "$DEV_MENU_WORD" <<'PY'
 import sys, pathlib
-stage, limits, skip, devmenu = sys.argv[1:]
-r = pathlib.Path(stage, "README-PREVIEW.txt"); r.write_text(r.read_text().replace("__LIMITS__", limits))
+stage, limits, skip, devmenu, devword = sys.argv[1:]
+r = pathlib.Path(stage, "README-PREVIEW.txt"); r.write_text(r.read_text().replace("__LIMITS__", limits).replace("__DEV_MENU_WORD__", devword).replace("__DEV_MENU__", devmenu))
 l = pathlib.Path(stage, "parasite-eve-preview")
 l.write_text(l.read_text().replace("__DEFAULT_SKIP__", skip).replace("__DEV_MENU__", devmenu))
 PY
 BIN_SHA="$(sha256sum "$STAGE/bin/parasite-eve-port" | cut -d' ' -f1)"
 LAUNCHER_SHA="$(sha256sum "$STAGE/parasite-eve-preview" | cut -d' ' -f1)"
 BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-python3 - "$STAGE/build-info.json" "$SOURCE_COMMIT" "$SOURCE_NOTE" "$BUILD_TIME" "$BIN_SHA" "$LAUNCHER_SHA" <<'PY'
+python3 - "$STAGE/build-info.json" "$SOURCE_COMMIT" "$SOURCE_NOTE" "$BUILD_TIME" "$BIN_SHA" "$LAUNCHER_SHA" "$DEV_MENU" <<'PY'
 import json, sys
-out, commit, note, t, bsha, lsha = sys.argv[1:]
+out, commit, note, t, bsha, lsha, devmenu = sys.argv[1:]
 info = {
     "schema": 1,
     "name": "parasite-eve-day1-preview",
@@ -211,6 +220,7 @@ info = {
     "build_time_utc": t,
     "binary": {"path": "bin/parasite-eve-port", "sha256": bsha},
     "launcher": {"path": "parasite-eve-preview", "sha256": lsha},
+    "dev_menu_default": int(devmenu),
     "contains_game_data": False,
 }
 with open(out, "w") as f:
@@ -219,6 +229,10 @@ with open(out, "w") as f:
 PY
 chmod 0644 "$STAGE/build-info.json"
 
+# Guard: the packaged launcher must carry the chosen dev-menu default and no placeholder.
+grep -qF "export PE_DEV_MENU=\"\${PE_DEV_MENU:-$DEV_MENU}\"" "$STAGE/parasite-eve-preview" || die "launcher dev-menu default not applied (wanted $DEV_MENU)"
+! grep -rqF "__DEV_MENU" "$STAGE" || die "unreplaced __DEV_MENU placeholder in the stage"
+grep -qF "\"dev_menu_default\": $DEV_MENU" "$STAGE/build-info.json" || die "build-info.json lacks dev_menu_default=$DEV_MENU"
 # Guard: only the expected payload files (incl. the SDL_GameControllerDB mapping + licence), no disc images, nothing from rom/.
 mapfile -t files < <(cd "$WORK" && find "$NAME" -type f | LC_ALL=C sort)
 expected=("$NAME/README-PREVIEW.txt" "$NAME/bin/gamecontrollerdb-LICENSE.txt" "$NAME/bin/gamecontrollerdb.txt" "$NAME/bin/parasite-eve-port" "$NAME/build-info.json" "$NAME/parasite-eve-preview")

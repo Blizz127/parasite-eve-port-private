@@ -158,6 +158,10 @@ LB/RB = L1/R1, LT/RT = L2/R2, Back = Select, Start = Start, D-pad or left stick
 `PE_PAD_SWAP_XY=1` swaps Square/Triangle, `PE_PAD_DEBUG=1` logs raw events.
 Tested by `pe-host-pad-tests` (CTest `host-pad-input`). The owner preview
 package is built by `pc_port/package_preview.sh` (no game data inside).
+Packaging requires `PE_PREVIEW_DEV_MENU=1` (owner/checkpoint build: Back+Start
+or F8 opens the dev menu) or `PE_PREVIEW_DEV_MENU=0` (public preview); the
+launcher's `PE_DEV_MENU` environment override still wins at run time, and
+`pc_port/tools/check_preview_dev_menu.sh <tarball> <0|1>` verifies a package.
 Resizing or maximizing scales the full game image to fit while keeping its
 original 4:3 aspect ratio; unused space has black borders.
 Pacing is per emulated VBlank (`PE_AudioDriver_SetVBlankPacer`): one VBlank
