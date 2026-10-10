@@ -47,6 +47,7 @@ SENTINEL = 0x8000DEAC
 SP0 = 0x801FFF00
 EXCLUDE = (0x801FE000, 0x80200000)      # native frame arena + retail stack
 MAX_STEPS = 200000
+COVER: set | None = None                # retail pcs executed (--coverage)
 
 
 class Fault(Exception):
@@ -60,7 +61,10 @@ def s32(v):
 
 def mock_ret(target: int, seed: int) -> int:
     h = (target * 2654435761 + seed * 40503) & 0xFFFFFFFF
-    return 0x80100000 + (h & 0xFFFFC)
+    if ((seed * 2654435761) & 0xFFFFFFFF) >> 16 & 1:   # half the seeds (hashed, so it does not
+                                        # couple with the directed combinations): a small signed value (both signs of
+        return ((h & 0x1FFF) - 0x1000) & 0xFFFFFFFF   # every division bias get exercised)
+    return 0x80100000 + (h & 0xDFFFC)   # stays below both stack windows
 
 
 def sx16(v):
@@ -186,9 +190,13 @@ def run_mips(ram: bytearray, entry: int, args: list[int], seed: int):
             v -= 1 << (8 * n)
         return v & 0xFFFFFFFF
 
+    written: set[int] = set()
+
     def st(a, n, v):
         off = addr(a, n)
         ram[off:off + n] = (v & ((1 << (8 * n)) - 1)).to_bytes(n, "little")
+        if 0x1FF000 <= off < RAM_SIZE:
+            written.update(range(off, off + n))
 
     steps = 0
     while True:
@@ -197,6 +205,8 @@ def run_mips(ram: bytearray, entry: int, args: list[int], seed: int):
             raise Fault("step limit")
         if pc == SENTINEL:
             return r[2], calls
+        if COVER is not None:
+            COVER.add(pc)
         w = ld(pc, 4, False)
         op, rs, rt, rd = w >> 26, (w >> 21) & 31, (w >> 16) & 31, (w >> 11) & 31
         sh, fn, imm = (w >> 6) & 31, w & 63, w & 0xFFFF
@@ -263,7 +273,13 @@ def run_mips(ram: bytearray, entry: int, args: list[int], seed: int):
         elif op == 3:
             tgt = (cur & 0xF0000000) | ((w & 0x3FFFFFF) << 2)
             run_slot(ram, r, pc, ld, st)
-            calls.append((tgt, tuple(r[4:8])))
+            sp = (r[29] + 16) & 0x1FFFFFFF
+            av = tuple(r[4:8]) + struct.unpack_from("<8I", ram, sp)
+            # stack-local arguments: frames differ between the sides, so the
+            # pointed-to bytes (at call time) are compared instead of the address
+            calls.append((tgt, tuple(("S", bytes(ram[(v & 0x1FFFFFFF):(v & 0x1FFFFFFF) + 16]),
+                                      [((v & 0x1FFFFFFF) + j) in written for j in range(16)], v)
+                                     if 0x801FF000 <= v < SP0 + 0x100 else v for v in av)))
             r[2] = mock_ret(tgt, seed)
             r[31] = cur + 8
             pc, npc = cur + 8, cur + 12
@@ -432,7 +448,25 @@ uint32_t mock_call(uint32_t fn, unsigned n, uint32_t a0, uint32_t a1, uint32_t a
     fprintf(logf_, "C %08X", fn);
     for (i = 0; i < n && i < 4; i++) fprintf(logf_, " %08X", a[i]);
     fprintf(logf_, "\n");
-    return 0x80100000u + (h & 0xFFFFCu);
+    if (((seed_ * 2654435761u) >> 16) & 1u) return (uint32_t)((int32_t)(h & 0x1FFFu) - 0x1000);
+    return 0x80100000u + (h & 0xDFFFCu);
+}
+uint32_t mock_args(uint32_t fn, unsigned n, const uint32_t *a)
+{
+    uint32_t h = fn * 2654435761u + seed_ * 40503u;
+    unsigned i;
+    fprintf(logf_, "C %08X", fn);
+    for (i = 0; i < n && i < 12; i++) {
+        if (a[i] >= 0x801FE000u && a[i] < 0x801FF000u) {
+            unsigned j;
+            fprintf(logf_, " S:%08X:", a[i]);
+            for (j = 0; j < 16; j++) fprintf(logf_, "%02X", ram[(a[i] & 0x1FFFFFu) + j]);
+        } else
+            fprintf(logf_, " %08X", a[i]);
+    }
+    fprintf(logf_, "\n");
+    if (((seed_ * 2654435761u) >> 16) & 1u) return (uint32_t)((int32_t)(h & 0x1FFFu) - 0x1000);
+    return 0x80100000u + (h & 0xDFFFCu);
 }
 int main(int argc, char **argv)
 {
@@ -461,14 +495,129 @@ def candidates() -> list[tuple[Path, str, str]]:
         name = p.name.split("__")[0]
         body = re.sub(r'"[^"]*"', '""', t.split("*/", 1)[1])
         calls = set(re.findall(r"\b(func_[0-9A-F]{8})\s*\(", body)) - {name}
-        if calls or "host prototypes" in t or "PE_HostToGuest" in t:
+        m0 = re.search(r"decomp-source-overlay: (room_\w+)/", t)
+        nonmatching = bool(m0) and name in o.nonmatching_leaves().get(m0.group(1), {})
+        if "PE_HostToGuest" in t or ((calls or "host prototypes" in t) and not nonmatching):
             continue
         m = re.search(r"decomp-source-overlay: (room_\w+)/", t)
         out.append((p, name, m.group(1)))
     return out
 
 
-def one(p: Path, name: str, ovl: str, seeds: int, cc: str) -> tuple[str, str]:
+PROTO_RE = re.compile(r"^(\w[\w \*]*?)\s*\b(func_[0-9A-F]{8})\((.*?)\);", re.M)
+
+
+def host_masks(t: str) -> dict[int, list[int]]:
+    """{callee vma: per-argument compare mask} for host-prototyped callees."""
+    if "host prototypes" not in t:
+        return {}
+    block = t.split("host prototypes", 1)[1].split("\n\n", 1)[0]
+    out = {}
+    for _ret, fn, prm in PROTO_RE.findall(block):
+        ps = [] if prm.strip() == "void" else [x.strip() for x in prm.split(",")]
+        out[int(fn[5:], 16)] = [0xFFFF if "short" in ty else 0xFF if "char" in ty else 0xFFFFFFFF
+                                for ty in ps]
+    return out
+
+
+def host_stubs(t: str) -> str:
+    """Mock definitions for a TU's host-prototyped callees (NON_MATCHING leaves):
+    every argument is logged (stack args too, as retail passes them at sp+16+4k),
+    narrow parameters masked to their width so they compare with the retail
+    register/stack word; the return value is the same seed-derived mock as the
+    retail interpreter's jal."""
+    if "host prototypes" not in t:
+        return ""
+    block = t.split("host prototypes", 1)[1].split("\n\n", 1)[0]
+    out = []
+    for ret, fn, prm in PROTO_RE.findall(block):
+        ps = [] if prm.strip() == "void" else [x.strip() for x in prm.split(",")]
+        names, logs = [], []
+        for k, ty in enumerate(ps):
+            nm = f"p{k}"
+            names.append(re.sub(r"\w+$", nm, ty) if re.search(r"\s\w+$", ty) else f"{ty} {nm}")
+            w = "0xFFFFu" if "short" in ty else "0xFFu" if "char" in ty else "0xFFFFFFFFu"
+            logs.append(f"(uint32_t)(uintptr_t){nm} & {w}")
+        body = (f"uint32_t a_[12] = {{{', '.join(logs) or '0'}}}; "
+                f"uint32_t v_ = mock_args(0x{fn[5:]}u, {len(ps)}u, a_);")
+        retst = "" if ret.strip() == "void" else f" return ({ret.strip()})v_;"
+        out.append(f"{ret} {fn}({', '.join(names) or 'void'}) {{ {body}{retst} }}")
+    return "\n" + "\n".join(out) + "\n"
+
+
+def directed_specs() -> dict[tuple[str, str], list[tuple[str, int, list[int]]]]:
+    """Directed inputs for NON_MATCHING leaves, from configs/USA/overlays/nonmatching.yaml:
+    `inputs: [ovl, name, "a0=1,2; h(a1+0x10)=0..5"]`.  Each seed takes the
+    (seed mod product)-th combination: `aN=` sets argument N, `h(aN+OFF)=` /
+    `w(aN+OFF)=` store a halfword / word there (value lists or LO..HI ranges)."""
+    out: dict = {}
+    if not o.NONMATCH_MANIFEST.exists():
+        return out
+    for m in re.finditer(r'^\s*-\s*\[\s*(\w+)\s*,\s*(\w+)\s*,\s*"([^"]*)"\s*\]',
+                         o.NONMATCH_MANIFEST.read_text().split("inputs:", 1)[-1], re.M):
+        terms = []
+        for t in m.group(3).split(";"):
+            lhs, rhs = (x.strip() for x in t.split("="))
+            vals: list[int] = []
+            for v in rhs.split(","):
+                if ".." in v:
+                    lo_, hi_ = (int(x, 0) for x in v.split(".."))
+                    vals += list(range(lo_, hi_ + 1))
+                else:
+                    vals.append(int(v, 0))
+            terms.append((lhs, vals))
+        out[(m.group(1), m.group(2))] = terms
+    return out
+
+
+def inputs(name, ov, data, seeds, recorded, spec):
+    """(seed, ram, args): recorded game snapshots if given, else seeded random
+    RAM (pointer-heavy) with the directed terms applied on top."""
+    if recorded:
+        for k, f in enumerate(sorted(Path(recorded).glob("rec_*.bin"))):
+            b = f.read_bytes()
+            if len(b) != RAM_SIZE + SPAD + 16:
+                continue
+            lf = ov["leaves"][name]
+            at_ = lf["vram"] & 0x1FFFFFFF
+            if b[at_:at_ + lf["file_size"]] != data[lf["file_offset"]:lf["file_offset"] + lf["file_size"]]:
+                continue                       # another overlay's code was resident: not this leaf
+            yield k, bytearray(b[:RAM_SIZE + SPAD]), list(struct.unpack_from("<4I", b, RAM_SIZE + SPAD))
+        return
+    for seed in range(seeds):
+        rng = random.Random(f"{name}:{seed}")
+        ram = bytearray(RAM_SIZE + SPAD)
+        words = [0x80100000 + (rng.getrandbits(18) << 2) if rng.random() < 0.7
+                 else rng.choice((0, 1, 2, 3, 0xFF, 0xFFFF, rng.getrandbits(32)))
+                 for _ in range((RAM_SIZE + SPAD) // 4)]
+        ram[:] = struct.pack(f"<{len(words)}I", *words)
+        base = ov["vram"] & 0x1FFFFFFF
+        ram[base:base + len(data)] = data
+        args = [0x80100000 + (rng.getrandbits(18) << 2) for _ in range(4)]
+        if spec:
+            k = seed
+            for lhs, vals in spec:
+                v = vals[k % len(vals)]
+                k //= len(vals)
+                mm = re.fullmatch(r"a(\d)", lhs)
+                if mm:
+                    args[int(mm.group(1))] = v & 0xFFFFFFFF
+                    continue
+                mm = re.fullmatch(r"([hw])\((?:a(\d)\+)?(0x[0-9A-Fa-f]+|\d+)\)", lhs)
+                if not mm:
+                    raise SystemExit(f"e21_diff: bad directed term {lhs!r}")
+                base_ = args[int(mm.group(2))] if mm.group(2) else 0
+                at = (base_ + int(mm.group(3), 0)) & 0x1FFFFFFF
+                struct.pack_into("<H" if mm.group(1) == "h" else "<I", ram, at,
+                                 v & (0xFFFF if mm.group(1) == "h" else 0xFFFFFFFF))
+        yield seed, ram, args
+
+
+def one(p: Path, name: str, ovl: str, seeds: int, cc: str, cover: bool = False,
+        recorded: str = "", directed: dict | None = None) -> tuple[str, str]:
+    directed = directed or {}
+    global COVER
+    COVER = set() if cover else None
     ov = o.parse_overlay(ovl)
     blob = o.blob_path(ovl)
     if blob is None:
@@ -485,10 +634,12 @@ def one(p: Path, name: str, ovl: str, seeds: int, cc: str) -> tuple[str, str]:
     else:
         call = (f"uint32_t rv = (uint32_t)(int32_t){name}({argl}); "
                 f"fprintf(logf_, \"R %08X\\n\", rv);")
+    stubs = host_stubs(t)
+    masks = host_masks(t)
     with tempfile.TemporaryDirectory() as d:
         d = Path(d)
         (d / "pe_guest_decomp.h").write_text(MOCK_H)
-        src = t + HARNESS.replace("CALL_LINE", call)
+        src = t + HARNESS.replace("CALL_LINE", call) + stubs
         (d / "t.c").write_text(src)
         (d / "gte_ext.c").write_text(GTE_EXT)
         pc = o.REPO_ROOT / "pc_port"
@@ -504,16 +655,7 @@ def one(p: Path, name: str, ovl: str, seeds: int, cc: str) -> tuple[str, str]:
         if r.returncode:
             return "nocompile", r.stderr[:300]
         ran = 0
-        for seed in range(seeds):
-            rng = random.Random(hash((name, seed)) & 0xFFFFFFFF)
-            ram = bytearray(RAM_SIZE + SPAD)
-            words = [0x80100000 + (rng.getrandbits(18) << 2) if rng.random() < 0.7
-                     else rng.choice((0, 1, 2, 3, 0xFF, 0xFFFF, rng.getrandbits(32)))
-                     for _ in range((RAM_SIZE + SPAD) // 4)]
-            ram[:] = struct.pack(f"<{len(words)}I", *words)
-            base = ov["vram"] & 0x1FFFFFFF
-            ram[base:base + len(data)] = data
-            args = [0x80100000 + (rng.getrandbits(18) << 2) for _ in range(4)]
+        for seed, ram, args in inputs(name, ov, data, seeds, recorded, directed.get((ovl, name))):
             r_ram = bytearray(ram)
             try:
                 v0, calls = run_mips(r_ram, leaf["vram"], list(args), seed)
@@ -543,14 +685,34 @@ def one(p: Path, name: str, ovl: str, seeds: int, cc: str) -> tuple[str, str]:
                 parts = nl.split()[1:]
                 if int(parts[0], 16) != tgt:
                     return "MISMATCH", f"seed {seed}: call {tgt:08X} vs {parts[0]}"
+                mk = masks.get(tgt, [])
                 for k, pv in enumerate(parts[1:]):
-                    if int(pv, 16) != regs[k]:
-                        return "MISMATCH", f"seed {seed}: call {tgt:08X} a{k} {regs[k]:08X} vs {pv}"
+                    m = mk[k] if k < len(mk) else 0xFFFFFFFF
+                    rv_ = regs[k]
+                    if isinstance(rv_, tuple) and not pv.startswith("S:"):
+                        rv_ = rv_[3]           # a guest pointer that merely lies in the stack window
+                    if pv.startswith("S:") and not isinstance(rv_, tuple):
+                        pv = pv.split(":")[1]  # likewise on the native side
+                    if isinstance(rv_, tuple) or pv.startswith("S:"):
+                        nb = bytes.fromhex(pv.split(":")[2]) if pv.startswith("S:") else b""
+                        if not (isinstance(rv_, tuple) and len(nb) == 16 and
+                                all(nb[j] == rv_[1][j] for j in range(16) if rv_[2][j])):
+                            return "MISMATCH", (f"seed {seed}: call {tgt:08X} a{k} stack arg "
+                                                f"{rv_[1].hex() if isinstance(rv_, tuple) else hex(rv_)} vs {pv} "
+                                                f"(retail-written {''.join('w' if x else '.' for x in rv_[2]) if isinstance(rv_, tuple) else '-'})")
+                        continue
+                    if int(pv, 16) & m != rv_ & m:
+                        return "MISMATCH", f"seed {seed}: call {tgt:08X} a{k} {rv_:08X} vs {pv}"
             rl = [l for l in log if l.startswith("R ")][0].split()[1]
             if rl != "-" and int(rl, 16) != v0 and not sig.group(1).startswith(("uint8", "int8", "uint16", "int16")):
                 return "MISMATCH", f"seed {seed}: v0 {v0:08X} vs {rl}"
             ran += 1
-        return ("ok" if ran else "skipped"), f"{ran} seeds"
+        cov = ""
+        if COVER is not None:
+            lo_, hi_ = leaf["vram"], leaf["vram"] + leaf["file_size"]
+            hit = sum(1 for a in COVER if lo_ <= a < hi_)
+            cov = f", retail coverage {hit}/{leaf['file_size'] // 4} words"
+        return ("ok" if ran else "skipped"), f"{ran} seeds{cov}"
 
 
 def main() -> int:
@@ -559,14 +721,19 @@ def main() -> int:
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--verbose", action="store_true")
     ap.add_argument("--jobs", type=int, default=4)
+    ap.add_argument("--recorded", default="", help="replay PE_RECORD_GUESTCALL snapshots from DIR")
+    ap.add_argument("--coverage", action="store_true", help="report retail instruction coverage")
+    ap.add_argument("--only", default="", help="substring of the TU file name or source overlay")
     args = ap.parse_args()
     cc = shutil.which("cc") or shutil.which("gcc")
     cands = candidates()
+    if args.only:
+        cands = [c for c in cands if args.only in c[0].name or args.only == c[2]]
     if args.limit:
         cands = cands[: args.limit]
     res: dict[str, list] = {}
     with concurrent.futures.ProcessPoolExecutor(max_workers=max(1, args.jobs)) as ex:
-        futs = {ex.submit(one, p, n, ov, args.seeds, cc): (p.name, ov) for p, n, ov in cands}
+        futs = {ex.submit(one, p, n, ov, args.seeds, cc, args.coverage, args.recorded, directed_specs()): (p.name, ov) for p, n, ov in cands}
         for f in concurrent.futures.as_completed(futs):
             st, why = f.result()
             res.setdefault(st, []).append((futs[f][0], why))

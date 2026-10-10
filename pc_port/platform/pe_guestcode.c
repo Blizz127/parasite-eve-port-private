@@ -1,7 +1,54 @@
 /* Guest-code dispatch; contract in pe_guestcode.h. */
 #include "pe_guestcode.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+
+uint8_t PE_LoadU8(pe_addr_t a);
+
+/* Differential-test recorder (test aid; off unless the env var is set):
+ * PE_RECORD_GUESTCALL=VMA:DIR[:N[:EVERY]] writes, for every EVERY-th guest call
+ * to VMA (at most N), DIR/rec_NNNN.bin = 2 MiB guest RAM + 1 KiB scratchpad +
+ * a0..a3 (little-endian u32) taken at entry, before the native body runs.
+ * tools/analysis/e21_diff.py --recorded DIR replays them against the retail asm. */
+static void record_call(pe_addr_t fn, const uintptr_t a[4])
+{
+    static int init;
+    static unsigned vma, n_max = 64, every = 1, seen, written;
+    static char dir[512];
+    if (!init) {
+        const char *e = getenv("PE_RECORD_GUESTCALL");
+        init = 1;
+        if (e && *e) {
+            char *end;
+            vma = (unsigned)strtoul(e, &end, 16);
+            if (*end == ':') {
+                const char *d = end + 1, *c = strchr(d, ':');
+                size_t len = c ? (size_t)(c - d) : strlen(d);
+                if (len < sizeof dir) { memcpy(dir, d, len); dir[len] = 0; }
+                if (c) { n_max = (unsigned)strtoul(c + 1, &end, 10);
+                         if (*end == ':') every = (unsigned)strtoul(end + 1, 0, 10); }
+            }
+            if (!every) every = 1;
+        }
+    }
+    if (!vma || fn != vma || !dir[0] || written >= n_max || (seen++ % every))
+        return;
+    {
+        char path[600];
+        FILE *f;
+        unsigned i;
+        uint32_t w;
+        snprintf(path, sizeof path, "%s/rec_%04u.bin", dir, written);
+        f = fopen(path, "wb");
+        if (!f) return;
+        for (i = 0; i < 0x200000u; i++) fputc(PE_LoadU8(0x80000000u + i), f);
+        for (i = 0; i < 0x400u; i++) fputc(PE_LoadU8(0x1F800000u + i), f);
+        for (i = 0; i < 4; i++) { w = (uint32_t)a[i]; fwrite(&w, 4, 1, f); }
+        fclose(f);
+        written++;
+    }
+}
 
 int PE_Decomp_BoundaryFrom(const char *caller, const char *symbol, unsigned vma,
                            unsigned arity, uintptr_t a0, uintptr_t a1,
@@ -182,6 +229,7 @@ static int guest_call(const char *site, pe_addr_t fn, unsigned arity,
                       const uintptr_t a[PE_GUESTCALL_MAX_ARGS])
 {
     const PeGuestCodeEntry *e = fn ? PE_GuestCode_Resolve(fn) : NULL;
+    record_call(fn, a);
     if (e && e->thunk)
         return e->thunk(a[0], a[1], a[2], a[3]);
     if (e && e->thunk8) {

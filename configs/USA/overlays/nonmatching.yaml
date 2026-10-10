@@ -1,0 +1,16 @@
+# NON_MATCHING overlay leaves: functionally equivalent C, not byte-exact.
+# The overlay YAML keeps these spans as `asm`, so the exact rebuild is unchanged.
+# tools/analysis/gen_overlay_ports.py emits a native TU for each from
+# src/nonmatching/overlays/<ovl>/<name>.c; the runtime registry still keys it to
+# the retail bytes (FNV-1a over the span), and tools/analysis/e21_diff.py
+# differential-tests it against the retail asm (RAM, scratchpad, calls, v0).
+#   - [overlay, name, file_offset, file_size]
+leaves:
+  - [room_m0156i, func_8018F058, 0x70, 0x11D8]   # particle emitter; mode 2 register allocation differs
+  - [room_m0156i, func_80192208, 0x3220, 0x7E0]   # debris effect (m0156i / m0380i)
+  - [room_m0156i, func_80191B94, 0x2BAC, 0x674]   # debris particle callback (m0156i / m0380i)
+# Directed differential inputs (seed k takes the k-th combination; see e21_diff.py).
+inputs:
+  - [room_m0156i, func_8018F058, "a0=1,2; h(a1+0x10)=0..5; h(a1+0x12)=0,1,7,8,23; h(0x800F336C)=4,0; w(0x800F3428)=1,0"]
+  - [room_m0156i, func_80192208, "a0=0,1,2; w(0x800E27EC)=1,2,3,32,33,0; w(0x800B0E64)=0,0x80100000"]
+  - [room_m0156i, func_80191B94, "a0=1,2,0; h(a1+0x10)=0,1,2,3,-1; h(a1+0x12)=0,5,19,20,31,32; h(a1+0x6)=0,1; h(0x800F336C)=4,1; w(0x800F3428)=1,0"]
