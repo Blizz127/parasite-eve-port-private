@@ -134,6 +134,10 @@ def main() -> int:
     for n in names:
         if "env_fn" in SEGMENTS[n]:
             SEGMENTS[n]["env"] = SEGMENTS[n].pop("env_fn")()
+        if n == "day3_walk":          # persist block per story step: day4_route_regress --persist
+            SEGMENTS[n]["env"]["PE_D3_PERSIST_DUMP"] = os.path.abspath(os.path.join(a.log_dir, "persist"))
+            os.makedirs(SEGMENTS[n]["env"]["PE_D3_PERSIST_DUMP"], exist_ok=True)
+            SEGMENTS[n]["linger"] = 120       # the 0x1B8 block is written just after the story step
     ok = all([run_segment(n, SEGMENTS[n], a, disc, os.environ.get("DISC2"), prefix="day3")
               for n in names])
     print("DAY3_ROUTE=" + ("PASS" if ok else "FAIL"))

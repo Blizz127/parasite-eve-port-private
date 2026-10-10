@@ -69,6 +69,7 @@ def run_segment(name: str, seg: dict, a, disc: str, disc2: str | None, prefix: s
     if disc2:
         cmd += ["--disc2-image", disc2]
     cps, idx, frame, token, story, peak, fail = seg["checkpoints"], 0, 0, 0, 0, 0, None
+    done_at = None
     t0 = time.time()
     with open(log, "w") as lf:
         p = subprocess.Popen(cmd, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
@@ -96,7 +97,10 @@ def run_segment(name: str, seg: dict, a, disc: str, disc2: str | None, prefix: s
                       flush=True)
                 idx += 1
             if idx == len(cps):
-                break
+                done_at = done_at if done_at is not None else frame
+                if frame - done_at >= seg.get("linger", 0):
+                    break                         # linger: e.g. let the persist dump land
+                continue
             for k, v, d in cps[idx + 1:]:
                 if k == "token" and token == v:
                     fail = f"checkpoint '{d}' fired before '{cps[idx][2]}'"

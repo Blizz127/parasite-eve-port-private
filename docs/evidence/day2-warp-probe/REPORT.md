@@ -1553,3 +1553,23 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
   straight line hugged the machine corner); m0132i car at 0x1EE, wait 300
   frames for the car arrival to re-place Aya before the panel, and longer
   waits in the "Select Floor" menu.
+
+### Gate: day4_walk (2026-10-09 night)
+
+- pc_port/tools/day4_route_regress.py: segment day4_walk, warp m0098i at
+  0x1B8 with the persist block the same gate run's day3_walk dumped
+  (day3_route_regress now sets PE_D3_PERSIST_DUMP=<log-dir>/persist for
+  day3_walk and lingers 120 frames after its last checkpoint so the 0x1B8
+  block lands), then the committed day4_walk_waypoints.txt to 0x220. 78
+  ordered checkpoints (every first room entry and story step). Nothing
+  from the game is committed. The gate chain runs it after day3_walk.
+  PASS: day3_walk 0x1B8 at frame 65002, day4_walk 0x220 at frame 97562.
+- Fix: the m0046i/m0043i/m0042i/m0041i (0x216) entries of the full pass
+  were only in the scratch copy; now committed (the gate caught it).
+- Smoke test of the 7 off-route arity fixes (warp, story 0x220, 6000
+  frames, X mash, with a recorder probe on each function): m0269i, m0273i,
+  m0318i, m0401i, m0429i all load and run clean to the frame limit, but
+  none of the 7 functions is called by a plain warp (they are enemy/effect
+  callbacks of scripted battles: m0273i/m0318i are entered from m0360i,
+  m0429i from m0349i). Not exercised in game yet; m0273i/m0318i lie on the
+  Day 5 m0360i branch.
