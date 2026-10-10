@@ -19,7 +19,8 @@
  *            ^N: pulse Down for N frames instead, e.g. to move a menu cursor;
  *            %N: wait N frames with no buttons; *N: pulse Circle (raw 0x2000,
  *            the field check edge 0x20000000, e.g. the m0129i elevator);
- *            $HEX[:N]: hold raw pad HEX for N frames (default 12), e.g. turn in place at a wall)
+ *            $HEX[:N]: hold raw pad HEX for N frames (default 12), e.g. turn in place at a wall;
+ *            +: run there (hold Circle while walking), e.g. the timed m0381i roof escape)
  * The entry used is the one for the current token with the highest MINSTORY
  * <= story; a matching #VISIT entry wins, then a matching &MASK entry. Its waypoints run in order; after the last one the pilot holds
  * still (the pad script resumes) until the room or story changes.
@@ -32,7 +33,7 @@
 #ifndef PC_PORT_ROUTE_DAY3_PILOT_H
 #define PC_PORT_ROUTE_DAY3_PILOT_H
 
-typedef struct { int x, z, r, act, tmo, dn; unsigned pm; } D3Wp;   /* tmo: give up after N frames (~N); dn: 1 = ^N pulses Down, 2 = %N waits, 3 = *N pulses Circle, 4 = $HEX[:N] holds raw pad HEX N frames (e.g. turn in place) */
+typedef struct { int x, z, r, act, tmo, dn, run; unsigned pm; } D3Wp;   /* tmo: give up after N frames (~N); dn: 1 = ^N pulses Down, 2 = %N waits, 3 = *N pulses Circle, 4 = $HEX[:N] holds raw pad HEX N frames (e.g. turn in place) */
 typedef struct { uint32_t token, story, flags, slot; int visit, n; D3Wp wp[24]; } D3Entry;
 static D3Entry g_d3[160];
 static int g_d3_n = -1;
@@ -66,8 +67,11 @@ static void D3Parse(void)
             w->z = (int)strtol(s + 1, &end, 10); s = end;
             w->r = 100;
             if (*s == ',') { w->r = (int)strtol(s + 1, &end, 10); s = end; }
-            while (*s == '!' || *s == '~' || *s == '^' || *s == '%' || *s == '*' || *s == '$') {   /* suffixes in any order */
-                int v = *s == '$' ? 12 : (int)strtol(s + 1, &end, 10);
+            w->run = 0;
+            while (*s == '!' || *s == '~' || *s == '^' || *s == '%' || *s == '*' || *s == '$' || *s == '+') {   /* suffixes in any order */
+                int v;
+                if (*s == '+') { w->run = 1; s++; continue; }
+                v = *s == '$' ? 12 : (int)strtol(s + 1, &end, 10);
                 if (*s == '$') { w->pm = (unsigned)strtoul(s + 1, &end, 16); w->dn = 4; w->act = v; if (*end == ':') w->act = (int)strtol(end + 1, &end, 10); s = end; continue; }
                 if (*s == '!') w->act = v; else if (*s == '^') { w->act = v; w->dn = 1; }
                 else if (*s == '%') { w->act = v; w->dn = 2; }
@@ -338,6 +342,7 @@ static uint16_t RouteDay3Pilot(uint16_t script_mask)
         {   /* Cross pulse while walking: advances text the field mode does not flag */
             uint16_t m = RouteM34ShimMove(ax, az, wx, wz, 0);
             if ((g_frame % 16) == 3 || (g_frame % 16) == 4) m &= 0xBFFFu;
+            if (w->run) m &= 0xDFFFu;           /* active-low Circle: run */
             return m;
         }
     }

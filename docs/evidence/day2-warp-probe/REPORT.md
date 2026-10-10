@@ -1521,3 +1521,35 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
   across cases 0-5, plus 0x18 bytes of extra division code). The WIP stays
   outside the repo until it matches. Still open after it: m0156i -> m0380i,
   the m0157i entry trace, 0x220.
+
+### Day 4, m0156i -> m0380i -> m0381i -> m0157i (2026-10-09 evening)
+
+- 0x8018F058 did not match quickly (mode 2 register allocation; one more
+  attempt with Muse made no change, Qwen's API refused access). Installed
+  as a NON_MATCHING native port, differential-tested against the retail asm
+  (see docs/evidence/nonmatching/REPORT.md). The new mechanism: manifest
+  configs/USA/overlays/nonmatching.yaml, sources in src/nonmatching/.
+- The roof fight had a second soft-lock with the assist: the script exits
+  once HP <= 1000000 (999999), and a follow-up bullet in that window was
+  one-hit-killed. The assist now does retail damage for any HP > 900000.
+- The fight ends -> m0380i (second phase, same code as m0156i; its end
+  needed 0x80192208 + 0x80191B94, both NON_MATCHING ports, tested the same
+  way) -> m0381i.
+- m0157i is entered from m0381i: after the Eve scene (story 0x1FC)
+  module 6 counts var7 to 0x7F (~1016 frames) and sends 0x13 -> m0438i
+  (Game Over). Reaching module 5's quad x -3200..-1700 z -11000..-10000
+  sends 0xFB (stops the timer) and payload 1 -> m0157i. Walking is too
+  slow; the pilot gained a `+` waypoint suffix (hold Circle = run).
+- Then m0157i -> m0158i (0x200) -> m0159i -> m0160i (0x208) -> m0035i ->
+  m0046i (0x210, 0x216, police precinct, field control): next is routing
+  m0046i to 0x220.
+- m0046i (0x216) -> m0043i -> m0042i -> m0041i: module 8 quad x
+  -2029..-624 z -4..209 at story 0x216 -> module 2 payload 0x64: scene,
+  0x218, -> m0352i, which sets 0x220 -> world map.
+- FULL DAY 4 PASS: one continuous run from m0098i at 0x1B8 (persist
+  0x1B8) reaches story 0x220 at frame 97562 with no stop (stop reason
+  frame-limit only). Through-run fixes (warp-tested legs that broke on a
+  through run): m0328i after the fuse pickup, back down x 1450 (the
+  straight line hugged the machine corner); m0132i car at 0x1EE, wait 300
+  frames for the car arrival to re-place Aya before the panel, and longer
+  waits in the "Select Floor" menu.
