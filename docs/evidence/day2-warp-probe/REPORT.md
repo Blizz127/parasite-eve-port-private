@@ -1607,3 +1607,24 @@ not drawn there.  The ladder at (3880,2970) does not take Cross/Up: module 2
 does not start the ladder-bottom quad thread when p[1] == 0xA8 (entry from
 m0168i), only on message 1.  Next: find what lowers the bridge or sends
 message 1 (the other m0173i modules / m0174i side), then m0433i.
+
+### Day 5: m0167i "can't walk" root cause, m0173i ladder, route to m0176i (2026-10-10)
+
+- The m0167i post-fight stop was a harness bug, not a game bug: the route walker
+  (RouteM34ShimMove) learns the pad->world map online, and knockback in the fight
+  taught it Down = (-251,748); after the fight it pinned Aya at (0,404). Fix
+  (route_reward_sewer_pilot.h): the map is saved at a battle start and restored at
+  its end, from story 0x220 on (Day 1-4 gate routes were tuned with the carried
+  map; freezing/reseeding in all days broke day4_walk at m0132i/m0153i, k53-k55).
+  Day 5 now runs with moving fights; m0167i x2 and m0168i end with Aya walking.
+- m0173i is not a port bug: entering from m0168i (p1 0xA8) arms only the x=3649
+  line (z 2756..3232, west of the ladder); crossing it climbs to the upper walkway.
+  Message 1 is the arm for the other entries / after a battle in the room.
+- Route now 0x220 -> m0173i -> m0433i (0x240) -> m0174i (0x248; the stair landing
+  is an item-drop spot) -> m0175i -> m0176i -> m0178i/m0179i.
+- Blocker: m0176i sewer gates. The door quad picks m0180i/m0179i/m0178i from p36
+  0x1000/0x2000/0x4000 (set by module 3 on messages 3/4 from the control panel's
+  menu, message 0xe); m0178i/m0179i: "The water is too high to cross"; the panel
+  (facing test rot 0x600..0xA00) says "There's not enough power" in the gated build.
+- Harness: PE_D3_RAM_DUMP=FRAME:PATH,... (2 MB guest RAM), floor dump writes y.
+- Gate k56: CHAIN PASS (day4_walk 0x220 at frame 97562).

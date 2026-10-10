@@ -97,6 +97,20 @@ static uint16_t RouteDay3Pilot(uint16_t script_mask)
     unsigned mode = PE_LoadU32(0x8009D28Cu), d1a0 = PE_LoadU32(0x8009D1A0u);
     pe_addr_t aya = PE_LoadU32(0x8009D254u);
     int ax, az;
+    {   /* PE_D3_RAM_DUMP="FRAME:PATH,...": harness probe, 2 MB guest RAM at those frames */
+        const char *q = getenv("PE_D3_RAM_DUMP");
+        while (q && *q) {
+            char *e, path[512]; int f = (int)strtol(q, &e, 10); size_t n = 0;
+            if (*e != ':') break;
+            for (q = e + 1; *q && *q != ',' && n < sizeof path - 1; q++) path[n++] = *q;
+            path[n] = 0;
+            if (f == g_frame) {
+                FILE *o = fopen(path, "wb");
+                if (o) { for (uint32_t i = 0; i < 0x200000u; i++) fputc(PE_LoadU8(0x80000000u + i), o); fclose(o); }
+            }
+            if (*q == ',') q++;
+        }
+    }
 
     if (g_d3_n < 0) D3Parse();
     if (!g_d3_n) return script_mask;
@@ -261,7 +275,7 @@ static uint16_t RouteDay3Pilot(uint16_t script_mask)
                     fprintf(f, "dim %d nv %d nt %d\n", dim, nv, nt);
                     for (int i = 0; i < nv; i++) {
                         pe_addr_t v = vp + (uint32_t)i * (dim ? 6u : 4u);
-                        fprintf(f, "v %d %d\n", (int16_t)PE_LoadU16(v), (int16_t)PE_LoadU16(v + (dim ? 4u : 2u)));
+                        fprintf(f, "v %d %d %d\n", (int16_t)PE_LoadU16(v), (int16_t)PE_LoadU16(v + (dim ? 4u : 2u)), dim ? (int16_t)PE_LoadU16(v + 2u) : 0);   /* x z y */
                     }
                     for (int i = 0; i < nt; i++) {
                         pe_addr_t t = tp + (uint32_t)i * (dim ? 28u : 22u) + (dim ? 8u : 2u);

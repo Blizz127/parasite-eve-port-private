@@ -63,7 +63,22 @@ static uint16_t RouteM34ShimMove(int ax, int az, int wx, int wz, int stop2)
         /* M34's arena camera changes angle as Aya moves (m34d: stuck holding a
          * stale Up at (-734,768)), so re-derive the map from the live matrix
          * whenever it changes. */
-        static int lc=0x7FFFFFFF, lsn=0x7FFFFFFF;
+        static int lc=0x7FFFFFFF, lsn=0x7FFFFFFF, lbattle=-1;
+        /* What the walker learns in a battle is dropped when it ends: hits and
+         * knockback move Aya against the held pad (Day 5 m0167i: Down learned as
+         * (-251,748) mid-fight, and after the fight the walker pinned her at
+         * (0,404) pressing into the wall; the game itself had control back).
+         * The pre-battle map is restored when the fight ends. */
+        int battle=(PE_LoadU32(0x8009D1A0u)&0x802u)!=0;
+        static int svx[4], svz[4], sinit;
+        /* Day 5 on (story >= 0x220) only: the Day 1-4 gate routes were tuned with the
+         * fight-learned map carried over (m0132i at 0x1EE depends on it). */
+        if (PE_LoadU32(0x800A7918u) < 0x220u) battle=0;
+        if (battle!=lbattle) {
+            if (battle) { memcpy(svx,g_m34s_vx,sizeof svx); memcpy(svz,g_m34s_vz,sizeof svz); sinit=g_m34s_init; }
+            else if (lbattle>=0) { memcpy(g_m34s_vx,svx,sizeof svx); memcpy(g_m34s_vz,svz,sizeof svz); g_m34s_init=sinit; }
+            lbattle=battle;
+        }
         if (GA_TOKEN==0xA8003248u && (c!=lc || sn!=lsn)) {
             if (lc!=0x7FFFFFFF) g_m34s_init=0;
             lc=c; lsn=sn;
