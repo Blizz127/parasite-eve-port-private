@@ -12,7 +12,7 @@ On a mapped SDL GameController (Xbox labels, including Steam Input):
 | Control | Action |
 | --- | --- |
 | Back/View + Start/Menu on the same controller | Open or close the development menu |
-| D-pad Up/Down or left stick Up/Down | Move one row per press or stick deflection |
+| D-pad (vertical) or left analog stick (vertical) | Move one row per press or stick deflection |
 | A | Confirm, toggle a cheat, or select a warp |
 | B | Back one page; close at the root |
 | Keyboard Up/Down, Enter, Escape | Navigate, confirm, back when open |
