@@ -1573,3 +1573,37 @@ LINK_EXACT, then carved (`carve.py`, `fixwindow.py`, `git add -N`) with
   callbacks of scripted battles: m0273i/m0318i are entered from m0360i,
   m0429i from m0349i). Not exercised in game yet; m0273i/m0318i lie on the
   Day 5 m0360i branch.
+
+### Day 5, 0x220 -> m0173i (2026-10-09 night)
+
+Waypoints: `pc_port/tools/day5_walk_waypoints.txt` (from the 0x218 persist).
+World map location 1 -> m0161i -> m0162i (fight) -> m0163i (fight) -> m0165i
+(scene, story 0x228/0x230) -> m0166i manhole (0x238) -> sewer m0167i hub ->
+south arm -> m0168i -> west end -> m0167i (west arm) -> south arm -> m0168i ->
+west end -> m0173i.  m0168i's west exit goes to m0173i only when p[0x37] == 1;
+otherwise it bumps p[0x37] and sends Aya back into the hub, so the loop is run
+twice.
+
+Fixes on the way:
+- m0163i fight stopped at CPU_BOUNDARY 80192A68, then 801924FC (enemy shot
+  effect and its particle callback, room_m0162i bytes): both ported
+  NON_MATCHING (docs/evidence/nonmatching/REPORT.md).
+- m0167i fight stopped at func_80078BE4 (Psy-Q libgte ApplyMatrix, called from
+  m0167i func_8018F8B8): host replacement `PE_ApplyMatrix_Guest`
+  (pe_port_compat.h host-replacement marker; func_800794C4_port.c), with test
+  INIT1_applymatrix_guest.  No func_80078BE4 is defined.
+
+Open issue (not yet fixed): with the moving battle shim, the m0167i fight ends
+with Aya at (0,404) after the item-full "Exit Menu", and she can turn but not
+walk in any direction afterwards (field mode 9, no STOP).  Fighting standing
+(`PE_D3_BTL_SEQ`, Cross/release) avoids it; the route uses that from m0162i on.
+Needs checking whether a player can reach that spot in retail.
+
+Blocker (0x238, m0173i): Aya arrives from m0168i on the lower deck (4289,125).
+The exit to m0433i (story < 0x248: story = 0x240) / m0174i is the module 2
+quad around (-1150,50), across the channel on the bridge strip the floor mesh
+has at z -107..314.  Aya stops at (3334,138), the channel edge; the bridge is
+not drawn there.  The ladder at (3880,2970) does not take Cross/Up: module 2
+does not start the ladder-bottom quad thread when p[1] == 0xA8 (entry from
+m0168i), only on message 1.  Next: find what lowers the bridge or sends
+message 1 (the other m0173i modules / m0174i side), then m0433i.

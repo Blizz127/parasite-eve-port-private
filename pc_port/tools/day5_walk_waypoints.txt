@@ -1,0 +1,11 @@
+# Day 5 played route (0x220 -> toward 0x2D6): PE_ROUTE_WAYPOINTS entries, one per line (see pc_port/src/route_day3_pilot.h).
+# Battles from m0162i on are fought standing (PE_D3_BTL_SEQ="BFFF:10,FFFF:20"x150): with the moving battle shim Aya ends the m0167i
+# fight at (0,404) and cannot walk afterwards (open issue, see docs/evidence/day2-warp-probe/REPORT.md, Day 5).
+A8000048@220=1,0   (world map at 0x220: Day 5, location 1 = Chinatown m0161i; 2 m0096i, 3 m0260i, 4 m0331i hospital, 6 m0024i, 8 m0058i)
+A80260C8@220=0,-3600,40;-25,-2000,40   (m0161i Chinatown at 0x220: north up the street to quad x -800..750 z -2700..-1300 -> m0162i)
+A8026148@220=100,2975,40   (m0162i at 0x220: floor path to mod0 payload 0x2 x -800..1000 z 2700..3250 -> m0163i)
+A80261C8@220=-100,4650,40   (m0163i at 0x220: floor path to mod0 payload 0x1 x -1200..1000 z 4500..4800 -> m0165i)
+A80262C8@228=0,1000,40;50,1875,40   (m0165i at 0x228: floor path to mod0 payload 0xc x -200..300 z 1700..2050 -> m0166i)
+A8026348@238=-1100,-500,40   (m0166i at 0x238: sewer west quad x -1471..-741 -> m0167i)
+A80263C8@238=0,0,40;0,-2300,40   (m0167i at 0x238: sewer hub, south arm quad x -333..460 z -2718..-1718 -> m0168i)
+A8026448@238=-4500,0,40;-8750,0,40   (m0168i at 0x238: west along the sewer to quad x -9053..-8449: m0173i once p[0x37]==1, else p37+=1 -> m0167i)
