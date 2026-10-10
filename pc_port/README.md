@@ -170,7 +170,7 @@ its `VSync(n)` waits and the 240 Hz music clock all run at retail speed; a
 present only polls input. (Pacing per present had run gameplay and music at
 2x.) F6 toggles normal speed (60000/1001 Hz) and uncapped fast-forward; on a
 controller L3 (left stick click) toggles it and R3 (right stick click)
-fast-forwards while held. The window title shows the active mode, and the sound
+fast-forwards while held. The window title gains "[Fast-forward]" while it is active, and the sound
 device is muted with a fade while fast-forwarding (the WAV dump is not). Normal is the default. Frame waits use a monotonic
 clock and poll input; long pauses discard the timing backlog.
 

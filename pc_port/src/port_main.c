@@ -73,7 +73,7 @@ static struct {
     .screenshot = NULL, .vram_screenshot = NULL, .vram_raw = NULL,
     .trace_path = NULL,
     .hold_ms = 0, .scale = 2, .hold_until_close = 1, .debug_overlay = 0,
-    .window_title = "Parasite Eve Native Port",
+    .window_title = "Parasite Eve",
     .direct_clear_test = 0, .stop_after_event = NULL,
     .max_frames = 0, .max_main_iterations = 0,
     .disc_image = NULL, .disc_load_test = 0, .rng_oracle_dump = 0,

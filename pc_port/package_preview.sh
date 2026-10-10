@@ -94,7 +94,7 @@ SKIP=()
 # checkpoint builds packaged with PE_PREVIEW_DEV_MENU=1; PE_DEV_MENU=0 turns it off.
 export PE_DEV_MENU="${PE_DEV_MENU:-__DEV_MENU__}"
 exec "$HERE/bin/parasite-eve-port" --windowed "${SKIP[@]}" --scale 3 \
-    --window-title "Parasite Eve - Day 1 preview" \
+    --window-title "Parasite Eve" \
     --disc-image "$DISC" "$@"
 LAUNCHER
 chmod 0755 "$STAGE/parasite-eve-preview"
@@ -154,7 +154,7 @@ keep the 4:3 picture); PE_FULLSCREEN=0 keeps a window, PE_FULLSCREEN=1 or
 
 Fast-forward runs the game uncapped and mutes the sound (it fades out and
 back in, so there is no chipmunk audio or static); the window title shows
-the active speed.
+[Fast-forward] while it is on.
 
 Dev menu (cheats, Day warps, Options > Enhancements / Assists): hold Back/View
 and Start/Menu together on a controller, or press F8 on a keyboard. This build
