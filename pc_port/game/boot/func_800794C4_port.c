@@ -185,3 +185,15 @@ pe_addr_t PE_MulMatrix0_Guest(pe_addr_t left, pe_addr_t right, pe_addr_t out)
     for (i = 0; i < 9u; i++) PE_StoreU16(out + i * 2u, (uint16_t)o[i]);
     return out;
 }
+
+/* Psy-Q ApplyMatrix (retail func_80078BE4), host replacement: RT <- m's
+ * rotation, V0 <- v, MVMVA rtv0 (sf=1, no translation), out <- MAC1-3. */
+pe_addr_t PE_ApplyMatrix_Guest(pe_addr_t m, pe_addr_t v, pe_addr_t out)
+{
+    unsigned i;
+    PE_GTE_LoadRT33(m);
+    PE_GTE_SetV0((int16_t)PE_LoadU16(v), (int16_t)PE_LoadU16(v + 2u), (int16_t)PE_LoadU16(v + 4u));
+    PE_GTE_MVMVA(0x86000u);
+    for (i = 0; i < 3u; i++) PE_StoreU32(out + i * 4u, (uint32_t)g_pe_gte.mac[i]);
+    return out;
+}

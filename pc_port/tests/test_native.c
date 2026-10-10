@@ -37466,6 +37466,29 @@ static void test_INIT1_rotmatrix_guest(void)
     PASS();
 }
 
+/* PE_ApplyMatrix_Guest (host replacement for func_80078BE4, Psy-Q ApplyMatrix,
+ * in lowered room code; first hit m0167i func_8018F8B8): out = rot*v >>12 as
+ * 32-bit words, translation ignored, returns out. */
+static void test_INIT1_applymatrix_guest(void)
+{
+    static const int16_t a[9] = {4096,0,0, 0,2048,0, 100,-200,4096};
+    static const int16_t v[3] = {1000, -3000, 7};
+    unsigned i;
+    TEST("INIT1_applymatrix_guest");
+    ResetTestState();
+    PE_Fill(0x80140000u, 64u, 0xA5u);
+    for (i = 0; i < 9u; i++) PE_StoreU16(0x80140040u + i*2u, (uint16_t)a[i]);
+    PE_StoreU32(0x80140054u, 0x12345u); PE_StoreU32(0x80140058u, 0x12345u); PE_StoreU32(0x8014005Cu, 0x12345u);
+    for (i = 0; i < 3u; i++) PE_StoreU16(0x80140080u + i*2u, (uint16_t)v[i]);
+    ASSERT(PE_ApplyMatrix_Guest(0x80140040u, 0x80140080u, 0x80140000u) == 0x80140000u, "returns out");
+    for (i = 0; i < 3u; i++) {
+        int32_t want = (a[i*3]*v[0] + a[i*3+1]*v[1] + a[i*3+2]*v[2]) >> 12;
+        ASSERT((int32_t)PE_LoadU32(0x80140000u + i*4u) == want, "out[i] = row_i . v >> 12 (no translation)");
+    }
+    ASSERT(PE_LoadU8(0x8014000Cu) == 0xA5u, "writes 12 bytes only");
+    PASS();
+}
+
 /* PE_MulMatrix0_Guest (host replacement for func_800785D4 in lowered room
  * code): out = left*right rotation (>>12, int16 clamp), translation kept. */
 static void test_INIT1_mulmatrix0_guest(void)
@@ -40825,6 +40848,7 @@ int main(void)
     test_INIT1_rotation_retail_vectors();
     test_INIT1_rotmatrix_guest();
     test_INIT1_mulmatrix0_guest();
+    test_INIT1_applymatrix_guest();
     test_INIT1_clip_formats_and_joint_override();
     test_SKIP2_script_movie_and_nop();
     test_SKIP2_media_wait_retry();
