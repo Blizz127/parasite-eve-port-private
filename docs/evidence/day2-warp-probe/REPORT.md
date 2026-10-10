@@ -1624,7 +1624,7 @@ message 1 (the other m0173i modules / m0174i side), then m0433i.
   is an item-drop spot) -> m0175i -> m0176i -> m0178i/m0179i.
 - Blocker: m0176i sewer gates. The door quad picks m0180i/m0179i/m0178i from p36
   0x1000/0x2000/0x4000 (set by module 3 on messages 3/4 from the control panel's
-  menu, message 0xe); m0178i/m0179i: "The water is too high to cross"; the panel
-  (facing test rot 0x600..0xA00) says "There's not enough power" in the gated build.
+  menu, message 0xe); m0178i/m0179i: the water-too-high message; the panel
+  (facing test rot 0x600..0xA00) gives the no-power message in the gated build.
 - Harness: PE_D3_RAM_DUMP=FRAME:PATH,... (2 MB guest RAM), floor dump writes y.
 - Gate k56: CHAIN PASS (day4_walk 0x220 at frame 97562).
