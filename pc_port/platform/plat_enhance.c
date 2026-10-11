@@ -226,9 +226,15 @@ int32_t pe_enh_enemy_damage(uint32_t body, int32_t damage)
     if (!pe_enh_one_hit_kills() || body == 0u) return damage;    /* retail path */
     /* Story-scripted battles (game flag 0x800: the Eve stage fight on Day 1) are ended by
      * their script, not by the enemy's HP; killing the enemy there leaves the script
-     * waiting forever (observed on the Day-1 autopilot).  The assist stays inactive. */
-    if (PE_LoadU32(GA_GAME_FLAGS) & 0x800u) return damage;
+     * waiting forever (observed on the Day-1 autopilot).  There the assist only applies
+     * the script-phase marker rule below. */
     hp = (int32_t)PE_LoadU32(body + 0x10u);
+    /* Above the +1000000 script-phase marker, one hit takes the enemy down to
+     * exactly 1000000 and the room script's own exit runs (also in story battles,
+     * flag 0x800: the Day-5 Statue of Liberty Eve, m0273i, three parts at
+     * 1000000 + 1589/1750/1900). */
+    if (hp > 1000000) return damage > 0 ? hp - 1000000 : damage;
+    if (PE_LoadU32(GA_GAME_FLAGS) & 0x800u) return damage;
     /* Scripts also make an enemy invulnerable for a scripted phase by adding 1000000
      * to its HP (rooms test `HP <= 1000000`, e.g. room_m0429i func_801926B4).  Killing
      * it there skips the script's own exit: the Day-4 m0156i roof fight then sat in
@@ -236,10 +242,6 @@ int32_t pe_enh_enemy_damage(uint32_t body, int32_t damage)
      * just below it: the script's exit runs once HP drops to <= 1000000 (999999 on
      * that roof), and a second bullet in that window must not kill it either.  No
      * ordinary enemy comes near 900000 HP. */
-    /* Above the marker, one hit takes the enemy down to exactly 1000000: the
-     * script's own exit then runs as if the phase had been fought out (the Day-5
-     * Statue of Liberty Eve, m0273i: three parts at 1000000 + 1589/1750/1900). */
-    if (hp > 1000000) return damage > 0 ? hp - 1000000 : damage;
     if (hp > 900000) return damage;
     return (hp > 0 && damage < hp) ? hp : damage;
 }
