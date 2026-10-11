@@ -430,7 +430,6 @@ void PE_GTE_WriteData(uint32_t reg, uint32_t value);
 uint32_t PE_GTE_ReadCtrl(uint32_t reg);
 void PE_GTE_WriteCtrl(uint32_t reg, uint32_t value);
 void PE_GTE_Command(uint32_t cmd);
-static inline void PE_Decomp_GuestTrapDivZero(const char *fn) { (void)fn; }
 static inline uint8_t  PE_LoadU8(pe_addr_t a)  { return *at(a); }
 static inline uint16_t PE_LoadU16(pe_addr_t a) { uint16_t v; memcpy(&v, at(a), 2); return v; }
 static inline uint32_t PE_LoadU32(pe_addr_t a) { uint32_t v; memcpy(&v, at(a), 4); return v; }
