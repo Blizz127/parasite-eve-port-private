@@ -162,10 +162,21 @@ class Gte:
             self.d[9 + i] = min(max(mac, lo), 0x7FFF) & 0xFFFFFFFF
 
 
-def out_bytes(fn: int, k: int, seed: int) -> bytes:
-    """The 8 bytes a mocked callee writes through an `out=` stack argument (both sides)."""
+OUT_LEN_SHIFT = 40                      # out=FN:K:LEN keeps LEN above the FN<<4|K key
+
+
+def out_key(v: int) -> int:
+    return v & ((1 << OUT_LEN_SHIFT) - 1)
+
+
+def out_len(v: int) -> int:
+    return (v >> OUT_LEN_SHIFT) or 8
+
+
+def out_bytes(fn: int, k: int, seed: int, n: int = 8) -> bytes:
+    """The bytes (8 by default) a mocked callee writes through an `out=` stack argument (both sides)."""
     x, b = (fn * 2654435761 + seed * 40503 + k * 0x9E37) & 0xFFFFFFFF, bytearray()
-    for _ in range(8):
+    for _ in range(n):
         x = (x * 1103515245 + 12345) & 0xFFFFFFFF
         b.append((x >> 16) & 0xFF)
     return bytes(b)
@@ -290,10 +301,11 @@ def run_mips(ram: bytearray, entry: int, args: list[int], seed: int, outs: froze
                                       [((v & 0x1FFFFFFF) + j) in written for j in range(16)], v)
                                      if 0x801FF000 <= v < SP0 + 0x100 else v for v in av)))
             for k in range(len(av)):
-                if (tgt << 4 | k) in outs and 0x801FF000 <= av[k] < SP0 + 0x100:
+                n_ = next((out_len(v) for v in outs if out_key(v) == (tgt << 4 | k)), 0)
+                if n_ and 0x801FF000 <= av[k] < SP0 + 0x100:
                     o_ = av[k] & 0x1FFFFFFF
-                    ram[o_:o_ + 8] = out_bytes(tgt, k, seed)
-                    written.update(range(o_, o_ + 8))
+                    ram[o_:o_ + n_] = out_bytes(tgt, k, seed, n_)
+                    written.update(range(o_, o_ + n_))
             r[2] = mock_ret(tgt, seed)
             r[31] = cur + 8
             pc, npc = cur + 8, cur + 12
@@ -432,6 +444,7 @@ uint32_t mock_call(uint32_t fn, unsigned n, uint32_t a0, uint32_t a1, uint32_t a
 static inline int PE_GuestCall(const char *s, pe_addr_t fn, unsigned n, uintptr_t a0, uintptr_t a1, uintptr_t a2, uintptr_t a3)
 { (void)s; return (int)mock_call(fn, n, (uint32_t)a0, (uint32_t)a1, (uint32_t)a2, (uint32_t)a3); }
 #define PE_D_COMP_A(_1, _2, _3, _4, ...) (uint32_t)(uintptr_t)(_1), (uint32_t)(uintptr_t)(_2), (uint32_t)(uintptr_t)(_3), (uint32_t)(uintptr_t)(_4)
+static inline void PE_Decomp_GuestTrapDivZero(const char *fn) { (void)fn; printf("GUEST_TRAP\n"); exit(4); }
 #define PE_D_COMP_BOUNDARY0(s, v) (int)mock_call(v, 0u, 0, 0, 0, 0)
 #define PE_D_COMP_BOUNDARY1(s, v, ...) (int)mock_call(v, 1u, PE_D_COMP_A(__VA_ARGS__, 0, 0, 0, 0))
 #define PE_D_COMP_BOUNDARY2(s, v, ...) (int)mock_call(v, 2u, PE_D_COMP_A(__VA_ARGS__, 0, 0, 0, 0))
@@ -485,7 +498,7 @@ uint32_t mock_args(uint32_t fn, unsigned n, const uint32_t *a)
         for (q = 0; q < sizeof outs_ / sizeof outs_[0]; q++)
             if (outs_[q] == (fn << 4 | i) && a[i] >= 0x801FE000u && a[i] < 0x801FF000u) {
                 x = fn * 2654435761u + seed_ * 40503u + i * 0x9E37u;
-                for (j = 0; j < 8; j++) {
+                for (j = 0; j < outl_[q]; j++) {
                     x = x * 1103515245u + 12345u;
                     ram[(a[i] & 0x1FFFFFu) + j] = (uint8_t)(x >> 16);
                 }
@@ -531,17 +544,37 @@ def candidates() -> list[tuple[Path, str, str]]:
 
 
 PROTO_RE = re.compile(r"^(\w[\w \*]*?)\s*\b(func_[0-9A-F]{8})\((.*?)\);", re.M)
+_REPL: dict[str, str] | None = None
+
+
+def host_protos(t: str) -> list[tuple[str, str, str]]:
+    """(ret, func_X, params) of a TU's host-prototyped callees.  A host
+    replacement (gen_overlay_ports.host_replacements: PE_RotMatrixYXZ_Guest for
+    func_80079754, ...) is reported under its retail func_X so it is mocked and
+    logged like the retail jal; its stub keeps the host name."""
+    global _REPL
+    if "host prototypes" not in t:
+        return []
+    if _REPL is None:
+        _REPL = {v["host"]: k for k, v in o.host_replacements().items()}
+    block = t.split("host prototypes", 1)[1].split("\n\n", 1)[0]
+    out = list(PROTO_RE.findall(block))
+    for m in re.finditer(r"^(\w[\w \*]*?)\s*\b(PE_\w+)\((.*?)\);", block, re.M):
+        if m.group(2) in _REPL:
+            out.append((m.group(1), m.group(2), m.group(3)))
+    return out
+
+
+def proto_vma(fn: str) -> int:
+    return int((_REPL.get(fn, fn) if fn.startswith("PE_") else fn)[5:], 16)
 
 
 def host_masks(t: str) -> dict[int, list[int]]:
     """{callee vma: per-argument compare mask} for host-prototyped callees."""
-    if "host prototypes" not in t:
-        return {}
-    block = t.split("host prototypes", 1)[1].split("\n\n", 1)[0]
     out = {}
-    for _ret, fn, prm in PROTO_RE.findall(block):
+    for _ret, fn, prm in host_protos(t):
         ps = [] if prm.strip() == "void" else [x.strip() for x in prm.split(",")]
-        out[int(fn[5:], 16)] = [0xFFFF if "short" in ty else 0xFF if "char" in ty else 0xFFFFFFFF
+        out[proto_vma(fn)] = [0xFFFF if "short" in ty else 0xFF if "char" in ty else 0xFFFFFFFF
                                 for ty in ps]
     return out
 
@@ -554,9 +587,8 @@ def host_stubs(t: str) -> str:
     retail interpreter's jal."""
     if "host prototypes" not in t:
         return ""
-    block = t.split("host prototypes", 1)[1].split("\n\n", 1)[0]
     out = []
-    for ret, fn, prm in PROTO_RE.findall(block):
+    for ret, fn, prm in host_protos(t):
         ps = [] if prm.strip() == "void" else [x.strip() for x in prm.split(",")]
         names, logs = [], []
         for k, ty in enumerate(ps):
@@ -565,7 +597,7 @@ def host_stubs(t: str) -> str:
             w = "0xFFFFu" if "short" in ty else "0xFFu" if "char" in ty else "0xFFFFFFFFu"
             logs.append(f"(uint32_t)(uintptr_t){nm} & {w}")
         body = (f"uint32_t a_[12] = {{{', '.join(logs) or '0'}}}; "
-                f"uint32_t v_ = mock_args(0x{fn[5:]}u, {len(ps)}u, a_);")
+                f"uint32_t v_ = mock_args(0x{proto_vma(fn):08X}u, {len(ps)}u, a_);")
         retst = "" if ret.strip() == "void" else f" return ({ret.strip()})v_;"
         out.append(f"{ret} {fn}({', '.join(names) or 'void'}) {{ {body}{retst} }}")
     return "\n" + "\n".join(out) + "\n"
@@ -585,8 +617,10 @@ def directed_specs() -> dict[tuple[str, str], list[tuple[str, int, list[int]]]]:
         for t in m.group(3).split(";"):
             lhs, rhs = (x.strip() for x in t.split("="))
             vals: list[int] = []
-            if lhs == "out":                   # out=FN:K,...: callee FN writes 8 bytes through stack arg K
-                terms.append((lhs, [int(x.split(":")[0], 16) << 4 | int(x.split(":")[1]) for x in rhs.split(",")]))
+            if lhs == "out":                   # out=FN:K[:LEN],...: callee FN writes LEN (8) bytes through stack arg K
+                terms.append((lhs, [int(x.split(":")[0], 16) << 4 | int(x.split(":")[1])
+                                    | (int(x.split(":")[2], 0) << OUT_LEN_SHIFT if x.count(":") == 2 else 0)
+                                    for x in rhs.split(",")]))
                 continue
             for v in rhs.split(","):
                 if ".." in v:
@@ -672,7 +706,9 @@ def one(p: Path, name: str, ovl: str, seeds: int, cc: str, cover: bool = False,
         (d / "pe_guest_decomp.h").write_text(MOCK_H)
         outs = frozenset(v for lhs, vs in directed.get((ovl, name), []) if lhs == "out" for v in vs)
         harness = HARNESS.replace("static unsigned seed_;", "static unsigned seed_;\nstatic const uint32_t outs_[] = {"
-                                  + ", ".join(f"0x{v:X}u" for v in sorted(outs) or [0xFFFFFFFF]) + "};")
+                                  + ", ".join(f"0x{out_key(v) & 0xFFFFFFFF:X}u" for v in sorted(outs) or [0xFFFFFFFF]) + "};\n"
+                                  + "static const unsigned outl_[] = {"
+                                  + ", ".join(f"{out_len(v)}u" for v in sorted(outs) or [0]) + "};")
         src = t + harness.replace("CALL_LINE", call) + stubs
         (d / "t.c").write_text(src)
         (d / "gte_ext.c").write_text(GTE_EXT)
