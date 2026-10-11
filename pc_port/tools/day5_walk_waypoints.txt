@@ -41,3 +41,7 @@ A80403C8@260=-150,-3000,40;-100,1350,40   (m0207i at 0x260: the hall: north to t
 A80404C8@260=-340,-350,40   (m0209i at 0x260: the stone heads: try to leave (quad x -440..-240 z -900..200) for the earthquake noise -> m0207i)
 A8041048@260=-340,-350,40   (m0210i at 0x260: the stone heads after the quake: back west (quad x -440..-240 z -900..200) -> m0207i)
 A80403C8@260#2=-100,1100,5000$FFBF:60;-100,1100,5000$FFDF:60;-100,-1000,40;341,-3631,40;1000,-2416,40   (m0207i at 0x260, second visit: to the stairs, quad x 820..1180 z -2516..-2316 -> 2F)
+A8041248@260=310,-155,40;0,800,40   (m0214i at 0x260: 2F landing: south to the quad x -500..500 z 700..900 -> m0216i (m0215i once p22 bit 0x42); north (m0217i) is locked until p22 bit 0xB6)
+A8041348@260=-415,-1300,40;-1310,-968,40;-1035,-350,40;-1074,552,40;-1795,1235,40;-1832,1200,40   (m0216i at 0x260: the jammed south hall (sets p22 bit 0x42): through to the trigger x -1932..-1732 z 1105..1306 -> m0212i, the stone heads balcony)
+A8041148@260=430,-160,40;430,-160,5000%90!20;430,-160,5000%60!20   (m0212i at 0x260: the stone heads balcony: to the ledge trigger x 340..520 z -200..-123, confirm the first choice -> m0213i (the other drops to m0211i))
+A80411C8@260=157,-109,40;-5,-156,40;-150,0,40   (m0213i at 0x260: fire escape: west to the trigger x -255..-50 z -132..132 -> m0218i)
