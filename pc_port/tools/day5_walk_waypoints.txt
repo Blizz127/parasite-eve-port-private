@@ -31,3 +31,4 @@ A80283C8@258=-150,-9875,40   (m0187i at 0x258: back south to the quad x -800..50
 A8028248@258=1455,-649,40;965,-340,20;965,-200,20~60   (m0184i at 0x258: back over the platform to the quad x 20..1910 z -383..-330 -> m0183i)
 A80281C8@258=1241,5650,40;620,5650,40;522,5090,40;489,4805,40;250,4650,40;2,4001,40!30;40,3440,40;40,3440,5000%60!30;40,3300,20~90!30   (m0183i at 0x258: the station: north round the benches and the item crate (z 5650) (the quad x 312..1950 z 4087..4500 leads back to m0184i) to the stair gate (quad x -188..269 z 3384..3501 -> m0000i), open it with the Gate Key)
 A8000048@258=9,0   (world map at 0x258: Day 5 after the Gate Key: location 9 = Museum (2 = the optional Warehouse, m0096i))
+A8029148@258=6006,1438,40;3700,1350,40   (m0192i at 0x258: the Museum steps: up to the doors quad x 3482..3937 z 1094..1604 -> m0196i)
