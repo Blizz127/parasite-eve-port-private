@@ -18,6 +18,15 @@ leaves:
   - [room_m0188i, func_801951EC, 0x6204, 0x3B4]   # ground-burst battle effect main (m0188i)
   - [room_m0188i, func_801955A0, 0x65B8, 0x474]   # splash pool particle callback (m0188i)
   - [room_m0188i, func_80195A14, 0x6A2C, 0x360]   # splash battle effect main (m0188i)
+  - [room_m0245i, func_801933EC, 0x4404, 0x2A0]   # triceratops beam glow particle callback (m0245i); handwritten cop2 loads
+  - [room_m0245i, func_8019368C, 0x46A4, 0x6F0]   # triceratops beam battle effect main (m0245i); handwritten cop2 loads
+  - [room_m0245i, func_80194C54, 0x5C6C, 0x2A0]   # triceratops beam glow particle callback, second beam (m0245i)
+  - [room_m0245i, func_80194EF4, 0x5F0C, 0x6F0]   # triceratops beam battle effect main, second beam (m0245i)
+  - [room_m0245i, func_80192500, 0x3518, 0xD44]   # triceratops fire breath particle callback (m0245i); handwritten cop2 loads
+  - [room_m0245i, func_80193D7C, 0x4D94, 0xD30]   # triceratops fire breath particle callback, second head (m0245i)
+  - [room_m0273i, func_80197BBC, 0x8BD4, 0x4A4]   # slime / Eve turn-and-strike battle effect main (m0273i); handwritten cop2 loads
+  - [room_m0273i, func_8019665C, 0x7674, 0x37C]   # slime drop particle callback (m0273i)
+  - [room_m0273i, func_80192838, 0x3850, 0x3C8]   # slime grab-attack driver (m0273i)
 # Directed differential inputs (seed k takes the k-th combination; see e21_diff.py).
 inputs:
   - [room_m0156i, func_8018F058, "a0=1,2; h(a1+0x10)=0..5; h(a1+0x12)=0,1,7,8,23; h(0x800F336C)=4,0; w(0x800F3428)=1,0; out=800CFB7C:2,800783E4:4,800CF3AC:1,800CE8F0:3"]
@@ -32,3 +41,13 @@ inputs:
   - [room_m0188i, func_801951EC, "a0=0,1,2,3; h(a1+0x8)=0,1,6,-1; w(0x800E27EC)=0,1,4; w(0x800F32D0)=0x80180000; w(0x80180008)=0x80180100,0; w(0x80180100)=0x80180200,0; w(0x80180218)=0x80180300; w(0x80180300)=1,2; w(0x800E2368)=0x80180400; w(0x8018040C)=0x100,0; w(0x800F33E0)=0x80180500; out=800CE870:2,800CE9D4:2,800CFB7C:2"]
   - [room_m0188i, func_801955A0, "a0=1,2,0; h(a1+0x10)=0,1,2; h(a1+0x12)=0,1,15,16,23,24,-3; h(a1+0x8)=0,127,-129,300; h(a1+0xC)=0,-64,255; h(a1+0x2)=0,-200,300; h(a1+0xA)=0,7,-9; h(0x800942EC)=0,-100; w(0x800E27EC)=1,7,36; h(0x800F336C)=4,1; w(0x800F3428)=1,0; out=800CF3AC:1"]
   - [room_m0188i, func_80195A14, "a0=1,0,2,3; w(0x800E27EC)=0,1,2,3,47,48,49,59,60,61; w(0x800F33E0)=0x80180000; w(0x800F32D0)=0x80180100; out=800CE870:2"]
+  - [room_m0245i, func_801933EC, "a0=1,2,0,3; h(a1+0xA)=0,1,15,16,-3; h(a1+0xC)=0,5,-9; h(a1+0xE)=0,-64,63; h(a1+0x2)=0,-200,300; w(0x800E27EC)=0,1,7; h(0x800F336C)=4,1; w(0x800F3428)=1,0; w(0x800BCFA4)=0x80180600"]
+  # m0245i beam mains: a1 pinned to 0x80180800 (a random d pointer can land in the overlay code the retail interpreter runs; d[0] stores then rewrite it).
+  - [room_m0245i, func_8019368C, "a0=0,1,2,3; a1=0x80180800; h(a1+0x0)=0,8,127,128,-8; w(0x800E27EC)=0,1,2,3,47,48; w(0x800F33E0)=0x80180000; w(0x800F32D0)=0x80180100; h(0x800F336C)=4,1; w(0x800F3428)=1,0; w(0x800BCFA4)=0x80180600; out=800CE8F0:3,800CF3AC:1"]
+  - [room_m0245i, func_80194C54, "a0=1,2,0,3; h(a1+0xA)=0,1,15,16,-3; h(a1+0xC)=0,5,-9; h(a1+0xE)=0,-64,63; h(a1+0x2)=0,-200,300; w(0x800E27EC)=0,1,7; h(0x800F336C)=4,1; w(0x800F3428)=1,0; w(0x800BCFA4)=0x80180600"]
+  - [room_m0245i, func_80194EF4, "a0=0,1,2,3; a1=0x80180800; h(a1+0x0)=0,8,127,128,-8; w(0x800E27EC)=0,1,2,3,47,48; w(0x800F33E0)=0x80180000; w(0x800F32D0)=0x80180100; h(0x800F336C)=4,1; w(0x800F3428)=1,0; w(0x800BCFA4)=0x80180600; out=800CE8F0:3,800CF3AC:1"]
+  - [room_m0245i, func_80192500, "a0=1,2,0; h(a1+0x14)=0,1,2,3; h(a1+0x16)=0,1,3,12,13,19,20,23,24; h(a1+0xE)=0,1,15; h(a1+0x6)=0,1; h(a1+0x10)=0,59,60; w(0x800E27EC)=0,1,2,3,31,32; w(0x800F32D0)=0x80180000; w(0x80180008)=0x80180100; w(0x80180100)=0x80180200; w(0x80180200)=0x01000000,0x11000000; w(0x800E2368)=0x80180300; w(0x8018030C)=0x100,0; w(0x8009D254)=0x80180400; w(0x80180400)=0x80180500; h(0x800F336C)=4,1; w(0x800F3428)=1,0; w(0x800BCFA4)=0x80180600; out=800CE9D4:2,800CFAA8:2,800CE870:2,800CFB7C:2"]
+  - [room_m0245i, func_80193D7C, "a0=1,2,0; h(a1+0x14)=0,1,2,3; h(a1+0x16)=0,1,3,12,13,19,20,23,24; h(a1+0xE)=0,1,15; h(a1+0x6)=0,1; h(a1+0x10)=0,59,60; w(0x800E27EC)=0,1,2,3,31,32; w(0x800F32D0)=0x80180000; w(0x80180008)=0x80180100; w(0x80180100)=0x80180200; w(0x80180200)=0x01000000,0x11000000; w(0x800E2368)=0x80180300; w(0x8018030C)=0x100,0; w(0x8009D254)=0x80180400; w(0x80180400)=0x80180500; h(0x800F336C)=4,1; w(0x800F3428)=1,0; w(0x800BCFA4)=0x80180600; out=800CE9D4:2,800CFAA8:2,800CE870:2,800CFB7C:2"]
+  - [room_m0273i, func_80197BBC, "a0=0,1,2; w(0x800F32D0)=0x80180000; w(0x80180008)=0x80180100; w(0x80180100)=0x80180200; w(0x80180218)=0x80180300; w(0x80180300)=1,2; w(0x8018010C)=0xD0000,0xC0000; h(0x80180116)=0,1,5,9,14,20,40; h(0x8018011A)=0,3,30; w(0x80180338)=0x80180400; w(0x8009D254)=0x80180500; h(0x8019AF5A)=0,1; h(0x8019AF5C)=1,7; h(0x8019AF56)=0,2; h(0x8019AF64)=2,10"]
+  - [room_m0273i, func_8019665C, "a0=1,2,0; a1=0x80180800; h(0x80180806)=0,1,7,8; h(0x80180802)=-200,0,300; h(0x80180812)=0,40; h(0x80180816)=0,1; h(0x800942EC)=0,100; h(0x8019AF62)=-500,500; h(0x8019AF54)=0,3; w(0x8009D254)=0x80180A00; w(0x80180BFC)=0,0x30,0x500; w(0x80180C04)=0,0x40; w(0x80180A00)=0x80180E00; w(0x800F32D0)=0x80180000; w(0x80180008)=0x80180100; w(0x80180100)=0x80180200,0; h(0x800F336C)=4,1; w(0x800F3428)=1,0"]
+  - [room_m0273i, func_80192838, "a0=0x80180800; w(0x80180808)=0x80180100; h(0x8018084A)=0,1; h(0x80180848)=0,3; w(0x8018010C)=0x0D090000,0x0D080000,0x0D100000,0x0D050000; h(0x80180116)=0,1,3,0x18,0x22,0x32,12; h(0x8018011A)=0,2,0x17,0x21,0x31,12; w(0x80180100)=0x80180200,0; w(0x80180218)=0x80180300; w(0x80180810)=0x80180340; h(0x80180814)=0,2; w(0x8009D254)=0x80180A00; w(0x80180A00)=0,0x80180E00; h(0x80180E0C)=0,5"]

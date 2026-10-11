@@ -56,7 +56,7 @@ static const uint16_t kM34sPad[4]={0xFFEFu,0xFFDFu,0xFFBFu,0xFF7Fu};
 
 static uint16_t RouteM34ShimMove(int ax, int az, int wx, int wz, int stop2)
 {
-    static int last_dir=-1, hold=0, px, pz;
+    static int last_dir=-1, hold=0, px, pz, seed_frame=-1000;
     int c=(int16_t)PE_LoadU16(0x800BD000u),sn=(int16_t)PE_LoadU16(0x800BD004u);
     int best=-1; long long bd=0;
     {
@@ -101,7 +101,7 @@ static uint16_t RouteM34ShimMove(int ax, int az, int wx, int wz, int stop2)
         /* A reseed (new room) also restarts the learning window: the old
          * room's last position vs. the new spawn is not a pad displacement
          * (Day 3 m0100i after the m0115i vision: it flipped Up to south). */
-        last_dir=-1; hold=0; px=ax; pz=az;
+        last_dir=-1; hold=0; px=ax; pz=az; seed_frame=g_frame;
         fprintf(stderr,"M34_SHIM_MAP_SEED c=%d sn=%d U=(%d,%d) R=(%d,%d) D=(%d,%d) L=(%d,%d)\n",
                 c,sn,g_m34s_vx[0],g_m34s_vz[0],g_m34s_vx[1],g_m34s_vz[1],
                 g_m34s_vx[2],g_m34s_vz[2],g_m34s_vx[3],g_m34s_vz[3]);
@@ -109,7 +109,11 @@ static uint16_t RouteM34ShimMove(int ax, int az, int wx, int wz, int stop2)
     /* Learn: after 12 frames of the same single direction, the net
      * displacement over the last window is that pad's world direction. */
     /* Learning off in M34: knockback from the head corrupts it (m34c flipped Left). */
-    if (last_dir>=0 && hold>=12 && GA_TOKEN!=0xA8003248u) {
+    /* Day 5 museum (story >= 0x260): no learning in the first 60 frames of a room.
+     * The scripted walk-in moves Aya against the held pad (m0237i second entry:
+     * Up learned as (-559,-440) at +23 frames, then pinned at (-3,-346)). */
+    if (PE_LoadU32(0x800A7918u) >= 0x260u && g_frame-seed_frame<60) { hold=0; px=ax; pz=az; }
+    else if (last_dir>=0 && hold>=12 && GA_TOKEN!=0xA8003248u) {
         int dx=ax-px,dz=az-pz,n=abs(dx)+abs(dz);
         if (n>=40) {
             int nx=dx*1000/n,nz=dz*1000/n;

@@ -418,6 +418,7 @@ void PE_GTE_WriteData(uint32_t reg, uint32_t value);
 uint32_t PE_GTE_ReadCtrl(uint32_t reg);
 void PE_GTE_WriteCtrl(uint32_t reg, uint32_t value);
 void PE_GTE_Command(uint32_t cmd);
+static inline void PE_Decomp_GuestTrapDivZero(const char *fn) { (void)fn; }
 static inline uint8_t  PE_LoadU8(pe_addr_t a)  { return *at(a); }
 static inline uint16_t PE_LoadU16(pe_addr_t a) { uint16_t v; memcpy(&v, at(a), 2); return v; }
 static inline uint32_t PE_LoadU32(pe_addr_t a) { uint32_t v; memcpy(&v, at(a), 4); return v; }
@@ -552,9 +553,7 @@ def host_stubs(t: str) -> str:
     narrow parameters masked to their width so they compare with the retail
     register/stack word; the return value is the same seed-derived mock as the
     retail interpreter's jal."""
-    if "host prototypes" not in t:
-        return ""
-    block = t.split("host prototypes", 1)[1].split("\n\n", 1)[0]
+    block = t.split("host prototypes", 1)[1].split("\n\n", 1)[0] if "host prototypes" in t else ""
     out = []
     for ret, fn, prm in PROTO_RE.findall(block):
         ps = [] if prm.strip() == "void" else [x.strip() for x in prm.split(",")]
@@ -568,6 +567,19 @@ def host_stubs(t: str) -> str:
                 f"uint32_t v_ = mock_args(0x{fn[5:]}u, {len(ps)}u, a_);")
         retst = "" if ret.strip() == "void" else f" return ({ret.strip()})v_;"
         out.append(f"{ret} {fn}({', '.join(names) or 'void'}) {{ {body}{retst} }}")
+    # Host replacements (pe_port_compat.h `host-replacement: func_X`): the lowered
+    # TU calls PE_* directly; mock it as the retail jal to func_X.
+    for fx, r in o.host_replacements().items():
+        if not re.search(r"\b" + r["host"] + r"\s*\(", t):
+            continue
+        ps = [x.strip() for x in r["params"] if x.strip() not in ("", "void")]
+        nm = [f"p{k}" for k in range(len(ps))]
+        decl = ", ".join(f"pe_addr_t {n}" if "pe_addr_t" in ty else f"{re.sub(r'\s*\w+$', '', ty) or ty} {n}"
+                         for ty, n in zip(ps, nm))
+        logs = ", ".join(f"(uint32_t)(uintptr_t){n}" for n in nm) or "0"
+        retst = "" if r["ret"] == "void" else f" return ({r['ret']})v_;"
+        out.append(f"{r['ret']} {r['host']}({decl or 'void'}) {{ uint32_t a_[12] = {{{logs}}}; "
+                   f"uint32_t v_ = mock_args(0x{fx[5:]}u, {len(ps)}u, a_);{retst} }}")
     return "\n" + "\n".join(out) + "\n"
 
 
