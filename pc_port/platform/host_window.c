@@ -674,7 +674,7 @@ uint16_t HostWindow_PadRaw(void)
 {
     /* Keyboard and controller both drive the pad at once. */
     if (pe_plat_cheats_menu_open() || HostDevMenu_CapturesInput()) return 0xFFFFu;
-    return (uint16_t)(~(g_sony_held | HostPad_Held()));
+    return (uint16_t)(~(g_sony_held | HostDevMenu_FilterHeld(HostPad_Held())));
 }
 
 static int monotonic_ns(uint64_t *out)

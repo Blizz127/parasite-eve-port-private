@@ -1,11 +1,45 @@
 /* Host-only menu controls. No SDL video/audio initialization or guest writes.
- * SDL is loaded only for PE_DEV_MENU=1; Linux joystick gameplay stays intact.
+ * SDL is loaded unless PE_DEV_MENU=0 (or PE_CHEATS=0); Linux joystick
+ * gameplay stays intact.
+ *
+ * Two modes (pe_plat/cheats.h):
+ *   player (PE_DEV_MENU unset, the packaged default): hold Back/View, then
+ *     press Start/Menu.  While Back is held (up to SEL_HOLD_MS) Select and
+ *     Start are kept from the game; a short Back tap with no Start is
+ *     delivered to the game as a Select tap on release, a long hold is
+ *     passed through as held Select.  Start alone always reaches the game.
+ *   developer (PE_DEV_MENU=1): Back and Start are reserved as soon as either
+ *     is pressed (the original behaviour).
  */
 #include "host_dev_menu.h"
 #include "pe_plat/cheats.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+#include "host_pad.h"
+
+#define SEL_HOLD_MS 400u   /* player mode: Back held this long passes through as Select */
+#define SEL_TAP_MS  100u   /* player mode: a released short Back tap = Select held this long */
+
+static unsigned g_filter_sel;                 /* hide Select/Start from the game */
+static unsigned long long g_sel_tap_until;    /* inject Select until (ms) */
+
+static unsigned long long menu_now_ms(void)
+{
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    return (unsigned long long)t.tv_sec * 1000ull + (unsigned long long)t.tv_nsec / 1000000ull;
+}
+
+uint16_t HostDevMenu_FilterHeld(uint16_t held)
+{
+    if (g_filter_sel)
+        held &= (uint16_t)~(HOST_PAD_SELECT | HOST_PAD_START);
+    else if (g_sel_tap_until && menu_now_ms() < g_sel_tap_until)
+        held |= HOST_PAD_SELECT;
+    return held;
+}
 #ifdef PE_HAVE_SDL2
 #include <SDL.h>
 #include <dlfcn.h>
@@ -17,6 +51,7 @@
 #define MENU_BACK 8u
 #define MENU_COMBO 16u
 #define MENU_RESERVED 32u
+#define MENU_SEL 128u      /* Back/View held */
 #define MENU_DEADZONE 12000
 
 /* Use the SDL headers for ABI/types, resolving the library at runtime. */
@@ -79,6 +114,7 @@ static unsigned held(SDL_GameController *c)
     if (p_SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_B)) bits |= MENU_BACK;
     if (back && start) bits |= MENU_COMBO;
     if (back || start) bits |= MENU_RESERVED;
+    if (back) bits |= MENU_SEL;
     for (int b = 0; b < SDL_CONTROLLER_BUTTON_MAX; b++)
         if (p_SDL_GameControllerGetButton(c, (SDL_GameControllerButton)b)) bits |= 64u;
     for (int a = 0; a < SDL_CONTROLLER_AXIS_MAX; a++) {
@@ -141,9 +177,25 @@ void HostDevMenu_Poll(void)
         else if ((all & (MENU_UP | MENU_DOWN)) == MENU_UP && (presses & MENU_UP)) pe_plat_cheats_key(PE_CHEAT_KEY_UP, 1);
         else if ((all & (MENU_UP | MENU_DOWN)) == MENU_DOWN && (presses & MENU_DOWN)) pe_plat_cheats_key(PE_CHEAT_KEY_DOWN, 1);
     }
-    /* Reserve Back/Start before the combo completes: neither opens retail
-     * pause/select. Drain held inputs after closing so A/B cannot leak. */
-    if (was_open || pe_plat_cheats_menu_open() || (all & MENU_RESERVED)) drain = 1;
+    if (pe_plat_cheats_dev_mode()) {
+        /* Reserve Back/Start before the combo completes: neither opens retail
+         * pause/select. Drain held inputs after closing so A/B cannot leak. */
+        if (was_open || pe_plat_cheats_menu_open() || (all & MENU_RESERVED)) drain = 1;
+        g_filter_sel = 0;
+    } else {
+        static int sel_down, sel_combo;
+        static unsigned long long sel_t0;
+        unsigned long long now = menu_now_ms();
+        if (all & MENU_SEL) {
+            if (!sel_down) { sel_down = 1; sel_t0 = now; sel_combo = 0; }
+            if (presses & MENU_COMBO) sel_combo = 1;
+        } else if (sel_down) {
+            if (!sel_combo && now - sel_t0 < SEL_HOLD_MS) g_sel_tap_until = now + SEL_TAP_MS;
+            sel_down = 0;
+        }
+        g_filter_sel = sel_down && (sel_combo || now - sel_t0 < SEL_HOLD_MS);
+        if (was_open || pe_plat_cheats_menu_open()) drain = 1;
+    }
     if (!all && !pe_plat_cheats_menu_open()) drain = 0;
     capture = pe_plat_cheats_menu_open() || drain;
 }
@@ -159,6 +211,7 @@ void HostDevMenu_Close(void)
     if (library) dlclose(library);
     memset(pads, 0, sizeof pads);
     library = NULL; attempted = initialized = capture = drain = 0;
+    g_filter_sel = 0; g_sel_tap_until = 0;
 }
 #else
 void HostDevMenu_Poll(void)

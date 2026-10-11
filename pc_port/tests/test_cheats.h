@@ -69,6 +69,8 @@ static void test_CHEATS_toggles(void)
     static uint8_t fb[320 * 240 * 3];
     const uint8_t *shown;
     TEST("CHEATS_toggles");
+    /* the flat F8 warp list: the dev menu off (it is on by default) */
+    setenv("PE_DEV_MENU", "0", 1);
     cheats_fixture();
     /* F2 god mode */
     cheat_press(PE_CHEAT_KEY_F2);
@@ -163,6 +165,7 @@ static void test_CHEATS_toggles(void)
     ASSERT(pe_plat_cheats_warp_count() >= 13, "Day-1 checkpoint list");
     pe_plat_cheats_reset();
     ResetTestState();
+    unsetenv("PE_DEV_MENU");
     PASS();
 }
 
