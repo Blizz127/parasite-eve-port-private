@@ -1430,6 +1430,10 @@ int32_t func_80079274(pe_addr_t v0, pe_addr_t v1, pe_addr_t v2, pe_addr_t sxy0,
                       pe_addr_t sxy1, pe_addr_t sxy2, pe_addr_t ir0, pe_addr_t flags);
 void func_80079E14(int32_t angle,pe_addr_t dest);
 pe_addr_t func_80078C34(pe_addr_t matrix,pe_addr_t vector,pe_addr_t out);
+/* func_800C5538: chain/tail segment update, NON_MATCHING host port (game/boot/func_800C5538_port.c). */
+void func_800C5538(pe_addr_t a0);
+/* func_800C5A40: chain/tail segment renderer, NON_MATCHING host port (game/boot/func_800C5A40_port.c). */
+void func_800C5A40(pe_addr_t a0);
 void func_800C3B04(pe_addr_t style);
 void func_800CDD0C(int a0, int a1, pe_addr_t pe_a2);
 void func_800CDE90(int a0, int a1, pe_addr_t pe_a2);

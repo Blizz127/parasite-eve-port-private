@@ -199,7 +199,7 @@ static void load_env_warp(void)
 {
     const char *r = getenv("PE_WARP_ROOM"), *st = getenv("PE_WARP_STORY"), *at = getenv("PE_WARP_AT");
     if (getenv("PE_WARP_ROUTE") && *getenv("PE_WARP_ROUTE")) {
-        if (!pe_plat_cheats_dev_menu_enabled()) {
+        if (!pe_plat_cheats_dev_mode()) {
             fprintf(stderr, "[WARP] PE_WARP_ROUTE ignored: dev-only (needs PE_DEV_MENU=1)\n");
             return;
         }
@@ -213,7 +213,7 @@ static void load_env_warp(void)
         return;
     }
     if (!r || !*r) return;
-    if (!pe_plat_cheats_dev_menu_enabled()) {
+    if (!pe_plat_cheats_dev_mode()) {
         fprintf(stderr, "[WARP] PE_WARP_ROOM ignored: dev-only (needs PE_DEV_MENU=1)\n");
         return;
     }
@@ -252,7 +252,16 @@ void pe_plat_cheats_init(void)
 }
 
 int pe_plat_cheats_enabled(void) { return C.inited ? C.enabled : 1; }
+/* PE_DEV_MENU: "1" developer mode (Back/Start reserved for the combo, env
+ * warps PE_WARP_*), "0" off, unset or anything else player mode: the menu is
+ * reachable (hold Back/View then press Start/Menu, or F8) but Start/Select
+ * reach the game as usual.  PE_CHEATS=0 turns every mode off. */
 int pe_plat_cheats_dev_menu_enabled(void)
+{
+    const char *e = getenv("PE_DEV_MENU");
+    return pe_plat_cheats_enabled() && !(e && strcmp(e, "0") == 0);
+}
+int pe_plat_cheats_dev_mode(void)
 {
     const char *e = getenv("PE_DEV_MENU");
     return pe_plat_cheats_enabled() && e && strcmp(e, "1") == 0;

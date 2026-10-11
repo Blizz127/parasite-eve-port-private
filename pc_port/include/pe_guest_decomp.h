@@ -124,6 +124,10 @@ void PE_Decomp_SetBoundaryStop(int stop);
  * stops the run; the caller then returns the R3000 div result.  Counted
  * either way (PE_Decomp_GuestTrapCount). */
 void PE_Decomp_GuestTrapDivZero(const char *fn);
+/* Message of the first boundary / guest-trap stop ("" when none). */
+const char *PE_Decomp_StopDetail(void);
+/* Record the first stop message from a non-decomp boundary (disc swap, ...). */
+void PE_Decomp_NoteStopDetail(const char *text);
 unsigned PE_Decomp_GuestTrapCount(void);
 int  PE_Decomp_BoundaryStopEnabled(void);
 

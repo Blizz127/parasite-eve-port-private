@@ -1,9 +1,21 @@
 # Native port development menu
 
-The menu is a host-only, opt-in aid. Launch with `PE_DEV_MENU=1` to enable
-controller navigation. Its default is off; all cheats also start off.
-`PE_CHEATS=0` hard-disables both the existing keyboard console and this menu.
-The menu does not pause simulation. Use warps and cheats for development only.
+The menu is a host-only aid. It is **in every build and reachable by
+default** ("player mode"), but nothing changes until you open it; all cheats
+start off. `PE_DEV_MENU=0` turns the menu off (F8 keeps its flat warp
+list); `PE_CHEATS=0` hard-disables both the menu and the keyboard console. The menu does not pause simulation.
+
+| `PE_DEV_MENU` | Mode | Behaviour |
+| --- | --- | --- |
+| unset (packaged default) | player | Hold Back/View, then press Start/Menu to open. Start alone still reaches the game; a short Back tap is delivered to the game as Select, and Back held alone for 0.4 s passes through as held Select. F8 opens the menu from the keyboard. |
+| `1` | developer | Back/View and Start/Menu are reserved immediately (original behaviour below); developer env warps (`PE_WARP_*`) are honoured. |
+| `0` | off | Dev menu disabled; the F1–F8 keyboard console keeps its original flat menus. |
+
+## Opening it
+
+- Controller: **hold Back/View (Select), then press Start/Menu.** The same
+  combo closes it; B backs out one page and closes at the root.
+- Keyboard: **F8** opens the menu; Up/Down, Enter and Escape navigate.
 
 ## Controls
 
@@ -17,7 +29,7 @@ On a mapped SDL GameController (Xbox labels, including Steam Input):
 | B | Back one page; close at the root |
 | Keyboard Up/Down, Enter, Escape | Navigate, confirm, back when open |
 
-With this opt-in enabled, Back/View and Start/Menu are reserved immediately
+In developer mode (`PE_DEV_MENU=1`), Back/View and Start/Menu are reserved immediately
 when either is pressed, so the opening combo does not also send Select/Start
 into the game. Release both before pressing the combo again. Directions and
 A/B are consumed while the menu is open; after closing, held controller buttons
@@ -38,8 +50,8 @@ no selectable checkpoints. EX/Chrysler entries are not supplied yet. Current
 checkpoint metadata belongs to the separate warp-sweep lane; the menu consumes
 `pe_plat_cheats_warp_count/name/day` and does not invent checkpoints or room state.
 
-Existing F1–F5, F7 and F8 remain available. F8 opens the development menu when
-`PE_DEV_MENU=1`; without that opt-in it keeps its original flat warp menu.
+Existing F1–F5, F7 and F8 remain available. F8 opens the development menu unless
+`PE_DEV_MENU=0`.
 F6 or L3 toggle fast-forward and R3 holds it during gameplay. Controller
 fast-forward hotkeys are suppressed during menu capture. Existing fast-forward
 state is retained when opening the menu.

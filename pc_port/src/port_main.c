@@ -32,6 +32,13 @@
 #include <stdlib.h>
 #include <limits.h>
 #include <errno.h>
+#include <time.h>
+#include "pe_guest_decomp.h"
+#ifdef _WIN32
+#include <direct.h>
+#else
+#include <sys/stat.h>
+#endif
 
 extern void func_8001220C(void);
 extern int  func_8006E9A0(int);
@@ -1127,6 +1134,64 @@ static void HostSignalsExit(void) {}
 static int QuitPoll_Window(void) { return g_host_term_sig || HostWindow_Poll(); }
 static int QuitPoll_Signal(void) { return g_host_term_sig != 0; }
 
+/* A stop on missing native code ends the game.  In a windowed (player) run
+ * the reason is also written to a small text file the player can send:
+ *   $XDG_STATE_HOME/parasite-eve-port/last-stop.txt
+ *   (~/.local/state/parasite-eve-port/last-stop.txt when unset;
+ *    %APPDATA%\\parasite-eve-port\\last-stop.txt on Windows).
+ * Only unresolved-boundary and guest-trap stops write it; a normal quit does not. */
+static void port_write_stop_report(void)
+{
+    PEPortStopReason why = PE_Port_GetStopReason();
+    char dir[1024], path[1100];
+    const char *base;
+    FILE *f;
+    time_t now;
+    if (why != PE_PORT_STOP_UNRESOLVED_BOUNDARY && why != PE_PORT_STOP_GUEST_TRAP)
+        return;
+#ifdef _WIN32
+    base = getenv("APPDATA");
+    if (!base || !base[0]) return;
+    snprintf(dir, sizeof dir, "%s\\parasite-eve-port", base);
+    _mkdir(dir);
+    snprintf(path, sizeof path, "%s\\last-stop.txt", dir);
+#else
+    base = getenv("XDG_STATE_HOME");
+    if (base && base[0]) {
+        snprintf(dir, sizeof dir, "%s/parasite-eve-port", base);
+        mkdir(base, 0755);
+    } else {
+        const char *home = getenv("HOME");
+        if (!home || !home[0]) return;
+        snprintf(dir, sizeof dir, "%s/.local", home); mkdir(dir, 0755);
+        snprintf(dir, sizeof dir, "%s/.local/state", home); mkdir(dir, 0755);
+        snprintf(dir, sizeof dir, "%s/.local/state/parasite-eve-port", home);
+    }
+    mkdir(dir, 0755);
+    snprintf(path, sizeof path, "%s/last-stop.txt", dir);
+#endif
+    f = fopen(path, "w");
+    if (!f) {
+        fprintf(stderr, "[HOST] could not write the stop report %s\n", path);
+        return;
+    }
+    now = time(NULL);
+    fprintf(f, "Parasite Eve native port stopped on code it has no native C for yet.\n"
+               "Please send this file to the developer.\n\n");
+    fprintf(f, "time: %s", ctime(&now));
+    fprintf(f, "stop_reason: %s\n", PE_Port_StopReasonName(why));
+    fprintf(f, "detail: %s\n", PE_Decomp_StopDetail());
+    fprintf(f, "room token: %08X\nstory persist[74]: %08X\n",
+            (unsigned)PE_LoadU32(0x8009D280u), (unsigned)PE_LoadU32(0x800A7918u));
+    {
+        int vs_, ds_, pr_, mk_;
+        HostFB_GetState(&vs_, &ds_, &pr_, &mk_);
+        fprintf(f, "presents: %d\n", pr_);
+    }
+    fclose(f);
+    fprintf(stderr, "[HOST] stop report written to %s\n", path);
+}
+
 int main(int argc, char **argv) {
     HostSignalsInstall();
     WatchdogArm();
@@ -1451,6 +1516,8 @@ int main(int argc, char **argv) {
             PE_Port_StopReasonName(PE_Port_GetStopReason()));
     fprintf(stderr, "[HOST] final room token=%08X story persist[74]=%08X\n",
             (unsigned)PE_LoadU32(0x8009D280u), (unsigned)PE_LoadU32(0x800A7918u));
+    if (!g_opts.headless)
+        port_write_stop_report();
     {
         PeGpuState gpu;
 

@@ -7,6 +7,7 @@
 #include "host_dev_menu.h"
 #include "pe_plat/cheats.h"
 #include "pe_guest_ram.h"
+#include "host_pad.h"
 #define CHECK(x) do { if (!(x)) { fprintf(stderr, "FAIL line %d: %s (%s)\n", __LINE__, #x, SDL_GetError()); exit(1); } checks++; } while (0)
 static int checks;
 static PePlatCheatState state(void) { PePlatCheatState s; pe_plat_cheats_get_state(&s); return s; }
@@ -27,7 +28,7 @@ static SDL_Joystick *attach(int *index) {
 int main(int argc, char **argv)
 {
     int index, second;
-    unsetenv("PE_DEV_MENU");
+    setenv("PE_DEV_MENU", "0", 1);
     if (argc > 1 && strcmp(argv[1], "--disabled") == 0) {
         setenv("PE_CHEATS", "0", 1); setenv("PE_DEV_MENU", "1", 1);
         poll(); CHECK(SDL_WasInit(SDL_INIT_GAMECONTROLLER) == 0);
@@ -46,6 +47,22 @@ int main(int argc, char **argv)
     CHECK(SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER) == 0);
     SDL_Joystick *j = attach(&index);
     combo(j); CHECK(!state().menu); /* off remains inert with devices */
+    /* Player mode (PE_DEV_MENU unset, the packaged default): Start alone
+     * reaches the game, Back+Start opens, a short Back tap becomes Select. */
+    unsetenv("PE_DEV_MENU"); poll();
+    button(j, SDL_CONTROLLER_BUTTON_START, 1);
+    CHECK(!state().menu); CHECK(!HostDevMenu_CapturesInput());
+    CHECK(HostDevMenu_FilterHeld(HOST_PAD_START) == HOST_PAD_START);
+    button(j, SDL_CONTROLLER_BUTTON_START, 0);
+    button(j, SDL_CONTROLLER_BUTTON_BACK, 1);
+    CHECK(!HostDevMenu_CapturesInput());
+    CHECK(HostDevMenu_FilterHeld(HOST_PAD_SELECT | HOST_PAD_START | HOST_PAD_CROSS) == HOST_PAD_CROSS);
+    button(j, SDL_CONTROLLER_BUTTON_START, 1); CHECK(state().menu); CHECK(HostDevMenu_CapturesInput());
+    button(j, SDL_CONTROLLER_BUTTON_START, 0); button(j, SDL_CONTROLLER_BUTTON_BACK, 0);
+    CHECK(HostDevMenu_FilterHeld(0) == 0); /* combo release is not a Select tap */
+    tap(j, SDL_CONTROLLER_BUTTON_B); CHECK(!state().menu);
+    tap(j, SDL_CONTROLLER_BUTTON_BACK); CHECK(!state().menu);
+    CHECK(HostDevMenu_FilterHeld(0) == HOST_PAD_SELECT); /* short tap delivered as Select */
     setenv("PE_DEV_MENU", "1", 1); poll();
     button(j, SDL_CONTROLLER_BUTTON_BACK, 1);
     CHECK(HostDevMenu_CapturesInput()); CHECK(!state().menu);

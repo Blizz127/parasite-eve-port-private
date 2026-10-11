@@ -18,7 +18,8 @@
  *
  * Scripted keys for headless tests: PE_CHEAT_KEYS="frame:KEY,frame:KEY"
  * (frame = present count; KEY = F1..F8, UP, DOWN, ENTER, BACK, DEV_MENU).
- * PE_DEV_MENU=1 enables a host-only cheats/Day-warp menu (F8 or controller).
+ * Dev menu (F8 or controller Back+Start): reachable by default in player
+ * mode; PE_DEV_MENU=1 is developer mode, PE_DEV_MENU=0 turns it off.
  * See docs/port/DEV_MENU.md for the SDL controller controls.
  */
 #ifndef PE_PLAT_CHEATS_H
@@ -46,7 +47,8 @@ int  pe_plat_cheats_enabled(void);          /* 0 when PE_CHEATS=0 */
 /* A key press (pressed=1) or release.  Returns 1 when the console consumed
  * it (the host must not pass it to the game pad). */
 int  pe_plat_cheats_key(PeCheatKey key, int pressed);
-int  pe_plat_cheats_dev_menu_enabled(void); /* PE_DEV_MENU=1, default off */
+int  pe_plat_cheats_dev_menu_enabled(void); /* reachable: PE_DEV_MENU unset (player) or 1; 0 = off */
+int  pe_plat_cheats_dev_mode(void);         /* PE_DEV_MENU=1: developer mode (env warps, reserved combo) */
 int  pe_plat_cheats_menu_open(void);        /* warp menu: arrows/Enter are ours */
 /* Once per presented frame (emits the mods FRAME_TICK event). */
 void pe_plat_cheats_frame(void);
