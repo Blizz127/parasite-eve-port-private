@@ -109,9 +109,18 @@ class TStruct(T):
         off = size = 0
         align = 1
         for d in node.decls:
-            if getattr(d, "bitsize", None) is not None:
-                raise LowerError("bitfield member")
             ft = self.low.ty(d.type)
+            if getattr(d, "bitsize", None) is not None:
+                # Only byte/halfword-sized, naturally aligned int bitfields
+                # (e.g. `signed int low : 16; signed int high : 16;`): on the
+                # little-endian guest they are exactly an s8/s16 member, and the
+                # container int keeps the struct's alignment.
+                w = int(d.bitsize.value, 0) if hasattr(d.bitsize, "value") else -1
+                if (not isinstance(ft, TInt) or ft.size != 4 or w not in (8, 16)
+                        or self.union or off % (w // 8)):
+                    raise LowerError("bitfield member")
+                align = max(align, 1 if packed else 4)
+                ft = TInt(w // 8, ft.signed)
             a = 1 if packed else alignof(ft)
             s = sizeof(ft)
             align = max(align, a)

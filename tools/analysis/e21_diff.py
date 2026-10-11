@@ -605,6 +605,8 @@ def host_stubs(t: str) -> str:
     for fx, r in o.host_replacements().items():
         if not re.search(r"\b" + r["host"] + r"\s*\(", t):
             continue
+        if any(re.search(r"\b" + r["host"] + r"\(", x) for x in out):
+            continue
         ps = [x.strip() for x in r["params"] if x.strip() not in ("", "void")]
         nm = [f"p{k}" for k in range(len(ps))]
         decl = ", ".join(f"pe_addr_t {n}" if "pe_addr_t" in ty else f"{re.sub(r'\s*\w+$', '', ty) or ty} {n}"
