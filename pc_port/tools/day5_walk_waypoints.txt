@@ -32,3 +32,7 @@ A8028248@258=1455,-649,40;965,-340,20;965,-200,20~60   (m0184i at 0x258: back ov
 A80281C8@258=1241,5650,40;620,5650,40;522,5090,40;489,4805,40;250,4650,40;2,4001,40!30;40,3440,40;40,3440,5000%60!30;40,3300,20~90!30   (m0183i at 0x258: the station: north round the benches and the item crate (z 5650) (the quad x 312..1950 z 4087..4500 leads back to m0184i) to the stair gate (quad x -188..269 z 3384..3501 -> m0000i), open it with the Gate Key)
 A8000048@258=9,0   (world map at 0x258: Day 5 after the Gate Key: location 9 = Museum (2 = the optional Warehouse, m0096i))
 A8029148@258=6006,1438,40;3700,1350,40   (m0192i at 0x258: the Museum steps: up to the doors quad x 3482..3937 z 1094..1604 -> m0196i)
+A8029348@260=458,523,40;-240,1199,40;-150,1990,40   (m0196i at 0x260: the museum hall: north to the quad x -500..200 z 1782..2200)
+A80400C8@260=150,-3300,40;100,-1500,40;-25,345,40   (m0201i at 0x260: the rainforest: north to the quad x -500..450 z 245..445)
+A8040248@260=272,2723,40;-110,2570,40   (m0204i at 0x260: the hall: north-west to the quad x -160..-60 z 2040..3100 -> m0205i)
+A80402C8@260=0,-300,40;-1480,0,40   (m0205i at 0x260: the geology exhibit: west past the scorpion (mini boss) to the quad x -1580..-1380 z -550..550 -> m0206i)
