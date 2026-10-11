@@ -236,6 +236,10 @@ int32_t pe_enh_enemy_damage(uint32_t body, int32_t damage)
      * just below it: the script's exit runs once HP drops to <= 1000000 (999999 on
      * that roof), and a second bullet in that window must not kill it either.  No
      * ordinary enemy comes near 900000 HP. */
+    /* Above the marker, one hit takes the enemy down to exactly 1000000: the
+     * script's own exit then runs as if the phase had been fought out (the Day-5
+     * Statue of Liberty Eve, m0273i: three parts at 1000000 + 1589/1750/1900). */
+    if (hp > 1000000) return damage > 0 ? hp - 1000000 : damage;
     if (hp > 900000) return damage;
     return (hp > 0 && damage < hp) ? hp : damage;
 }
