@@ -160,11 +160,13 @@ typedef struct {
     HostPadDevice dev;
     int input_seen;      /* first input from this device logged */
     char name[128];
+    uint32_t generation; /* connection number: a reopened slot is a new origin */
 } HostPadSlot;
 
 static HostPadSlot g_slots[HOST_PAD_MAX_DEVICES] = {
     {-1, "", {{0}}}, {-1, "", {{0}}}, {-1, "", {{0}}}, {-1, "", {{0}}}};
 static uint64_t g_last_scan;
+static uint32_t g_generation;
 static int g_scanned_once;
 static uint16_t g_last_held;
 static int g_debug = -1;
@@ -229,6 +231,7 @@ static void try_open(const char *path)
     }
     slot->fd = fd;
     slot->input_seen = 0;
+    slot->generation = ++g_generation & 0x0FFFFFFFu;
     snprintf(slot->path, sizeof(slot->path), "%s", path);
     snprintf(slot->name, sizeof(slot->name), "%s", name);
     fprintf(stderr, "[PAD] controller connected: %s (%s)\n", path, name);
@@ -317,6 +320,18 @@ uint16_t HostPad_Held(void)
     for (int i = 0; i < HOST_PAD_MAX_DEVICES; i++)
         if (g_slots[i].fd >= 0) held |= HostPad_DeviceHeld(&g_slots[i].dev);
     return held;
+}
+
+int HostPad_Origins(HostPadOrigin *out, int max)
+{
+    int n = HostPadSDL_Origins(out, max);
+    for (int i = 0; i < HOST_PAD_MAX_DEVICES && n < max; i++)
+        if (g_slots[i].fd >= 0) {
+            out[n].key = 0x80000000u | (g_slots[i].generation << 2) | (uint32_t)i;
+            out[n].held = HostPad_DeviceHeld(&g_slots[i].dev);
+            n++;
+        }
+    return n;
 }
 
 uint8_t HostPad_Hotkeys(void)

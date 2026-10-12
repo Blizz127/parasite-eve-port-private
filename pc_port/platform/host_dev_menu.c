@@ -1,8 +1,9 @@
 /* Host-only menu controls. No SDL video/audio initialization or guest writes.
- * The menu reads the merged controller word (HostPad_Held: SDL GameController
- * and Linux joystick devices), so every controller the game can use opens and
- * drives it.  This file loads no SDL of its own: host_pad_sdl.c is the only
- * SDL user, so the menu and the game always see the same devices.
+ * The menu reads every controller connection (HostPad_Origins: SDL
+ * GameController and Linux joystick devices), so every controller the game can
+ * use opens and drives it; the combo must come from one connection.  This file
+ * loads no SDL of its own: host_pad_sdl.c is the only SDL user, so the menu and
+ * the game always see the same devices.
  *
  * Select+Start (Back/View + Start/Menu) opens the menu; Up/Down move, Cross
  * (A) confirms, Circle (B) returns.  A lone Select or Start still reaches the
@@ -26,19 +27,20 @@ static uint64_t now_ms(void)
     return (uint64_t)t.tv_sec * 1000u + (uint64_t)t.tv_nsec / 1000000u;
 }
 
-void HostDevMenu_Step(uint16_t held, uint64_t now)
+void HostDevMenu_Step(const HostPadOrigin *in, int n, uint64_t now)
 {
     HostPadComboEvents ev;
     int open;
     pe_plat_cheats_init();
     if (!pe_plat_cheats_dev_menu_enabled()) {
         memset(&g_combo, 0, sizeof g_combo);
-        g_deliver = held;
+        g_deliver = 0;
+        for (int k = 0; k < n; k++) g_deliver |= in[k].held;
         g_capture = 0;
         return;
     }
     open = pe_plat_cheats_menu_open();
-    g_deliver = HostPadCombo_Step(&g_combo, held, open, now, &ev);
+    g_deliver = HostPadCombo_Step(&g_combo, in, n, open, now, &ev);
     if (ev.open) pe_plat_cheats_key(PE_CHEAT_KEY_DEV_MENU, 1);
     else if (open) {
         if (ev.back) pe_plat_cheats_key(PE_CHEAT_KEY_BACK, 1);
@@ -51,7 +53,12 @@ void HostDevMenu_Step(uint16_t held, uint64_t now)
     g_capture = open || pe_plat_cheats_menu_open() || g_combo.drain;
 }
 
-void HostDevMenu_Poll(void) { HostDevMenu_Step(HostPad_Held(), now_ms()); }
+void HostDevMenu_Poll(void)
+{
+    HostPadOrigin in[HOST_PAD_COMBO_ORIGINS];
+    int n = HostPad_Origins(in, HOST_PAD_COMBO_ORIGINS);
+    HostDevMenu_Step(in, n, now_ms());
+}
 
 int HostDevMenu_CapturesInput(void) { return g_capture; }
 

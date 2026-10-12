@@ -356,6 +356,19 @@ uint16_t HostPadSDL_Held(void)
     return h;
 }
 
+int HostPadSDL_Origins(HostPadOrigin *out, int max)
+{
+    int n = 0;
+    if (S.state != 1) return 0;
+    for (int k = 0; k < HPS_MAX_DEVICES && n < max; k++)
+        if (S.dev[k].id >= 0) {
+            out[n].key = 0x40000000u | ((uint32_t)S.dev[k].id & 0x3FFFFFFFu);
+            out[n].held = S.dev[k].held;
+            n++;
+        }
+    return n;
+}
+
 uint8_t HostPadSDL_Hotkeys(void)
 {
     uint8_t h = 0;
