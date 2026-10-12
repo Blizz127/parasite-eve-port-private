@@ -699,9 +699,11 @@ int HostWindow_Poll(void)
 
 uint16_t HostWindow_PadRaw(void)
 {
-    /* Keyboard and controller both drive the pad at once. */
+    /* Keyboard and controller both drive the pad at once.  The controller
+     * word goes through the dev-menu combo filter (a lone Select/Start is
+     * withheld only while it could still become Select+Start). */
     if (pe_plat_cheats_menu_open() || HostDevMenu_CapturesInput()) return 0xFFFFu;
-    return (uint16_t)(~(g_sony_held | HostPad_Held()));
+    return (uint16_t)(~(g_sony_held | HostDevMenu_FilterPad(HostPad_Held())));
 }
 
 static int monotonic_ns(uint64_t *out)

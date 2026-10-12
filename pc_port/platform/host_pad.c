@@ -158,6 +158,8 @@ typedef struct {
     int fd;
     char path[64];
     HostPadDevice dev;
+    int input_seen;      /* first input from this device logged */
+    char name[128];
 } HostPadSlot;
 
 static HostPadSlot g_slots[HOST_PAD_MAX_DEVICES] = {
@@ -226,7 +228,9 @@ static void try_open(const char *path)
         name[sizeof(name) - 1] = 0;
     }
     slot->fd = fd;
+    slot->input_seen = 0;
     snprintf(slot->path, sizeof(slot->path), "%s", path);
+    snprintf(slot->name, sizeof(slot->name), "%s", name);
     fprintf(stderr, "[PAD] controller connected: %s (%s)\n", path, name);
 }
 
@@ -237,6 +241,7 @@ static void close_slot(HostPadSlot *slot, const char *why)
     fprintf(stderr, "[PAD] controller disconnected: %s (%s)\n", slot->path, why);
     slot->fd = -1;
     slot->path[0] = 0;
+    slot->input_seen = 0;
     memset(&slot->dev, 0, sizeof(slot->dev));
 }
 
@@ -286,6 +291,12 @@ void HostPad_Poll(void)
             }
             if ((size_t)n < sizeof(ev)) break;
         }
+        if (slot->fd >= 0 && !slot->input_seen && HostPad_DeviceHeld(&slot->dev)) {
+            /* One line per device: the owner's log then shows which pad and
+             * which backend actually fed input. */
+            slot->input_seen = 1;
+            fprintf(stderr, "[PAD] first input: js %s (%s)\n", slot->path, slot->name);
+        }
     }
     if (g_debug) {
         uint16_t held = HostPad_Held();
@@ -295,12 +306,14 @@ void HostPad_Poll(void)
     }
 }
 
-/* SDL devices win; the js* nodes count only while SDL has none open (the
- * same physical pad would otherwise be read twice). */
+/* Both backends count, ORed.  An SDL-only device (Steam's virtual pad whose
+ * layout sends keys, a pad without a usable mapping) must not blank a working
+ * js* pad, and a pad SDL cannot see (Steam's SDL_GAMECONTROLLER_IGNORE_DEVICES)
+ * still works through js*.  The same physical pad read through both reports
+ * the same buttons, so reading it twice is harmless. */
 uint16_t HostPad_Held(void)
 {
     uint16_t held = HostPadSDL_Held();
-    if (HostPadSDL_Count() > 0) return held;
     for (int i = 0; i < HOST_PAD_MAX_DEVICES; i++)
         if (g_slots[i].fd >= 0) held |= HostPad_DeviceHeld(&g_slots[i].dev);
     return held;
@@ -309,7 +322,6 @@ uint16_t HostPad_Held(void)
 uint8_t HostPad_Hotkeys(void)
 {
     uint8_t hk = HostPadSDL_Hotkeys();
-    if (HostPadSDL_Count() > 0) return hk;
     for (int i = 0; i < HOST_PAD_MAX_DEVICES; i++)
         if (g_slots[i].fd >= 0) hk |= HostPad_DeviceHotkeys(&g_slots[i].dev);
     return hk;

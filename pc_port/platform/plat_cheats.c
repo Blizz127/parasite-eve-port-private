@@ -16,6 +16,12 @@
  *   Room transfer      field VM op 0x31 = func_80017BB4(args): latches the
  *                      room token in D_8009D280 and sets D_8009D1A0 |= 0x2000.
  *   Story word         persist[74] = 0x800A7918.
+ *   Entry door         persist[1] = 0x800A77F4 (s32): every exit script
+ *                      writes it (field op 0x0A, func_800173F4) just before
+ *                      op 0x31; the destination room's actors branch on it
+ *                      (op 0x09 ==), so a warp must set it or the room runs
+ *                      its default arm. M0027I/M0028I additionally require
+ *                      movement into their normal encounter zones.
  * No retail data tables are embedded: item ids come from the loaded room
  * scripts at run time; the warp list is route checkpoint tokens.
  */
@@ -43,28 +49,65 @@ extern int func_80017BB4(pe_addr_t a0) __attribute__((weak));
 #define GA_TOKEN       0x8009D280u
 #define GA_ROOM_CUR    0x8009D1C4u   /* func_8003F3C4 loops while == D_8009D280 */
 #define GA_STORY       0x800A7918u
+#define GA_DOOR        0x800A77F4u
 #define GA_INV         0x8009D048u
 #define GA_INV_COUNT   0x8009D050u
 /* Scratch for the room-transfer argument block (unused hand window). */
 #define PE_CHEAT_STACK 0x801FF460u   /* +0 args[0] -> +8 token word */
 
-typedef struct { const char *name; uint32_t token, story; } CheatWarp;
+/* door WARP_DOOR_KEEP: leave persist[1] as it is, exactly as the env warp
+ * (PE_WARP_ROOM/PE_WARP_STORY) that verified the entry did. */
+#define WARP_DOOR_KEEP 0xFFFFFFFFu
+typedef struct { const char *name; uint32_t token, story, door; int day; } CheatWarp;
 /* Day-1 route checkpoints: first-entry room token and persist[74]
- * (build/lanes/port/rr_full30.log "[ROUTE] change" lines). */
+ * (build/lanes/port/rr_full30.log "[ROUTE] change" lines), and the entry
+ * door the normal route's exit script writes to persist[1] before that
+ * transfer (PE_VM_TRACE of a --route-pad run: the last op 0x0A store to
+ * 0x800A77F4 before each op 0x31).  Names, doors and the 13-target New Game
+ * sweep: main-repo e401df37 / 2fb417a0 (docs/evidence/codex-warp-sweep). */
 static const CheatWarp k_warps[] = {
-    {"FIELD START (CARNEGIE HALL)", 0xA8000148u, 0x08u},
-    {"STAGE (M0002I)",              0xA80002C8u, 0x18u},
-    {"M0011I",                      0xA80011C8u, 0x40u},
-    {"EVE 1 ROOM (M0023I)",         0xA80021C8u, 0x5Bu},
-    {"SEWER ENTRY (M0026I)",        0xA8002348u, 0x68u},
-    {"SEWER (M0027I)",              0xA80023C8u, 0x68u},
-    {"SEWER HALL (M0028I)",         0xA8002448u, 0x68u},
-    {"M0031I",                      0xA80030C8u, 0x68u},
-    {"M0032I",                      0xA8003148u, 0x68u},
-    {"M0033I",                      0xA80031C8u, 0x68u},
-    {"M34 ALLIGATOR (M0034I)",      0xA8003248u, 0x6Cu},
-    {"M0359I POST-BOSS",            0xA80654C8u, 0x70u},
-    {"M0036I DAY-1 EXIT",           0xA8003348u, 0x78u},
+    {"FIELD START (CARNEGIE HALL)",  0xA8000148u, 0x08u, 0x0Au, 1},
+    {"STAGE (M0005I)",               0xA80002C8u, 0x18u, 0x04u, 1},
+    {"HALL RAT ENCOUNTER (M0013I)",  0xA80011C8u, 0x40u, 0x0Du, 1},
+    {"EVE 1 ROOM (M0023I)",          0xA80021C8u, 0x5Bu, 0x17u, 1},
+    {"SEWER ENTRY (M0026I)",         0xA8002348u, 0x68u, 0x17u, 1},
+    {"SEWER (M0027I; WALK IN)",      0xA80023C8u, 0x68u, 0x1Au, 1},
+    {"SEWER HALL (M0028I; WALK IN)", 0xA8002448u, 0x68u, 0x1Bu, 1},
+    {"SEWER PASSAGE (M0031I)",       0xA80030C8u, 0x68u, 0x1Cu, 1},
+    {"SEWER ROOM (M0032I)",          0xA8003148u, 0x68u, 0x1Fu, 1},
+    {"SEWER ROOM (M0033I)",          0xA80031C8u, 0x68u, 0x20u, 1},
+    {"M34 ALLIGATOR (M0034I)",       0xA8003248u, 0x6Cu, 0x21u, 1},
+    {"SEWER POST-BOSS (M0359I)",     0xA80654C8u, 0x70u, 0x22u, 1},
+    {"M0036I DAY-1 EXIT",            0xA8003348u, 0x78u, 0x01u, 1},
+    /* Day-2 route checkpoints (main-repo 063c530b: the gated Day-2 route run,
+     * probe 34, "[ROUTE] change" lines: first-entry token and persist[74]).
+     * Doors: the predecessor's exit script writes persist[1] (op 0x0A) to the
+     * value the destination's spawn arm compares (op 0x09 ==): M0042I<-0 (from
+     * M0351I), M0043I<-42, M0047I<-43, M0195I<-191, M0230I<-195, M0239I<-230,
+     * M0059I<-58, M0061I<-60, M0065I<-61.  World-map entries (M0351I, M0191I,
+     * M0374I) are entered with door 0: their spawn arms compare only other
+     * values, so 0 takes the default (world-map) arm. */
+    {"DAY 2 START (M0351I)",         0xA80650C8u, 0x80u, 0u,   2},
+    {"M0042I",                       0xA8004148u, 0x88u, 0u,   2},
+    {"M0043I",                       0xA80041C8u, 0x90u, 42u,  2},
+    {"M0047I",                       0xA80043C8u, 0xA4u, 43u,  2},
+    {"CENTRAL PARK (M0191I)",        0xA80290C8u, 0xC0u, 0u,   2},
+    {"CENTRAL PARK (M0195I)",        0xA80292C8u, 0xC8u, 191u, 2},
+    {"CENTRAL PARK (M0230I)",        0xA8043048u, 0xC0u, 195u, 2},
+    {"CENTRAL PARK (M0239I)",        0xA80434C8u, 0xC0u, 230u, 2},
+    {"PARK (M0374I)",                0xA8067248u, 0xE4u, 0u,   2},
+    {"PARK FIGHT (M0059I)",          0xA80054C8u, 0xE8u, 58u,  2},
+    {"ZOO (M0061I)",                 0xA80060C8u, 0xE8u, 60u,  2},
+    {"ZOO (M0065I)",                 0xA80062C8u, 0xE8u, 61u,  2},
+    /* Day 3/4: the warp entries of the day3_route_regress.py gate segments
+     * (day3_start, day3_mid, day3_end), which warp with PE_WARP_ROOM /
+     * PE_WARP_STORY and leave persist[1] alone; each room's own script then
+     * drives the story (0x148, 0x190; M0352I's room_transfer enters the Day-4
+     * entry M0098I, which writes 0x1B8).  The warp keeps the current stats and
+     * items: later Day-3/4 fights may need the cheats. */
+    {"DAY 3 START (M0093I)",         0xA80091C8u, 0x140u, WARP_DOOR_KEEP, 3},
+    {"DAY 3 (M0108I)",               0xA8020448u, 0x188u, WARP_DOOR_KEEP, 3},
+    {"DAY 4 START (VIA M0352I)",     0xA8065148u, 0x1B0u, WARP_DOOR_KEEP, 4},
 };
 #define N_WARPS ((int)(sizeof(k_warps) / sizeof(k_warps[0])))
 
@@ -258,12 +301,12 @@ int pe_plat_cheats_dev_menu_enabled(void)
     return pe_plat_cheats_enabled() && e && strcmp(e, "1") == 0;
 }
 
-/* The warp lane supplies day metadata; all base checkpoints are Day 1. */
-extern int pe_plat_cheats_warp_day(int index) __attribute__((weak));
-static int warp_day(int index)
+/* Day of each warp (1..6, 0 = invalid index), from the table. */
+int pe_plat_cheats_warp_day(int index)
 {
-    return pe_plat_cheats_warp_day ? pe_plat_cheats_warp_day(index) : 1;
+    return (index >= 0 && index < N_WARPS) ? k_warps[index].day : 0;
 }
+static int warp_day(int index) { return pe_plat_cheats_warp_day(index); }
 static int day_warp_count(int day)
 {
     int n = 0;
@@ -503,7 +546,8 @@ static int in_field(uint32_t tok)
 
 /* 1 = transfer requested, 0 = wait (field running but busy),
  * -1 = no room_transfer linked, -2 = not in the field (refused). */
-static int warp_to(uint32_t token, int set_story, uint32_t story)
+static int warp_to(uint32_t token, int set_story, uint32_t story,
+                   int set_door, uint32_t door)
 {
     uint32_t d1a0 = PE_LoadU32(GA_D1A0);
     uint32_t tok = PE_LoadU32(GA_TOKEN);
@@ -520,6 +564,7 @@ static int warp_to(uint32_t token, int set_story, uint32_t story)
      * the prologue hand over to its first room before warping. */
     if (PE_LoadU8(GA_MOVIE) || tok == TOK_PROLOGUE) return 0;
     if (set_story) PE_StoreU32(GA_STORY, story);
+    if (set_door) PE_StoreU32(GA_DOOR, door);
     PE_StoreU32(PE_CHEAT_STACK + 8u, token);
     PE_StoreU32(PE_CHEAT_STACK + 0u, PE_CHEAT_STACK + 8u);
     (void)func_80017BB4(PE_CHEAT_STACK);                 /* the field VM's room_transfer */
@@ -528,7 +573,8 @@ static int warp_to(uint32_t token, int set_story, uint32_t story)
 
 static int warp_pass(int index)
 {
-    return warp_to(k_warps[index].token, 1, k_warps[index].story);
+    return warp_to(k_warps[index].token, 1, k_warps[index].story,
+                   k_warps[index].door != WARP_DOOR_KEEP, k_warps[index].door);
 }
 
 void pe_plat_cheats_apply(void)
@@ -587,7 +633,7 @@ void pe_plat_cheats_apply(void)
                     fprintf(stderr, "[WARP] disc 2 handoff unavailable\n");
                 }
             }
-            r = in_field(tok) ? warp_to(C.env_token, C.env_set_story, C.env_story) : 0;
+            r = in_field(tok) ? warp_to(C.env_token, C.env_set_story, C.env_story, 0, 0) : 0;
             if (r > 0) {
                 C.env_warp = 0;
                 C.warps++;
@@ -767,8 +813,14 @@ const uint8_t *pe_plat_cheats_overlay(const uint8_t *rgb, int w, int h)
         }
         if (!n) draw_text(12, y, "NO VERIFIED WARPS FOR THIS DAY", 170, 170, 170);
     } else if (C.menu) {
+        /* The list (all days) is taller than the screen: scroll it so the
+         * cursor row stays visible above the toast line. */
+        int fit, first = 0;
         draw_text(4, y, "WARP (UP/DOWN, ENTER, F8 CLOSES)", 120, 220, 255); y += 10;
-        for (int i = 0; i < N_WARPS; i++, y += 9) {
+        fit = (h - 14 - y) / 9;
+        if (fit < 1) fit = 1;
+        if (C.menu_index >= fit) first = C.menu_index - fit + 1;
+        for (int i = first; i < N_WARPS && i < first + fit; i++, y += 9) {
             int sel = i == C.menu_index;
             if (sel) draw_text(4, y, ">", 255, 255, 0);
             draw_text(12, y, k_warps[i].name, sel ? 255 : 170, sel ? 255 : 170, sel ? 0 : 170);

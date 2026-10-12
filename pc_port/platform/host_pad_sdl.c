@@ -110,7 +110,7 @@ uint16_t HostPadSDL_MapJoystick(const HostPadRawMap *m, const uint8_t *btn, int 
 
 /* ── runtime (dlopen SDL2) ─────────────────────────────────────────── */
 
-typedef struct { void *gc, *js; int32_t id; uint16_t held; uint8_t hk; char name[96]; } HpsDev;
+typedef struct { void *gc, *js; int32_t id; uint16_t held; uint8_t hk, input_seen; char name[96]; } HpsDev;
 
 static struct {
     int state;             /* 0 untried, 1 ready, -1 unavailable/disabled */
@@ -234,6 +234,12 @@ static void hps_init(void)
      * SDL_GAMECONTROLLERCONFIG / IGNORE_DEVICES env is read by SDL itself. */
     S.SetHint("SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS", "1");
     S.SetHint("SDL_GAMECONTROLLER_USE_BUTTON_LABELS", "0");
+    /* SDL >= 2.28 hides Steam's virtual gamepad unless this is set.  Steam sets
+     * it only for the process it launches, so a port started by a launcher
+     * under Game Mode could see no controller at all when Steam also hides the
+     * physical pad.  A hint never overrides the same variable in the
+     * environment. */
+    S.SetHint("SDL_GAMECONTROLLER_ALLOW_STEAM_VIRTUAL_GAMEPAD", "1");
     if (S.Init(HPS_INIT_JOYSTICK | HPS_INIT_GAMECONTROLLER) != 0) {
         fprintf(stderr, "[PAD] SDL2 init failed (%s); using /dev/input/js*\n", S.GetError());
         dlclose(S.lib); S.lib = NULL;
@@ -242,7 +248,9 @@ static void hps_init(void)
     for (int i = 0; i < HPS_MAX_DEVICES; i++) S.dev[i].id = -1;
     load_db_file();
     S.state = 1;
-    fprintf(stderr, "[PAD] SDL2 GameController backend ready\n");
+    fprintf(stderr, "[PAD] SDL2 GameController backend ready (SteamAppId %s, SDL_GAMECONTROLLER_IGNORE_DEVICES %s)\n",
+            getenv("SteamAppId") ? "set" : "unset",
+            getenv("SDL_GAMECONTROLLER_IGNORE_DEVICES") ? "set" : "unset");
     return;
 fail:
     fprintf(stderr, "[PAD] SDL2 missing symbol %s; using /dev/input/js*\n", miss);
@@ -318,6 +326,11 @@ void HostPadSDL_Poll(void)
             for (int i = 0; i < na; i++) a[i] = S.JSAxis(d->js, i);
             if (S.JSNumHats(d->js) > 0) hat = S.JSHat(d->js, 0);
             d->held = HostPadSDL_MapJoystick(&S.raw, b, nb, a, na, hat, S.swap_xy, &d->hk);
+        }
+        if (d->held && !d->input_seen) {
+            /* One line per device: which pad and backend actually fed input. */
+            d->input_seen = 1;
+            fprintf(stderr, "[PAD] first input: SDL %s (%s)\n", d->name, d->gc ? "GameController" : "raw joystick");
         }
     }
     if (S.debug) {
