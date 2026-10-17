@@ -265,6 +265,17 @@ def yaml_leaves(path: Path):
     return int(vm.group(1), 16) if vm else VB, out
 
 
+def nonmatching_leaves(room: str):
+    """[(name, off, size)] of the room's NON_MATCHING C leaves
+    (configs/USA/overlays/nonmatching.yaml); the registry carries them too."""
+    path = OVL_DIR / "nonmatching.yaml"
+    if not path.is_file():
+        return []
+    return [(m.group(1), int(m.group(2), 16), int(m.group(3), 16))
+            for m in re.finditer(rf"^\s*-\s*\[\s*room_{re.escape(room)}\s*,\s*(func_\w+)\s*,"
+                                 r"\s*(0x[0-9A-Fa-f]+)\s*,\s*(0x[0-9A-Fa-f]+)\s*\]", path.read_text(), re.M)]
+
+
 def matched_index(pkgs):
     """{(vma, size, fp): [(room, leaf, has_src)]} over every room target."""
     idx: dict = {}
@@ -487,19 +498,36 @@ def main() -> int:
             if m:
                 skips[(m.group(1), m.group(2))] = m.group(3)
     chunk = me["chunk2"]
+    ypath = OVL_DIR / f"room_{ns.room}.yaml"
+    c_spans = (yaml_leaves(ypath)[1] if ypath.is_file() else []) + nonmatching_leaves(ns.room)
+
+    def natives_at(o):
+        found = []
+        for (dv, dfp), ents in disp.items():
+            if dv != VB + o:
+                continue
+            for t, sym, esz, hand in ents:
+                if o + esz <= len(chunk) and fnv1a(chunk[o:o + esz]) == dfp:
+                    found.append((t, sym, esz, hand, dfp))
+        return found
+
     rows = []
     for off, size in bs:
         vma = VB + off
         fp = fnv1a(chunk[off:off + size])
         # native: entry at this vma whose own size/fp match the room bytes
-        natives, tables = [], set()
-        for (dv, dfp), ents in disp.items():
-            if dv != vma:
-                continue
-            for t, sym, esz, hand in ents:
-                if off + esz <= len(chunk) and fnv1a(chunk[off:off + esz]) == dfp:
-                    natives.append((t, sym, esz, hand, dfp))
-                    tables.add((t, dfp, esz))
+        natives = natives_at(off)
+        data_head = 0
+        if not natives:
+            # data words before the room's first function folded into its body
+            # (see pe_all_rooms_native_census.py): the YAML c leaf that ends the
+            # body is its code
+            for _n, o2, s2 in c_spans:
+                if off < o2 and o2 + s2 == off + size:
+                    tail = [x for x in natives_at(o2) if x[2] == s2]
+                    if tail:
+                        natives, data_head = tail, o2 - off
+                    break
         # PE_GuestCode_Resolve: exactly one fingerprint match (identical 8-byte stubs count once)
         distinct = {(dfp, esz) for _, _, esz, _, dfp in natives}
         matches = len({t for t, _, _, _, _ in natives})
@@ -534,7 +562,8 @@ def main() -> int:
         kind = None
         if mine is not None:
             kind = "conditional" if any("(conditional)" in w for _, w in path_of(fam[ns.room]["reach"], vma)) else "unconditional"
-        rows.append(dict(vma=vma, off=off, size=size, fnv1a=fp, status=status, direct_binding=direct, reach_kind=kind,
+        rows.append(dict(vma=vma, off=off, size=size, fnv1a=fp, status=status, data_head=data_head,
+                         direct_binding=direct, reach_kind=kind,
                          native=[f"{t}:{s}" for t, s, *_ in natives],
                          matched_c=[dict(room=r, leaf=l, src_file=s) for r, l, s in mc],
                          gen_skip_reason=reason,
@@ -572,6 +601,7 @@ def main() -> int:
     for r in rows:
         print(f"  {r['vma']:08X} +{r['size']:#5x} fnv {r['fnv1a']:08X} {r['status']:16s} "
               f"{('REACH' + ('?' if r['reach_kind'] == 'conditional' else ' ')) if r['reachable'] else '-     '} matchedC={'y' if r['matched_c'] else 'n'}"
+              + (f"  [data head {r['data_head']:#x}]" if r["data_head"] else "")
               + (f"  [{r['gen_skip_reason']}]" if r["gen_skip_reason"] else ""))
     print(f"SUMMARY: {len(rows)} bodies; {n_nat} native; {len(reach)} reachable; "
           f"{len(rnn)} reachable-not-native ({sum(r['size'] for r in rnn):#x} bytes)")

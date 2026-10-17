@@ -111,17 +111,38 @@ def census_room(name, pkgs, disp, dbind, midx, skips, cidx, clos):
     bs = c.bodies(me["chunk2"], lo, hi)
     a = c.analyse_room(name, me, win, bs)
     chunk = me["chunk2"]
+    y = c.OVL_DIR / f"room_{name}.yaml"
+    c_spans = (c.yaml_leaves(y)[1] if y.is_file() else []) + c.nonmatching_leaves(name)
+
+    def natives_at(off):
+        found = []
+        for (dv, dfp), ents in disp.items():
+            if dv != c.VB + off:
+                continue
+            for t, sym, esz, hand in ents:
+                if off + esz <= len(chunk) and c.fnv1a(chunk[off:off + esz]) == dfp:
+                    found.append((t, sym, esz, hand, dfp))
+        return found
+
     rows = []
     for off, size in bs:
         vma = c.VB + off
         fp = c.fnv1a(chunk[off:off + size])
-        natives = []
-        for (dv, dfp), ents in disp.items():
-            if dv != vma:
-                continue
-            for t, sym, esz, hand in ents:
-                if off + esz <= len(chunk) and c.fnv1a(chunk[off:off + esz]) == dfp:
-                    natives.append((t, sym, esz, hand, dfp))
+        natives = natives_at(off)
+        data_head = 0
+        if not natives:
+            # The roomscan text-window rule folds the data words that precede
+            # a room's first function (a seed, colours, a string) into its
+            # first body.  When the YAML declares a c leaf that starts inside
+            # the body and ends with it, the body's code is that leaf: its
+            # entry is what code and records call (the head is addressed as
+            # data, e.g. m0145i `RoomFxSeed8 D_8018F1CC`).
+            for _n, o2, s2 in c_spans:
+                if off < o2 and o2 + s2 == off + size:
+                    tail = [x for x in natives_at(o2) if x[2] == s2]
+                    if tail:
+                        natives, data_head = tail, o2 - off
+                    break
         # PE_GuestCode_Resolve: one fingerprint match, where matches with the
         # same size and FNV count once if they are 8-byte stubs or share the
         # generated symbol (closure equality is not modelled here: stricter).
@@ -164,7 +185,8 @@ def census_room(name, pkgs, disp, dbind, midx, skips, cidx, clos):
         if mine is not None:
             kind = ("conditional" if any("(conditional)" in w for _, w in c.path_of(a["reach"], vma))
                     else "unconditional")
-        rows.append(dict(vma=vma, size=size, fnv1a=fp, status=status, reachable=mine is not None,
+        rows.append(dict(vma=vma, size=size, fnv1a=fp, status=status, data_head=data_head,
+                         reachable=mine is not None,
                          reach_kind=kind, matched_c=[f"{r}/{l}" for r, l, _ in mc],
                          gen_skip_reason=reason, direct=direct, c_twins=twins,
                          native=sorted({f"{t}:{s}" for t, s, *_ in natives})))
@@ -220,6 +242,8 @@ def main() -> int:
     twin_keys = {(row["vma"], row["size"], row["fnv1a"]) for r in out for row in r["rows"]
                  if not row["status"].startswith("native") and row["c_twins"]}
     summary = dict(rooms=len(out), bodies=sum(len(r["rows"]) for r in out),
+                   native_via_data_head=sum(1 for r in out for row in r["rows"]
+                                            if row["data_head"] and row["status"].startswith("native")),
                    unique_not_native_with_c_twin=len(twin_keys),
                    by_status=dict(tot), reachable_by_status=dict(reach_tot),
                    unique_bodies=len(uniq_all),
