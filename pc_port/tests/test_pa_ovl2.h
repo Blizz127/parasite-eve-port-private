@@ -203,17 +203,24 @@ static void test_PA_ovl2_DACA4(void)
     ASSERT(PE_LoadU32(R2(4)) == 0x12345u + (r3 & 0x1Fu) + 0x8AAu, "DACA4: angle advance");
     PE_StoreU32(0x800E27ECu, 0x50u);
     ASSERT(func_800DACA4(1, PO2_REC) == 1, "DACA4: ends at 0x50");
-    /* mode 2 at 0x60: no bursts; D_800F3374 = 0x40, func_800CF5B0(a1, 0) */
-    PE_Decomp_ResetBoundaries();
-    Bootstrap_ResetArg4CallLog();
-    PE_StoreU32(0x800E27ECu, 0x60u);
-    ASSERT(func_800DACA4(2, PO2_REC) == 0, "DACA4: mode 2");
-    ASSERT(PE_LoadU16(0x800F3374u) == 0x40u, "DACA4: D_800F3374 = 0x40");
-    ASSERT(PE_Decomp_BoundaryCount() == 1u &&
-           strcmp(PE_Decomp_BoundaryName(0), "func_800CF5B0") == 0 &&
-           g_bootstrap_arg4_call_count == 1 &&
-           g_bootstrap_arg4_calls[0].arg0 == PO2_REC && g_bootstrap_arg4_calls[0].arg1 == 0u,
-           "DACA4: func_800CF5B0(a1, 0) boundary");
+    /* mode 2 at 0x60: no bursts; D_800F3374 = 0x40, then the native
+     * func_800CF5B0(a1, 0) (generated from its matched C), which loads the
+     * camera matrix *D_800BCFA4 into the GTE rotation registers. */
+    {
+        static const uint32_t cam[8] = {0x01000FFFu, 0xFFE00010u, 0x00200FFAu,
+                                        0xFFF00030u, 0x00000FF0u, 0x100u, -0x80u, 0x2000u};
+        for (unsigned i = 0; i < 8u; i++) PE_StoreU32(0x80170000u + 4u * i, cam[i]);
+        PE_StoreU32(0x800BCFA4u, 0x80170000u);
+        PE_Decomp_ResetBoundaries();
+        Bootstrap_ResetArg4CallLog();
+        PE_StoreU32(0x800E27ECu, 0x60u);
+        ASSERT(func_800DACA4(2, PO2_REC) == 0, "DACA4: mode 2");
+        ASSERT(PE_LoadU16(0x800F3374u) == 0x40u, "DACA4: D_800F3374 = 0x40");
+        ASSERT(PE_Decomp_BoundaryCount() == 0u && g_bootstrap_arg4_call_count == 0,
+               "DACA4: func_800CF5B0(a1, 0) runs natively (no boundary)");
+        for (unsigned i = 0; i < 5u; i++)
+            ASSERT(PE_GTE_ReadCtrl(i) == cam[i], "DACA4: func_800CF5B0 loads the camera rotation");
+    }
     PASS();
 }
 

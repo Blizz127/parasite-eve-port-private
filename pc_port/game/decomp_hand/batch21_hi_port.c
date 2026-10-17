@@ -7,6 +7,8 @@
 #include "pe_guest_decomp.h"
 #include "pe_sdk.h"
 #include "hand_hi_protos.h"
+void func_800DB25C(uint32_t a_position, int32_t a_x, int32_t a_y, int32_t a_angle, int32_t a_radius,
+                  int32_t a_depth, int32_t a_intensity, uint32_t a_color);   /* generated (gen_decomp_ports --e21) */
 
 extern int32_t func_80077CF4(int32_t angle);
 extern int32_t func_80077DC4(int32_t angle);
@@ -90,7 +92,7 @@ int func_800DAF8C(int a0, pe_addr_t a1)
 
 /* src/func_800DB5F4.c: short burst.  Mode 1 ends at frame 8.  Mode 2:
  * colour curve D_800E1CC8 at a1[5], drawn by func_800DB25C(D_800E2224,
- * a1[0..3], 1, 0x80 - (f << 4), colour) — boundary (no matched C). */
+ * a1[0..3], 1, 0x80 - (f << 4), colour), generated from its matched C. */
 int func_800DB5F4(int a0, pe_addr_t a1)
 {
     int f = (int)PE_LoadU32(0x800E27ECu);
@@ -100,13 +102,16 @@ int func_800DB5F4(int a0, pe_addr_t a1)
         if (f < 8)
             break;
         return 1;
-    case 2:
+    case 2: {
+        /* src/func_800DB5F4.c: v = 0x80 - (D_800E27EC << 4);
+         * func_800CF3AC(&D_800E1CC8, buf, a1[5]);
+         * func_800DB25C(&D_800E2224, a1[0], a1[1], a1[2], a1[3], 1, v, buf); */
+        int32_t v = 0x80 - (int32_t)((uint32_t)f << 4);
         func_800CF3AC(0x800E1CC8u, S21_BUF, (int16_t)PE_LoadU16(a1 + 0xAu));
-        PE_D_COMP_BOUNDARY4("func_800DB25C", 0x800DB25Cu, 0x800E2224u,
-                            (int16_t)PE_LoadU16(a1 + 0u), (int16_t)PE_LoadU16(a1 + 2u),
-                            (int16_t)PE_LoadU16(a1 + 4u));
-        /* remaining arguments: a1[3], 1, 0x80 - (f << 4), colour block */
+        func_800DB25C(0x800E2224u, (int16_t)PE_LoadU16(a1 + 0u), (int16_t)PE_LoadU16(a1 + 2u),
+                      (int16_t)PE_LoadU16(a1 + 4u), (int16_t)PE_LoadU16(a1 + 6u), 1, v, S21_BUF);
         break;
+    }
     default:
         return 0;
     }

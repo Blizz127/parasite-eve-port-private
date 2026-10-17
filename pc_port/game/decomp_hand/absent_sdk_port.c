@@ -73,7 +73,9 @@ static int pa_call(const char *site, pe_addr_t target, unsigned arity,
         func_8007C13C();
         return 0;
     default:
-        return PE_Decomp_Boundary(site, target, arity, a0, a1, a2, a3);
+        /* retail jalr through the guest-code registry (native thunk, else
+         * the same loud boundary) */
+        return PE_GuestCall(site, target, arity, a0, a1, a2, a3);
     }
 }
 

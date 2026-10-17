@@ -41,8 +41,8 @@ int func_80084B78(pe_addr_t a0)
     default:
         hook = PE_LoadU32(a0 + 0x14u);
         if (hook != 0u)
-            (void)PE_Decomp_Boundary("func_80084B78 a0->+0x14 card hook", hook, 1u,
-                                     a0, 0u, 0u, 0u);
+            (void)PE_GuestCall("func_80084B78 a0->+0x14 card hook", hook, 1u,
+                               a0, 0u, 0u, 0u);
         else
             func_800835C0(a0);
         break;

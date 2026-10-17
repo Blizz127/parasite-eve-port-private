@@ -113,7 +113,9 @@ static uint32_t cd_icall(const char *slot, pe_addr_t fn, unsigned arity,
     default:
         break;
     }
-    return (uint32_t)PE_Decomp_Boundary(slot, fn, arity, a0, a1, a2, 0u);
+    /* Any other target: the retail jalr through the guest-code registry
+     * (native thunk, else the same loud boundary). */
+    return (uint32_t)PE_GuestCall(slot, fn, arity, a0, a1, a2, 0u);
 }
 
 /* ── src/func_8007D614.c ───────────────────────────────────────────────

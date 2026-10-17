@@ -516,8 +516,9 @@ static void test_PORTABSENT_overlay_namespaced(void)
            "801F1B60 a0 != 1 leaves the flag");
     ASSERT(ovl_03C9__func_801F1B60(1) == 0 && PE_LoadU16(0x801F1F3Au) == 0u,
            "801F1B60 clears the flag");
-    /* ovl_0700 func_80190D08: func_80191834(a0) — ovl_0700-local, no port:
-     * a boundary labelled "ovl_0700:" (never a plain-named pc_port
+    /* ovl_0700 func_80190D08: func_80191834(a0) — the ovl_0700-local node
+     * unlink (next at +0x64, prev at +0x68), generated from its matched C
+     * under its namespaced symbol (no boundary, never a plain-named pc_port
      * definition) — then func_80191678(*a0), the namespaced generated
      * ovl_0700 leaf: unlink node n from the D_801E4A88 {prev,next} list,
      * push it on the D_8019CBC0 free chain (D_8019C830[n] = old head). */
@@ -532,11 +533,15 @@ static void test_PORTABSENT_overlay_namespaced(void)
         PE_StoreU16(0x8019C9D0u, 7u);
         PE_StoreU16(0x8019CBC0u, 9u);
         PE_StoreU16(PA_E9 + 0x7000u, 3u);
+        /* the record's own {next,prev} neighbours for func_80191834 */
+        PE_StoreU32(PA_E9 + 0x7000u + 0x64u, PA_E9 + 0x7100u);
+        PE_StoreU32(PA_E9 + 0x7000u + 0x68u, PA_E9 + 0x7200u);
         ovl_0700__func_80190D08(PA_E9 + 0x7000u);
-        ASSERT(PE_Decomp_BoundaryCount() == 1 &&
-               strcmp(PE_Decomp_BoundaryName(0), "ovl_0700:func_80191834") == 0 &&
-               g_bootstrap_arg4_calls[0].arg0 == PA_E9 + 0x7000u,
-               "ovl_0700-local unported callee: overlay-labelled boundary");
+        ASSERT(PE_Decomp_BoundaryCount() == 0 && g_bootstrap_arg4_call_count == 0,
+               "ovl_0700-local callee func_80191834 runs natively (no boundary)");
+        ASSERT(PE_LoadU32(PA_E9 + 0x7100u + 0x68u) == PA_E9 + 0x7200u &&
+               PE_LoadU32(PA_E9 + 0x7200u + 0x64u) == PA_E9 + 0x7100u,
+               "func_80191834 unlinks the record (next->prev = prev, prev->next = next)");
         ASSERT(PE_LoadU16(L + 2u * 4u + 2u) == 4u && PE_LoadU16(L + 4u * 4u) == 2u,
                "node 3 unlinked (2 <-> 4)");
         ASSERT(PE_LoadU16(L + 3u * 4u) == 0xFFFFu && PE_LoadU16(L + 3u * 4u + 2u) == 0xFFFFu,

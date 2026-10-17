@@ -3,6 +3,7 @@
 #include "psx_compat.h"
 #include "pe_port_compat.h"
 #include "game_port.h"
+#include "pe_guestcode.h"
 
 extern unsigned int func_80052F70(void);
 static pe_addr_t sort_ram(pe_addr_t p) {return p<0x200000u?p|0x80000000u:p;}
@@ -12,6 +13,8 @@ static pe_addr_t sort_item(int32_t id)
     uint32_t fn=PE_LoadU32(0x8009D0B4u);
     if (fn==0x800532B4u) return func_800532B4((uint32_t)id);
     if (fn==0x8005332Cu) return func_8005332C(id);
+    if (PE_GuestCode_Resolve(fn))   /* retail jalr through the registry */
+        return (pe_addr_t)(uint32_t)PE_GuestCall("@sort_item",fn,1u,(uint32_t)id,0u,0u,0u);
     Bootstrap_ReturnVoid("PE_InventorySortItem","inventory sorting callback");
     PE_Port_RequestStop(PE_PORT_STOP_UNRESOLVED_BOUNDARY);return 0u;
 }
@@ -51,6 +54,8 @@ static int32_t sort_compare(pe_addr_t callback,pe_addr_t a,pe_addr_t b)
 {
     if (callback==0x8005AFFCu) return func_8005AFFC(a,b);
     if (callback==0x8005B124u) return func_8005B124(a,b);
+    if (PE_GuestCode_Resolve(callback))   /* retail jalr through the registry */
+        return PE_GuestCall("@sort_compare",callback,2u,a,b,0u,0u);
     Bootstrap_ReturnVoid("PE_InventorySortCompare","retail quicksort");
     PE_Port_RequestStop(PE_PORT_STOP_UNRESOLVED_BOUNDARY);return 0;
 }

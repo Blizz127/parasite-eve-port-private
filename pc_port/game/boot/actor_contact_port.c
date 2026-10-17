@@ -3,6 +3,7 @@
 #include "psx_compat.h"
 #include "pe_port_compat.h"
 #include "game_port.h"
+#include "pe_guestcode.h"
 #include <stdio.h>
 
 static int32_t contact_h(pe_addr_t p) {return (int16_t)PE_LoadU16(p);}
@@ -174,6 +175,10 @@ static void contact_callback(pe_addr_t fn,pe_addr_t actor,int part,pe_addr_t oth
 {
     if (!fn) return;
     if (fn==0x8001D268u) {func_8001D268(actor,part,other,other_part);return;}
+    if (PE_GuestCode_Resolve(fn)) {   /* retail jalr through the registry */
+        (void)PE_GuestCall("@80036448:contact",fn,4u,actor,(uint32_t)part,other,(uint32_t)other_part);
+        return;
+    }
     fprintf(stderr,"[CONTACT] Unported callback %08X\n",fn);
     Bootstrap_ReturnVoid("func_80036448_callback","actor contact");
     PE_Port_RequestStop(PE_PORT_STOP_UNRESOLVED_BOUNDARY);
