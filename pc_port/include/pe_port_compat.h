@@ -236,6 +236,8 @@ extern void func_8002FAA4(pe_addr_t actor, unsigned int index,
                           unsigned int a2, unsigned int a3,
                           unsigned int b3, unsigned int half_c);
 extern void func_8002FAD8(pe_addr_t actor, unsigned int index, uint32_t first, uint32_t last);
+/* Matched font-page initializer, used by cold dialogue paths. */
+unsigned char func_80038D74(void);
 /* Field-VM opcodes 0x83 and 0xB6: generated from the matched C
  * (src/func_800133E8.c, src/func_80019810.c) by gen_decomp_ports.py --e21. */
 int func_800133E8(void);
@@ -968,6 +970,8 @@ extern int func_8001784C(pe_addr_t pe_a0);
 extern int func_800130B4(pe_addr_t args);
 extern int func_80015240(pe_addr_t args);
 extern void func_80039B74(pe_addr_t dest, pe_addr_t clip, int a2, int a3);
+void func_80039D24(pe_addr_t dest, pe_addr_t clip, short frame);
+void func_80039ED4(pe_addr_t dest, pe_addr_t clip, short frame);
 extern pe_addr_t func_800362B8(unsigned int size);
 extern void func_8003A6A8(pe_addr_t dest, pe_addr_t unused);
 extern void func_8003E188(pe_addr_t dest);

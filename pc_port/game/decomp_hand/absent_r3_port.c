@@ -14,6 +14,7 @@
 #include "pe_memcard.h"
 #include "pe_guest_decomp.h"
 #include "hand_absent_r3_protos.h"
+#include "game_port.h"
 
 /* decomp-derived callees without a canonical header prototype (generated
  * TUs in pc_port/game/decomp/; signatures copied from those definitions). */
@@ -40,8 +41,8 @@ static pe_addr_t r3_arg(pe_addr_t a, unsigned k)
 }
 
 /* ── src/func_80015964.c ────────────────────────────────────────────────
- * Field-VM opcode: if !func_80038D0C() run func_80038D74 (no pc_port
- * implementation: boundary).  k = func_8003944C(**a0).  k == 0xFF: reload
+ * Field-VM opcode: if !func_80038D0C() run the native font-page initializer
+ * func_80038D74().  k = func_8003944C(**a0).  k == 0xFF: reload
  * func_80039970 and D_8009D280 = func_8006E3D4(D_8009CD78 when
  * func_800392EC() < 2, else D_8009CD80); return 1.  Otherwise row =
  * (u8)(func_800392EC() - 1) / 10; D_8009D280 = func_8006E3D4(
@@ -54,8 +55,11 @@ int func_80015964(pe_addr_t a0)
     unsigned char k;
     unsigned char row;
 
-    if (!(unsigned char)func_80038D0C())
-        (void)PE_D_COMP_BOUNDARY0("func_80038D74", 0x80038D74u);
+    if (!(unsigned char)func_80038D0C()) {
+        const unsigned stop_epoch = PE_Port_StopEpoch();
+        (void)func_80038D74();
+        if (PE_Port_StopEpoch() != stop_epoch) return 0;
+    }
     k = func_8003944C(PE_LoadU8(PE_LoadU32(a0)));
     if (k == 0xFFu) {
         if (func_800392EC() < 2u) {

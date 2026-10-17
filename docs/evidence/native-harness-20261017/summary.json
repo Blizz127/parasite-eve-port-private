@@ -1,0 +1,64 @@
+{
+ "font": {
+  "status": "PASS",
+  "scope": "font initializer body only; all five callees mocked",
+  "cases": 54,
+  "skipped": 0,
+  "exe_sha1": "452fb033f2eaa4b18aa20a5bca60b8125af3a37b",
+  "body_sha256": "450c39072acb73b703e0a3810d97963608e73aa33b14baa1aa11d83f2ce85005",
+  "compared": "return, ordered typed calls, all RAM except exact incoming-register spills, full scratchpad",
+  "coverage_limit": "all252 normal words required; malformed-data traps, real IO and room reachability untested",
+  "negative_controls": "return, call list, page table, unrelated RAM, scratchpad in every case",
+  "ignored_spill_bytes_count": 36,
+  "coverage_count": 252,
+  "excluded_trap_guard_words_count": 8,
+  "results_file_sha256": "0f59d5f9f26254e858de084a8b656e21f11396382cf6486d1dfc71907c539fc6"
+ },
+ "animation": {
+  "status": "PASS",
+  "cases": 117,
+  "skipped": 0,
+  "scope": "matched animation parent/decoders + actual rotation callee on both sides; no mocks",
+  "stack_exclusions": "52 exact prologue spill bytes for parent; 36 direct; 16 null clip; rotation frameless",
+  "comparisons": "all other main RAM and every scratchpad byte, including pad/retained rows",
+  "coverage_limit": "actual words reported; no claim of all branches or room reachability",
+  "coverage_count": 488,
+  "results_file_sha256": "2a63b6ca01742852ac59afb3ba10f266d8c8648176b4e14818a542b55935cdd8"
+ },
+ "vm": {
+  "status": "PASS",
+  "scope": "two handler bodies; three math callees mocked; no game",
+  "cases": 693,
+  "skipped": 0,
+  "exe_sha1": "452fb033f2eaa4b18aa20a5bca60b8125af3a37b",
+  "comparisons": "return, ordered typed calls, all RAM except 12 exact register-spill bytes; full scratchpad",
+  "negative_controls": "return, ordered call list, non-stack RAM, scratchpad; every case",
+  "coverage": {
+   "800133E8": 67,
+   "80019810": 45
+  },
+  "excluded_trap_words_count": 8,
+  "results_file_sha256": "c6079ee273f50d0c98238f2c4a845ed853aca3997b1d0ffe6d33808b76b2ad36"
+ },
+ "inputs_sha256": {
+  "pc_port/game/decomp_hand/font_page_init_port.c": "61c6f444036db8ebb6ea8291ae89d51ef131108591db1fa28835946c258d6652",
+  "tools/analysis/font_native/harness.c": "54f22cb21f56c1eb7bd6c6e43211ec0643e629cc8ff3ab45a5ff04d033335c83",
+  "tools/analysis/font_native/validate.py": "411cfdf403f8914f2458491c944c76e3eb598adcedb5d577e5a9cece45cffe25",
+  "pc_port/game/decomp_hand/animation_decode_port.c": "44ad4f6848bd7a2c514e8c5a0ee982a0142b6bd0b6760b4a38418b9bb6dbc549",
+  "pc_port/game/boot/func_800794C4_port.c": "2d8c3666af54fecb74942ddf2b91402252e29a33a45e02a96efda14e71614960",
+  "tools/analysis/animation_native/harness.c": "75ebf893bd1ad6795c63c560d3e24574ae76c630e5f8a8c1a2d3ae589b0b0204",
+  "tools/analysis/animation_native/validate.py": "e3e0e65234848fd3bc4e2bbf582a5faaafbd0f287a8e66f61632ecb7cd1aea28",
+  "tools/analysis/animation_native/retail-pins.json": "8012e9bbdb16cc5cf73dbc6d3190cf4e9596dfb25156e6a4acc474a42debc11c",
+  "pc_port/game/decomp/func_800133E8_port.c": "d9bcdcda140fd37ab4947eb73bb75dee025a9bb7db2fcc3512683c5597660329",
+  "pc_port/game/decomp/func_80019810_port.c": "18a22cf357ef9ee12108786ec705f79329344e43afb087f4fcd3f777f22ed8d3",
+  "tools/analysis/field_vm_native/harness.c": "f8f8b271dce09a357f8ab1cedf3b638e97ac588f5b9f27318c3ac445e6daf665",
+  "tools/analysis/field_vm_native/trap_shim.c": "f3e5ac53ab748e8ac4e4f2b49cb643022b6db04e738758b7e3a064c47b899719",
+  "tools/analysis/field_vm_native/validate.py": "6ee34a480cc2686e94f35095a7c1616ec4e6f2de8217972a77ef4f7137cf24d5",
+  "tools/analysis/e21_diff.py": "ecd762d114a98ca14026de3750defa8ebb1451926fce22718941c6f5601a38a3",
+  "scripts/run_native_oracle_harnesses.sh": "2737f8a313c70566e36b4f3cb0760c2b2cebbc006eff359ea9b5aa268a5554cc"
+ },
+ "exe_sha1": "452fb033f2eaa4b18aa20a5bca60b8125af3a37b",
+ "command": "PATH=<venv with pycparser>:$PATH TMPDIR=/tmp/... scripts/run_native_oracle_harnesses.sh",
+ "run_utc": "2026-10-17T21:41:58Z",
+ "tree": "inputs as committed with this file (hashes above)"
+}
