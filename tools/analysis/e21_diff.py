@@ -169,6 +169,10 @@ OUT_EXTENTS = {
     (0x80079754, 1): 18, (0x80078CC4, 0): 20,
     (0x800CE8F0, 3): 6, (0x800CE9D4, 2): 6, (0x800CEAE8, 2): 6,
     (0x800CFB7C, 2): 6, (0x800CF3AC, 1): 3,
+    # ApplyMatrixSV writes a 3-short vector; the RotMatrix variant 800794C4
+    # writes rotation + translation (32 bytes, as the m0075i directed specs);
+    # 80071A44 is memset(dst, byte, len) with the 16 bytes room callers pass.
+    (0x80078C34, 2): 6, (0x800794C4, 1): 32, (0x80071A44, 0): 16,
 }
 
 
@@ -612,7 +616,11 @@ int main(int argc, char **argv)
 """
 
 
-def candidates() -> list[tuple[Path, str, str]]:
+def candidates(with_calls: bool = False) -> list[tuple[Path, str, str]]:
+    """Generated E21 room TUs to differential-test.  By default a matched TU
+    that makes calls is left out (NON_MATCHING TUs with calls are always in);
+    with_calls takes those too: their host-prototyped callees are mocked
+    exactly like NON_MATCHING ones (host_stubs)."""
     out = []
     for p in sorted((o.REPO_ROOT / o.ROOMS_DIR).glob("*_port.c")):
         t = p.read_text()
@@ -623,7 +631,8 @@ def candidates() -> list[tuple[Path, str, str]]:
         calls = set(re.findall(r"\b(func_[0-9A-F]{8})\s*\(", body)) - {name}
         m0 = re.search(r"decomp-source-overlay: (room_\w+)/", t)
         nonmatching = bool(m0) and name in o.nonmatching_leaves().get(m0.group(1), {})
-        if "PE_HostToGuest" in t or ((calls or "host prototypes" in t) and not nonmatching):
+        if "PE_HostToGuest" in t or ((calls or "host prototypes" in t) and not nonmatching
+                                     and not with_calls):
             continue
         m = re.search(r"decomp-source-overlay: (room_\w+)/", t)
         out.append((p, name, m.group(1)))
@@ -708,6 +717,9 @@ def host_stubs(t: str) -> str:
 # caller locals would require identical stack layout, which native C does not
 # promise.  Matrices include their three translations, not just rotation.
 STACK_EXTENTS = {
+    (0x80078C34, 0): 18, (0x80078C34, 1): 6, (0x80078C34, 2): 0,   # ApplyMatrixSV
+    (0x800794C4, 0): 6, (0x800794C4, 1): 0,
+    (0x800C4FC4, 1): 32,                                            # ring renderer matrix
     (0x80079754, 0): 6, (0x80079754, 1): 0,
     (0x80078CC4, 0): 20, (0x80078CC4, 1): 12,
     (0x800C71E4, 1): 32,
@@ -830,6 +842,12 @@ def one(p: Path, name: str, ovl: str, seeds: int, cc: str, cover: bool = False,
         d = Path(d)
         (d / "pe_guest_decomp.h").write_text(MOCK_H)
         outs = frozenset(v for lhs, vs in directed.get((ovl, name), []) if lhs == "out" for v in vs)
+        # A callee whose output extent is known writes it on both sides even
+        # without a directed out= term, so a caller that reads its own stack
+        # buffer back after the call (a RotMatrix into a local matrix) compares
+        # the same bytes instead of two different stack fills.
+        keyed = {out_key(v) for v in outs}
+        outs = outs | frozenset(fn << 4 | k for (fn, k) in OUT_EXTENTS if (fn << 4 | k) not in keyed)
         harness = HARNESS.replace("static unsigned seed_;", "static unsigned seed_;\nstatic const uint32_t outs_[] = {"
                                   + ", ".join(f"0x{out_key(v) & 0xFFFFFFFF:X}u" for v in sorted(outs) or [0xFFFFFFFF]) + "};\n"
                                   + "static const unsigned outl_[] = {"
@@ -838,15 +856,24 @@ def one(p: Path, name: str, ovl: str, seeds: int, cc: str, cover: bool = False,
         (d / "t.c").write_text(src)
         (d / "gte_ext.c").write_text(GTE_EXT)
         pc = o.REPO_ROOT / "pc_port"
-        r = subprocess.run([cc, "-O1", "-std=gnu11", "-funsigned-char", "-w", "-c",
-                            "-I", str(pc / "include"), "-I", str(pc / "platform"), "-I", str(pc),
-                            "-I", str(pc / "bootstrap"), "-o", str(d / "pe_gte.o"),
-                            str(pc / "platform" / "pe_gte.c")], capture_output=True, text=True)
-        if r.returncode:
-            return "nocompile", "pe_gte.c: " + r.stderr[:300]
+        # The native GTE: pe_gte.c plus, when present, the command engine it
+        # dispatches to (pe_gte_commands.c).
+        gte_objs = []
+        for unit in ("pe_gte.c", "pe_gte_commands.c"):
+            src_ = pc / "platform" / unit
+            if not src_.exists():
+                continue
+            obj = d / (unit[:-2] + ".o")
+            r = subprocess.run([cc, "-O1", "-std=gnu11", "-funsigned-char", "-w", "-c",
+                                "-I", str(pc / "include"), "-I", str(pc / "platform"), "-I", str(pc),
+                                "-I", str(pc / "bootstrap"), "-o", str(obj), str(src_)],
+                               capture_output=True, text=True)
+            if r.returncode:
+                return "nocompile", f"{unit}: " + r.stderr[:300]
+            gte_objs.append(str(obj))
         r = subprocess.run([cc, "-O1", "-std=gnu11", "-funsigned-char", "-w", "-I", str(d),
                             "-o", str(d / "t"), str(d / "t.c"), str(d / "gte_ext.c"),
-                            str(d / "pe_gte.o")], capture_output=True, text=True)
+                            *gte_objs], capture_output=True, text=True)
         if r.returncode:
             return "nocompile", r.stderr[:300]
         ran = 0
@@ -930,10 +957,12 @@ def main() -> int:
     ap.add_argument("--recorded", default="", help="replay PE_RECORD_GUESTCALL snapshots from DIR")
     ap.add_argument("--coverage", action="store_true", help="report retail instruction coverage")
     ap.add_argument("--check-gte", action="store_true", help="also compare final GTE data/control registers")
+    ap.add_argument("--with-calls", action="store_true",
+                    help="also test matched TUs that make calls (callees mocked as for NON_MATCHING)")
     ap.add_argument("--only", default="", help="substring of the TU file name or source overlay")
     args = ap.parse_args()
     cc = shutil.which("cc") or shutil.which("gcc")
-    cands = candidates()
+    cands = candidates(args.with_calls)
     if args.only:
         cands = [c for c in cands if args.only in c[0].name or args.only == c[2]]
     if args.limit:
