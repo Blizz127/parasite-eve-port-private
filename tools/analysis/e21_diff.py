@@ -163,6 +163,13 @@ class Gte:
 
 
 OUT_LEN_SHIFT = 40                      # out=FN:K:LEN keeps LEN above the FN<<4|K key
+# Output extents of known callees' pointer arguments: the bytes a mocked
+# callee writes through an out= stack argument when the spec gives no LEN.
+OUT_EXTENTS = {
+    (0x80079754, 1): 18, (0x80078CC4, 0): 20,
+    (0x800CE8F0, 3): 6, (0x800CE9D4, 2): 6, (0x800CEAE8, 2): 6,
+    (0x800CFB7C, 2): 6, (0x800CF3AC, 1): 3,
+}
 
 
 def out_key(v: int) -> int:
@@ -170,19 +177,75 @@ def out_key(v: int) -> int:
 
 
 def out_len(v: int) -> int:
-    return (v >> OUT_LEN_SHIFT) or 8
+    k = out_key(v)
+    return (v >> OUT_LEN_SHIFT) or OUT_EXTENTS.get((k >> 4, k & 15), 8)
 
 
-def out_bytes(fn: int, k: int, seed: int, n: int = 8) -> bytes:
-    """The bytes (8 by default) a mocked callee writes through an `out=` stack argument (both sides)."""
+def out_bytes(fn: int, k: int, seed: int, n: int | None = None) -> bytes:
+    """The bytes a mocked callee writes through an `out=` stack argument (both
+    sides): LEN from the spec, else the callee's known extent, else 8."""
     x, b = (fn * 2654435761 + seed * 40503 + k * 0x9E37) & 0xFFFFFFFF, bytearray()
-    for _ in range(n):
+    for _ in range(OUT_EXTENTS.get((fn, k), 8) if n is None else n):
         x = (x * 1103515245 + 12345) & 0xFFFFFFFF
         b.append((x >> 16) & 0xFF)
     return bytes(b)
 
 
-def run_mips(ram: bytearray, entry: int, args: list[int], seed: int, outs: frozenset = frozenset()):
+def prologue_save_instructions(ram: bytearray, entry: int) -> frozenset[int]:
+    """Recognize saves of incoming registers, not every store using an s-register.
+
+    Era prologues interleave saves with assignments to other saved registers.
+    Follow the entry basic block, retaining only registers not yet assigned,
+    and require a first save inside the allocated stack frame.  Any control
+    transfer ends this conservative recognition; later stores (including call
+    delay slots) are caller data even when their source is s0-s7/fp/ra.
+    """
+    incoming = set(range(16, 24)) | {30, 31}
+    saved, pcs = set(), set()
+    stack_delta = 0
+    for offset in range(0, 64 * 4, 4):
+        pc = entry + offset
+        at = pc & 0x1FFFFFFF
+        if at + 4 > RAM_SIZE:
+            break
+        w = struct.unpack_from("<I", ram, at)[0]
+        op, rs, rt, rd = w >> 26, (w >> 21) & 31, (w >> 16) & 31, (w >> 11) & 31
+        fn, imm = w & 63, w & 0xFFFF
+        simm = imm - 0x10000 if imm & 0x8000 else imm
+        if 1 <= op <= 7 or (op == 0 and fn in (8, 9, 12, 13)):
+            break
+        if op in (0x28, 0x29, 0x2A, 0x2B, 0x2E):
+            if (op == 0x2B and rs == 29 and rt in incoming and rt not in saved
+                    and stack_delta < 0 and simm >= 0 and stack_delta + simm + 4 <= 0):
+                pcs.add(pc)
+                saved.add(rt)
+            continue
+        written_reg = None
+        if op == 0:
+            if fn in (0, 2, 3, 4, 6, 7, 16, 18, 32, 33, 34, 35, 36, 37, 38, 39, 42, 43):
+                written_reg = rd
+            elif fn not in (17, 19, 24, 25, 26, 27):
+                break
+        elif 8 <= op <= 15 or 0x20 <= op <= 0x26:
+            written_reg = rt
+        elif op == 0x12:
+            if rs in (0, 2):
+                written_reg = rt
+            elif rs not in (4, 6) and not (rs & 16):
+                break
+        else:
+            break
+        if written_reg is not None:
+            incoming.discard(written_reg)
+            if written_reg == 29:
+                if op not in (8, 9) or rs != 29:
+                    break
+                stack_delta += simm
+    return frozenset(pcs)
+
+
+def run_mips(ram: bytearray, entry: int, args: list[int], seed: int, outs: frozenset = frozenset(),
+             gte_state: list | None = None):
     r = [0] * 32
     r[4:8] = args
     r[29] = SP0
@@ -211,11 +274,12 @@ def run_mips(ram: bytearray, entry: int, args: list[int], seed: int, outs: froze
         return v & 0xFFFFFFFF
 
     written: set[int] = set()
+    register_saves = prologue_save_instructions(ram, entry)
 
     def st(a, n, v, mark=True):
         off = addr(a, n)
         ram[off:off + n] = (v & ((1 << (8 * n)) - 1)).to_bytes(n, "little")
-        if mark and 0x1FF000 <= off < RAM_SIZE:   # register spills (sw s0-s7/fp/ra, x(sp)) are not data
+        if mark and 0x1FF000 <= off < RAM_SIZE:   # only identified prologue saves are not caller data
             written.update(range(off, off + n))
 
     steps = 0
@@ -224,6 +288,8 @@ def run_mips(ram: bytearray, entry: int, args: list[int], seed: int, outs: froze
         if steps > MAX_STEPS:
             raise Fault("step limit")
         if pc == SENTINEL:
+            if gte_state is not None:
+                gte_state[:] = [gte.rd(i) for i in range(32)] + [gte.rc(i) for i in range(32)]
             return r[2], calls
         if COVER is not None:
             COVER.add(pc)
@@ -294,11 +360,11 @@ def run_mips(ram: bytearray, entry: int, args: list[int], seed: int, outs: froze
             tgt = (cur & 0xF0000000) | ((w & 0x3FFFFFF) << 2)
             run_slot(ram, r, pc, ld, st)
             sp = (r[29] + 16) & 0x1FFFFFFF
-            av = tuple(r[4:8]) + struct.unpack_from("<8I", ram, sp)
+            av = tuple(r[4:8]) + struct.unpack_from("<12I", ram, sp)
             # stack-local arguments: frames differ between the sides, so the
             # pointed-to bytes (at call time) are compared instead of the address
-            calls.append((tgt, tuple(("S", bytes(ram[(v & 0x1FFFFFFF):(v & 0x1FFFFFFF) + 16]),
-                                      [((v & 0x1FFFFFFF) + j) in written for j in range(16)], v)
+            calls.append((tgt, tuple(("S", bytes(ram[(v & 0x1FFFFFFF):(v & 0x1FFFFFFF) + 32]),
+                                      [((v & 0x1FFFFFFF) + j) in written for j in range(32)], v)
                                      if 0x801FF000 <= v < SP0 + 0x100 else v for v in av)))
             for k in range(len(av)):
                 n_ = next((out_len(v) for v in outs if out_key(v) == (tgt << 4 | k)), 0)
@@ -353,7 +419,7 @@ def run_mips(ram: bytearray, entry: int, args: list[int], seed: int, outs: froze
             wr = (rt, v)
         elif op == 0x28: st(A + simm, 1, B)
         elif op == 0x29: st(A + simm, 2, B)
-        elif op == 0x2B: st(A + simm, 4, B, not (rs == 29 and (16 <= rt <= 23 or rt >= 30)))
+        elif op == 0x2B: st(A + simm, 4, B, cur not in register_saves)
         elif op in (0x2A, 0x2E):                                # swl / swr
             a = (A + simm) & 0xFFFFFFFF
             al = ld(a & ~3, 4, False)
@@ -378,6 +444,8 @@ def run_mips(ram: bytearray, entry: int, args: list[int], seed: int, outs: froze
 
 def run_slot(ram, r, pc, ld, st):
     """Execute the single delay-slot instruction of a jal/jalr (ALU/load/store)."""
+    if COVER is not None:
+        COVER.add(pc)
     w = ld(pc, 4, False)
     op, rs, rt, rd = w >> 26, (w >> 21) & 31, (w >> 16) & 31, (w >> 11) & 31
     sh, fn, imm = (w >> 6) & 31, w & 63, w & 0xFFFF
@@ -407,7 +475,7 @@ def run_slot(ram, r, pc, ld, st):
     elif op == 0x25: v = (rt, ld(A + simm, 2, False))
     elif op == 0x28: st(A + simm, 1, B)
     elif op == 0x29: st(A + simm, 2, B)
-    elif op == 0x2B: st(A + simm, 4, B, not (rs == 29 and (16 <= rt <= 23 or rt >= 30)))
+    elif op == 0x2B: st(A + simm, 4, B)
     else:
         raise Fault(f"delay-slot op {w:08X}")
     if v is not None and v[0]:
@@ -483,16 +551,16 @@ uint32_t mock_args(uint32_t fn, unsigned n, const uint32_t *a)
     uint32_t h = fn * 2654435761u + seed_ * 40503u;
     unsigned i;
     fprintf(logf_, "C %08X", fn);
-    for (i = 0; i < n && i < 12; i++) {
+    for (i = 0; i < n && i < 16; i++) {
         if (a[i] >= 0x801FE000u && a[i] < 0x801FF000u) {
             unsigned j;
             fprintf(logf_, " S:%08X:", a[i]);
-            for (j = 0; j < 16; j++) fprintf(logf_, "%02X", ram[(a[i] & 0x1FFFFFu) + j]);
+            for (j = 0; j < 32; j++) fprintf(logf_, "%02X", ram[(a[i] & 0x1FFFFFu) + j]);
         } else
             fprintf(logf_, " %08X", a[i]);
     }
     fprintf(logf_, "\n");
-    for (i = 0; i < n && i < 12; i++) {
+    for (i = 0; i < n && i < 16; i++) {
         unsigned j, q;
         uint32_t x;
         for (q = 0; q < sizeof outs_ / sizeof outs_[0]; q++)
@@ -518,6 +586,10 @@ int main(int argc, char **argv)
     logf_ = fopen(argv[8], "w");
     (void)a0; (void)a1; (void)a2; (void)a3;
     CALL_LINE
+    fprintf(logf_, "G");
+    for (unsigned i = 0; i < 32; i++) fprintf(logf_, " %08X", PE_GTE_ReadData(i));
+    for (unsigned i = 0; i < 32; i++) fprintf(logf_, " %08X", PE_GTE_ReadCtrl(i));
+    fprintf(logf_, "\n");
     fclose(logf_);
     f = fopen(argv[2], "wb"); fwrite(ram, 1, sizeof ram, f); fclose(f);
     return 0;
@@ -543,38 +615,37 @@ def candidates() -> list[tuple[Path, str, str]]:
     return out
 
 
-PROTO_RE = re.compile(r"^(\w[\w \*]*?)\s*\b(func_[0-9A-F]{8})\((.*?)\);", re.M)
-_REPL: dict[str, str] | None = None
+PROTO_RE = re.compile(r"^(\w[\w \*]*?)\s*\b(func_[0-9A-F]{8}|PE_\w+)\((.*?)\);", re.M)
 
 
-def host_protos(t: str) -> list[tuple[str, str, str]]:
-    """(ret, func_X, params) of a TU's host-prototyped callees.  A host
-    replacement (gen_overlay_ports.host_replacements: PE_RotMatrixYXZ_Guest for
-    func_80079754, ...) is reported under its retail func_X so it is mocked and
-    logged like the retail jal; its stub keeps the host name."""
-    global _REPL
+def host_prototypes(t: str):
+    """Native prototypes paired with the retail address being replaced.
+
+    Renamed SDK replacements (for example PE_RotMatrixYXZ_Guest) must be
+    called under their host name while the differential logs the retail jal
+    target.  Unknown host names are refused, never silently left untested.
+    """
     if "host prototypes" not in t:
-        return []
-    if _REPL is None:
-        _REPL = {v["host"]: k for k, v in o.host_replacements().items()}
+        return
+    replacements = {v["host"]: int(k[5:], 16)
+                    for k, v in o.host_replacements().items()}
     block = t.split("host prototypes", 1)[1].split("\n\n", 1)[0]
-    out = list(PROTO_RE.findall(block))
-    for m in re.finditer(r"^(\w[\w \*]*?)\s*\b(PE_\w+)\((.*?)\);", block, re.M):
-        if m.group(2) in _REPL:
-            out.append((m.group(1), m.group(2), m.group(3)))
-    return out
-
-
-def proto_vma(fn: str) -> int:
-    return int((_REPL.get(fn, fn) if fn.startswith("PE_") else fn)[5:], 16)
+    for ret, fn, prm in PROTO_RE.findall(block):
+        if fn.startswith("func_"):
+            address = int(fn[5:], 16)
+        else:
+            if fn not in replacements:
+                raise ValueError(f"e21_diff: no retail identity for host replacement {fn}")
+            address = replacements[fn]
+        yield ret, fn, prm, address
 
 
 def host_masks(t: str) -> dict[int, list[int]]:
     """{callee vma: per-argument compare mask} for host-prototyped callees."""
     out = {}
-    for _ret, fn, prm in host_protos(t):
+    for _ret, fn, prm, address in host_prototypes(t):
         ps = [] if prm.strip() == "void" else [x.strip() for x in prm.split(",")]
-        out[proto_vma(fn)] = [0xFFFF if "short" in ty else 0xFF if "char" in ty else 0xFFFFFFFF
+        out[address] = [0xFFFF if "short" in ty else 0xFF if "char" in ty else 0xFFFFFFFF
                                 for ty in ps]
     return out
 
@@ -585,10 +656,8 @@ def host_stubs(t: str) -> str:
     narrow parameters masked to their width so they compare with the retail
     register/stack word; the return value is the same seed-derived mock as the
     retail interpreter's jal."""
-    if "host prototypes" not in t:
-        return ""
     out = []
-    for ret, fn, prm in host_protos(t):
+    for ret, fn, prm, address in host_prototypes(t):
         ps = [] if prm.strip() == "void" else [x.strip() for x in prm.split(",")]
         names, logs = [], []
         for k, ty in enumerate(ps):
@@ -596,9 +665,11 @@ def host_stubs(t: str) -> str:
             names.append(re.sub(r"\w+$", nm, ty) if re.search(r"\s\w+$", ty) else f"{ty} {nm}")
             w = "0xFFFFu" if "short" in ty else "0xFFu" if "char" in ty else "0xFFFFFFFFu"
             logs.append(f"(uint32_t)(uintptr_t){nm} & {w}")
-        body = (f"uint32_t a_[12] = {{{', '.join(logs) or '0'}}}; "
-                f"uint32_t v_ = mock_args(0x{proto_vma(fn):08X}u, {len(ps)}u, a_);")
-        retst = "" if ret.strip() == "void" else f" return ({ret.strip()})v_;"
+        if len(ps) > 16:
+            raise ValueError(f"e21_diff: too many arguments for {fn}: {len(ps)}")
+        body = (f"uint32_t a_[16] = {{{', '.join(logs) or '0'}}}; "
+                f"uint32_t v_ = mock_args(0x{address:08X}u, {len(ps)}u, a_);")
+        retst = " (void)v_;" if ret.strip() == "void" else f" return ({ret.strip()})v_;"
         out.append(f"{ret} {fn}({', '.join(names) or 'void'}) {{ {body}{retst} }}")
     # Host replacements (pe_port_compat.h `host-replacement: func_X`): the lowered
     # TU calls PE_* directly; mock it as the retail jal to func_X.
@@ -613,9 +684,32 @@ def host_stubs(t: str) -> str:
                          for ty, n in zip(ps, nm))
         logs = ", ".join(f"(uint32_t)(uintptr_t){n}" for n in nm) or "0"
         retst = "" if r["ret"] == "void" else f" return ({r['ret']})v_;"
-        out.append(f"{r['ret']} {r['host']}({decl or 'void'}) {{ uint32_t a_[12] = {{{logs}}}; "
+        out.append(f"{r['ret']} {r['host']}({decl or 'void'}) {{ uint32_t a_[16] = {{{logs}}}; "
                    f"uint32_t v_ = mock_args(0x{fx[5:]}u, {len(ps)}u, a_);{retst} }}")
     return "\n" + "\n".join(out) + "\n"
+
+
+# Read extents of pointer arguments used by park effects.  Comparing adjacent
+# caller locals would require identical stack layout, which native C does not
+# promise.  Matrices include their three translations, not just rotation.
+STACK_EXTENTS = {
+    (0x80079754, 0): 6, (0x80079754, 1): 0,
+    (0x80078CC4, 0): 20, (0x80078CC4, 1): 12,
+    (0x800C71E4, 1): 32,
+    (0x800C6B90, 0): 6,
+    (0x800CE8F0, 2): 6, (0x800CE8F0, 3): 0,
+    (0x800CE9D4, 2): 0,
+    (0x800CEAE8, 0): 18, (0x800CEAE8, 1): 6, (0x800CEAE8, 2): 0,
+    (0x800CFB7C, 0): 6, (0x800CFB7C, 2): 0,
+    (0x800CF3AC, 1): 0,
+    (0x800CEE20, 0): 6, (0x800CEE20, 1): 8, (0x800CEE20, 8): 3,
+    (0x800D2B58, 0): 6, (0x800D2B58, 1): 6,
+    (0x800D2B58, 2): 3, (0x800D2B58, 3): 3,
+    (0x800D2370, 0): 6, (0x800D2370, 1): 6,
+    (0x800D2370, 9): 3, (0x800D2370, 10): 3,
+    (0x800D004C, 0): 6, (0x800D004C, 4): 8,
+    (0x800D004C, 7): 3, (0x800D004C, 8): 3,
+}
 
 
 def directed_specs() -> dict[tuple[str, str], list[tuple[str, int, list[int]]]]:
@@ -694,7 +788,8 @@ def inputs(name, ov, data, seeds, recorded, spec):
 
 
 def one(p: Path, name: str, ovl: str, seeds: int, cc: str, cover: bool = False,
-        recorded: str = "", directed: dict | None = None) -> tuple[str, str]:
+        recorded: str = "", directed: dict | None = None,
+        check_gte: bool = False) -> tuple[str, str]:
     directed = directed or {}
     global COVER
     COVER = set() if cover else None
@@ -743,7 +838,9 @@ def one(p: Path, name: str, ovl: str, seeds: int, cc: str, cover: bool = False,
         for seed, ram, args in inputs(name, ov, data, seeds, recorded, directed.get((ovl, name))):
             r_ram = bytearray(ram)
             try:
-                v0, calls = run_mips(r_ram, leaf["vram"], list(args), seed, outs)
+                gte_state = []
+                v0, calls = run_mips(r_ram, leaf["vram"], list(args), seed, outs,
+                                     gte_state if check_gte else None)
             except Fault:
                 continue
             (d / "in.bin").write_bytes(ram)
@@ -763,6 +860,12 @@ def one(p: Path, name: str, ovl: str, seeds: int, cc: str, cover: bool = False,
                 return "MISMATCH", (f"seed {seed}: scratchpad 0x{0x1F800000 + i:08X} retail "
                                     f"{r_ram[RAM_SIZE + i]:02X} native {n_ram[RAM_SIZE + i]:02X}")
             log = (d / "log").read_text().split("\n")
+            if check_gte:
+                native_gte = [int(v, 16) for v in next(l for l in log if l.startswith("G ")).split()[1:]]
+                if native_gte != gte_state:
+                    i = next(i for i in range(64) if native_gte[i] != gte_state[i])
+                    return "MISMATCH", (f"seed {seed}: GTE {'data' if i < 32 else 'ctrl'} {i % 32} "
+                                        f"retail {gte_state[i]:08X} native {native_gte[i]:08X}")
             ncalls = [l for l in log if l.startswith("C ")]
             if len(ncalls) != len(calls):
                 return "MISMATCH", f"seed {seed}: {len(calls)} retail calls vs {len(ncalls)} native"
@@ -780,8 +883,11 @@ def one(p: Path, name: str, ovl: str, seeds: int, cc: str, cover: bool = False,
                         pv = pv.split(":")[1]  # likewise on the native side
                     if isinstance(rv_, tuple) or pv.startswith("S:"):
                         nb = bytes.fromhex(pv.split(":")[2]) if pv.startswith("S:") else b""
-                        if not (isinstance(rv_, tuple) and len(nb) == 16 and
-                                all(nb[j] == rv_[1][j] for j in range(16) if rv_[2][j])):
+                        # Matrix consumers read translations at +20/+24/+28;
+                        # the old 16-byte probe could miss misplaced meshes.
+                        extent = STACK_EXTENTS.get((tgt, k), 16)
+                        if not (isinstance(rv_, tuple) and len(nb) == 32 and
+                                all(nb[j] == rv_[1][j] for j in range(extent) if rv_[2][j])):
                             return "MISMATCH", (f"seed {seed}: call {tgt:08X} a{k} stack arg "
                                                 f"{rv_[1].hex() if isinstance(rv_, tuple) else hex(rv_)} vs {pv} "
                                                 f"(retail-written {''.join('w' if x else '.' for x in rv_[2]) if isinstance(rv_, tuple) else '-'})")
@@ -808,6 +914,7 @@ def main() -> int:
     ap.add_argument("--jobs", type=int, default=4)
     ap.add_argument("--recorded", default="", help="replay PE_RECORD_GUESTCALL snapshots from DIR")
     ap.add_argument("--coverage", action="store_true", help="report retail instruction coverage")
+    ap.add_argument("--check-gte", action="store_true", help="also compare final GTE data/control registers")
     ap.add_argument("--only", default="", help="substring of the TU file name or source overlay")
     args = ap.parse_args()
     cc = shutil.which("cc") or shutil.which("gcc")
@@ -818,7 +925,7 @@ def main() -> int:
         cands = cands[: args.limit]
     res: dict[str, list] = {}
     with concurrent.futures.ProcessPoolExecutor(max_workers=max(1, args.jobs)) as ex:
-        futs = {ex.submit(one, p, n, ov, args.seeds, cc, args.coverage, args.recorded, directed_specs()): (p.name, ov) for p, n, ov in cands}
+        futs = {ex.submit(one, p, n, ov, args.seeds, cc, args.coverage, args.recorded, directed_specs(), args.check_gte): (p.name, ov) for p, n, ov in cands}
         for f in concurrent.futures.as_completed(futs):
             st, why = f.result()
             res.setdefault(st, []).append((futs[f][0], why))
