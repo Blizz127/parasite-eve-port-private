@@ -519,14 +519,21 @@ def main() -> int:
         natives = natives_at(off)
         data_head = 0
         if not natives:
-            # data words before the room's first function folded into its body
-            # (see pe_all_rooms_native_census.py): the YAML c leaf that ends the
-            # body is its code
-            for _n, o2, s2 in c_spans:
-                if off < o2 and o2 + s2 == off + size:
-                    tail = [x for x in natives_at(o2) if x[2] == s2]
-                    if tail:
-                        natives, data_head = tail, o2 - off
+            # The roomscan text-window rule folds the data words that precede
+            # a room's first function (a seed, colours, a string) into its
+            # first body.  When a leaf (this room's YAML c / NON_MATCHING leaf,
+            # or any registry entry: how a twin room resolves the same bytes)
+            # starts inside the body and ends with it, the body's code is that
+            # leaf: its entry is what code and records call (the head is
+            # addressed as data, e.g. m0145i `RoomFxSeed8 D_8018F1CC`).
+            cands = sorted({o2 for _n, o2, s2 in c_spans if off < o2 and o2 + s2 == off + size}
+                           | {dv - VB for (dv, _fp), ents in disp.items()
+                              if off < dv - VB < off + size
+                              and any(dv - VB + e[2] == off + size for e in ents)})
+            for o2 in cands:
+                tail = [x for x in natives_at(o2) if o2 + x[2] == off + size]
+                if tail:
+                    natives, data_head = tail, o2 - off
                     break
         # PE_GuestCode_Resolve: exactly one fingerprint match (identical 8-byte stubs count once)
         distinct = {(dfp, esz) for _, _, esz, _, dfp in natives}
