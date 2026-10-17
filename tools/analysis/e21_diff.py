@@ -77,8 +77,57 @@ def s16(v):
     return v - 0x10000 if v & 0x8000 else v
 
 
+_NATIVE_GTE = None
+
+
+def native_gte():
+    """ctypes handle on the port's own GTE engine (pc_port/platform/pe_gte.c +
+    pe_gte_commands.c), built once per process into TMPDIR.  The ctest
+    gte-native-hardware checks that engine against the real-console ps1-tests
+    log; the oracle runs the commands it does not model itself (RTPS, RTPT,
+    NCDS, AVSZ, ...) on it, so e21 exercises a leaf's lowering, not GTE
+    arithmetic, for those."""
+    global _NATIVE_GTE
+    if _NATIVE_GTE is None:
+        import ctypes
+        import hashlib
+        pc = o.REPO_ROOT / "pc_port"
+        srcs = [pc / "platform" / "pe_gte.c", pc / "platform" / "pe_gte_commands.c"]
+        key = hashlib.sha1(b"".join(s.read_bytes() for s in srcs)).hexdigest()[:16]
+        d = Path(tempfile.gettempdir()) / f"e21_native_gte_{key}"
+        so = d / "libpegte.so"
+        if not so.is_file():
+            d.mkdir(parents=True, exist_ok=True)
+            stub = d / "stub.c"
+            stub.write_text("#include <stdint.h>\n"
+                            "uint16_t PE_LoadU16(uint32_t a) { (void)a; return 0; }\n"
+                            "uint32_t PE_LoadU32(uint32_t a) { (void)a; return 0; }\n"
+                            "void PE_Port_RequestStop(const char *r) { (void)r; }\n")
+            tmp = d / f"libpegte.{os.getpid()}.so"
+            cc = shutil.which("cc") or shutil.which("gcc")
+            r = subprocess.run([cc, "-O1", "-std=gnu11", "-w", "-shared", "-fPIC",
+                                "-I", str(pc / "include"), "-I", str(pc / "platform"), "-I", str(pc),
+                                "-I", str(pc / "bootstrap"), "-o", str(tmp), *map(str, srcs), str(stub)],
+                               capture_output=True, text=True)
+            if r.returncode:
+                raise SystemExit("e21_diff: native GTE library: " + r.stderr[:300])
+            os.replace(tmp, so)
+        lib = ctypes.CDLL(str(so))
+        for fn in ("PE_GTE_ReadData", "PE_GTE_ReadCtrl"):
+            getattr(lib, fn).restype = ctypes.c_uint32
+            getattr(lib, fn).argtypes = [ctypes.c_uint32]
+        for fn in ("PE_GTE_WriteData", "PE_GTE_WriteCtrl"):
+            getattr(lib, fn).restype = None
+            getattr(lib, fn).argtypes = [ctypes.c_uint32, ctypes.c_uint32]
+        lib.PE_GTE_Command.restype = None
+        lib.PE_GTE_Command.argtypes = [ctypes.c_uint32]
+        _NATIVE_GTE = lib
+    return _NATIVE_GTE
+
+
 class Gte:
-    """Independent COP2 model (psx-spx 'GTE Registers' / MVMVA / NCLIP)."""
+    """Independent COP2 model (psx-spx 'GTE Registers' / MVMVA / NCLIP); every
+    other command runs on the port's hardware-checked engine (native_gte)."""
 
     def __init__(self):
         self.d = [0] * 32
@@ -132,34 +181,75 @@ class Gte:
         return self.c[r]
 
     def command(self, cmd):
+        """NCLIP and MVMVA (psx-spx): FLAG restarts per command; every MAC
+        addition is checked against 44 bits (FLAG 30-i / 27-i) and wraps;
+        IR saturation sets FLAG 24-i; NCLIP's MAC0 sets FLAG 16 / 15."""
         op = cmd & 0x3F
+        flag = 0
         if op == 0x06:
             sx = [s16(self.d[12 + i]) for i in range(3)]
             sy = [s16(self.d[12 + i] >> 16) for i in range(3)]
             m = sx[0] * sy[1] + sx[1] * sy[2] + sx[2] * sy[0] - sx[0] * sy[2] - sx[1] * sy[0] - sx[2] * sy[1]
+            if m > 0x7FFFFFFF:
+                flag |= 1 << 16
+            elif m < -0x80000000:
+                flag |= 1 << 15
             self.d[24] = m & 0xFFFFFFFF
+            self.set_flag(flag)
             return
-        if op != 0x12:
-            raise Fault(f"cop2 command {cmd:07X}")
         sf, mx, vs, cv, lm = (cmd >> 19) & 1, (cmd >> 17) & 3, (cmd >> 15) & 3, (cmd >> 13) & 3, (cmd >> 10) & 1
-        if mx != 0 or vs not in (0, 3) or cv not in (0, 3):
-            raise Fault(f"cop2 mvmva {cmd:07X}")
+        if op != 0x12 or mx == 3 or cv == 2:
+            self.native_command(cmd)
+            return
+        base = (0, 8, 16)[mx]
         m = []
         for i in range(4):
-            m += [s16(self.c[i]), s16(self.c[i] >> 16)]
-        m.append(s16(self.c[4]))
-        if vs == 0:
-            v = [s16(self.d[0]), s16(self.d[0] >> 16), s16(self.d[1])]
-        else:
+            m += [s16(self.c[base + i]), s16(self.c[base + i] >> 16)]
+        m.append(s16(self.c[base + 4]))
+        if vs == 3:
             v = [s16(self.d[9]), s16(self.d[10]), s16(self.d[11])]
-        t = [s32(self.c[5 + i]) for i in range(3)] if cv == 0 else [0, 0, 0]
+        else:
+            v = [s16(self.d[2 * vs]), s16(self.d[2 * vs] >> 16), s16(self.d[2 * vs + 1])]
+        t = ([s32(self.c[5 + i]) for i in range(3)] if cv == 0 else
+             [s32(self.c[13 + i]) for i in range(3)] if cv == 1 else [0, 0, 0])
         for i in range(3):
-            mac = (t[i] << 12) + m[3 * i] * v[0] + m[3 * i + 1] * v[1] + m[3 * i + 2] * v[2]
-            mac >>= 12 * sf
-            mac32 = s32(mac)
+            mac = t[i] << 12
+            for k in range(3):
+                mac += m[3 * i + k] * v[k]
+                if mac > 0x7FFFFFFFFFF:
+                    flag |= 1 << (30 - i)
+                elif mac < -0x80000000000:
+                    flag |= 1 << (27 - i)
+                mac &= 0xFFFFFFFFFFF
+                if mac & 0x80000000000:
+                    mac -= 0x100000000000
+            mac32 = s32(mac >> (12 * sf))
             self.d[25 + i] = mac32 & 0xFFFFFFFF
             lo = 0 if lm else -0x8000
-            self.d[9 + i] = min(max(mac, lo), 0x7FFF) & 0xFFFFFFFF
+            ir = min(max(mac32, lo), 0x7FFF)
+            if ir != mac32:
+                flag |= 1 << (24 - i)
+            self.d[9 + i] = ir & 0xFFFFFFFF
+        self.set_flag(flag)
+
+    def set_flag(self, flag):
+        self.c[31] = flag | (0x80000000 if flag & 0x7F87E000 else 0)
+
+    def native_command(self, cmd):
+        """Copy the architectural state into the native engine, run the
+        command there, copy it back.  Data 15 (SXYP), 28/29 (IRGB/ORGB) and
+        31 (LZCR) are views of other registers and are not written."""
+        g = native_gte()
+        for r in range(32):
+            g.PE_GTE_WriteCtrl(r, self.c[r] & 0xFFFFFFFF)
+        for r in range(32):
+            if r not in (15, 28, 29, 31):
+                g.PE_GTE_WriteData(r, self.d[r] & 0xFFFFFFFF)
+        g.PE_GTE_Command(cmd & 0x1FFFFFF)
+        for r in range(32):
+            if r not in (15, 28, 29):
+                self.d[r] = g.PE_GTE_ReadData(r)
+            self.c[r] = g.PE_GTE_ReadCtrl(r)
 
 
 OUT_LEN_SHIFT = 40                      # out=FN:K:LEN keeps LEN above the FN<<4|K key
@@ -173,6 +263,9 @@ OUT_EXTENTS = {
     # writes rotation + translation (32 bytes, as the m0075i directed specs);
     # 80071A44 is memset(dst, byte, len) with the 16 bytes room callers pass.
     (0x80078C34, 2): 6, (0x800794C4, 1): 32, (0x80071A44, 0): 16,
+    # colour lookup (src/func_800C3134.c: a2[0..2] = lerped r,g,b) and the
+    # range test's result word (src/func_800C5EB0.c: *a2 = 0 / hit)
+    (0x800C3134, 2): 3, (0x800C5EB0, 2): 4,
 }
 
 
@@ -510,6 +603,7 @@ MOCK_H = r"""
 #include <string.h>
 #include <stddef.h>
 typedef uint32_t pe_addr_t;
+typedef struct { int16_t x, y, w, h; } RECT;   /* pc_port/include/psx_compat.h */
 extern uint8_t ram[0x200400];
 static inline uint8_t *at(pe_addr_t a) { if ((a & 0x1FFFFC00u) == 0x1F800000u) return ram + 0x200000u + (a & 0x3FFu); if ((a & 0x1FFFFFFFu) + 4u > 0x200000u) { printf("FAULT %08X\n", a); exit(3); } return ram + (a & 0x1FFFFFFFu); }
 uint32_t PE_GTE_ReadData(uint32_t reg);
@@ -525,6 +619,8 @@ static inline void PE_StoreU16(pe_addr_t a, uint16_t v) { memcpy(at(a), &v, 2); 
 static inline void PE_StoreU32(pe_addr_t a, uint32_t v) { memcpy(at(a), &v, 4); }
 static inline void PE_Fill(pe_addr_t a, uint32_t n, uint8_t v) { memset(at(a), v, n); }
 static inline void *PE_Translate(pe_addr_t a, size_t n) { (void)n; return at(a); }
+/* a host pointer into the mock RAM, back as its guest address (host stubs log it) */
+static inline pe_addr_t mock_guest(const void *p) { size_t o = (size_t)((const uint8_t *)p - ram); return p ? (o >= 0x200000u ? 0x1F800000u + (pe_addr_t)(o - 0x200000u) : 0x80000000u + (pe_addr_t)o) : 0u; }
 pe_addr_t PE_GuestFrame_Enter(uint32_t n);
 void PE_GuestFrame_Leave(pe_addr_t b, uint32_t n);
 uint32_t mock_call(uint32_t fn, unsigned n, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3);
@@ -664,13 +760,23 @@ def host_prototypes(t: str):
         yield ret, fn, prm, address
 
 
+def narrow_mask(ty: str) -> int:
+    """Compare mask for a host parameter type: a 16/8-bit parameter carries only
+    its low bits, whatever the caller's register held above them (the callee's
+    own e21 test feeds it full registers)."""
+    if re.search(r"\bshort\b|\bu?int16_t\b|\b[us]16\b", ty):
+        return 0xFFFF
+    if re.search(r"\bchar\b|\bu?int8_t\b|\b[us]8\b", ty):
+        return 0xFF
+    return 0xFFFFFFFF
+
+
 def host_masks(t: str) -> dict[int, list[int]]:
     """{callee vma: per-argument compare mask} for host-prototyped callees."""
     out = {}
     for _ret, fn, prm, address in host_prototypes(t):
         ps = [] if prm.strip() == "void" else [x.strip() for x in prm.split(",")]
-        out[address] = [0xFFFF if "short" in ty else 0xFF if "char" in ty else 0xFFFFFFFF
-                                for ty in ps]
+        out[address] = [narrow_mask(ty) for ty in ps]
     return out
 
 
@@ -686,9 +792,14 @@ def host_stubs(t: str) -> str:
         names, logs = [], []
         for k, ty in enumerate(ps):
             nm = f"p{k}"
-            names.append(re.sub(r"\w+$", nm, ty) if re.search(r"\s\w+$", ty) else f"{ty} {nm}")
-            w = "0xFFFFu" if "short" in ty else "0xFFu" if "char" in ty else "0xFFFFFFFFu"
-            logs.append(f"(uint32_t)(uintptr_t){nm} & {w}")
+            named = re.search(r"[\s*]\w+$", ty) and not re.fullmatch(
+                r"(?:const\s+|volatile\s+|unsigned\s+|signed\s+)*\w+", ty.strip())
+            names.append(re.sub(r"\w+$", nm, ty) if named else f"{ty} {nm}")
+            w = f"0x{narrow_mask(ty):X}u"
+            if "*" in ty:            # host pointer parameter: log the guest address it maps
+                logs.append(f"(uint32_t)mock_guest({nm})")
+            else:
+                logs.append(f"(uint32_t)(uintptr_t){nm} & {w}")
         if len(ps) > 16:
             raise ValueError(f"e21_diff: too many arguments for {fn}: {len(ps)}")
         body = (f"uint32_t a_[16] = {{{', '.join(logs) or '0'}}}; "
@@ -718,6 +829,10 @@ def host_stubs(t: str) -> str:
 # promise.  Matrices include their three translations, not just rotation.
 STACK_EXTENTS = {
     (0x80078C34, 0): 18, (0x80078C34, 1): 6, (0x80078C34, 2): 0,   # ApplyMatrixSV
+    (0x800C3134, 2): 0,                     # pure output (3 colour bytes)
+    (0x800C5EB0, 1): 0, (0x800C5EB0, 2): 0,  # a1 unread; a2 pure output
+    (0x800D3114, 10): 4, (0x800D3114, 11): 4,  # col0/col1: one CV each (r,g,b read)
+    (0x8007506C, 0): 8, (0x800750CC, 0): 8, (0x8007512C, 0): 8,   # one RECT
     (0x800794C4, 0): 6, (0x800794C4, 1): 0,
     (0x800C4FC4, 1): 32,                                            # ring renderer matrix
     (0x80079754, 0): 6, (0x80079754, 1): 0,
@@ -786,13 +901,16 @@ def inputs(name, ov, data, seeds, recorded, spec):
     for seed in range(seeds):
         rng = random.Random(f"{name}:{seed}")
         ram = bytearray(RAM_SIZE + SPAD)
-        words = [0x80100000 + (rng.getrandbits(18) << 2) if rng.random() < 0.7
+        # Seeded pointers stay below both stack windows (as mock returns do):
+        # an argument or RAM pointer into the retail frame aliases the leaf's
+        # own locals there but not in the native guest frame.
+        words = [0x80100000 + ((rng.getrandbits(18) << 2) & 0xDFFFC) if rng.random() < 0.7
                  else rng.choice((0, 1, 2, 3, 0xFF, 0xFFFF, rng.getrandbits(32)))
                  for _ in range((RAM_SIZE + SPAD) // 4)]
         ram[:] = struct.pack(f"<{len(words)}I", *words)
         base = ov["vram"] & 0x1FFFFFFF
         ram[base:base + len(data)] = data
-        args = [0x80100000 + (rng.getrandbits(18) << 2) for _ in range(4)]
+        args = [0x80100000 + ((rng.getrandbits(18) << 2) & 0xDFFFC) for _ in range(4)]
         if spec:
             k = seed
             for lhs, vals in spec:
@@ -910,7 +1028,12 @@ def one(p: Path, name: str, ovl: str, seeds: int, cc: str, cover: bool = False,
                                         f"retail {gte_state[i]:08X} native {native_gte[i]:08X}")
             ncalls = [l for l in log if l.startswith("C ")]
             if len(ncalls) != len(calls):
-                return "MISMATCH", f"seed {seed}: {len(calls)} retail calls vs {len(ncalls)} native"
+                rt_ = [f"{c[0]:08X}" for c in calls]
+                nt_ = [l.split()[1] for l in ncalls]
+                k_ = next((i for i in range(min(len(rt_), len(nt_))) if rt_[i] != nt_[i].upper()), min(len(rt_), len(nt_)))
+                return "MISMATCH", (f"seed {seed}: {len(calls)} retail calls vs {len(ncalls)} native "
+                                    f"(first difference at call {k_}: retail {' '.join(rt_[k_:k_ + 4])} | "
+                                    f"native {' '.join(nt_[k_:k_ + 4])})")
             for (tgt, regs), nl in zip(calls, ncalls):
                 parts = nl.split()[1:]
                 if int(parts[0], 16) != tgt:
@@ -931,7 +1054,7 @@ def one(p: Path, name: str, ovl: str, seeds: int, cc: str, cover: bool = False,
                         if not (isinstance(rv_, tuple) and len(nb) == 32 and
                                 all(nb[j] == rv_[1][j] for j in range(extent) if rv_[2][j])):
                             return "MISMATCH", (f"seed {seed}: call {tgt:08X} a{k} stack arg "
-                                                f"{rv_[1].hex() if isinstance(rv_, tuple) else hex(rv_)} vs {pv} "
+                                                f"{('@%08X:' % rv_[3]) + rv_[1].hex() if isinstance(rv_, tuple) else hex(rv_)} vs {pv} "
                                                 f"(retail-written {''.join('w' if x else '.' for x in rv_[2]) if isinstance(rv_, tuple) else '-'})")
                         continue
                     if int(pv, 16) & m != rv_ & m:
