@@ -392,8 +392,13 @@ class Lowerer:
                     self._global_decl(ext.decl)
         if self.fdef is None:
             raise LowerError("definition not found")
-        if len([e for e in ast.ext if isinstance(e, c_ast.FuncDef)]) != 1:
+        defs = [e for e in ast.ext if isinstance(e, c_ast.FuncDef)]
+        if sum(1 for e in defs if "static" not in (e.decl.storage or [])) > 1:
             raise LowerError("more than one function definition")
+        # file-local helpers (`static inline int sel(...)`): lowered by
+        # lower_leaf as static host functions; calls to them are direct.
+        self.local_funcs = {e.decl.name for e in defs
+                            if e.decl.name != self.name and "static" in (e.decl.storage or [])}
 
     def _collect_structs(self, node, tdname) -> None:
         for n in walk(node):
@@ -937,6 +942,10 @@ class Lowerer:
                 return self.guest_call(f"0x{data_address(name):08X}u", args, ft)
             if name == "__builtin_memcpy" and len(args) == 3:
                 return self.builtin_memcpy(args)
+            if name in self.local_funcs:
+                if name not in self.sigs:
+                    raise LowerError(f"helper {name} not lowered yet")
+                return self.direct_call(name, args, ft, self.sigs[name], discard)
             raise LowerError(f"call to unknown {name}")
         c, t = self.rv(fn)
         if not isinstance(t, TPtr):
@@ -1111,6 +1120,10 @@ class Lowerer:
         if any(p.strip() == "..." for p in params):
             raise LowerError(f"variadic callee {name}")
         live = []
+        pad = 0
+        if len(args) < len(params) and DEAD_TRAILING_PARAMS.get(name, len(params)) <= len(args):
+            pad = len(params) - len(args)
+            params = params[:len(args)]
         if len(params) != len(args):
             if self.live_a0_forwardable(args, ft, sig, len(params)):
                 self.live_a0 = True     # E21d: the callee reads the leaf's own live $a0
@@ -1139,6 +1152,7 @@ class Lowerer:
                 if isinstance(t, THostPtr):
                     raise LowerError(f"host pointer passed to {name} parameter {p.strip()}")
                 out.append(c)
+        out += ["0"] * pad
         fname = sig.get('host') or name
         nl = len(live)
         call = self.ordered_call(args, out[nl:], lambda c: f"{fname}({', '.join(out[:nl] + c)})")
@@ -1534,7 +1548,7 @@ class Lowerer:
             body.insert(0, "    uint32_t " + ", ".join(f"pe_hr{n} = 0u" for n in sorted(self.hr_used))
                         + ";   /* GPRs carried between asm statements */")
         plist = ", ".join(params) or "void"
-        sig = f"{rett} {self.name}({plist})"
+        sig = f"{'static ' if getattr(self, 'static_fn', False) else ''}{rett} {self.name}({plist})"
         if not self.frame:
             return sig, "\n".join(prelude + body), rett
         # Frame-owning leaf: the body runs inside a guest frame it can address.
@@ -1614,6 +1628,14 @@ def decay_param(t: T) -> T:
         return TPtr(t)
     return t
 
+
+# Callees whose parameters from this index on retail never reads, as their
+# hand ports document; a call passing fewer arguments is then exact with the
+# missing ones as 0 (the ovl_0457 credits code calls both with fewer).
+DEAD_TRAILING_PARAMS = {
+    "func_8010BD4C": 1,   # count: clobbered by the first datum before any use
+    "func_8010C89C": 3,   # a3: recomputed from a2 before its first use
+}
 
 FUNC_NAME_RE = re.compile(r"func_[0-9A-Fa-f]{8}")
 DATA_NAME_RE = re.compile(r"D_[0-9A-Fa-f]{7,8}")
@@ -2081,16 +2103,76 @@ def lower_leaf(name: str, text: str, known: set[str], sigs: dict[str, dict],
     for lit in re.findall(r"\b0x[0-9A-Fa-f]{8}\b", text):
         v = int(lit, 16)
         # MMIO / BIOS spaces stay refused; the scratchpad is guest memory.
-        if (v & 0x1FFFF000) in (0x1F801000, 0x1F802000) or (v & 0xFF000000) in (0xA0000000, 0xB0000000) \
-                or (v & 0x1FF00000) == 0x1FC00000:
+        # Only the KUSEG/KSEG0/KSEG1 mirrors are those spaces: 0xFFC00000 is a
+        # KSEG2 bit mask (func_8006B4F8 `W(h, 0x2C) & 0xFFC00000`), not BIOS.
+        seg = v & 0xE0000000
+        if seg in (0x00000000, 0x80000000, 0xA0000000) and \
+                ((v & 0x1FFFF000) in (0x1F801000, 0x1F802000) or (v & 0x1FF00000) == 0x1FC00000):
             raise LowerError(f"hardware/BIOS literal {lit}")
-    low = Lowerer(name, text, known, sigs)
-    low.asm_table = asm_table
-    low.aliases = asm_table[0]["aliases"]
-    sig, body, ret = low.lower()
+        if (v & 0xFF000000) in (0xA0000000, 0xB0000000):
+            raise LowerError(f"hardware/BIOS literal {lit}")
+    def one(fn, sg, static):
+        low = Lowerer(fn, text, known | helpers, sg)
+        low.asm_table = asm_table
+        low.aliases = asm_table[0]["aliases"]
+        low.static_fn = static
+        return low, low.lower()
+
+    helpers: set[str] = set()
+    probe = Lowerer(name, text, known, sigs)
+    helpers = set(probe.local_funcs)
+    hsigs: dict[str, dict] = {}
+    done: dict[str, tuple] = {}
+    for _round in range(len(helpers) + 1):
+        progress = False
+        for h in sorted(helpers - set(done)):
+            try:
+                hl, (hsig, hbody, hret) = one(h, {**sigs, **hsigs}, True)
+            except LowerError as exc:
+                if str(exc).startswith("helper ") and "not lowered yet" in str(exc):
+                    continue
+                raise LowerError(f"helper {h}: {exc}")
+            done[h] = (hl, hsig, hbody)
+            m = re.match(r"(?:static\s+)?(.*?)\b" + re.escape(h) + r"\((.*)\)$",
+                         hsig if hsig else hbody.split(";", 1)[0])
+            prm = [x.strip() for x in split_top_commas(m.group(2))] if m else []
+            hsigs[h] = {"ret": m.group(1).strip() if m else "int32_t",
+                        "params": [x for x in prm if x not in ("", "void")]}
+            progress = True
+        if not progress:
+            break
+    if set(done) != helpers:
+        raise LowerError(f"helpers {sorted(helpers - set(done))} not lowerable")
+    low, (sig, body, ret) = one(name, {**sigs, **hsigs}, False)
+    used = set(low.helpers)
+    callees = set(low.callees)
+    local_defs = []
+    for h in sorted(done):
+        hl, hsig, hbody = done[h]
+        used |= hl.helpers
+        callees |= hl.callees
+        local_defs.append(f"{hsig}\n{{\n{hbody}\n}}\n" if hsig else f"{hbody}\n}}\n")
     return {"sig": sig, "body": body, "ret": ret,
-            "helpers": [HELPERS[h] for h in sorted(low.helpers)],
-            "callees": sorted(low.callees - {name})}
+            "helpers": [HELPERS[h] for h in sorted(used)],
+            "local_defs": local_defs,
+            "callees": sorted(callees - {name} - helpers)}
+
+
+def split_top_commas(s: str) -> list[str]:
+    out, depth, cur = [], 0, ""
+    for ch in s:
+        if ch in "([":
+            depth += 1
+        elif ch in ")]":
+            depth -= 1
+        if ch == "," and depth == 0:
+            out.append(cur)
+            cur = ""
+        else:
+            cur += ch
+    if cur.strip():
+        out.append(cur)
+    return out
 
 
 def render_lowered(name: str, leaf: dict, res: dict, protos: list[str],
@@ -2120,6 +2202,9 @@ def render_lowered(name: str, leaf: dict, res: dict, protos: list[str],
         lines.append("/* host prototypes of decomp-derived callees (generated TUs) */")
         lines += protos
         lines.append("")
+    if res.get("local_defs"):
+        lines.append("/* the leaf's file-local helpers (static in its C) */")
+        lines += res["local_defs"]
     if res["sig"] is None:      # frame-owning leaf: body already carries both definitions
         lines.append(f"{res['body']}\n}}\n")
     else:

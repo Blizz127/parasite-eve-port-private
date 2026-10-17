@@ -278,6 +278,22 @@ def run_overlay(ovl: dict, args, windows) -> tuple[int, int, list, dict, dict]:
             if cc:
                 uncompilable = g.compile_check(cc, rendered)
                 rendered = [(n, c) for n, c in rendered if n not in uncompilable]
+                # A verbatim TU the host compiler rejects gets one E21 try, as
+                # in run_rooms (host types on guest pointers are what fails).
+                retry = []
+                for n in sorted(uncompilable):
+                    if n not in plans:
+                        continue
+                    text = leaf_src(ov, n).read_text(encoding="utf-8", errors="replace")
+                    txt = lowered_tu(n, text, ovl["leaves"][n], None, known, sigs, dsigs)
+                    if isinstance(txt, str) and txt.startswith("/*"):
+                        retry.append((n, post_process(ovl, n, txt, local, windows)))
+                if retry:
+                    unc2 = g.compile_check(cc, retry)
+                    for n, c in retry:
+                        if n not in unc2:
+                            rendered.append((n, c))
+                            uncompilable.pop(n, None)
         emitted = {n for n, _ in rendered}
 
         out_dir.mkdir(parents=True, exist_ok=True)

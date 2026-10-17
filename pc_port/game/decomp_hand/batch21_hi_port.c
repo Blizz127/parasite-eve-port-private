@@ -7,6 +7,7 @@
 #include "pe_guest_decomp.h"
 #include "pe_sdk.h"
 #include "hand_hi_protos.h"
+void func_800D27FC(int32_t a_x, uint32_t a_ang, uint32_t a_col, int32_t a_bright);   /* generated (gen_decomp_ports --e21) */
 void func_800DB25C(uint32_t a_position, int32_t a_x, int32_t a_y, int32_t a_angle, int32_t a_radius,
                   int32_t a_depth, int32_t a_intensity, uint32_t a_color);   /* generated (gen_decomp_ports --e21) */
 
@@ -32,7 +33,8 @@ static int s21_div(int num, int den)
 
 /* src/func_800DAB98.c: swaying wisp.  Mode 1: x = a1[1] * cos((f << 10) /
  * a1[3]) / 4096, z += 0x10, life a1[3].  Mode 2: colour curve D_800E1C04
- * at f, drawn by func_800D27FC(x, z, colour, 0x80, 1) — boundary. */
+ * at f, drawn by func_800D27FC(x, z, colour, 0x80, 1); the fifth argument is
+ * unread by the generated func_800D27FC (four parameters). */
 int func_800DAB98(int a0, pe_addr_t a1)
 {
     int f = (int)PE_LoadU32(0x800E27ECu);
@@ -48,9 +50,8 @@ int func_800DAB98(int a0, pe_addr_t a1)
         return 1;
     case 2:
         func_800CF3AC(0x800E1C04u, S21_BUF, f);
-        PE_D_COMP_BOUNDARY4("func_800D27FC", 0x800D27FCu,
-                            (int16_t)PE_LoadU16(a1 + 0u), (int16_t)PE_LoadU16(a1 + 4u),
-                            S21_BUF, 0x80);   /* fifth argument: 1 */
+        func_800D27FC((int16_t)PE_LoadU16(a1 + 0u),
+                      (uint32_t)(int32_t)(int16_t)PE_LoadU16(a1 + 4u), S21_BUF, 0x80);
         break;
     default:
         return 0;

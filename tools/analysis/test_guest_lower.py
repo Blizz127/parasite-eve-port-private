@@ -69,6 +69,11 @@ def tu(src: str, name: str = "func_80190000", known=(), sigs=None, extra: str = 
 
 
 class CRunner(unittest.TestCase):
+    def run_c_tu(self, res: dict, main: str) -> str:
+        head = "\n".join(res["helpers"]) + "\n" + "\n".join(res.get("local_defs", []))
+        body = (res["body"] + "\n}\n") if res["sig"] is None else f"{res['sig']}\n{{\n{res['body']}\n}}\n"
+        return self.run_c(MOCK_H + head + "\n" + body, main)
+
     def run_c(self, code: str, main: str) -> str:
         cc = shutil.which("cc") or shutil.which("gcc")
         with tempfile.TemporaryDirectory() as d:
@@ -682,6 +687,23 @@ int **func_8019537C(int a0, unsigned int a1)
                     'int func_80190000(int x) { return D_80190100(D_80190200(1), x); }')
         self.assertNotIn("__auto_type", res["body"])
 
+    def test_two_non_static_definitions_refused(self):
+        with self.assertRaises(gl.LowerError):
+            lower("int helper(int a) { return a; }\nint func_80190000(int x) { return helper(x); }")
+
+    def test_dead_trailing_parameter_padded(self):
+        res = lower("extern void func_8010BD4C();\nvoid func_80190000(int x) { func_8010BD4C(x); }",
+                    known={"func_8010BD4C"},
+                    sigs={"func_8010BD4C": {"ret": "void", "params": ["pe_addr_t dst", "uint32_t count"]}})
+        self.assertIn("func_8010BD4C(", res["body"])
+        self.assertRegex(res["body"], r"func_8010BD4C\([^;]*, 0\)")
+
+    def test_kseg2_mask_is_not_a_bios_literal(self):
+        lower("int func_80190000(unsigned int w) { return (w & 0xFFC00000) != 0; }")
+        for lit in ("0xBFC00000", "0x9FC00180", "0x1F801810", "0xBF801070"):
+            with self.assertRaises(gl.LowerError, msg=lit):
+                lower(f"int func_80190000(void) {{ return *(volatile int *){lit}; }}")
+
     def test_recursive_frame_leaf_declares_its_entry_first(self):
         src = ('int func_80190000(int n) { int buf[2]; buf[0] = n; '
                'if (n > 0) return func_80190000(n - 1) + buf[0]; return 0; }')
@@ -849,6 +871,26 @@ class IntegerAsm(CRunner):
     def tu_pinned(self, src: str) -> str:
         res = gl.lower_leaf("func_80190000", src, set(), {}, strip_asm=self.strip())
         return MOCK_H + "\n".join(res["helpers"]) + f"\n{res['sig']}\n{{\n{res['body']}\n}}\n"
+
+
+@unittest.skipUnless(shutil.which("cc") or shutil.which("gcc"), "no host C compiler")
+class LocalHelpers(CRunner):
+    def test_static_helpers_are_lowered_as_static_host_functions(self):
+        # src/func_8005A318.c's shape: `static inline` helpers the leaf calls.
+        src = """
+        extern int D_8009D050;
+        static inline int clamp(int a) { return a < D_8009D050 ? a : D_8009D050; }
+        static inline int twice(int a) { return clamp(a) * 2; }
+        int func_80190000(int x) { return twice(x) + clamp(x + 1); }"""
+        res = lower(src)
+        defs = "\n".join(res["local_defs"])
+        self.assertIn("static int32_t clamp(", defs)
+        self.assertIn("static int32_t twice(", defs)
+        self.assertNotIn("clamp", res["callees"])
+        out = self.run_c_tu(res, """
+            PE_StoreU32(0x8009D050u, 10u);
+            printf("%d %d\\n", func_80190000(3), func_80190000(20));""")
+        self.assertEqual(out.split(), [str(3 * 2 + 4), str(10 * 2 + 10)])
 
 if __name__ == "__main__":
     unittest.main()
