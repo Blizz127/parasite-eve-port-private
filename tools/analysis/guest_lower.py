@@ -85,6 +85,19 @@ class TInt(T):
         return f"{'s' if self.signed else 'u'}{self.size * 8}"
 
 
+class TBits(TInt):
+    """A bitfield member: bits [pos, pos+width) of a container of the
+    declared type, numbered from the least significant bit (MIPS little
+    endian, as gcc lays them out).  Only an lvalue has this type: a load
+    yields the promoted int value (see Lowerer.load)."""
+    def __init__(self, base: TInt, pos: int, width: int):
+        super().__init__(base.size, base.signed)
+        self.base, self.pos, self.width = base, pos, width
+
+    def __repr__(self):
+        return f"{self.base!r}:{self.pos}+{self.width}"
+
+
 class TFloat(T):
     pass
 
@@ -131,20 +144,44 @@ class TStruct(T):
         packed = self.packed or self.low.is_packed(node, self.tag)
         fields: list[tuple[str, T, int]] = []
         off = size = 0
+        bit = 0          # bit cursor of a bitfield run; 0 outside one
         align = 1
         for d in node.decls:
             ft = self.low.ty(d.type)
             if getattr(d, "bitsize", None) is not None:
-                # Only byte/halfword-sized, naturally aligned int bitfields
-                # (e.g. `signed int low : 16; signed int high : 16;`): on the
-                # little-endian guest they are exactly an s8/s16 member, and the
-                # container int keeps the struct's alignment.
                 w = int(d.bitsize.value, 0) if hasattr(d.bitsize, "value") else -1
-                if (not isinstance(ft, TInt) or ft.size != 4 or w not in (8, 16)
-                        or self.union or off % (w // 8)):
+                if not isinstance(ft, TInt) or self.union or packed or not 0 <= w <= ft.size * 8:
                     raise LowerError("bitfield member")
-                align = max(align, 1 if packed else 4)
-                ft = TInt(w // 8, ft.signed)
+                unit = ft.size * 8
+                cur = off * 8 + bit
+                if (w in (8, 16) and ft.size == 4 and cur % w == 0 and d.name is not None):
+                    # A byte/halfword-sized, naturally placed field (e.g.
+                    # `signed int low : 16; signed int high : 16;`) is exactly
+                    # an s8/s16 member on the little-endian guest; the
+                    # container int keeps the struct's alignment.
+                    align = max(align, 4)
+                    off, bit = cur // 8, 0
+                    ft = TInt(w // 8, ft.signed)
+                else:
+                    # gcc (PCC_BITFIELD_TYPE_MATTERS): a field that would cross
+                    # a unit of its declared type starts the next unit; a
+                    # zero-width field just aligns to it.
+                    if w == 0 or cur % unit + w > unit:
+                        cur = (cur + unit - 1) // unit * unit
+                    if w == 0:
+                        off, bit = cur // 8, cur % 8
+                        size = max(size, (cur + 7) // 8)
+                        continue
+                    fo = cur // unit * ft.size
+                    if d.name is not None:
+                        fields.append((d.name, TBits(ft, cur - fo * 8, w), fo))
+                        align = max(align, alignof(ft))
+                    cur += w
+                    off, bit = cur // 8, cur % 8
+                    size = max(size, (cur + 7) // 8)
+                    continue
+            elif bit:
+                off, bit = off + 1, 0       # a plain member starts at a byte
             a = 1 if packed else alignof(ft)
             s = sizeof(ft)
             align = max(align, a)
@@ -319,6 +356,11 @@ class Lowerer:
         # has written with no call since.
         self.hr_used: set[int] = set()
         self.hr_valid: set[int] = set()
+        # HI/LO an asm mult left for a later asm mfhi/mflo (function-scope
+        # pe_hi/pe_lo): valid only in straight-line code with no call and no
+        # C multiply/divide in between (cc1 uses HI/LO for those).
+        self.hilo_used = False
+        self.hilo_valid = False
         self._parse(text)
 
     # parsing ---------------------------------------------------------
@@ -581,6 +623,19 @@ class Lowerer:
 
     def load(self, lv: LV) -> tuple[str, T]:
         t = lv.ty
+        if isinstance(t, TBits):
+            if lv.kind == "v":
+                raise LowerError("bitfield of a register local")
+            raw, _ = self.load(LV(lv.kind, lv.code, t.base))
+            if t.base.signed:
+                val = (f"((int32_t)((uint32_t)({raw}) << {32 - t.pos - t.width}) "
+                       f">> {32 - t.width})")
+            else:
+                val = f"((uint32_t)({raw}) >> {t.pos} & 0x{(1 << t.width) - 1:X}u)"
+            # the promoted value: int unless an unsigned field needs all 32 bits
+            if t.width == 32 and not t.base.signed:
+                return val, U32
+            return f"((int32_t){val})", S32
         if isinstance(t, TArr):
             return (lv.code, (TPtr if lv.kind == "g" else THostPtr)(t.of)) if lv.kind != "v" \
                 else (lv.code, THostPtr(t.of))
@@ -606,6 +661,20 @@ class Lowerer:
 
     def store(self, lv: LV, val: str) -> str:
         t = lv.ty
+        if isinstance(t, TBits):
+            # read-modify-write of the container, as the retail lw/and/or/sw
+            if lv.kind == "v":
+                raise LowerError("bitfield of a register local")
+            ta, tv = self.newtmp(), self.newtmp()
+            atype = "uint32_t" if lv.kind == "g" else "uint8_t *"
+            clv = LV(lv.kind, ta, t.base)
+            mask = ((1 << t.width) - 1) << t.pos
+            cmask = (1 << (8 * t.base.size)) - 1
+            old, _ = self.load(clv)
+            new = (f"(((uint32_t)({old}) & 0x{~mask & cmask:X}u) | "
+                   f"(((uint32_t)({tv}) << {t.pos}) & 0x{mask:X}u))")
+            return (f"({{ {atype} {ta} = {lv.code}; uint32_t {tv} = (uint32_t)({val}); "
+                    f"{self.store(clv, new)}; }})")
         if lv.kind == "v":
             return f"{lv.code} = ({htype(t)})({val})"
         size = sizeof(t)
@@ -693,6 +762,8 @@ class Lowerer:
                     and (x.name in self.funcs or FUNC_NAME_RE.fullmatch(x.name)):
                 return f"0x{code_address(x.name):08X}u", TPtr(self.funcs.get(x.name) or TFunc(S32, None, False))
             lv = self.lv(x)
+            if isinstance(lv.ty, TBits):
+                raise LowerError("address of bitfield")
             if lv.kind == "g":
                 return lv.code, TPtr(lv.ty)
             if lv.kind == "b":
@@ -726,6 +797,8 @@ class Lowerer:
         return self.arith_op(op, a, at, b, bt)
 
     def arith_op(self, op, a, at, b, bt) -> tuple[str, T]:
+        if op in ("*", "/", "%"):
+            self.hilo_valid = False         # cc1's mult/div write HI/LO
         if isinstance(at, THostPtr) or isinstance(bt, THostPtr):
             raise LowerError("host pointer arithmetic")
         ap, bp = isinstance(at, TPtr), isinstance(bt, TPtr)
@@ -794,6 +867,8 @@ class Lowerer:
             if lv.kind == "v" or not want:
                 s = self.store(lv, v)
                 return (f"({s})" if want else s), lv.ty
+            if isinstance(lv.ty, TBits):
+                raise LowerError("bitfield assignment as value")
             tv = self.newtmp()
             tv_lv = LV(lv.kind, lv.code, lv.ty)
             return (f"({{ {htype(lv.ty)} {tv} = ({htype(lv.ty)})({v}); "
@@ -803,6 +878,8 @@ class Lowerer:
         return self.rmw(lv, lambda cur: self.arith_op(op, cur, lv.ty, r, rt)[0], want, post=False)
 
     def rmw(self, lv: LV, fn, want: bool, post: bool) -> tuple[str, T]:
+        if isinstance(lv.ty, TBits) and want:
+            raise LowerError("bitfield read-modify-write as value")
         ht = htype(lv.ty)
         if lv.kind == "v":
             if post:
@@ -858,12 +935,36 @@ class Lowerer:
                 return self.boundary_call(name, args, ft)
             if DATA_NAME_RE.fullmatch(name) and ft is not None:
                 return self.guest_call(f"0x{data_address(name):08X}u", args, ft)
+            if name == "__builtin_memcpy" and len(args) == 3:
+                return self.builtin_memcpy(args)
             raise LowerError(f"call to unknown {name}")
         c, t = self.rv(fn)
         if not isinstance(t, TPtr):
             raise LowerError("call through non-pointer")
         ft = t.to if isinstance(t.to, TFunc) else None
         return self.guest_call(c, args, ft)
+
+    def builtin_memcpy(self, args) -> tuple[str, T]:
+        """`__builtin_memcpy(d, s, n)`: cc1 expands it inline (no call), so
+        only the copied bytes are observable; copy them in guest/host
+        memory as the operands live, and yield d as memcpy does."""
+        (dc, dt), (sc, st), (nc, nt) = (self.rv(a) for a in args)
+        kinds = []
+        for t in (dt, st):
+            if isinstance(t, TPtr):
+                kinds.append("g")
+            elif isinstance(t, THostPtr):
+                kinds.append("b")
+            else:
+                raise LowerError("memcpy of non-pointer")
+        if not isinstance(nt, TInt):
+            raise LowerError("memcpy length")
+        k = "".join(kinds)
+        self.helpers.add(f"copy_{k}")
+        td = self.newtmp()
+        dty = "uint32_t" if k[0] == "g" else "uint8_t *"
+        return (f"({{ {dty} {td} = {dc}; pe_low_copy_{k}({td}, {sc}, (uint32_t)({nc})); {td}; }})",
+                (TPtr if k[0] == "g" else THostPtr)(TVoid()))
 
     def scalar_args(self, args) -> list[str]:
         out = []
@@ -899,6 +1000,7 @@ class Lowerer:
 
     def guest_call(self, fcode, args, ft) -> tuple[str, T]:
         self.hr_valid.clear()
+        self.hilo_valid = False
         if len(args) > self.GUEST_CALL_MAX_ARGS:
             raise LowerError(f"indirect call with more than {self.GUEST_CALL_MAX_ARGS} arguments")
         rt = self.ret_of(ft)
@@ -925,6 +1027,7 @@ class Lowerer:
 
     def boundary_call(self, name, args, ft) -> tuple[str, T]:
         self.hr_valid.clear()
+        self.hilo_valid = False
         a = self.scalar_args(args)
         n = min(len(a), 4)
         if n == 0:
@@ -979,6 +1082,7 @@ class Lowerer:
     def direct_call(self, name, args, ft, sig, discard=False) -> tuple[str, T]:
         self.callees.add(name)
         self.hr_valid.clear()
+        self.hilo_valid = False
         rt = self.ret_of(ft)
         if sig is None:
             if name != self.name:
@@ -1030,6 +1134,19 @@ class Lowerer:
         I = ind
         if s is None:
             return
+        # An asm mult's HI/LO reaches a later mfhi only along straight-line
+        # code: any control-flow statement (or label) ends that window.
+        straight = isinstance(s, (c_ast.Decl, c_ast.DeclList, c_ast.Assignment, c_ast.UnaryOp,
+                                  c_ast.FuncCall, c_ast.ExprList, c_ast.Compound,
+                                  c_ast.EmptyStatement))
+        if not straight:
+            self.hilo_valid = False
+        self._stmt(s, I, out)
+        if not straight:
+            self.hilo_valid = False
+
+    def _stmt(self, s, ind: str, out: list[str]) -> None:
+        I = ind
         if isinstance(s, c_ast.Compound):
             out.append(I + "{")
             self.block(s, I + "    ", out)
@@ -1146,7 +1263,8 @@ class Lowerer:
             if not c.isdigit():
                 decl.append(f"{tag}_{k}")
         gprs = sorted({o[-1][1] for o in spec["ops"] if o[0] == "load" and o[-1][0] == "gpr"}
-                      | {o[2][1] for o in spec["ops"] if o[0] == "alu" and o[2][0] == "gpr"}
+                      | {o[2][1] for o in spec["ops"] if o[0] in ("alu", "slt") and o[2][0] == "gpr"}
+                      | {o[1][1] for o in spec["ops"] if o[0] in ("mfhi", "mflo") and o[1][0] == "gpr"}
                       | {o[1][1] for o in spec["ops"] if o[0] in ("cfc2", "mfc2") and o[1][0] == "gpr"})
         carried = self.asm_table[0].get("carried", set())
         for n in sorted(spec.get("carried_in", ())):
@@ -1161,6 +1279,12 @@ class Lowerer:
                 self.hr_used.add(n)
                 self.hr_valid.add(n)
         self.hr_used.update(spec.get("carried_in", ()))
+        if spec.get("hilo_in") and not self.hilo_valid:
+            raise LowerError("asm: HI/LO not set by an earlier asm mult")
+        if spec.get("hilo_in") or spec.get("hilo_out"):
+            self.hilo_used = True
+        if spec.get("hilo_out"):
+            self.hilo_valid = True
         if decl:
             body.append(J + "uint32_t " + ", ".join(f"{d} = 0u" for d in decl) + ";")
         for j, (c, _) in enumerate(ins):
@@ -1212,6 +1336,19 @@ class Lowerer:
                 body.append(f"{J}PE_StoreU32({r(o[3])} + {o[2] & 0xFFFFFFFF}u, PE_GTE_ReadData({o[1]}u));")
             elif o[0] == "cmd":
                 body.append(f"{J}PE_GTE_Command(0x{o[1]:07X}u);")
+            elif o[0] == "slt":
+                _, signed, d, a, b = o
+                bv = f"{b[1]}u" if b[0] == "imm" else r(b)
+                cmp = (f"(int32_t){r(a)} < (int32_t){bv}" if signed else f"{r(a)} < {bv}")
+                body.append(f"{J}{r(d)} = ({cmp}) ? 1u : 0u;")
+            elif o[0] == "mult":
+                _, signed, a, b = o
+                wide = (f"(uint64_t)((int64_t)(int32_t){r(a)} * (int64_t)(int32_t){r(b)})"
+                        if signed else f"((uint64_t){r(a)} * (uint64_t){r(b)})")
+                body.append(f"{J}{{ uint64_t pe_p = {wide}; pe_lo = (uint32_t)pe_p; "
+                            f"pe_hi = (uint32_t)(pe_p >> 32); }}")
+            elif o[0] in ("mfhi", "mflo"):
+                body.append(f"{J}{r(o[1])} = pe_{o[0][2:]};")
         for k in range(nout):
             lv = self.lv(opers[k])
             if not is_scalar(lv.ty):
@@ -1369,6 +1506,8 @@ class Lowerer:
         if self.live_a0:
             params = ["uint32_t a_pe_live_a0"]
             body.insert(0, "    /* E21d: retail forwards this leaf's live $a0 to its first call */")
+        if self.hilo_used:
+            body.insert(0, "    uint32_t pe_hi = 0u, pe_lo = 0u;   /* HI/LO between asm statements */")
         if self.hr_used:
             body.insert(0, "    uint32_t " + ", ".join(f"pe_hr{n} = 0u" for n in sorted(self.hr_used))
                         + ";   /* GPRs carried between asm statements */")
@@ -1459,9 +1598,14 @@ DATA_NAME_RE = re.compile(r"D_[0-9A-Fa-f]{7,8}")
 
 
 def data_address(name: str) -> int:
-    if not DATA_NAME_RE.fullmatch(name):
-        raise LowerError(f"global {name} has no retail address name")
-    return int(name[2:], 16)
+    """Retail address of an object named by its address: D_XXXXXXXX, or a
+    func_XXXXXXXX declared as data (room code passes a callback as
+    `extern unsigned char func_8018F004[]`, i.e. the code address)."""
+    if DATA_NAME_RE.fullmatch(name):
+        return int(name[2:], 16)
+    if FUNC_NAME_RE.fullmatch(name):
+        return int(name[5:], 16)
+    raise LowerError(f"global {name} has no retail address name")
 
 
 def code_address(name: str) -> int:
@@ -1687,6 +1831,19 @@ def compile_asm(tpl: str, outs, ins, clobbers=None, carried_in=None) -> list[tup
         elif mnem in ("sw", "sh", "sb") and len(args) == 2:
             off, base = _mem(args[1])
             ops.append(("store", mnem, off, src(base), src(_reg(args[0], "gpr"))))
+        elif mnem in ("slt", "sltu") and len(args) == 3:
+            a, b = src(_reg(args[1], "gpr")), src(_reg(args[2], "gpr"))
+            ops.append(("slt", mnem == "slt", dst(_reg(args[0], "gpr")), a, b))
+        elif mnem in ("slti", "sltiu") and len(args) == 3:
+            a = src(_reg(args[1], "gpr"))
+            imm = int(args[2], 0)
+            if not -0x8000 <= imm <= 0x7FFF:
+                raise LowerError(f"asm: {mnem} immediate {args[2]}")
+            ops.append(("slt", mnem == "slti", dst(_reg(args[0], "gpr")), a, ("imm", imm & 0xFFFFFFFF)))
+        elif mnem in ("mult", "multu") and len(args) == 2:
+            ops.append(("mult", mnem == "mult", src(_reg(args[0], "gpr")), src(_reg(args[1], "gpr"))))
+        elif mnem in ("mfhi", "mflo") and len(args) == 1:
+            ops.append((mnem, dst(_reg(args[0], "gpr"))))
         elif mnem in ("ctc2", "mtc2") and len(args) == 2:
             r = src(_reg(args[0], "gpr"))
             n = _reg(args[1], "cop")[1]
@@ -1824,7 +1981,15 @@ def extract_asm(text: str) -> tuple[str, list[dict]]:
                 clob.add(int(cm.group(1)))
         cin: set[int] = set()
         ops = compile_asm(tpl, outs, ins, clob, cin)
-        table.append({"outs": outs, "ins": ins, "ops": ops, "carried_in": cin})
+        hilo_in = False
+        for o in ops:
+            if o[0] == "mult":
+                break
+            if o[0] in ("mfhi", "mflo"):
+                hilo_in = True
+                break
+        table.append({"outs": outs, "ins": ins, "ops": ops, "carried_in": cin,
+                      "hilo_in": hilo_in, "hilo_out": any(o[0] == "mult" for o in ops)})
         table[0].setdefault("carried", set()).update(cin)
         args = "".join(f", ({e})" for _, e in outs + ins)
         out.append(text[pos:m.start()])

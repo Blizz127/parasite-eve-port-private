@@ -444,7 +444,11 @@ class Refusals(unittest.TestCase):
         self.assertRefused("int func_80190000(float *f) { return *f > 1; }", "float")
 
     def test_bitfield(self):
-        self.assertRefused("typedef struct B { int a : 3; } B;\n"
+        # Plain struct bitfields lower (class Bitfields); union or packed
+        # bitfields have no gcc layout here yet and stay refused.
+        self.assertRefused("typedef union B { int a : 3; int b; } B;\n"
+                           "int func_80190000(B *b) { return b->a; }", "bitfield")
+        self.assertRefused("typedef struct { int a : 3; char c; } __attribute__((packed)) B;\n"
                            "int func_80190000(B *b) { return b->a; }", "bitfield")
 
     def test_static_local(self):
@@ -668,6 +672,166 @@ int **func_8019537C(int a0, unsigned int a1)
         self.assertIsNone(res["sig"])
         body = res["body"]
         self.assertTrue(body.startswith("int32_t func_80190000(int32_t a_n);"), body[:80])
+
+
+@unittest.skipUnless(shutil.which("cc") or shutil.which("gcc"), "no host C compiler")
+class Bitfields(CRunner):
+    def test_p_tag_addprim(self):
+        # room_m0017i func_8018F580's addPrim through P_TAG {addr:24, len:8}.
+        src = """
+        typedef struct { unsigned addr : 24; unsigned len : 8; } P_TAG;
+        #define getaddr(p) (((P_TAG *)(p))->addr)
+        #define setaddr(p, _addr) (((P_TAG *)(p))->addr = (_addr))
+        #define addPrim(ot, p) setaddr(p, getaddr(ot)), setaddr(ot, (unsigned int)(p))
+        int func_80190000(unsigned int *ot, unsigned int *p) {
+            addPrim(ot, p);
+            return ((P_TAG *)p)->len + sizeof(P_TAG);
+        }"""
+        out = self.run_c(tu(src), """
+            PE_StoreU32(0x80100000u, 0x05123456u);
+            PE_StoreU32(0x80100100u, 0x09ABCDEFu);
+            int r = func_80190000(0x80100000u, 0x80100100u);
+            printf("%d %08X %08X\\n", r, PE_LoadU32(0x80100000u), PE_LoadU32(0x80100100u));""")
+        self.assertEqual(out.strip(), "13 05100100 09123456")
+
+    def test_layout_signed_and_unit_crossing_match_host_gcc(self):
+        # The guest (MIPS o32 LE) and the host (SysV x86-64) lay these
+        # int/unsigned/short bitfields out identically, so the host struct is
+        # the oracle: a field that would cross its 32-bit unit moves on, a
+        # signed field sign-extends, untouched container bits survive.
+        decl = ("typedef struct { int a : 5; int b : 11; unsigned c : 20; "
+                "unsigned d : 20; short e; } S;")
+        src = decl + """
+        int func_80190000(S *s, int k) {
+            s->a = -3; s->b = k; s->c = 0xABCDE; s->d = 0x12345; s->e = -7;
+            return s->b * 100 + s->a + sizeof(S);
+        }"""
+        out = self.run_c(tu(src, extra=decl.replace("} S;", "} HS;") + "\n"), """
+            HS h; int i;
+            memset(&h, 0xFF, sizeof h);
+            h.a = -3; h.b = -1000; h.c = 0xABCDE; h.d = 0x12345; h.e = -7;
+            PE_Fill(0x80100000u, 16u, 0xFF);
+            int r = func_80190000(0x80100000u, -1000);
+            int same = sizeof h == 16;
+            for (i = 0; i < 16; i++) same &= ((uint8_t *)&h)[i] == PE_LoadU8(0x80100000u + i);
+            printf("%d %d\\n", r, same);""")
+        self.assertEqual(out.strip(), f"{-1000 * 100 - 3 + 16} 1")
+
+    def test_bitfield_compound_assignment(self):
+        src = """
+        typedef struct { unsigned lo : 4; unsigned mid : 8; unsigned hi : 20; } T;
+        void func_80190000(T *t) { t->mid += 0x81; t->lo++; t->hi |= 1; }"""
+        out = self.run_c(tu(src), """
+            PE_StoreU32(0x80100000u, 0xFFFF0F8Fu);   /* hi 0xFFFF0, mid 0xF8, lo 0xF */
+            func_80190000(0x80100000u);
+            printf("%08X\\n", PE_LoadU32(0x80100000u));""")
+        # mid 0xF8 + 0x81 = 0x179 -> 0x79; lo 0xF + 1 -> 0; hi 0xFFFF0 | 1
+        self.assertEqual(out.strip(), "FFFF1790")
+
+    def test_bitfield_value_uses_refused(self):
+        for body in ("return t->lo = 3;", "return t->lo++;", "return (int)&t->lo;"):
+            src = ("typedef struct { unsigned lo : 4; } T;\n"
+                   f"int func_80190000(T *t) {{ {body} }}")
+            with self.assertRaises(gl.LowerError, msg=body):
+                lower(src)
+
+
+@unittest.skipUnless(shutil.which("cc") or shutil.which("gcc"), "no host C compiler")
+class Builtins(CRunner):
+    def test_builtin_memcpy_into_frame_buffer(self):
+        # room_m0418i func_80192C84: a 4-byte table copied into a stack
+        # buffer whose address goes to guest code.
+        src = """
+        extern unsigned char D_8018F04C[];
+        extern void D_800D1AE0(unsigned char *a0, int a1);
+        void func_80190000(short *a2) {
+            unsigned char buf[4];
+            __builtin_memcpy(buf, D_8018F04C, 4);
+            D_800D1AE0(buf, a2[1]);
+        }"""
+        out = self.run_c(tu(src), """
+            PE_StoreU32(0x8018F04Cu, 0x44332211u);
+            PE_StoreU16(0x80100002u, 0xFFF9u);
+            func_80190000(0x80100000u);
+            printf("%u %08X %08X %d\\n", calls, call_fn, PE_LoadU32((pe_addr_t)call_a0),
+                   (int)(int32_t)call_a1);""")
+        self.assertEqual(out.strip(), "1 800D1AE0 44332211 -7")
+
+    def test_func_named_data_is_its_code_address(self):
+        # room_m0012i func_8018F20C passes its callback as
+        # `extern unsigned char func_8018F004[]`.
+        src = """
+        extern unsigned char func_8018F004[];
+        extern int D_800CE560(unsigned char *cb, int n);
+        int func_80190000(void) { return D_800CE560(func_8018F004, 3); }"""
+        out = self.run_c(tu(src), """
+            int r = func_80190000();
+            printf("%d %08X %08X %u\\n", r, call_fn, (unsigned)call_a0, (unsigned)call_a1);""")
+        self.assertEqual(out.strip(), "7 800CE560 8018F004 3")
+
+
+@unittest.skipUnless(shutil.which("cc") or shutil.which("gcc"), "no host C compiler")
+class IntegerAsm(CRunner):
+    # room_m0273i func_80196348's shapes: slt into a pinned local, and a
+    # mult whose HI an mfhi in a later statement reads (magic division).
+    SRC = """
+    int func_80190000(int goal, int cur, int af) {
+        register int cmp asm("$2");
+        register int hi asm("$7");
+        int num = af << 13, sign, q;
+        asm("slt %0, %1, %2" : "=r"(cmp) : "r"(goal), "r"(cur));
+        asm volatile("mult %0, %1" : : "r"(num), "r"(0x22B63CBF));
+        sign = num >> 31;
+        asm volatile("mfhi %0" : "=r"(hi));
+        q = (hi >> 4) - sign;
+        return cmp * 100000 + q;
+    }"""
+
+    def test_slt_and_mult_mfhi_across_statements(self):
+        out = self.run_c(self.tu_pinned(self.SRC), """
+            printf("%d %d %d\\n", func_80190000(5, 3, 100), func_80190000(3, 5, -77),
+                   func_80190000(7, 7, 118));""")
+        def ref(goal, cur, af):
+            num = (af << 13) & 0xFFFFFFFF
+            snum = num - (1 << 32) if num & 0x80000000 else num
+            hi = ((snum * 0x22B63CBF) >> 32)
+            q = (hi >> 4) - (-1 if snum < 0 else 0)
+            return (1 if goal < cur else 0) * 100000 + q
+        self.assertEqual(out.split(), [str(ref(5, 3, 100)), str(ref(3, 5, -77)), str(ref(7, 7, 118))])
+
+    def test_mfhi_after_a_call_or_control_flow_refused(self):
+        for between in ("D_80190100();", "if (af) af++;", "af = af * 3;"):
+            src = ("extern void D_80190100(void);\n"
+                   "int func_80190000(int af) { register int hi asm(\"$7\");\n"
+                   "  asm volatile(\"mult %0, %1\" : : \"r\"(af), \"r\"(af));\n"
+                   f"  {between}\n"
+                   "  asm volatile(\"mfhi %0\" : \"=r\"(hi)); return hi; }")
+            with self.assertRaises(gl.LowerError, msg=between):
+                gl.lower_leaf("func_80190000", src, set(), {}, strip_asm=self.strip())
+
+    def test_slti_sltiu(self):
+        src = """
+        int func_80190000(int a) {
+            int s, u;
+            asm("slti %0, %1, -5" : "=r"(s) : "r"(a));
+            asm("sltiu %0, %1, -5" : "=r"(u) : "r"(a));
+            return s * 10 + u;
+        }"""
+        out = self.run_c(tu(src), """
+            printf("%d %d %d\\n", func_80190000(-6), func_80190000(3), func_80190000(-4));""")
+        # sltiu compares against the sign-extended immediate as unsigned
+        self.assertEqual(out.split(), ["11", "1", "0"])
+
+    @staticmethod
+    def strip():
+        # register pins (`register int x asm("$2")`) are cc1 hints the
+        # generators strip before lowering, exactly as here
+        import gen_decomp_ports as g
+        return g.strip_era_asm
+
+    def tu_pinned(self, src: str) -> str:
+        res = gl.lower_leaf("func_80190000", src, set(), {}, strip_asm=self.strip())
+        return MOCK_H + "\n".join(res["helpers"]) + f"\n{res['sig']}\n{{\n{res['body']}\n}}\n"
 
 if __name__ == "__main__":
     unittest.main()
