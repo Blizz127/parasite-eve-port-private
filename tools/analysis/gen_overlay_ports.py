@@ -234,6 +234,7 @@ def run_overlay(ovl: dict, args, windows) -> tuple[int, int, list, dict, dict]:
         shim_macros = g.pc_port_macros()
 
         plans: dict[str, dict] = {}
+        lowered: dict[str, str] = {}
         skipped = {}
         for name in sorted(ovl["leaves"]):
             src = leaf_src(ov, name)
@@ -244,7 +245,14 @@ def run_overlay(ovl: dict, args, windows) -> tuple[int, int, list, dict, dict]:
             plan = g.analyze(name, text, ovl["leaves"][name], known, shim_macros,
                              protos, sigs)
             if not plan["eligible"]:
-                skipped[name] = plan["reason"]
+                # E21, as for room code: a pointer-model refusal is lowered to
+                # explicit guest-memory C instead (guest_lower.py).
+                txt = lowered_tu(name, text, ovl["leaves"][name], plan["reason"],
+                                 known, sigs, dsigs)
+                if isinstance(txt, str) and txt.startswith("/*"):
+                    lowered[name] = txt
+                    continue
+                skipped[name] = plan["reason"] + (f"; E21: {txt}" if txt else "")
                 continue
             stripped = g.strip_comments(text)
             override = [c for c in plan["callees"]
@@ -255,12 +263,15 @@ def run_overlay(ovl: dict, args, windows) -> tuple[int, int, list, dict, dict]:
             plan["derived_all"] = sorted(dsigs)
             plans[name] = plan
         if args.check:
-            return len(plans), 0, [], skipped, {}
+            return len(plans) + len(lowered), 0, [], skipped, {}
 
         rendered = []
+        local = set(plans) | set(lowered)
         for name, plan in plans.items():
             txt = g.render(name, plan, ovl["leaves"], known, protos)
-            rendered.append((name, post_process(ovl, name, txt, set(plans), windows)))
+            rendered.append((name, post_process(ovl, name, txt, local, windows)))
+        for name, txt in lowered.items():
+            rendered.append((name, post_process(ovl, name, txt, local, windows)))
         uncompilable = {}
         if not args.no_compile_check:
             cc = g.find_compiler()
@@ -356,23 +367,7 @@ def group_symbol(key: str, name: str) -> str:
 # the leaf itself.  Such a leaf is lowered to explicit guest-memory C instead
 # (tools/analysis/guest_lower.py); anything the lowering cannot express keeps
 # the original refusal (plus the lowering's own reason).
-LOWER_REASONS = ("pointer parameter", "leaf struct with pointer members",
-                 "callee result dereferenced", "guest-address result of",
-                 "pointer-to-pointer cast", "pointer cast of non-D_",
-                 "host pointer", "relational compare of pointers",
-                 "function address value", "asm",
-                 # E21e: assigning a pointer-typed global slot stores a 32-bit
-                 # guest address; the lowering does that with an explicit
-                 # PE_StoreU32 (m0123i fight effect func_8019537C).
-                 "pointer-global store",
-                 # scratchpad (0x1F800000-0x1F8003FF) is guest memory; MMIO/BIOS
-                 # literals are re-refused by the lowering itself.
-                 "hardware/BIOS literal 0x1F8000", "hardware/BIOS literal 0x1F8001",
-                 "hardware/BIOS literal 0x1F8002", "hardware/BIOS literal 0x1F8003",
-                 # E21c: extra arguments the callee never reads (guest_lower
-                 # unread_args_droppable); any other arity mismatch is
-                 # re-refused by the lowering.
-                 "call arity")
+LOWER_REASONS = gl.LOWER_REASONS
 
 
 # A Psy-Q SDK entry the port reimplements on the host under its own name

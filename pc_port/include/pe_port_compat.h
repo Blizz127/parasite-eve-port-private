@@ -236,6 +236,10 @@ extern void func_8002FAA4(pe_addr_t actor, unsigned int index,
                           unsigned int a2, unsigned int a3,
                           unsigned int b3, unsigned int half_c);
 extern void func_8002FAD8(pe_addr_t actor, unsigned int index, uint32_t first, uint32_t last);
+/* Field-VM opcodes 0x83 and 0xB6: generated from the matched C
+ * (src/func_800133E8.c, src/func_80019810.c) by gen_decomp_ports.py --e21. */
+int func_800133E8(void);
+int func_80019810(pe_addr_t args);
 extern int func_800198C4(pe_addr_t args);
 extern void func_8002FF78(unsigned int tag, unsigned int value);
 extern int  func_8002FE78(unsigned int tag);

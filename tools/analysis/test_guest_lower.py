@@ -454,9 +454,14 @@ class Refusals(unittest.TestCase):
         self.assertRefused('int func_80190000(int a) { __asm__("syscall"); return a; }', "asm")
 
     def test_unsupported_cop2_command(self):
-        # NCDS (0x4AE80413) has no register-level native implementation yet.
-        self.assertRefused('int func_80190000(int a) { __asm__ volatile(".word 0x4AE80413"); '
+        # A reserved operation stays refused even with the complete native GTE.
+        self.assertRefused('int func_80190000(int a) { __asm__ volatile(".word 0x4A000002"); '
                            'return a; }', "cop2 command")
+
+    def test_ncds_lowered_to_native_command(self):
+        res = lower('int func_80190000(int a) { __asm__ volatile(".word 0x4AE80413"); '
+                    'return a; }')
+        self.assertIn("PE_GTE_Command(0x0E80413u)", res["body"])
 
     def test_rtps_lowered(self):
         res = lower('int func_80190000(int a) { __asm__ volatile("nop\\n\\tnop\\n\\t.word 0x4A180001"); '
@@ -480,10 +485,24 @@ class Refusals(unittest.TestCase):
         res = lower(src, known={"func_800CEE20"}, sigs=self.VOID_SIG)
         self.assertIn("func_800CEE20(", res["body"])
 
-    def test_rtpt_lm1_refused(self):
-        # RTPT with lm=1 is not modelled by PE_GTE_RTPT_coordinates.
-        self.assertRefused('int func_80190000(int a) { __asm__ volatile(".word 0x4A280430"); '
-                           'return a; }', "cop2 command")
+    def test_rtpt_lm1_lowered(self):
+        res = lower('int func_80190000(int a) { __asm__ volatile(".word 0x4A280430"); '
+                    'return a; }')
+        self.assertIn("PE_GTE_Command(0x0280430u)", res["body"])
+
+    def test_color_fifo_flag_and_perspective_registers_lowered(self):
+        src = r"""
+        int func_80190000(int value) {
+            int flag, color, point;
+            __asm__ volatile("mtc2 %3,$20\n\tctc2 %3,$26\n\t"
+                             "cfc2 %0,$31\n\tmfc2 %1,$29\n\tmfc2 %2,$15"
+                             : "=r"(flag), "=r"(color), "=r"(point) : "r"(value));
+            return flag ^ color ^ point;
+        }"""
+        body = lower(src)["body"]
+        for call in ("PE_GTE_WriteData(20u,", "PE_GTE_WriteCtrl(26u,",
+                     "PE_GTE_ReadCtrl(31u)", "PE_GTE_ReadData(29u)", "PE_GTE_ReadData(15u)"):
+            self.assertIn(call, body)
 
     def test_memory_constraint(self):
         # A non-empty template with an "m" operand is still refused.
@@ -626,6 +645,29 @@ int **func_8019537C(int a0, unsigned int a1)
         import gen_overlay_ports as gop
         self.assertTrue("pointer-global store D_801956B8".startswith(gop.LOWER_REASONS))
 
+
+    def test_prototyped_guest_call_converts_narrow_arguments(self):
+        # room_m0429i func_80191928: D_800DFFB8(short, short, short) is reached
+        # by jalr; retail passes (short)x in each register.
+        res = lower('extern int D_800DFFB8(short cur, short target, unsigned char rate);\n'
+                    'int func_80190000(int x) { return D_800DFFB8(x, x + 1, x); }')
+        body = res["body"]
+        self.assertIn("(int32_t)(int16_t)(", body)
+        self.assertIn("(int32_t)(uint8_t)(", body)
+        self.assertIn("PE_GuestCall(", body)
+
+    def test_unprototyped_guest_call_keeps_default_promotions(self):
+        res = lower('extern int D_800DFFB8();\n'
+                    'int func_80190000(short x) { return D_800DFFB8(x); }')
+        self.assertNotIn("(int32_t)(int16_t)((", res["body"].split("PE_GuestCall(")[1].split(";")[0])
+
+    def test_recursive_frame_leaf_declares_its_entry_first(self):
+        src = ('int func_80190000(int n) { int buf[2]; buf[0] = n; '
+               'if (n > 0) return func_80190000(n - 1) + buf[0]; return 0; }')
+        res = lower(src)
+        self.assertIsNone(res["sig"])
+        body = res["body"]
+        self.assertTrue(body.startswith("int32_t func_80190000(int32_t a_n);"), body[:80])
 
 if __name__ == "__main__":
     unittest.main()

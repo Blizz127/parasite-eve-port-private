@@ -42,6 +42,30 @@ class LowerError(Exception):
     pass
 
 
+# Refusal reasons of the verbatim generators (gen_decomp_ports.analyze) that
+# are about the host/guest pointer model, not about the leaf itself.  Such a
+# leaf is lowered here instead; anything the lowering cannot express keeps the
+# original refusal (plus the lowering's own reason).  Shared by
+# gen_overlay_ports.py (room code) and gen_decomp_ports.py --e21 (EXE leaves).
+LOWER_REASONS = ("pointer parameter", "leaf struct with pointer members",
+                 "callee result dereferenced", "guest-address result of",
+                 "pointer-to-pointer cast", "pointer cast of non-D_",
+                 "host pointer", "relational compare of pointers",
+                 "function address value", "asm",
+                 # E21e: assigning a pointer-typed global slot stores a 32-bit
+                 # guest address; the lowering does that with an explicit
+                 # PE_StoreU32 (m0123i fight effect func_8019537C).
+                 "pointer-global store",
+                 # scratchpad (0x1F800000-0x1F8003FF) is guest memory; MMIO/BIOS
+                 # literals are re-refused by the lowering itself.
+                 "hardware/BIOS literal 0x1F8000", "hardware/BIOS literal 0x1F8001",
+                 "hardware/BIOS literal 0x1F8002", "hardware/BIOS literal 0x1F8003",
+                 # E21c: extra arguments the callee never reads (guest_lower
+                 # unread_args_droppable); any other arity mismatch is
+                 # re-refused by the lowering.
+                 "call arity")
+
+
 # ── guest types ──────────────────────────────────────────────────────────
 
 class T:
@@ -857,6 +881,22 @@ class Lowerer:
 
     GUEST_CALL_MAX_ARGS = 8   # PE_GUESTCALL_MAX_ARGS (pe_guestcode.h)
 
+    @staticmethod
+    def proto_args(a: list[str], ft) -> list[str]:
+        """A prototyped callee receives each argument converted to its
+        parameter type (C as if by assignment), and O32 then carries that
+        value sign- or zero-extended in the 32-bit register: retail's caller
+        truncates `(short)x` before the jalr (room_m0429i func_80191928 passes
+        0x63EC, not 0x801063EC, to `D_800DFFB8(short, short, short)`).
+        Unprototyped and variadic tail arguments keep the default promotions."""
+        if not (isinstance(ft, TFunc) and ft.params):
+            return a
+        out = []
+        for i, x in enumerate(a):
+            p = ft.params[i] if i < len(ft.params) else None
+            out.append(f"(int32_t)({htype(p)})({x})" if isinstance(p, TInt) and p.size < 4 else x)
+        return out
+
     def guest_call(self, fcode, args, ft) -> tuple[str, T]:
         self.hr_valid.clear()
         if len(args) > self.GUEST_CALL_MAX_ARGS:
@@ -866,12 +906,12 @@ class Lowerer:
             # O32 stack arguments (sp+16...): PE_GuestCallN carries them to a
             # 5..8-parameter thunk; a callee taking more than the site passes
             # is a loud boundary there.
-            a = self.scalar_args(args)
+            a = self.proto_args(self.scalar_args(args), ft)
             call = (f"PE_GuestCallN(\"@{self.site}:jalr\", (pe_addr_t)({fcode}), {len(args)}u, "
                     "(const uintptr_t[]){"
                     + ", ".join(f"(uintptr_t)(uint32_t)({x})" for x in a) + "})")
             return self.typed_ret(call, rt)
-        a = self.scalar_args(args) + ["0"] * (4 - len(args))
+        a = self.proto_args(self.scalar_args(args), ft) + ["0"] * (4 - len(args))
         call = (f"PE_GuestCall(\"@{self.site}:jalr\", (pe_addr_t)({fcode}), {len(args)}u, "
                 + ", ".join(f"(uintptr_t)(uint32_t)({x})" for x in a) + ")")
         return self.typed_ret(call, rt)
@@ -1340,7 +1380,12 @@ class Lowerer:
         n = (self.frame + 7) // 8 * 8
         inner = f"pe_lowered_{self.name}"
         args = ", ".join(["pe_fp"] + [p.split()[-1] for p in params])
-        wrapper = [f"static {rett} {inner}(pe_addr_t pe_fp{', ' + plist if params else ''})",
+        # The public entry is declared first: a recursive leaf (EXE
+        # func_8001B5FC) calls itself from the inner body, and each recursion
+        # level enters its own guest frame through that entry, as retail's
+        # jal does.
+        wrapper = [f"{sig};", "",
+                   f"static {rett} {inner}(pe_addr_t pe_fp{', ' + plist if params else ''})",
                    "{", *body, "}", "", sig, "{",
                    f"    const pe_addr_t pe_fp = PE_GuestFrame_Enter({n}u);"]
         if rett == "void":
@@ -1469,13 +1514,17 @@ def parse_const(e) -> tuple[int, T]:
 # Command).  Anything outside this set keeps the "asm" refusal.
 
 ASM_HEAD_RE = re.compile(r"\b(?:__asm__|asm)\s*(?:__volatile__|volatile)?\s*\(")
-# COP2 commands with a native implementation: MVMVA (mx=RT, v in {V0, IR},
-# cv in {TR, none}), NCLIP, RTPS and RTPT (sf=1, lm=0: PE_GTE_RTPS/RTPT_coordinates).
-# Readable data registers include the SZ0-SZ3 FIFO ($16-$19, gte_stszotz).
-GTE_DATA_W = set(range(0, 15)) | {24, 25, 26, 27, 30}
-GTE_DATA_R = set(range(0, 15)) | {16, 17, 18, 19, 24, 25, 26, 27, 31}
-GTE_CTRL = set(range(0, 24))
-
+# The complete native GTE backend provides every documented command and all
+# 32 data/control register operations (including hardware read-only writes).
+# This policy must be integrated together with pe_gte_commands.c; it does not
+# authorize lowering original CPU instructions outside the narrow asm subset.
+GTE_NATIVE_COMMANDS = frozenset({
+    0x01, 0x06, 0x0C, 0x10, 0x11, 0x12, 0x13, 0x14, 0x16, 0x1B, 0x1C,
+    0x1E, 0x20, 0x28, 0x29, 0x2A, 0x2D, 0x2E, 0x30, 0x3D, 0x3E, 0x3F,
+})
+GTE_DATA_W = set(range(32))
+GTE_DATA_R = set(range(32))
+GTE_CTRL = set(range(32))
 
 ALU_OPS = {"sll": "<<", "srl": ">>", "sra": ">>", "addu": "+", "addiu": "+", "subu": "-",
            "or": "|", "ori": "|", "and": "&", "andi": "&", "xor": "^", "xori": "^"}
@@ -1484,16 +1533,7 @@ ALU_OPS = {"sll": "<<", "srl": ">>", "sra": ">>", "addu": "+", "addiu": "+", "su
 def gte_command_ok(word: int) -> bool:
     if (word >> 25) != 0x25:            # 0100101 = COP2 + command bit
         return False
-    cmd = word & 0x1FFFFFF
-    op = cmd & 0x3F
-    if op == 0x06:
-        return True                     # NCLIP
-    if op == 0x12:
-        mx, v, cv = (cmd >> 17) & 3, (cmd >> 15) & 3, (cmd >> 13) & 3
-        return mx == 0 and v in (0, 3) and cv in (0, 3)
-    if op in (0x01, 0x30):              # RTPS / RTPT, sf=1 lm=0
-        return (cmd >> 19) & 1 == 1 and (cmd >> 10) & 1 == 0
-    return False
+    return (word & 0x3F) in GTE_NATIVE_COMMANDS
 
 
 def _scan(text: str, i: int, close: str) -> int:
