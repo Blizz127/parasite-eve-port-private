@@ -864,8 +864,17 @@ def directed_specs() -> dict[tuple[str, str], list[tuple[str, int, list[int]]]]:
         return out
     for m in re.finditer(r'^\s*-\s*\[\s*(\w+)\s*,\s*(\w+)\s*,\s*"([^"]*)"\s*\]',
                          o.NONMATCH_MANIFEST.read_text().split("inputs:", 1)[-1], re.M):
-        terms = []
-        for t in m.group(3).split(";"):
+        out[(m.group(1), m.group(2))] = parse_directed(m.group(3))
+    return out
+
+
+def parse_directed(spec: str) -> list[tuple[str, list[int]]]:
+    """One directed-input spec string (see directed_specs) as its term list."""
+    terms = []
+    if True:
+        for t in spec.split(";"):
+            if not t.strip():
+                continue
             lhs, rhs = (x.strip() for x in t.split("="))
             vals: list[int] = []
             if lhs == "out":                   # out=FN:K[:LEN],...: callee FN writes LEN (8) bytes through stack arg K
@@ -880,8 +889,7 @@ def directed_specs() -> dict[tuple[str, str], list[tuple[str, int, list[int]]]]:
                 else:
                     vals.append(int(v, 0))
             terms.append((lhs, vals))
-        out[(m.group(1), m.group(2))] = terms
-    return out
+    return terms
 
 
 def inputs(name, ov, data, seeds, recorded, spec):

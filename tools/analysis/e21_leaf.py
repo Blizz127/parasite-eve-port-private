@@ -2,7 +2,8 @@
 """Render one room leaf's port TU privately and run the e21 differential on it.
 
     python3 tools/analysis/e21_leaf.py room_m0429i func_801982A4 [--seeds 6]
-        [--check-gte] [--coverage] [--keep DIR]
+        [--check-gte] [--coverage | --uncovered] [--keep DIR]
+        [--nonmatching OFF:SIZE] [--inputs "a0=1,2; h(a1+0x10)=0..2"]
 
 The leaf must already be a room leaf: a `c` span in its room YAML or an entry
 in configs/USA/overlays/nonmatching.yaml (for NON_MATCHING C).  For a new
@@ -53,9 +54,13 @@ def main() -> int:
     ap.add_argument("--seeds", type=int, default=6)
     ap.add_argument("--check-gte", action="store_true")
     ap.add_argument("--coverage", action="store_true")
+    ap.add_argument("--uncovered", action="store_true",
+                    help="also list the retail words no seed executed (implies --coverage)")
     ap.add_argument("--keep", type=Path, help="write the room's TUs here (kept)")
     ap.add_argument("--nonmatching", metavar="OFF:SIZE",
                     help="treat the leaf as NON_MATCHING at this blob offset/size for this run")
+    ap.add_argument("--inputs", metavar="SPEC",
+                    help='directed inputs for this run, nonmatching.yaml syntax: "a0=1,2; h(a1+0x10)=0..2"')
     ns = ap.parse_args()
     if not ns.room.startswith("room_"):
         ns.room = "room_" + ns.room
@@ -96,9 +101,17 @@ def main() -> int:
             print(f"e21_leaf: notu {('uncompilable: ' + unc[bad[0]][:300]) if bad else 'no TU rendered'}")
             return 1
         cc = shutil.which("cc") or shutil.which("gcc")
-        st, detail = e.one(tus[0], ns.leaf, ns.room, ns.seeds, cc, ns.coverage, "",
-                           e.directed_specs(), ns.check_gte)
+        specs = e.directed_specs()
+        if ns.inputs:
+            specs[(ns.room, ns.leaf)] = e.parse_directed(ns.inputs)
+        st, detail = e.one(tus[0], ns.leaf, ns.room, ns.seeds, cc, ns.coverage or ns.uncovered, "",
+                           specs, ns.check_gte)
         print(f"e21_leaf: {st} {tus[0].name} {detail}")
+        if ns.uncovered and e.COVER is not None:
+            leaf = o.parse_overlay(ns.room)["leaves"][ns.leaf]
+            lo, hi = leaf["vram"], leaf["vram"] + leaf["file_size"]
+            miss = [a for a in range(lo, hi, 4) if a not in e.COVER]
+            print("e21_leaf: uncovered " + (" ".join(f"{a:08X}" for a in miss) or "none"))
         return 0 if st == "ok" else 1
     finally:
         if tmp:
