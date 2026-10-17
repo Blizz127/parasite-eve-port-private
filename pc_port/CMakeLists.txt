@@ -593,6 +593,25 @@ if(BUILD_TESTS)
     add_test(NAME akao-tick-oracle COMMAND pe-akao-tick-oracle-tests
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
     set_tests_properties(akao-tick-oracle PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 600)
+    # M0086I park callbacks through the generated registry and actual native
+    # callees, compared with retained retail-oracle fixtures. No interpreter
+    # is linked; the owner's disc/cache supplies the original room identity.
+    add_executable(pe-park-m0086-full-tests
+        tests/test_park_m0086_full.c ${PE_GUESTCODE_REGISTRY})
+    target_link_libraries(pe-park-m0086-full-tests PRIVATE pe_field_runtime)
+    add_test(NAME park-m0086-full COMMAND pe-park-m0086-full-tests
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
+    set_tests_properties(park-m0086-full PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 120)
+
+    # M0089I code-0x77 effect through the generated registry and actual native
+    # callees, with retained retail RAM/packet/GTE/RNG fixtures and controls.
+    add_executable(pe-park-m0089-full-tests
+        tests/test_park_m0089_full.c ${PE_GUESTCODE_REGISTRY})
+    target_link_libraries(pe-park-m0089-full-tests PRIVATE pe_field_runtime)
+    add_test(NAME park-m0089-full COMMAND pe-park-m0089-full-tests
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
+    set_tests_properties(park-m0089-full PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 120)
+
     # Standalone GTE math: no game runtime or interpreter in this executable.
     add_executable(pe-gte-native-command-tests tests/test_gte_native_commands.c
         platform/pe_gte.c platform/pe_gte_commands.c)
