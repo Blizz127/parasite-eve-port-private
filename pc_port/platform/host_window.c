@@ -422,6 +422,20 @@ static int resize_image(int width, int height)
 
 static const char *host_env(const char *name) { return getenv(name); }
 
+/* WM_CLASS (ICCCM, set before the window is mapped): instance
+ * "parasite-eve", class "Parasite Eve".  Without it a task bar has no
+ * application name for the window and falls back to the executable name
+ * (parasite-eve-port).  The property is the two strings, each with its NUL. */
+static void set_wm_class(void)
+{
+    static const char wm_class[] = "parasite-eve\0Parasite Eve";
+    Atom prop = XInternAtom(g_dpy, "WM_CLASS", 0);
+    Atom str = XInternAtom(g_dpy, "STRING", 0);
+    if (prop && str)
+        XChangeProperty(g_dpy, g_win, prop, str, 8, PropModeReplace,
+                        (const unsigned char *)wm_class, (int)sizeof(wm_class));
+}
+
 int HostWindow_Open(const char *display, int width, int height,
                     const char *title, int scale, int fullscreen)
 {
@@ -459,6 +473,7 @@ int HostWindow_Open(const char *display, int width, int height,
     g_vblank_paced=0;g_last_vblank_ns=0;
     ftrace_init();
     HostWindow_SetTitle(title);
+    set_wm_class();
     XSelectInput(g_dpy, g_win, ExposureMask | KeyPressMask | (1L<<1) | StructureNotifyMask | FocusChangeMask);
     g_wm_delete = XInternAtom(g_dpy, "WM_DELETE_WINDOW", 0);
     XSetWMProtocols(g_dpy, g_win, &g_wm_delete, 1);
@@ -527,12 +542,24 @@ void HostWindow_Blit(const uint8_t *rgb, int fb_w, int fb_h)
     }
 }
 
+/* The title is the game's name alone ("Parasite Eve" from the packaged
+ * launchers); " [Fast-forward]" is appended only while fast-forward runs.
+ * _NET_WM_NAME carries the same text as UTF-8 for EWMH task bars. */
 void HostWindow_SetTitle(const char *title)
 {
     char label[560];
     if (title) snprintf(g_title,sizeof(g_title),"%s",title);
-    snprintf(label,sizeof(label),"%s [%s]",g_title,g_ff_active?"Fast-forward":"Normal speed");
-    if (g_dpy && g_win) { XStoreName(g_dpy, g_win, label); XFlush(g_dpy); }
+    if (g_ff_active) snprintf(label,sizeof(label),"%s [Fast-forward]",g_title);
+    else snprintf(label,sizeof(label),"%s",g_title);
+    if (g_dpy && g_win) {
+        Atom net_name = XInternAtom(g_dpy, "_NET_WM_NAME", 0);
+        Atom utf8 = XInternAtom(g_dpy, "UTF8_STRING", 0);
+        XStoreName(g_dpy, g_win, label);
+        if (net_name && utf8)
+            XChangeProperty(g_dpy, g_win, net_name, utf8, 8, PropModeReplace,
+                            (const unsigned char *)label, (int)strlen(label));
+        XFlush(g_dpy);
+    }
 }
 
 /* Recompute the effective fast-forward state; on a change reset the pacer,
@@ -672,9 +699,11 @@ int HostWindow_Poll(void)
 
 uint16_t HostWindow_PadRaw(void)
 {
-    /* Keyboard and controller both drive the pad at once. */
+    /* Keyboard and controller both drive the pad at once.  The controller
+     * word goes through the dev-menu combo filter (a lone Select/Start is
+     * withheld only while it could still become Select+Start). */
     if (pe_plat_cheats_menu_open() || HostDevMenu_CapturesInput()) return 0xFFFFu;
-    return (uint16_t)(~(g_sony_held | HostDevMenu_FilterHeld(HostPad_Held())));
+    return (uint16_t)(~(g_sony_held | HostDevMenu_FilterPad(HostPad_Held())));
 }
 
 static int monotonic_ns(uint64_t *out)

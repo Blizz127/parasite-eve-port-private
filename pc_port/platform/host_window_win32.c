@@ -273,7 +273,8 @@ void HostWindow_SetTitle(const char *title)
 {
     char label[560];
     if (title) snprintf(g_title,sizeof(g_title),"%s",title);
-    snprintf(label,sizeof(label),"%s [%s]",g_title,g_fast_forward?"Fast-forward":"Normal speed");
+    if (g_fast_forward) snprintf(label,sizeof(label),"%s [Fast-forward]",g_title);
+    else snprintf(label,sizeof(label),"%s",g_title);
     if (g_hwnd) SetWindowTextA(g_hwnd,label);
 }
 

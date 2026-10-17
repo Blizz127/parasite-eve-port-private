@@ -27,9 +27,6 @@ leaves:
   - [room_m0273i, func_80197BBC, 0x8BD4, 0x4A4]   # slime / Eve turn-and-strike battle effect main (m0273i); handwritten cop2 loads
   - [room_m0273i, func_8019665C, 0x7674, 0x37C]   # slime drop particle callback (m0273i)
   - [room_m0273i, func_80192838, 0x3850, 0x3C8]   # slime grab-attack driver (m0273i)
-  - [room_m0075i, func_8018F814, 0x82C, 0x330]   # park battle weapon/effect draw callback (m0075i / m0080i); handwritten cop2
-  - [room_m0075i, func_8018FC60, 0xC78, 0x2B0]   # park battle weapon/effect shadow callback (m0075i / m0080i); handwritten cop2
-  - [room_m0063i, func_8018F320, 0x338, 0x9F4]   # park leaping enemy flight state (m0063i / m0083i); handwritten cop2, scratchpad
   - [room_m0089i, func_80192CD4, 0x3CEC, 0x52C]   # park battle effect callback (m0089i)
   - [room_m0089i, func_80193200, 0x4218, 0x418]   # park battle effect particle callback (m0089i); handwritten cop2
   - [room_m0089i, func_80193618, 0x4630, 0x9D8]   # park battle effect 2 callback (m0089i)
@@ -63,6 +60,8 @@ inputs:
   - [room_m0273i, func_80197BBC, "a0=0,1,2; w(0x800F32D0)=0x80180000; w(0x80180008)=0x80180100; w(0x80180100)=0x80180200; w(0x80180218)=0x80180300; w(0x80180300)=1,2; w(0x8018010C)=0xD0000,0xC0000; h(0x80180116)=0,1,5,9,14,20,40; h(0x8018011A)=0,3,30; w(0x80180338)=0x80180400; w(0x8009D254)=0x80180500; h(0x8019AF5A)=0,1; h(0x8019AF5C)=1,7; h(0x8019AF56)=0,2; h(0x8019AF64)=2,10"]
   - [room_m0273i, func_8019665C, "a0=1,2,0; a1=0x80180800; h(0x80180806)=0,1,7,8; h(0x80180802)=-200,0,300; h(0x80180812)=0,40; h(0x80180816)=0,1; h(0x800942EC)=0,100; h(0x8019AF62)=-500,500; h(0x8019AF54)=0,3; w(0x8009D254)=0x80180A00; w(0x80180BFC)=0,0x30,0x500; w(0x80180C04)=0,0x40; w(0x80180A00)=0x80180E00; w(0x800F32D0)=0x80180000; w(0x80180008)=0x80180100; w(0x80180100)=0x80180200,0; h(0x800F336C)=4,1; w(0x800F3428)=1,0; out=800CFB7C:2:8"]
   - [room_m0273i, func_80192838, "a0=0x80180800; w(0x80180808)=0x80180100; h(0x8018084A)=0,1; h(0x80180848)=0,3; w(0x8018010C)=0x0D090000,0x0D080000,0x0D100000,0x0D050000; h(0x80180116)=0,1,3,0x18,0x22,0x32,12; h(0x8018011A)=0,2,0x17,0x21,0x31,12; w(0x80180100)=0x80180200,0; w(0x80180218)=0x80180300; w(0x80180810)=0x80180340; h(0x80180814)=0,2; w(0x8009D254)=0x80180A00; w(0x80180A00)=0,0x80180E00; h(0x80180E0C)=0,5"]
+  # The next three direct e21 for the matched leaves (db9ca12b src/overlays) that
+  # replaced the earlier NON_MATCHING copies of the same functions.
   - [room_m0075i, func_8018F814, "a0=0,1; out=80071A44:0:16,80078CC4:0:32,800794C4:1:32"]
   - [room_m0075i, func_8018FC60, "a0=0,1; out=80071A44:0:16,80078CC4:0:32,800794C4:1:32"]
   - [room_m0063i, func_8018F320, "h(a0+0x1A)=0,1; w(a0+0x84)=0,0x4000000,-0x4000000; w(a0+0x7C)=0,0x80180000; h(a0+0x94)=0,1"]

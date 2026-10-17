@@ -35808,6 +35808,9 @@ static void test_ATK3_retail_attack_initialization(void)
 #include "test_disc_swap.h"
 #include "pe_drive_tray.h"
 #include "test_drive_tray.h"
+#include "host_pad.h"
+#include "host_pad_combo.h"
+#include "test_pad_combo.h"
 #include "test_gte_regs.h"
 #include "test_m0034i_model.h"
 #include "test_m0034i_setup.h"
@@ -41107,6 +41110,7 @@ int main(void)
     test_PLAT_all();   /* step P0: pe_plat adapters (test_pe_plat.h) */
     test_HOSTFB_vblank_clock_vs_vsync_calls();
     test_CHEATS_all(); /* opt-in cheat console (test_cheats.h) */
+    test_PADCOMBO_all(); /* Select+Start dev-menu combo (test_pad_combo.h) */
     test_ENH_all();    /* opt-in movement speed / always run (test_enhance.h) */
     test_ASSIST_all(); /* opt-in assists: 1-hit kills, god mode, EXP/BP mult (test_assists.h) */
     test_SPLIT_all();  /* one guest authority per retail scalar (test_split_brain.h) */

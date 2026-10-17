@@ -41,6 +41,7 @@
 #define HOST_PAD_SDL_H
 
 #include <stdint.h>
+#include "host_pad_combo.h"
 
 /* SDL_GameControllerButton / SDL_GameControllerAxis values (SDL2 ABI). */
 enum {
@@ -77,6 +78,9 @@ void     HostPadSDL_Poll(void);
 int      HostPadSDL_Count(void);      /* open SDL devices */
 uint16_t HostPadSDL_Held(void);
 uint8_t  HostPadSDL_Hotkeys(void);
+/* Open SDL devices as HostPadOrigin (key 0x40000000 | SDL instance id; SDL
+ * never reuses an instance id, so a reconnect is a new key). */
+int      HostPadSDL_Origins(HostPadOrigin *out, int max);
 void     HostPadSDL_Close(void);
 
 #endif

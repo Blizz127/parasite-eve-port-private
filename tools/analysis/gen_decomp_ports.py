@@ -2848,6 +2848,35 @@ def find_compiler() -> str | None:
     return None
 
 
+# Worker limit for compile_check().  The pool is sized from the operator's JOBS
+# (the variable scripts/build_pc_port.sh passes to cmake as -j), never from the
+# host CPU count: a big machine is not a grant to use all of it.  Unset JOBS
+# selects COMPILE_JOBS_DEFAULT.  A request above COMPILE_JOBS_MAX (the old hard
+# ceiling) runs at the ceiling, which is never more than was asked for.  Any
+# other value that is not a plain positive decimal integer stops the run
+# instead of guessing a limit.
+COMPILE_JOBS_DEFAULT = 4
+COMPILE_JOBS_MAX = 16
+
+
+def compile_jobs(environ=None) -> int:
+    """compile_check()'s worker count from JOBS; SystemExit on an unusable value."""
+    raw = (os.environ if environ is None else environ).get("JOBS")
+    if raw is None:
+        return COMPILE_JOBS_DEFAULT
+    text = raw.strip()
+    digits = text.lstrip("0")
+    if not re.fullmatch(r"[0-9]+", text) or not digits:
+        raise SystemExit(f"gen_decomp_ports: JOBS={raw!r} is not a usable worker "
+                         "limit; set a positive integer, or unset JOBS for the "
+                         f"default of {COMPILE_JOBS_DEFAULT}")
+    # Three or more significant digits is >= 100, past the ceiling (and too
+    # long to hand to int() unchecked: it refuses very long digit strings).
+    if len(digits) > 2:
+        return COMPILE_JOBS_MAX
+    return min(int(digits), COMPILE_JOBS_MAX)
+
+
 def compile_check(cc: str, items: list[tuple[str, str]]) -> dict[str, str]:
     """Syntax-check each (name, rendered source); return name -> first error.
 
@@ -2855,8 +2884,9 @@ def compile_check(cc: str, items: list[tuple[str, str]]) -> dict[str, str]:
     fooled: the eligibility rules say *why* a leaf is not host-representable,
     but only the compiler proves the emitted TU actually builds.  A leaf whose
     TU does not compile is reported and not written, so the generated tree is
-    always buildable.
+    always buildable.  At most compile_jobs() checks run at once.
     """
+    workers = compile_jobs()
     cmd_head = [cc, "-std=gnu11", "-fsyntax-only", *COMPILE_DEFINES]
     for inc in COMPILE_INCLUDES:
         cmd_head += ["-I", str(REPO_ROOT / inc)]
@@ -2878,7 +2908,6 @@ def compile_check(cc: str, items: list[tuple[str, str]]) -> dict[str, str]:
                     break
             return name, first or "compile failed"
 
-    workers = min(16, (os.cpu_count() or 4))
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
         for name, err in pool.map(one, items):
             if err:

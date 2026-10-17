@@ -53,6 +53,7 @@ set(PLATFORM_SRCS
     platform/pe_guest_image.c
     platform/plat_mods.c
     platform/plat_cheats.c
+    platform/host_pad_combo.c
     platform/plat_enhance.c
     platform/plat_timing.c
     platform/plat_audio.c
@@ -548,18 +549,19 @@ if(BUILD_TESTS)
         set_tests_properties(win32-input PROPERTIES TIMEOUT 30)
     endif()
     enable_testing()
-    if(UNIX AND NOT APPLE AND SDL2_FOUND)
+    if(UNIX AND NOT APPLE)
+        # The dev menu reads the merged controller word (no SDL of its own):
+        # the test feeds HostDevMenu_Step synthetic words and clock values.
         add_executable(pe-dev-menu-controller-tests tests/test_dev_menu_controller.c platform/host_dev_menu.c)
-        target_include_directories(pe-dev-menu-controller-tests PRIVATE platform include ${SDL2_INCLUDE_DIRS})
-        target_compile_definitions(pe-dev-menu-controller-tests PRIVATE PE_HAVE_SDL2=1)
-        target_link_libraries(pe-dev-menu-controller-tests PRIVATE pe_field_runtime SDL2::SDL2 dl)
+        target_include_directories(pe-dev-menu-controller-tests PRIVATE platform include)
+        target_link_libraries(pe-dev-menu-controller-tests PRIVATE pe_field_runtime)
         if(PE_PORT_SANITIZERS)
             target_compile_options(pe-dev-menu-controller-tests PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)
             target_link_options(pe-dev-menu-controller-tests PRIVATE -fsanitize=address,undefined -static-libasan -static-libubsan)
         endif()
         add_test(NAME dev-menu-controller COMMAND pe-dev-menu-controller-tests)
         add_test(NAME dev-menu-hard-disable COMMAND pe-dev-menu-controller-tests --disabled)
-        set_tests_properties(dev-menu-controller PROPERTIES TIMEOUT 30 ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy")
+        set_tests_properties(dev-menu-controller PROPERTIES TIMEOUT 30)
     endif()
 
 

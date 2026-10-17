@@ -24,6 +24,7 @@
 #define HOST_PAD_H
 
 #include <stdint.h>
+#include "host_pad_combo.h"
 
 #define HOST_PAD_SELECT   0x0001u
 #define HOST_PAD_START    0x0008u
@@ -73,6 +74,9 @@ void     HostPad_Poll(void);
 uint16_t HostPad_Held(void);
 /* Held HOST_PAD_HOTKEY_* bits OR-ed over all connected controllers. */
 uint8_t  HostPad_Hotkeys(void);
+/* Each connected controller (SDL devices, then js* nodes) with a key unique
+ * to that connection, for the dev-menu combo; returns the count (<= max). */
+int      HostPad_Origins(HostPadOrigin *out, int max);
 /* Close all devices. */
 void     HostPad_Close(void);
 
