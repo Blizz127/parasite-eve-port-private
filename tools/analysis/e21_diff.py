@@ -198,11 +198,23 @@ def prologue_save_instructions(ram: bytearray, entry: int) -> frozenset[int]:
     Follow the entry basic block, retaining only registers not yet assigned,
     and require a first save inside the allocated stack frame.  Any control
     transfer ends this conservative recognition; later stores (including call
-    delay slots) are caller data even when their source is s0-s7/fp/ra.
+    delay slots) are caller data even when their source is s0-s7/fp/ra.  The
+    one exception is the delay slot of the transfer that ends the entry block:
+    it executes before the transfer takes effect, and era prologues often put
+    the last register save there (`beq ...; sw $s0,0x18($sp)`).  It counts as
+    a save under the same rule (an incoming register, not yet saved or
+    assigned, stored inside the frame).
     """
     incoming = set(range(16, 24)) | {30, 31}
     saved, pcs = set(), set()
     stack_delta = 0
+
+    def is_save(w: int) -> bool:
+        op, rs, rt = w >> 26, (w >> 21) & 31, (w >> 16) & 31
+        simm = (w & 0xFFFF) - 0x10000 if w & 0x8000 else w & 0xFFFF
+        return (op == 0x2B and rs == 29 and rt in incoming and rt not in saved
+                and stack_delta < 0 and simm >= 0 and stack_delta + simm + 4 <= 0)
+
     for offset in range(0, 64 * 4, 4):
         pc = entry + offset
         at = pc & 0x1FFFFFFF
@@ -213,10 +225,13 @@ def prologue_save_instructions(ram: bytearray, entry: int) -> frozenset[int]:
         fn, imm = w & 63, w & 0xFFFF
         simm = imm - 0x10000 if imm & 0x8000 else imm
         if 1 <= op <= 7 or (op == 0 and fn in (8, 9, 12, 13)):
+            if at + 8 <= RAM_SIZE:
+                slot = struct.unpack_from("<I", ram, at + 4)[0]
+                if is_save(slot):
+                    pcs.add(pc + 4)
             break
         if op in (0x28, 0x29, 0x2A, 0x2B, 0x2E):
-            if (op == 0x2B and rs == 29 and rt in incoming and rt not in saved
-                    and stack_delta < 0 and simm >= 0 and stack_delta + simm + 4 <= 0):
+            if is_save(w):
                 pcs.add(pc)
                 saved.add(rt)
             continue

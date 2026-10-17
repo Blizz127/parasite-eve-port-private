@@ -103,5 +103,31 @@ class OracleContracts(unittest.TestCase):
         self.assertEqual(saves[2][:8], [False] * 8)
 
 
+    def test_register_save_in_first_branch_delay_slot_is_excluded(self):
+        # Retail m0188i func_80195A14 / m0273i func_801981A4 shape: the last
+        # callee-saved register is spilled in the delay slot of the first
+        # branch.  That spill is a register save, not caller data.
+        entry = 0x80010000
+
+        def imm(op, rs, rt, value):
+            return (op << 26) | (rs << 21) | (rt << 16) | (value & 0xFFFF)
+
+        words = [imm(9, 29, 29, -0x28),        # addiu sp,sp,-0x28
+                 imm(0x2B, 29, 31, 0x24),     # sw ra,0x24(sp)
+                 imm(0x2B, 29, 17, 0x1C),     # sw s1,0x1c(sp)
+                 imm(4, 4, 0, 2),             # beq a0,zero,+2
+                 imm(0x2B, 29, 16, 0x18),     # sw s0,0x18(sp): delay-slot save
+                 imm(0x2B, 29, 16, 0x10),     # sw s0,0x10(sp): s0 already saved -> data
+                 0]
+        ram = bytearray(e.RAM_SIZE + e.SPAD)
+        struct.pack_into(f"<{len(words)}I", ram, entry & 0x1FFFFFFF, *words)
+        saves = e.prologue_save_instructions(ram, entry)
+        self.assertEqual(saves, frozenset({entry + 4, entry + 8, entry + 16}))
+        # A delay-slot store of a register the entry block already assigned
+        # stays data.
+        words[4] = imm(0x2B, 29, 2, 0x18)    # sw v0,0x18(sp)
+        struct.pack_into(f"<{len(words)}I", ram, entry & 0x1FFFFFFF, *words)
+        self.assertEqual(e.prologue_save_instructions(ram, entry), frozenset({entry + 4, entry + 8}))
+
 if __name__ == "__main__":
     unittest.main()
