@@ -35,6 +35,7 @@ segments:
       # header switch jump tables: MASPSX_DISPATCH_FOLD pool
       - [0xC, rodata]
       - [0x228, asm]
+      - [0x288, c, func_8018F270]
       - [0x290, c, func_8018F278]
       - [0x330, c, func_8018F318]
       - [0x5B4, c, func_8018F59C]
