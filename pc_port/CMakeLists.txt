@@ -28,6 +28,7 @@ set(PLATFORM_SRCS
     platform/pe_irq.c
     platform/pe_irq_delivery.c
     platform/pe_gte.c
+    platform/pe_gte_commands.c
     platform/pe_mdec.c
     platform/pe_str_feed.c
     platform/pe_libetc.c
@@ -592,6 +593,20 @@ if(BUILD_TESTS)
     add_test(NAME akao-tick-oracle COMMAND pe-akao-tick-oracle-tests
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
     set_tests_properties(akao-tick-oracle PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 600)
+    # Standalone GTE math: no game runtime or interpreter in this executable.
+    add_executable(pe-gte-native-command-tests tests/test_gte_native_commands.c
+        platform/pe_gte.c platform/pe_gte_commands.c)
+    target_include_directories(pe-gte-native-command-tests PRIVATE
+        ${CMAKE_SOURCE_DIR}/platform ${CMAKE_SOURCE_DIR}/bootstrap)
+    add_test(NAME gte-native-fixed COMMAND pe-gte-native-command-tests)
+    set_tests_properties(gte-native-fixed PROPERTIES TIMEOUT 30)
+    set(PE_GTE_HW_LOG "" CACHE FILEPATH "Existing MIT ps1-tests real-console GTE log")
+    if(PE_GTE_HW_LOG)
+        add_test(NAME gte-native-hardware COMMAND pe-gte-native-command-tests
+            --hardware-log ${PE_GTE_HW_LOG})
+        set_tests_properties(gte-native-hardware PROPERTIES TIMEOUT 30)
+    endif()
+
     target_link_libraries(pe-native-tests PRIVATE pe_field_runtime)
 
     # Small external-consumer contract: this source is intentionally not part

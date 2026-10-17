@@ -6,8 +6,12 @@
 
 uint32_t func_80078004(uint32_t value)
 {
-    uint32_t leading=PE_GTE_LZCR(value),even,index,word;
+    uint32_t leading,even,index,word;
     int32_t shift;
+    /* Retail 80078004 writes LZCS, then reads LZCR at 80078010. Keep
+     * both observable GTE registers, including the zero-input early return. */
+    PE_GTE_WriteData(30u,value);
+    leading=PE_GTE_ReadData(31u);
     if (leading==32u) return 0u;
     even=leading&~1u;shift=(int32_t)even-24;
     index=shift>=0?value<<(unsigned)shift:(uint32_t)((int32_t)value>>(24u-even));

@@ -79,7 +79,7 @@ typedef struct {
     int32_t mac0;     /* C2DR 24 scalar result */
     uint32_t otz;     /* C2DR 7 averaged depth */
     uint32_t sxy[3], sz[4]; /* projection FIFOs */
-    uint32_t projection_flags; /* RTPS/RTPT result; other commands do not retain FLAG here */
+    uint32_t projection_flags; /* Most recent native GTE command FLAG result. */
     int16_t v0[3];    /* C2DR 0-1 VXY0/VZ0 */
     int16_t v1[3];    /* C2DR 2-3 VXY1/VZ1 */
     int16_t v2[3];    /* C2DR 4-5 VXY2/VZ2 */
@@ -125,7 +125,7 @@ int32_t PE_GTE_NCLIP(void);
 /* Register-level COP2 access for lowered inline GTE asm (E21b): psx-spx
  * register semantics over g_pe_gte (data $0-$31 via mtc2/mfc2/lwc2/swc2,
  * control $0-$31 via ctc2/cfc2).  PE_GTE_Command runs a cop2 command word
- * (low 25 bits): MVMVA (mx=RT) and NCLIP; anything else is a FATAL stop. */
+ * (low 25 bits): all 22 documented commands; unknown operations abort. */
 uint32_t PE_GTE_ReadData(uint32_t reg);
 void PE_GTE_WriteData(uint32_t reg, uint32_t value);
 uint32_t PE_GTE_ReadCtrl(uint32_t reg);

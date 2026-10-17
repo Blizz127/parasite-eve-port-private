@@ -14,6 +14,7 @@
  * cop2 registers have no guest-RAM address, so they live in g_pe_gte.
  */
 #include "pe_sdk.h"
+#include "pe_gte_commands.h"
 #include "game_port.h"
 
 PeGteState g_pe_gte;
@@ -183,217 +184,29 @@ void PE_GTE_SetBK(int32_t rbk, int32_t gbk, int32_t bbk)
     g_pe_gte.bk[2] = bbk;
 }
 
-static int32_t pe_gte_sat_ir(int64_t mac, int lm)
-{
-    if (lm) {
-        if (mac < 0)
-            return 0;
-        if (mac > 0x7FFF)
-            return 0x7FFF;
-        return (int32_t)mac;
-    }
-    if (mac < -0x8000)
-        return -0x8000;
-    if (mac > 0x7FFF)
-        return 0x7FFF;
-    return (int32_t)mac;
-}
-
+/* Every helper uses the same compiled native arithmetic as command calls.
+ * MVMVA short forms omit the opcode; retain their selector bits and force 12h.
+ * These helpers no longer skip selectors or retain another command's FLAG. */
 void PE_GTE_MVMVA(uint32_t cmd)
 {
-    int sf = (int)((cmd >> 19) & 1u);
-    int mx = (int)((cmd >> 17) & 3u);
-    int vsel = (int)((cmd >> 15) & 3u);
-    int cv = (int)((cmd >> 13) & 3u);
-    int lm = (int)((cmd >> 10) & 1u);
-    int16_t vx, vy, vz;
-    int32_t tx, ty, tz;
-    int row;
-    int shift;
-
-    /* Live 3A088 only issues mx=0 (RT). Other matrices are not invented. */
-    if (mx != 0)
-        return;
-
-    if (vsel == 3) {
-        vx = (int16_t)g_pe_gte.ir[0];
-        vy = (int16_t)g_pe_gte.ir[1];
-        vz = (int16_t)g_pe_gte.ir[2];
-    } else if (vsel == 0) {
-        vx = g_pe_gte.v0[0];
-        vy = g_pe_gte.v0[1];
-        vz = g_pe_gte.v0[2];
-    } else {
-        return;
-    }
-
-    if (cv == 0) {
-        tx = g_pe_gte.tr[0];
-        ty = g_pe_gte.tr[1];
-        tz = g_pe_gte.tr[2];
-    } else if (cv == 3) {
-        tx = ty = tz = 0;
-    } else {
-        return;
-    }
-
-    shift = sf * 12;
-    {
-        const int32_t t[3] = { tx, ty, tz };
-        for (row = 0; row < 3; row++) {
-            int64_t mac;
-
-            /* GTE translation is signed and scaled by 0x1000.  Multiply so
-             * negative translations retain the hardware value without C's
-             * undefined signed-left-shift behavior. */
-            mac = (int64_t)t[row] * 4096LL
-                + (int64_t)g_pe_gte.rt[row][0] * (int64_t)vx
-                + (int64_t)g_pe_gte.rt[row][1] * (int64_t)vy
-                + (int64_t)g_pe_gte.rt[row][2] * (int64_t)vz;
-            mac >>= shift;
-            g_pe_gte.mac[row] = (int32_t)mac;
-            g_pe_gte.ir[row] = pe_gte_sat_ir(mac, lm);
-        }
-    }
+    PE_GTE_Command((cmd & ~0x3Fu) | 0x12u);
 }
 
-static int64_t pe_gte_wrap44(int64_t value);
-
-static void pe_gte_mul3(const int16_t m[3][3], int32_t tx, int32_t ty,
-                        int32_t tz, int16_t vx, int16_t vy, int16_t vz,
-                        int sf, int lm)
+void PE_GTE_NCCT(void) { PE_GTE_Command(0x118043Fu); }
+void PE_GTE_GPF(int sf, int lm)
 {
-    const int32_t t[3] = { tx, ty, tz };
-    const int16_t v[3] = { vx, vy, vz };
-    int row;
-    int shift = sf * 12;
-
-    for (row = 0; row < 3; row++) {
-        int64_t mac;
-
-        /* GTE accumulates with signed 44-bit wrapping after each sum.
-         * IR saturation uses the signed 32-bit post-shift MAC value. */
-        mac = (int64_t)t[row] * 4096LL;
-        for (int col = 0; col < 3; ++col)
-            mac = pe_gte_wrap44(mac + (int64_t)m[row][col] * v[col]);
-        mac >>= shift;
-        g_pe_gte.mac[row] = (int32_t)mac;
-        g_pe_gte.ir[row] = pe_gte_sat_ir(g_pe_gte.mac[row], lm);
-    }
+    PE_GTE_Command(0x3Du | ((uint32_t)(sf != 0) << 19) |
+                   ((uint32_t)(lm != 0) << 10));
 }
-
-static uint8_t pe_gte_sat8(int32_t mac)
+void PE_GTE_GPL(int sf, int lm)
 {
-    int32_t x;
-
-    if (mac < 0)
-        return 0;
-    x = mac >> 4; /* MAC/16 */
-    if (x > 255)
-        return 255;
-    return (uint8_t)x;
+    PE_GTE_Command(0x3Eu | ((uint32_t)(sf != 0) << 19) |
+                   ((uint32_t)(lm != 0) << 10));
 }
-
-void PE_GTE_NCCT(void)
-{
-    const int16_t *vs[3];
-    uint8_t rgb[3];
-    uint8_t code;
-    int n;
-
-    /* ROM word 0x118043F: sf=1 lm=1. Formula is psx-spx NCCT, not NCLIP. */
-    vs[0] = g_pe_gte.v0;
-    vs[1] = g_pe_gte.v1;
-    vs[2] = g_pe_gte.v2;
-    rgb[0] = (uint8_t)(g_pe_gte.rgbc & 0xFFu);
-    rgb[1] = (uint8_t)((g_pe_gte.rgbc >> 8) & 0xFFu);
-    rgb[2] = (uint8_t)((g_pe_gte.rgbc >> 16) & 0xFFu);
-    code = (uint8_t)((g_pe_gte.rgbc >> 24) & 0xFFu);
-
-    for (n = 0; n < 3; n++) {
-        int row;
-
-        pe_gte_mul3(g_pe_gte.llm, 0, 0, 0, vs[n][0], vs[n][1], vs[n][2], 1, 1);
-        pe_gte_mul3(g_pe_gte.lcm, g_pe_gte.bk[0], g_pe_gte.bk[1],
-                    g_pe_gte.bk[2], (int16_t)g_pe_gte.ir[0],
-                    (int16_t)g_pe_gte.ir[1], (int16_t)g_pe_gte.ir[2], 1, 1);
-        for (row = 0; row < 3; row++) {
-            int64_t mac;
-
-            mac = ((int64_t)rgb[row] * (int64_t)g_pe_gte.ir[row]) << 4;
-            mac >>= 12;
-            g_pe_gte.mac[row] = (int32_t)mac;
-            g_pe_gte.ir[row] = pe_gte_sat_ir(mac, 1);
-        }
-        g_pe_gte.rgb_fifo[n] =
-            (uint32_t)pe_gte_sat8(g_pe_gte.mac[0])
-            | ((uint32_t)pe_gte_sat8(g_pe_gte.mac[1]) << 8)
-            | ((uint32_t)pe_gte_sat8(g_pe_gte.mac[2]) << 16)
-            | ((uint32_t)code << 24);
-    }
-}
-
-/* RTPS/RTPT coordinate outputs (sf=1,lm=0).
- * Authority: psx-spx GTE coordinate commands / UNR division. This view
- * exposes SXY/SZ FIFOs, MAC0, IR0 and the accumulated projection FLAG. */
-static uint32_t pe_gte_unr(uint32_t h, uint32_t sz)
-{
-    uint32_t shift = 0u, d, n, index, u;
-    int table;
-    uint64_t result;
-    if (h >= sz * 2u) return 0x1FFFFu;
-    while ((sz << shift) < 0x8000u) shift++;
-    n = h << shift;
-    d = sz << shift;
-    index = (d - 0x7FC0u) >> 7;
-    table = (int)((0x40000u / (index + 0x100u) + 1u) / 2u) - 0x101;
-    u = (uint32_t)(table < 0 ? 0 : table) + 0x101u;
-    d = (0x2000080u - d * u) >> 8;
-    d = (0x80u + d * u) >> 8;
-    result = ((uint64_t)n * d + 0x8000u) >> 16;
-    return result > 0x1FFFFu ? 0x1FFFFu : (uint32_t)result;
-}
-
-static int64_t pe_gte_wrap44(int64_t value)
-{
-    uint64_t bits = (uint64_t)value & UINT64_C(0xFFFFFFFFFFF);
-    return (bits & UINT64_C(0x80000000000))
-        ? (int64_t)bits - INT64_C(0x100000000000) : (int64_t)bits;
-}
-
-/* GPF/GPL hardware arithmetic; see psx-spx GTE interpolation commands.
- * GPL restores the accumulator's pre-shift scale before its 44-bit sum. */
-static void pe_gte_interpolate(int accumulate, int sf, int lm)
-{
-    unsigned i;
-    uint32_t color = g_pe_gte.rgbc & 0xFF000000u;
-    int shift = sf ? 12 : 0;
-    for (i = 0; i < 3; i++) {
-        int64_t base = accumulate ? (int64_t)g_pe_gte.mac[i] * (1 << shift) : 0;
-        int64_t value = pe_gte_wrap44(base +
-            (int64_t)(int16_t)g_pe_gte.ir[i] * (int16_t)g_pe_gte.ir0);
-        g_pe_gte.mac[i] = (int32_t)(value >> shift);
-        g_pe_gte.ir[i] = pe_gte_sat_ir(g_pe_gte.mac[i], lm);
-        color |= (uint32_t)pe_gte_sat8(g_pe_gte.mac[i]) << (i * 8u);
-    }
-    g_pe_gte.rgb_fifo[0] = g_pe_gte.rgb_fifo[1];
-    g_pe_gte.rgb_fifo[1] = g_pe_gte.rgb_fifo[2];
-    g_pe_gte.rgb_fifo[2] = color;
-}
-
-void PE_GTE_GPF(int sf, int lm) { pe_gte_interpolate(0, sf, lm); }
-void PE_GTE_GPL(int sf, int lm) { pe_gte_interpolate(1, sf, lm); }
-
 void PE_GTE_OP(int sf, int lm)
 {
-    int16_t ir[3]={(int16_t)g_pe_gte.ir[0],(int16_t)g_pe_gte.ir[1],(int16_t)g_pe_gte.ir[2]};
-    unsigned i;
-    for (i=0;i<3;i++) {
-        unsigned a=(i+1u)%3u,b=(i+2u)%3u;
-        int64_t value=(int64_t)ir[b]*g_pe_gte.rt[a][a]-(int64_t)ir[a]*g_pe_gte.rt[b][b];
-        g_pe_gte.mac[i]=(int32_t)(value>>(sf?12:0));
-        g_pe_gte.ir[i]=pe_gte_sat_ir(g_pe_gte.mac[i],lm);
-    }
+    PE_GTE_Command(0x0Cu | ((uint32_t)(sf != 0) << 19) |
+                   ((uint32_t)(lm != 0) << 10));
 }
 
 static void pe_gte_mac0_flags(int64_t value, uint32_t *flags)
@@ -402,73 +215,39 @@ static void pe_gte_mac0_flags(int64_t value, uint32_t *flags)
     if (value < INT32_MIN) *flags |= 1u << 15;
 }
 
-static void pe_gte_project_vertex(const int16_t vertex[3], uint32_t *xy, uint32_t *z,
-                                  uint32_t *flags, int last)
-{
-    unsigned int row, col;
-    uint32_t ratio;
-    int64_t sx, sy, cue;
-    for (row = 0; row < 3u; row++) {
-        int64_t sum = (int64_t)g_pe_gte.tr[row] * 4096;
-        for (col = 0; col < 3u; col++) {
-            sum += (int64_t)g_pe_gte.rt[row][col] * vertex[col];
-            if (sum >= INT64_C(0x80000000000)) *flags |= 1u << (30-row);
-            if (sum < -INT64_C(0x80000000000)) *flags |= 1u << (27-row);
-            sum = pe_gte_wrap44(sum);
-        }
-        g_pe_gte.mac[row] = (int32_t)(sum >> 12);
-        g_pe_gte.ir[row] = pe_gte_sat_ir(g_pe_gte.mac[row], 0);
-        if (g_pe_gte.mac[row] < -32768 || g_pe_gte.mac[row] > 32767) *flags |= 1u << (24-row);
-    }
-    *z = g_pe_gte.mac[2] < 0 ? 0u : g_pe_gte.mac[2] > 65535 ? 65535u : (uint32_t)g_pe_gte.mac[2];
-    if (g_pe_gte.mac[2] < 0 || g_pe_gte.mac[2] > 65535) *flags |= 1u << 18;
-    if ((uint16_t)g_pe_gte.h >= *z * 2u) *flags |= 1u << 17;
-    ratio = pe_gte_unr((uint16_t)g_pe_gte.h, *z);
-    pe_gte_mac0_flags((int64_t)ratio * g_pe_gte.ir[0] + g_pe_gte.ofx, flags);
-    pe_gte_mac0_flags((int64_t)ratio * g_pe_gte.ir[1] + g_pe_gte.ofy, flags);
-    sx = ((int64_t)ratio * g_pe_gte.ir[0] + g_pe_gte.ofx) >> 16;
-    sy = ((int64_t)ratio * g_pe_gte.ir[1] + g_pe_gte.ofy) >> 16;
-    if (sx < -1024 || sx > 1023) *flags |= 1u << 14;
-    if (sy < -1024 || sy > 1023) *flags |= 1u << 13;
-    if (sx < -1024) sx = -1024;
-    if (sx > 1023) sx = 1023;
-    if (sy < -1024) sy = -1024;
-    if (sy > 1023) sy = 1023;
-    *xy = (uint16_t)sx | ((uint32_t)(uint16_t)sy << 16);
-    cue = (int64_t)ratio * (int16_t)g_pe_gte.dqa + g_pe_gte.dqb;
-    g_pe_gte.mac0 = (int32_t)cue;
-    if (last) {
-        pe_gte_mac0_flags(cue, flags);
-        if ((cue >> 12) < 0 || (cue >> 12) > 4096) *flags |= 1u << 12;
-    }
-    cue >>= 12;
-    g_pe_gte.sxy[0] = g_pe_gte.sxy[1];
-    g_pe_gte.sxy[1] = g_pe_gte.sxy[2];
-    g_pe_gte.sxy[2] = *xy;
-    for (row = 0; row < 3; row++) g_pe_gte.sz[row] = g_pe_gte.sz[row+1];
-    g_pe_gte.sz[3] = *z;
-    g_pe_gte.ir0 = cue < 0 ? 0 : cue > 4096 ? 4096 : (int32_t)cue;
-}
-
 void PE_GTE_RTPS_coordinates(uint32_t *xy, uint32_t *z)
 {
-    uint32_t flags = 0;
-    pe_gte_project_vertex(g_pe_gte.v0, xy, z, &flags, 1);
-    g_pe_gte.projection_flags = flags | ((flags & 0x7F87E000u) ? 0x80000000u : 0u);
+    PE_GTE_Command(0x180001u);
+    *xy = g_pe_gte.sxy[2];
+    *z = g_pe_gte.sz[3];
 }
 
 void PE_GTE_RTPT_coordinates(uint32_t xy[3], uint32_t z[3])
 {
+    PE_GTE_Command(0x280030u);
+    for (unsigned i = 0; i < 3u; ++i) {
+        xy[i] = g_pe_gte.sxy[i];
+        z[i] = g_pe_gte.sz[i + 1u];
+    }
+}
+
+/* AVSZ starts a new FLAG result: preceding RTPT projection/IR0 flags do
+ * not survive. Retail AVSZ3/4 and the retained full-callee oracle use the
+ * wide product for MAC0 overflow and OTZ saturation, before MAC0 truncates.
+ * Same rule as the preserved native PE_GTE_AvszFlag implementation. */
+static uint32_t pe_gte_avsz_flags(int64_t value)
+{
     uint32_t flags = 0;
-    pe_gte_project_vertex(g_pe_gte.v0, xy, z, &flags, 0);
-    pe_gte_project_vertex(g_pe_gte.v1, xy + 1, z + 1, &flags, 0);
-    pe_gte_project_vertex(g_pe_gte.v2, xy + 2, z + 2, &flags, 1);
-    g_pe_gte.projection_flags = flags | ((flags & 0x7F87E000u) ? 0x80000000u : 0u);
+    int64_t depth = value >> 12;
+    pe_gte_mac0_flags(value, &flags);
+    if (depth < 0 || depth > 65535) flags |= 1u << 18;
+    return flags | ((flags & 0x7F87E000u) ? 0x80000000u : 0u);
 }
 
 void PE_GTE_AVSZ3(const uint32_t z[3])
 {
     int64_t value=(int64_t)(int16_t)g_pe_gte.zsf3*(z[0]+z[1]+z[2]);
+    g_pe_gte.projection_flags=pe_gte_avsz_flags(value);
     g_pe_gte.mac0=(int32_t)value;
     value>>=12;
     g_pe_gte.otz=value<0?0u:value>65535?65535u:(uint32_t)value;
@@ -477,6 +256,7 @@ void PE_GTE_AVSZ3(const uint32_t z[3])
 void PE_GTE_AVSZ4(const uint32_t z[4])
 {
     int64_t value=(int64_t)(int16_t)g_pe_gte.zsf4*(z[0]+z[1]+z[2]+z[3]);
+    g_pe_gte.projection_flags=pe_gte_avsz_flags(value);
     g_pe_gte.mac0=(int32_t)value;
     value>>=12;
     g_pe_gte.otz=value<0?0u:value>65535?65535u:(uint32_t)value;
@@ -484,12 +264,8 @@ void PE_GTE_AVSZ4(const uint32_t z[4])
 
 int32_t PE_GTE_NCLIP(void)
 {
-    int64_t value=0;
-    for (unsigned i=0;i<3;i++)
-        value+=(int64_t)(int16_t)g_pe_gte.sxy[i] *
-            ((int32_t)(int16_t)(g_pe_gte.sxy[(i+1)%3]>>16)-
-             (int32_t)(int16_t)(g_pe_gte.sxy[(i+2)%3]>>16));
-    return g_pe_gte.mac0=(int32_t)value;
+    PE_GTE_Command(0x1400006u);
+    return g_pe_gte.mac0;
 }
 
 /* ── register-level COP2 access (E21b: lowered inline GTE asm) ─────────
@@ -527,7 +303,8 @@ static uint32_t pe_gte_orgb(void)
 
 uint32_t PE_GTE_ReadData(uint32_t reg)
 {
-    switch (reg & 31u) {
+    reg &= 31u;
+    switch (reg) {
     case 0: return pe_gte_pack(g_pe_gte.v0[0], g_pe_gte.v0[1]);
     case 1: return pe_gte_sx16(g_pe_gte.v0[2]);
     case 2: return pe_gte_pack(g_pe_gte.v1[0], g_pe_gte.v1[1]);
@@ -553,7 +330,8 @@ uint32_t PE_GTE_ReadData(uint32_t reg)
 
 void PE_GTE_WriteData(uint32_t reg, uint32_t v)
 {
-    switch (reg & 31u) {
+    reg &= 31u;
+    switch (reg) {
     case 0: g_pe_gte.v0[0] = (int16_t)v; g_pe_gte.v0[1] = (int16_t)(v >> 16); break;
     case 1: g_pe_gte.v0[2] = (int16_t)v; break;
     case 2: g_pe_gte.v1[0] = (int16_t)v; g_pe_gte.v1[1] = (int16_t)(v >> 16); break;
@@ -652,28 +430,8 @@ void PE_GTE_WriteCtrl(uint32_t reg, uint32_t v)
 
 void PE_GTE_Command(uint32_t cmd)
 {
-    uint32_t op = cmd & 0x3Fu;
-    if (op == 0x12u && ((cmd >> 17) & 3u) == 0u && (((cmd >> 15) & 3u) == 0u || ((cmd >> 15) & 3u) == 3u)
-        && (((cmd >> 13) & 3u) == 0u || ((cmd >> 13) & 3u) == 3u)) {
-        PE_GTE_MVMVA(cmd);
+    if (PE_GTE_ExecuteNative(cmd) == 0)
         return;
-    }
-    if (op == 0x06u) {
-        (void)PE_GTE_NCLIP();
-        return;
-    }
-    if (op == 0x01u && (cmd & (1u << 19)) && !(cmd & (1u << 10))) {
-        /* RTPS sf=1 lm=0: projects V0 into the SXY/SZ FIFOs, MAC/IR, IR0, FLAG. */
-        uint32_t xy, z;
-        PE_GTE_RTPS_coordinates(&xy, &z);
-        return;
-    }
-    if (op == 0x30u && (cmd & (1u << 19)) && !(cmd & (1u << 10))) {
-        /* RTPT sf=1 lm=0: projects V0-V2 into the SXY/SZ FIFOs, MAC/IR, IR0, FLAG. */
-        uint32_t xy[3], z[3];
-        PE_GTE_RTPT_coordinates(xy, z);
-        return;
-    }
     fprintf(stderr, "FATAL: PE_GTE_Command: unsupported cop2 command 0x%07X (native only)\n", cmd);
     fflush(stderr);
     abort();
