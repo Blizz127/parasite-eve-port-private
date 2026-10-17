@@ -5,11 +5,9 @@
 #include "game_port.h"
 
 static pe_addr_t use_ram(pe_addr_t p) {return p<0x200000u?p|0x80000000u:p;}
-static void use_boundary(const char *name)
-{
-    Bootstrap_ReturnVoid(name,"func_80057834");
-    PE_Port_RequestStop(PE_PORT_STOP_UNRESOLVED_BOUNDARY);
-}
+/* Native bodies (decomp_hand/absent_lo_menu_port.c, decomp_hand/port6_port.c). */
+void func_8004F23C(void);
+void func_80048918(int a0, int a1, int a2);
 
 void func_800516B4(int32_t item)
 {
@@ -36,13 +34,22 @@ void func_80057834(int32_t index)
         PE_MenuCommitResult((uint32_t)(int32_t)(int16_t)PE_LoadU16(use_ram(slot))+3u);
         func_80057D30(index);
     } else {
-        unsigned subtype=PE_LoadU8(use_ram(record+14u));
-        if (subtype==1u) {
+        /* src/func_80057834.c: switch (p[0xE]) */
+        switch (PE_LoadU8(use_ram(record+14u))) {
+        case 1u:
             func_800516B4((int16_t)PE_LoadU16(use_ram(D_8009D048+(uint32_t)index*2u)));
             func_80057D30(index);func_80055760();
-        } else if (subtype==2u) use_boundary("func_8004F23C");
-        else if ((subtype>=4u && subtype<=6u) || (subtype>=12u && subtype<=14u))
-            use_boundary("func_80048918");
+            break;
+        case 2u:
+            func_8004F23C();
+            break;
+        case 4u: case 5u: case 6u:
+            func_80048918(0xFE,index,-1);
+            break;
+        case 12u: case 13u: case 14u:
+            func_80048918(0x200,index,-1);
+            break;
+        }
     }
 }
 

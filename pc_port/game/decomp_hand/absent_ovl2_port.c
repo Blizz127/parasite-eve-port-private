@@ -608,8 +608,7 @@ int func_800DEA30(int a0, pe_addr_t a1)
                     O2_SET16(v + 0u, O2_RAND() % 48 - 24);
                     O2_SET16(v + 4u, -(O2_RAND() % 80));
                     O2_SET16(v + 2u, O2_RAND() % 48 - 32);
-                    PE_Decomp_Boundary("func_800CEAE8", 0x800CEAE8u, 3u,
-                                       PE_LoadU32(O2_ACTOR() + 0x238u), v, v, 0u);
+                    func_800CEAE8(PE_LoadU32(O2_ACTOR() + 0x238u), v, v);
                     O2_SET16(p + 6u, O2_S16(v + 0u));
                     O2_SET16(p + 8u, O2_S16(v + 2u));
                     O2_SET16(p + 10u, O2_S16(v + 4u));

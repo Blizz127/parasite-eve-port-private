@@ -284,10 +284,23 @@ static void test_PA_ovl2_DDD70(void)
     PASS();
 }
 
+/* func_800CEAE8 (rtv0, sf=1, TR=0): out[i] = 16 bits of (RT[i] . v) >> 12. */
+static int16_t po2_rtv0(const int16_t m[3][3], const int16_t v[3], unsigned i)
+{
+    int64_t mac = (int64_t)m[i][0] * v[0] + (int64_t)m[i][1] * v[1] + (int64_t)m[i][2] * v[2];
+    return (int16_t)(uint16_t)(uint32_t)(int32_t)(mac >> 12);
+}
+
 static void test_PA_ovl2_DEA30(void)
 {
+    /* The actor's 3x3 rotation at +0x238 (retail rotates each particle's
+     * velocity by it through func_800CEAE8(stats, v, v)). */
+    static const int16_t mtx[3][3] = {{0x0800, 0x0123, -0x0040},
+                                      {-0x0300, 0x0F00, 0x0211},
+                                      {0x0055, -0x0700, 0x1000}};
     TEST("PA_ovl2_DEA30");
     po2_world();
+    for (unsigned i = 0; i < 9u; i++) PE_StoreU16(PO2_MTX + 2u * i, (uint16_t)mtx[i / 3u][i % 3u]);
     func_80071A64(0x99u);
     unsigned r = func_80071A54();
     func_80071A64(0x99u);
@@ -305,10 +318,15 @@ static void test_PA_ovl2_DEA30(void)
     func_80071A64(4u);
     ASSERT(func_800DEA30(1, PO2_REC) == 0, "DEA30: mode 1 below 0x30");
     const unsigned *s = rr + 8;   /* second pass: 8 draws per pass */
-    ASSERT(po2_s16(PO2_P1 + 6u) == (int16_t)((int)s[0] % 48 - 24) &&
-           po2_s16(PO2_P1 + 10u) == (int16_t)(-((int)s[1] % 80)) &&
-           po2_s16(PO2_P1 + 8u) == (int16_t)((int)s[2] % 48 - 32),
-           "DEA30: p[3..5] = v (x, y, z drawn in x, z, y order)");
+    {
+        /* v drawn x, z, y (v+0, v+4, v+2), then rotated in place. */
+        const int16_t v[3] = {(int16_t)((int)s[0] % 48 - 24), (int16_t)((int)s[2] % 48 - 32),
+                              (int16_t)(-((int)s[1] % 80))};
+        ASSERT(po2_s16(PO2_P1 + 6u) == po2_rtv0(mtx, v, 0u) &&
+               po2_s16(PO2_P1 + 8u) == po2_rtv0(mtx, v, 1u) &&
+               po2_s16(PO2_P1 + 10u) == po2_rtv0(mtx, v, 2u),
+               "DEA30: p[3..5] = actor rotation of v (drawn x, z, y)");
+    }
     ASSERT(po2_s16(PO2_P1 + 0u) == (int16_t)(0x0101 + (int)(s[3] & 0xFF) - 0x80) &&
            po2_s16(PO2_P1 + 2u) == (int16_t)(-0x1000 + (int)(s[4] & 0xFF) - 0x80) &&
            po2_s16(PO2_P1 + 4u) == (int16_t)(0x0303 + (int)(s[5] & 0xFF) - 0x80) &&
@@ -316,10 +334,8 @@ static void test_PA_ovl2_DEA30(void)
            PE_LoadU16(PO2_P1 + 12u) == (uint16_t)s[7], "DEA30: position, p[7], p[6]");
     ASSERT(PE_LoadU32(R2(4)) == 2u * 0x955u, "DEA30: angle += 0x955 per pass");
     ASSERT(PE_LoadU16(PO2_POOL + 12u + 0x14u) == 0u, "DEA30: only one particle allocated");
-    ASSERT(g_bootstrap_arg4_call_count == 2 &&
-           g_bootstrap_arg4_calls[0].arg0 == PO2_MTX &&
-           g_bootstrap_arg4_calls[0].arg1 == PE_OVL2_V &&
-           g_bootstrap_arg4_calls[0].arg2 == PE_OVL2_V, "DEA30: func_800CEAE8(stats, v, v) x2");
+    ASSERT(g_bootstrap_arg4_call_count == 0 && PE_Decomp_BoundaryCount() == 0,
+           "DEA30: func_800CEAE8(stats, v, v) runs natively (no boundary)");
     /* mode 2 at 0x20: no sprite/ring; final state from the second block */
     po2_set(R2(1), 50);
     PE_StoreU32(0x800E27ECu, 0x20u);

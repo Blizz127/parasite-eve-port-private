@@ -119,14 +119,15 @@ int func_8001A064(void)
 
 /* src/func_8001A9F8.c: if (D_8009D2E8 & 4) func_8001D170(D_8009D254); then
  * func_8001AE40 on every D_8009D20C actor whose +0x98 bit 7 is clear.
- * func_8001D170 has no pc_port implementation yet: loud boundary. */
+ * func_8001D170 (decomp_hand/port7_port.c) takes no argument (src/func_8001D170.c);
+ * retail's a0 is not read. */
+void func_8001D170(void);
 void func_8001A9F8(void)
 {
     pe_addr_t p;
 
     if (PE_LoadU32(0x8009D2E8u) & 4u)
-        (void)PE_D_COMP_BOUNDARY1("func_8001D170", 0x8001D170u,
-                                  PE_LoadU32(0x8009D254u));
+        func_8001D170();
     p = PE_LoadU32(0x8009D20Cu);
     while (p != 0u) {
         if ((PE_LoadU32(p + 0x26u * 4u) & 0x80u) == 0u)
