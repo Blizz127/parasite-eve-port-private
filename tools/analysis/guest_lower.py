@@ -1009,14 +1009,34 @@ class Lowerer:
             # 5..8-parameter thunk; a callee taking more than the site passes
             # is a loud boundary there.
             a = self.proto_args(self.scalar_args(args), ft)
-            call = (f"PE_GuestCallN(\"@{self.site}:jalr\", (pe_addr_t)({fcode}), {len(args)}u, "
-                    "(const uintptr_t[]){"
-                    + ", ".join(f"(uintptr_t)(uint32_t)({x})" for x in a) + "})")
+            call = self.ordered_call(args, a, lambda a: (
+                f"PE_GuestCallN(\"@{self.site}:jalr\", (pe_addr_t)({fcode}), {len(args)}u, "
+                "(const uintptr_t[]){" + ", ".join(f"(uintptr_t)(uint32_t)({x})" for x in a) + "})"))
             return self.typed_ret(call, rt)
-        a = self.proto_args(self.scalar_args(args), ft) + ["0"] * (4 - len(args))
-        call = (f"PE_GuestCall(\"@{self.site}:jalr\", (pe_addr_t)({fcode}), {len(args)}u, "
-                + ", ".join(f"(uintptr_t)(uint32_t)({x})" for x in a) + ")")
+        a = self.proto_args(self.scalar_args(args), ft)
+        call = self.ordered_call(args, a, lambda a: (
+            f"PE_GuestCall(\"@{self.site}:jalr\", (pe_addr_t)({fcode}), {len(args)}u, "
+            + ", ".join(f"(uintptr_t)(uint32_t)({x})" for x in a + ["0"] * (4 - len(a))) + ")"))
         return self.typed_ret(call, rt)
+
+    def ordered_call(self, args, codes: list[str], build) -> str:
+        """Retail cc1 evaluates the arguments of a call that contain calls
+        first, left to right (room_m0418i func_80190914: GetTPage, then
+        GetClut, as two stack arguments of one call); the host compiler's
+        argument order is unspecified.  With two or more such arguments they
+        are bound to temporaries in source order; `build(codes)` makes the
+        call from the (possibly replaced) argument codes."""
+        idx = [k for k, a in enumerate(args)
+               if k < len(codes) and any(isinstance(n, c_ast.FuncCall) for n in walk(a))]
+        if len(idx) < 2:
+            return build(codes)
+        codes = list(codes)
+        pre = []
+        for k in idx:
+            tv = self.newtmp()
+            pre.append(f"__auto_type {tv} = ({codes[k]});")
+            codes[k] = tv
+        return f"({{ {' '.join(pre)} {build(codes)}; }})"
 
     def typed_ret(self, call, rt) -> tuple[str, T]:
         if isinstance(rt, TVoid):
@@ -1119,7 +1139,9 @@ class Lowerer:
                 if isinstance(t, THostPtr):
                     raise LowerError(f"host pointer passed to {name} parameter {p.strip()}")
                 out.append(c)
-        call = f"{sig.get('host') or name}({', '.join(out)})"
+        fname = sig.get('host') or name
+        nl = len(live)
+        call = self.ordered_call(args, out[nl:], lambda c: f"{fname}({', '.join(out[:nl] + c)})")
         hret = sig["ret"].replace("extern", "").replace("static", "").strip()
         if "*" in hret:
             call = f"PE_HostToGuest({call})"

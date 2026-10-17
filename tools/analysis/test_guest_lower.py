@@ -665,6 +665,23 @@ int **func_8019537C(int a0, unsigned int a1)
                     'int func_80190000(short x) { return D_800DFFB8(x); }')
         self.assertNotIn("(int32_t)(int16_t)((", res["body"].split("PE_GuestCall(")[1].split(";")[0])
 
+    def test_call_arguments_with_calls_are_bound_in_source_order(self):
+        # room_m0418i func_80190914: retail evaluates GetTPage then GetClut as
+        # two stack arguments of one call; the host's argument order is free.
+        res = lower('extern int D_80190100(int, int, int);\n'
+                    'extern int D_80190200(int); extern int D_80190300(int);\n'
+                    'int func_80190000(int x) { return D_80190100(D_80190200(1), x, D_80190300(2)); }')
+        body = res["body"]
+        a, b = body.index("__auto_type pe_t1"), body.index("__auto_type pe_t2")
+        self.assertLess(a, b)
+        self.assertIn("0x80190200", body[a:b])
+        self.assertIn("0x80190300", body[b:body.index(";", b)])
+
+    def test_single_call_argument_is_not_rebound(self):
+        res = lower('extern int D_80190100(int, int);\nextern int D_80190200(int);\n'
+                    'int func_80190000(int x) { return D_80190100(D_80190200(1), x); }')
+        self.assertNotIn("__auto_type", res["body"])
+
     def test_recursive_frame_leaf_declares_its_entry_first(self):
         src = ('int func_80190000(int n) { int buf[2]; buf[0] = n; '
                'if (n > 0) return func_80190000(n - 1) + buf[0]; return 0; }')
