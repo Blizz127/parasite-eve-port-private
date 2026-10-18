@@ -62,6 +62,11 @@ leaves:
   - [room_m0318i, func_801944E8, 0x5500, 0x5C4]   # effect callback, modes 1/2 (m0318i)
   - [room_m0429i, func_801972EC, 0x8304, 0x600]   # effect callback, modes 1/2 (m0429i)
   - [room_m0429i, func_80196CCC, 0x7CE4, 0x620]   # effect callback, modes 0/1/2 (m0429i)
+  - [room_m0429i, func_801960C4, 0x70DC, 0x684]   # effect callback, modes 0/1/2 (m0429i)
+  - [room_m0318i, func_80198268, 0x9280, 0x690]   # effect callback, modes 1/2 (m0318i)
+  - [room_m0318i, func_80197618, 0x8630, 0x6A4]   # effect callback, modes 0/1/2 (m0318i)
+  - [room_m0318i, func_80194AAC, 0x5AC4, 0x6E4]   # effect callback, modes 0/1/2 (m0318i)
+  - [room_m0432i, func_8019485C, 0x5874, 0x704]   # effect-object callback, modes 1/2 (m0432i)
 # EXE leaves: [exe, name, SLUS file offset, size] (src/nonmatching/exe/<name>.c,
 # lowered by gen_decomp_ports.py --e21, proven by tools/analysis/e21_leaf.py exe)
   - [exe, func_800C3324, 0xB3B24, 0x7E0]   # 3D textured-quad packet; called by the 0x800E0D08 weapon-effect callbacks
@@ -145,6 +150,21 @@ inputs:
   - [room_m0429i, func_801972EC, "a0=0,1,2,3;h(a1+0x10)=3,0xFFFF,7"]
   - [room_m0429i, func_80196CCC, "a0=0,1,2; h(a1+0)=0,1,3,0x2E,0x2F; h(a1+2)=0,5,0xFFFF; h(a1+0x10)=0,1"]
   - [room_m0429i, func_80196CCC, "a0=0xFFFFFFFF,3,5"]
+  - [room_m0429i, func_801960C4, "a0=0,1,2,-1,3; h(a1+8)=0,5,0xC,0x10,0x18,0x19,0x20,0x21,0xFFF0; h(a1+0xA)=0,0x14; w(0x800F32D0)=0x80120000; w(0x80120008)=0x80121000; w(0x80121000)=0x80122000; w(0x80122018)=0x80123000; h(0x80123000)=1; w(0x800E2368)=0x80124000; h(0x8012400C)=0x0100"]
+  - [room_m0429i, func_801960C4, "a0=0; w(0x800F32D0)=0x80120000; w(0x80120008)=0x80121000,0; w(0x80121000)=0x80122000,0; w(0x80122018)=0x80123000; h(0x80123000)=1,2; w(0x800E2368)=0x80124000; h(0x8012400C)=0x0100,0"]
+  - [room_m0429i, func_801960C4, "a0=0,1,2; h(a1+8)=0,5,0xC,0x10,0x18,0x19,0x20,0x21; h(a1+0xA)=0,0x14; w(0x800F3428)=1,0"]
+  - [room_m0318i, func_80198268, "a0=1,2; h(a1+0x10)=0,1,2; h(a1+0x12)=0,3,9,0x17,0x30"]
+  - [room_m0318i, func_80198268, "a0=0,1,2,3; h(a1+0x10)=3,0xFFFF"]
+  - [room_m0318i, func_80197618, "a0=1,2; h(a1+0x10)=0,1,2; h(a1+0x12)=0,11,24; h(0x800F336C)=4,0; w(0x800F3428)=1,0; h(0x800942EC)=0x7000,0"]
+  - [room_m0318i, func_80197618, "a0=0,1,2; h(a1+0x10)=0,1,2,5; h(a1+0x12)=5,0xFFF0; h(0x800942EC)=0x8000,0x7FFF"]
+  - [room_m0318i, func_80197618, "a0=1,2; h(a1+0x10)=0xFFFF,0,1,2; h(a1+0x12)=3,0x20; h(a1+6)=0x8000,0x4000"]
+  - [room_m0318i, func_80197618, "a0=2; h(a1+0x10)=1; h(a1+0x12)=1,2,3,0xFFF0,7,9; h(a1+6)=0x8000,0x7FFF,0xC000,0x1234,0xF000,0x00FF"]
+  - [room_m0318i, func_80194AAC, "a0=1;a1=0x80130000;w(0x800F33E0)=0x80150000;h(a1+8)=0,1,2,3,0xFFFF;h(a1+0xA)=0,1,0xE,0xF,0x16,0x17,0x18,0x1E,0x1F,0x7FFF,0xFFFF;r(0x800CE610)=0,0x80140000"]
+  - [room_m0318i, func_80194AAC, "a0=0;a1=0x80130000;a2=0x80120000;w(0x800F33E0)=0x80150000;w(a2+0)=5,0x105;w(a2+4)=7;w(0x8009D20C)=0x80110000,0;w(0x8009D254)=0x80110000,0x80110300;w(0x80110000)=0x80110100,0;w(0x80110004)=0,0x80110200;w(0x80110200)=0x80110100;w(0x80110204)=0;h(0x8011020C)=0x0507;w(0x80110110)=1,0,0xFFFFFFFF;h(0x8011000C)=0x0507,0x0705,0x0505,0x0707"]
+  - [room_m0318i, func_80194AAC, "a0=2;a1=0x80130000;w(0x800BCFA4)=0x80140000;h(a1+0xC)=0,5,0xFFFB;w(0x800E27EC)=0,1;h(0x800E11EA)=0,3"]
+  - [room_m0318i, func_80194AAC, "a0=-1,3"]
+  - [room_m0432i, func_8019485C, "a0=1,2;h(a1+0x10)=0,1,2,3;h(a1+0x12)=0,5,0x1f,0x20,7,8,0xf,0x10,-3,0x7ff0,0x1e;h(0x800F336C)=4,0;w(0x800F3428)=1,0"]
+  - [room_m0432i, func_8019485C, "a0=0,1,2,3;h(a1+0x10)=-1,3,4"]
   - [exe, func_800C3324, "h(a0+0x28)=0x80,0x100,0x4000,0; w(a0+0x20)=0xFFFFFFFF,0x01010101,0x00FF0000; h(0x800F337A)=0,1; h(a0+0)=0x5000,0xB000; h(a0+2)=0x4000,0xC000"]
   - [exe, func_800C689C, "h(a0+0)=0,1;h(a0+4)=0,3;h(a0+8)=0,5;h(a0+0xC)=0,7;h(a0+0x10)=0,2;h(a0+0x14)=0,9;h(a0+2)=0,4;h(a0+6)=0,1"]
   - [exe, func_800D5A00, "a0=0,1,2,3;w(0x800E27EC)=0,4,10,11,12,13,0x1F,0x20,0xFFFFFFF9"]
