@@ -378,8 +378,10 @@ def narrow_ret(value: int, ty: str | None) -> int:
 
 
 def run_mips(ram: bytearray, entry: int, args: list[int], seed: int, outs: frozenset = frozenset(),
-             gte_state: list | None = None, ret_types: dict | None = None):
+             gte_state: list | None = None, ret_types: dict | None = None,
+             ret_override: dict | None = None):
     ret_types = ret_types or {}
+    ret_override = ret_override or {}
     r = [0] * 32
     r[4:8] = args
     r[29] = SP0
@@ -447,7 +449,7 @@ def run_mips(ram: bytearray, entry: int, args: list[int], seed: int, outs: froze
                 tgt = A
                 # mocked callee: the delay slot runs first (it may set an
                 # argument register), then the call is recorded and "returns"
-                pend_ret = narrow_ret(mock_ret(tgt, seed), ret_types.get(tgt))
+                pend_ret = narrow_ret(ret_override.get(tgt, mock_ret(tgt, seed)), ret_types.get(tgt))
                 run_slot(ram, r, pc, ld, st)
                 calls.append((tgt, tuple(r[4:8])))
                 r[2] = pend_ret
@@ -506,7 +508,7 @@ def run_mips(ram: bytearray, entry: int, args: list[int], seed: int, outs: froze
                     o_ = av[k] & 0x1FFFFFFF
                     ram[o_:o_ + n_] = out_bytes(tgt, k, seed, n_)
                     written.update(range(o_, o_ + n_))
-            r[2] = narrow_ret(mock_ret(tgt, seed), ret_types.get(tgt))
+            r[2] = narrow_ret(ret_override.get(tgt, mock_ret(tgt, seed)), ret_types.get(tgt))
             r[31] = cur + 8
             pc, npc = cur + 8, cur + 12
             continue
@@ -673,6 +675,14 @@ pe_addr_t PE_GuestFrame_Enter(uint32_t n) { fsp -= (n + 7u) & ~7u; return fsp; }
 void PE_GuestFrame_Leave(pe_addr_t b, uint32_t n) { (void)b; fsp += (n + 7u) & ~7u; }
 static unsigned seed_;
 static FILE *logf_;
+static uint32_t rov_fn_[32], rov_v_[32];   /* directed r(FN)=V returns */
+static unsigned rov_n_;
+static int rov_get(uint32_t fn, uint32_t *v)
+{
+    unsigned k;
+    for (k = 0; k < rov_n_; k++) if (rov_fn_[k] == fn) { *v = rov_v_[k]; return 1; }
+    return 0;
+}
 uint32_t mock_call(uint32_t fn, unsigned n, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3)
 {
     uint32_t a[4] = {a0, a1, a2, a3}, h = fn * 2654435761u + seed_ * 40503u;
@@ -680,6 +690,7 @@ uint32_t mock_call(uint32_t fn, unsigned n, uint32_t a0, uint32_t a1, uint32_t a
     fprintf(logf_, "C %08X", fn);
     for (i = 0; i < n && i < 4; i++) fprintf(logf_, " %08X", a[i]);
     fprintf(logf_, "\n");
+    { uint32_t v; if (rov_get(fn, &v)) return v; }
     if (((seed_ * 2654435761u) >> 16) & 1u) return (uint32_t)((int32_t)(h & 0x1FFFu) - 0x1000);
     return 0x80100000u + (h & 0xDFFFCu);
 }
@@ -709,6 +720,7 @@ uint32_t mock_args(uint32_t fn, unsigned n, const uint32_t *a)
                 }
             }
     }
+    { uint32_t v; if (rov_get(fn, &v)) return v; }
     if (((seed_ * 2654435761u) >> 16) & 1u) return (uint32_t)((int32_t)(h & 0x1FFFu) - 0x1000);
     return 0x80100000u + (h & 0xDFFFCu);
 }
@@ -718,6 +730,12 @@ int main(int argc, char **argv)
     uint32_t a0 = strtoul(argv[3], 0, 16), a1 = strtoul(argv[4], 0, 16),
              a2 = strtoul(argv[5], 0, 16), a3 = strtoul(argv[6], 0, 16);
     seed_ = (unsigned)strtoul(argv[7], 0, 10);
+    for (int k = 9; k < argc && rov_n_ < 32; k++) {   /* FN=V pairs */
+        char *eq = strchr(argv[k], '=');
+        if (!eq) continue;
+        rov_fn_[rov_n_] = (uint32_t)strtoul(argv[k], 0, 16);
+        rov_v_[rov_n_++] = (uint32_t)strtoul(eq + 1, 0, 16);
+    }
     if (!f || fread(ram, 1, sizeof ram, f) != sizeof ram) return 2;
     fclose(f);
     logf_ = fopen(argv[8], "w");
@@ -921,7 +939,10 @@ def directed_specs() -> dict[tuple[str, str], list[tuple[str, int, list[int]]]]:
     """Directed inputs for NON_MATCHING leaves, from configs/USA/overlays/nonmatching.yaml:
     `inputs: [ovl, name, "a0=1,2; h(a1+0x10)=0..5"]`.  Each seed takes the
     (seed mod product)-th combination: `aN=` sets argument N, `h(aN+OFF)=` /
-    `w(aN+OFF)=` store a halfword / word there (value lists or LO..HI ranges).
+    `w(aN+OFF)=` store a halfword / word there (value lists or LO..HI ranges);
+    `r(0xADDR)=` makes the mocked callee at ADDR return that value (on the
+    retail oracle and in the native stub alike) instead of the seeded mock,
+    which a busy-wait on a callee's status needs.
     A leaf may have several lines (one per mode, say): each is a spec of its
     own and runs the full seed count, so the value is a list of specs."""
     out: dict = {}
@@ -976,7 +997,7 @@ def inputs(name, ov, data, seeds, recorded, spec):
             at_ = lf["vram"] & 0x1FFFFFFF
             if b[at_:at_ + lf["file_size"]] != data[lf["file_offset"]:lf["file_offset"] + lf["file_size"]]:
                 continue                       # another overlay's code was resident: not this leaf
-            yield k, bytearray(b[:RAM_SIZE + SPAD]), list(struct.unpack_from("<4I", b, RAM_SIZE + SPAD))
+            yield k, bytearray(b[:RAM_SIZE + SPAD]), list(struct.unpack_from("<4I", b, RAM_SIZE + SPAD)), {}
         return
     specs = spec if spec and isinstance(spec[0], list) else [spec]
     for spec, seed in ((sp, sd) for sp in specs
@@ -993,6 +1014,7 @@ def inputs(name, ov, data, seeds, recorded, spec):
         base = ov["vram"] & 0x1FFFFFFF
         ram[base:base + len(data)] = data
         args = [0x80100000 + ((rng.getrandbits(18) << 2) & 0xDFFFC) for _ in range(4)]
+        rets: dict[int, int] = {}
         if spec:
             k = seed
             for lhs, vals in spec:
@@ -1000,6 +1022,10 @@ def inputs(name, ov, data, seeds, recorded, spec):
                     continue
                 v = vals[k % len(vals)]
                 k //= len(vals)
+                mm = re.fullmatch(r"r\((0x[0-9A-Fa-f]+)\)", lhs)
+                if mm:
+                    rets[int(mm.group(1), 16)] = v & 0xFFFFFFFF
+                    continue
                 mm = re.fullmatch(r"a(\d)", lhs)
                 if mm:
                     args[int(mm.group(1))] = v & 0xFFFFFFFF
@@ -1011,7 +1037,7 @@ def inputs(name, ov, data, seeds, recorded, spec):
                 at = (base_ + int(mm.group(3), 0)) & 0x1FFFFFFF
                 struct.pack_into("<H" if mm.group(1) == "h" else "<I", ram, at,
                                  v & (0xFFFF if mm.group(1) == "h" else 0xFFFFFFFF))
-        yield seed, ram, args
+        yield seed, ram, args, rets
 
 
 def one(p: Path, name: str, ovl: str, seeds: int, cc: str, cover: bool = False,
@@ -1081,17 +1107,20 @@ def one(p: Path, name: str, ovl: str, seeds: int, cc: str, cover: bool = False,
         if r.returncode:
             return "nocompile", r.stderr[:300]
         ran = 0
-        for seed, ram, args in inputs(name, ov, data, seeds, recorded, dspec or None):
+        for seed, ram, args, rets in inputs(name, ov, data, seeds, recorded, dspec or None):
             r_ram = bytearray(ram)
             try:
                 gte_state = []
                 v0, calls = run_mips(r_ram, leaf["vram"], list(args), seed, outs,
-                                     gte_state if check_gte else None, ret_types=ret_types)
+                                     gte_state if check_gte else None, ret_types=ret_types,
+                                     ret_override=rets)
             except Fault:
                 continue
             (d / "in.bin").write_bytes(ram)
             r = subprocess.run([str(d / "t"), str(d / "in.bin"), str(d / "out.bin"),
-                                *[f"{a:08X}" for a in args], str(seed), str(d / "log")],
+                                *[f"{a:08X}" for a in args], str(seed), str(d / "log"),
+                                *[f"{a:08X}={narrow_ret(v, ret_types.get(a)):08X}"
+                                  for a, v in rets.items()]],
                                capture_output=True, text=True, timeout=30)
             if r.returncode:
                 return "MISMATCH", f"seed {seed}: native exit {r.returncode} {r.stdout[:80]}"
