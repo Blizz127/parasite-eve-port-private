@@ -944,9 +944,25 @@ def neutralize_host_typedefs(text: str) -> str:
         "/* RECT: psx_compat.h (int16_t x, y, w, h — identical layout) */", text)
 
 
+ERA_LONG_RE = re.compile(r"\blong\s+long\b|\blong\s+int\b|\blong\b")
+
+
+def era_ilp32(text: str) -> str:
+    """gcc-2.7.2-psx is ILP32: `long` is 32 bits.  A verbatim body compiled on
+    an LP64 host would widen it; ovl_03C5 80121A00 and ovl_03D2 801922F4 read
+    DRAWENV through `PE_DECOMP_ARRAY(0x800BCDC8u, DRAWENV)`, and the
+    struct's `unsigned long dr_env[16]` made it 160 bytes instead of retail's
+    0x5C, so `D_800BCDC8[i] = D_801D13AC[i]` copied at the wrong stride over
+    D_800BCE80.  Outside `long long` (64-bit on both), `long` is spelled `int`.
+    The E21 lowering already types `long` as 4 bytes (guest_lower)."""
+    return ERA_LONG_RE.sub(lambda m: m.group(0) if m.group(0).split()[-1] == "long"
+                           and len(m.group(0).split()) == 2 else "int", text)
+
+
 def analyze(name: str, src_text: str, matched: dict,
             known: set[str], existing_macros: set[str],
             proto: dict[str, int], sigs: dict[str, dict]) -> dict:
+    src_text = era_ilp32(src_text)
     # E2b guard: a pin *without* an initialiser that is read before it is
     # written captures a live retail register — that is semantics, not a hint.
     pin_text = rewrite_tied_moves(strip_comments(src_text))

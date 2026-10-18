@@ -1079,8 +1079,29 @@ class GuestCallArgWidthTests(unittest.TestCase):
         self.assertEqual(g.canonical_guest_call_args(out), out)
 
 
-if __name__ == "__main__":
-    unittest.main()
+class EraIlp32Tests(unittest.TestCase):
+    """gcc-2.7.2-psx `long` is 32 bits; a verbatim body must not widen it."""
+
+    def test_long_becomes_int(self):
+        self.assertEqual(g.era_ilp32("unsigned long dr_env[16];"), "unsigned int dr_env[16];")
+        self.assertEqual(g.era_ilp32("long chunk; long int k; x = (long)y;"),
+                         "int chunk; int k; x = (int)y;")
+
+    def test_long_long_and_identifiers_are_kept(self):
+        for s in ("long long ll;", "unsigned long long x;", "longer = along;"):
+            self.assertEqual(g.era_ilp32(s), s)
+
+    def test_plan_body_and_types_are_ilp32(self):
+        # ovl_03D2 801922F4 / ovl_03C5 80121A00: the DRAWENV overlay over
+        # D_800BCDC8 must keep retail's 0x5C stride on an LP64 host.
+        src = ("typedef struct { short x, y, w, h; } RECT;\n"
+               "typedef struct { RECT clip; unsigned long dr_env[16]; } DRAWENV;\n"
+               "extern DRAWENV D_800BCDC8[];\nextern DRAWENV D_801D13AC[];\n"
+               "void func_80099990(void) {\n    D_800BCDC8[0] = D_801D13AC[0];\n}\n")
+        plan = analyze(src)
+        self.assertNotRegex(plan["body"], r"\blong\b")
+        self.assertIn("unsigned int dr_env[16];", plan["body"])
+
 
 
 class RoomIdiomRewriteTests(unittest.TestCase):
@@ -1115,3 +1136,7 @@ class RoomIdiomRewriteTests(unittest.TestCase):
         src = ("typedef struct Obj { int a; void (*fn)(); } Obj;\n"
                "int f(Obj *o) { o->fn(o); return 0; }\n")
         self.assertEqual(g.rewrite_code_pointer_members(src), src)
+
+
+if __name__ == "__main__":
+    unittest.main()
