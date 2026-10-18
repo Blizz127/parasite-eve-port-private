@@ -1195,7 +1195,7 @@ def one(p: Path, name: str, ovl: str, seeds: int, cc: str, cover: bool = False,
         # either way.
         min_ok = int(os.environ.get("E21_MIN_OK", "0") or 0)
         max_seeds = int(os.environ.get("E21_MAX_SEEDS", "256") or 256)
-        ext = {"to": 0}
+        seed_ext = {"to": 0}
 
         def runs():
             yield from inputs(name, ov, data, seeds, recorded, dspec or None)
@@ -1205,7 +1205,7 @@ def one(p: Path, name: str, ovl: str, seeds: int, cc: str, cover: bool = False,
                                seed_range=range(seeds, max_seeds)):
                 if ran >= min_ok:
                     return
-                ext["to"] = item[0] + 1
+                seed_ext["to"] = item[0] + 1
                 yield item
 
         for seed, ram, args, rets in runs():
@@ -1303,7 +1303,7 @@ def one(p: Path, name: str, ovl: str, seeds: int, cc: str, cover: bool = False,
             lo_, hi_ = leaf["vram"], leaf["vram"] + leaf["file_size"]
             hit = sum(1 for a in COVER if lo_ <= a < hi_)
             cov = f", retail coverage {hit}/{leaf['file_size'] // 4} words"
-        more = f" (seed range extended to {ext['to']})" if ext["to"] else ""
+        more = f" (seed range extended to {seed_ext['to']})" if seed_ext["to"] else ""
         return ("ok" if ran else "skipped"), f"{ran} seeds{more}{cov}"
 
 
@@ -1339,14 +1339,17 @@ def main() -> int:
     with concurrent.futures.ProcessPoolExecutor(max_workers=max(1, args.jobs)) as ex:
         futs = {ex.submit(one, p, n, ov, args.seeds, cc, args.coverage, args.recorded, directed_specs(), args.check_gte): (p.name, ov) for p, n, ov in cands}
         for f in concurrent.futures.as_completed(futs):
-            st, why = f.result()
+            try:
+                st, why = f.result()
+            except Exception as exc:          # one TU's harness failure must not end the sweep
+                st, why = "error", repr(exc)[:300]
             res.setdefault(st, []).append((futs[f][0], why))
     for st in sorted(res):
         print(f"e21_diff: {st}: {len(res[st])}")
-        if st in ("MISMATCH", "nocompile") or args.verbose:
+        if st in ("MISMATCH", "nocompile", "error") or args.verbose:
             for nm, why in sorted(res[st]):
                 print(f"  {st} {nm}: {why}")
-    return 1 if res.get("MISMATCH") or res.get("nocompile") else 0
+    return 1 if res.get("MISMATCH") or res.get("nocompile") or res.get("error") else 0
 
 
 if __name__ == "__main__":
