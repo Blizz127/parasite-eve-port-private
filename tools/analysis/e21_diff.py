@@ -1175,8 +1175,25 @@ def one(p: Path, name: str, ovl: str, seeds: int, cc: str, cover: bool = False,
                     if int(pv, 16) & m != rv_ & m:
                         return "MISMATCH", f"seed {seed}: call {tgt:08X} a{k} {rv_:08X} vs {pv}"
             rl = [l for l in log if l.startswith("R ")][0].split()[1]
-            if rl != "-" and int(rl, 16) != v0 and not sig.group(1).startswith(("uint8", "int8", "uint16", "int16")):
-                return "MISMATCH", f"seed {seed}: v0 {v0:08X} vs {rl}"
+            if rl != "-":
+                nv = int(rl, 16)
+                rty = sig.group(1)
+                if rty.startswith(("uint8", "int8", "uint16", "int16")):
+                    # A narrow return type is checked, not assumed: GCC returns
+                    # the value zero-/sign-extended (andi, sll+sra, lhu, lb), so
+                    # retail's v0 must already be its own extension; anything
+                    # else means the declared type is too narrow.  The value is
+                    # then compared at that width (the native log is extended).
+                    ext = narrow_ret(v0, rty.replace("_t", "").replace("uint", "unsigned ")
+                                     .replace("int8", "signed char").replace("int16", "short")
+                                     .replace("unsigned 8", "unsigned char").replace("unsigned 16", "unsigned short"))
+                    if ext != v0:
+                        return "MISMATCH", (f"seed {seed}: retail v0 {v0:08X} is not a {rty} "
+                                            f"(the declared return type is too narrow)")
+                    if nv != ext:
+                        return "MISMATCH", f"seed {seed}: v0 {v0:08X} vs {rl}"
+                elif nv != v0:
+                    return "MISMATCH", f"seed {seed}: v0 {v0:08X} vs {rl}"
             ran += 1
         cov = ""
         if COVER is not None:
