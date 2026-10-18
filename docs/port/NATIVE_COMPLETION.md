@@ -60,10 +60,12 @@ never declared resident in production, and closure-equal duplicates count once.
 
 "0 not-native" means that every room body has compiled host code. It does not
 mean that no room body can stop: a native body can still call something with
-no native code. The known case is room_m0017i `func_8018F0F0`, which calls the
-full `func_8003A088` through a generated boundary. The port has only that
-function's mode-0 cuts, and its GTE asm does not lower. See "Dangling callbacks"
-and Open.
+no native code. The known case was room_m0017i `func_8018F0F0`, which called
+`func_8003A088` through a generated boundary. The port had that function only
+under a cut name, and the leaf's GTE asm does not lower. Since regen25 it is a
+direct call; see "Dangling callbacks". The 38 remaining generated boundary
+sites (`boundary_site_census.py --generated`) are the dormant ones listed under
+"Generated-TU boundaries".
 
 No body is left without C. The last 47 were effect and particle callbacks of the
 late rooms. 4dba7922 covered m0429i 801982A4 and the room batches 1-12 the other
@@ -572,8 +574,11 @@ boundary, `#define func_X(...) PE_D_COMP_BOUNDARYn("func_X", ...)`: printf
 (`func_80071A74`) in 6 of them, and libspu/libcd-band internals
 (`func_8007E1F4`, `8007E22C`, `8007BDDC`, ...) in the rest.
 `boundary_site_census.py` skipped `#define` lines and so missed them; it now
-counts each binding. `--generated` gives 39 sites (it was 8): the 8 overlay
-sites above plus 31 bindings in these 21 TUs. None of the 21 is reached:
+counts each binding. `--generated` gave 39 sites (it was 8): the 8 overlay
+sites above plus 31 bindings in these 21 TUs. Since regen25 it gives 38:
+room_m0017i `func_8018F0F0`'s call of `func_8003A088` is now a direct call
+(see "Dangling callbacks"), and the other 7 overlay sites are the dormant
+intra-overlay boundaries in Open. None of the 21 is reached:
 - a reverse call-graph walk over pc_port finds no hand, platform or src
   caller, only other generated Psy-Q-band TUs that nothing reaches;
 - the EXE and the 515 PE.IMG blobs hold no aligned word with any of their
@@ -793,14 +798,21 @@ loop sentinel, 9 boundary arguments, and one word in the EXE data:
 | 0x800DB6BC | field effect type 16 main (EXE data 0x800E1CF8, node 16 of `D_800E1044`) | command code 0x55 with type 16 -> `PE_EffectCallback` -> stop | native, NON_MATCHING (f1a1b1c74) |
 | 0x80083944, 0x800846AC, 0x800847B0, 0x8008486C | Psy-Q libpad/libcard hooks: card record +0x18 (`func_800837C8`) and slots `D_8009B724/72C/730` (`func_800844E4`, installed at boot) | only through the libcard driver hand ports in `absent_cd_port.c` (`cd_icall`) | open: Psy-Q, so they cannot be `func_<addr>` definitions; production saves through the host memory card (`PE_Memcard_*` in `func_80041108_port.c`), and whether the libcard driver hooks ever run in production is not established |
 
-After f1a1b1c74 the census reports:
+After f1a1b1c74 the census reported 4 stored, 9 boundary arguments and
+1 comparison. The ninth boundary argument was room_m0017i `func_8018F0F0`'s
+call of `func_8003A088`. The model-matrix walk has been native all along under
+the name `func_8003A088_mode0_walk_cut`: despite the name it follows every
+`+0x28` mode of the leaf, and production's per-actor update `func_80015240`
+calls it. It now has its own entry, `func_8003A088`
+(`game/boot/func_8003A088_port.c`). After regen25 the room TU calls it
+directly and the registry has its row (5776 thunks). The room TU's e21 at the
+shipped flags gives 32 seeds and 45/45 words.
 
-    dangling_callback_census: 4 stored unresolved, 9 boundary arguments, 1 comparisons
+    dangling_callback_census: 4 stored unresolved, 8 boundary arguments, 1 comparisons
 
 The 4 are the libcard hooks. The boundary arguments are the Psy-Q-band
-generated TUs, `func_80079178`, `func_80080E34`, the card frontier, and
-room_m0017i `func_8018F0F0` -> `func_8003A088` (Open). The comparison is
-`port6_port.c`'s `0x8007E3B4` loop sentinel.
+generated TUs, `func_80079178`, `func_80080E34` and the card frontier. The
+comparison is `port6_port.c`'s `0x8007E3B4` loop sentinel.
 
 `PE_EffectCallback` has a `[DAY1_SHIM]` arm that skips an unresolved effect
 callback instead of stopping. It runs only under `PE_BOUNDARY_POLICY=record`,
@@ -889,11 +901,6 @@ Earlier gates:
 
 - The ending credits need a CD-XA provider. Until one exists they stop on
   `credits_cd_xa_service`; see "Reachable gap".
-- room_m0017i `func_8018F0F0` calls the full `func_8003A088` (model matrix
-  walk) through a generated boundary. The port has only mode-0 cuts of it
-  (`game/boot/func_8003A088_port.c`), and the matched leaf's GTE asm does not
-  lower ("asm: instruction $13"). Where m0017i falls on the route is not
-  established.
 - The four Psy-Q libcard hooks in "Dangling callbacks". As Psy-Q functions
   they need host replacements, not `func_<addr>` definitions, if the libcard
   driver ever runs them in production.

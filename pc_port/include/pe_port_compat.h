@@ -1012,6 +1012,8 @@ extern void func_800794C4(pe_addr_t angles, pe_addr_t out);
 extern void func_8003A088_mode0_empty_cut(pe_addr_t dest);
 extern void func_8003AC90(pe_addr_t dest, pe_addr_t view);
 extern void func_8003A088_mode0_walk_cut(pe_addr_t dest);
+/* The whole func_8003A088 (every +0x28 mode, then the bone walk). */
+extern void func_8003A088(pe_addr_t dest);
 extern void func_8003B97C_empty_cut(pe_addr_t dest, pe_addr_t bea40);
 extern void func_8003B97C_lighting_cut(pe_addr_t dest, pe_addr_t bea40);
 extern void func_8003BCE0(pe_addr_t dest, int a1, int a2);

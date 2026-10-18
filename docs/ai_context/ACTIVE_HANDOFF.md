@@ -150,13 +150,16 @@ Later on 2026-10-18 (all committed, none pushed):
     edits). The e21 harness gained `func_800D1DEC`'s 6/3-byte argument
     extents.
 
-  Left: four Psy-Q libcard hooks (whether production runs them is not
-  established) and m0017i -> `func_8003A088` (GTE asm).
+  Left: four Psy-Q libcard hooks; whether production runs them is not
+  established.
+- regen25: room_m0017i `func_8018F0F0` now calls the native
+  `func_8003A088` directly. The walk cut already covered every mode, and
+  `func_8003A088` is now its named entry. Generated boundary sites 39 -> 38,
+  registry 5776. Gates: suite 1665/1665, ctests 6/6, psyq PASS (1421); the
+  room TU's e21 gives 32 seeds and 45/45 words.
 
 Open (NATIVE_COMPLETION.md has each):
 - the ending credits need a CD-XA provider (gated to a loud stop);
-- room_m0017i `func_8018F0F0` -> `func_8003A088` (generated boundary; GTE
-  asm does not lower; route position unknown);
 - the four Psy-Q libcard hooks, and the seven unsettled boundary conditions;
 - latent verbatim-TU classes that no fix closes: 32-bit address wrap on
   out-of-range indices (func_800428D4 with D_800A1860 == 0 is the one

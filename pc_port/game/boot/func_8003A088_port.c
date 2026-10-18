@@ -213,6 +213,17 @@ void func_8003A088_mode0_walk_cut(pe_addr_t dest)
     }
 }
 
+/* func_8003A088 itself.  Despite its name, the walk cut above follows every
+ * +0x28 mode of src/func_8003A088.c (1 source copy, 3 rigid attach, 4
+ * parent-relative, then the bone walk); production's per-actor update
+ * (func_80015240) calls it for every actor.  Room code that calls
+ * func_8003A088 directly (room_m0017i func_8018F0F0) reaches it here instead
+ * of a generated boundary. */
+void func_8003A088(pe_addr_t dest)
+{
+    func_8003A088_mode0_walk_cut(dest);
+}
+
 /* 3AC90..3AF14: view x joint transforms, then three-vertex RTPT batches.
  * The retail loop projects a final complete triple even for count%3 != 0. */
 void func_8003AC90(pe_addr_t dest, pe_addr_t view)
