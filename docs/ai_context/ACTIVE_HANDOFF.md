@@ -26,8 +26,29 @@ direct calls (bug), fingerprint-guarded m0005i effect bindings (bug: other
 rooms' callbacks at the same VMAs ran Eve's charge code), and m0429i
 801982A4 NON_MATCHING.
 
-Next: full e21 sweep, then the 46 no-C room bodies (m0318i 19, m0432i 11,
-m0429i 9, ...) as NON_MATCHING C, each proven with e21_leaf.
+Later on 2026-10-18 (commits d11531b7e, f91561717):
+- The ending credits now run native. `func_8001220C` called the ovl_0457
+  loop through a `psx_compat.h` Bootstrap stub; it now goes through the
+  registry. The credits' libpress calls and printf have host replacements.
+  The `func_8004DCA4` nonzero mode follows the matched C, with 8 new retail
+  cases.
+  Evidence: `docs/evidence/native-credits-20261018/REPORT.md`, suite
+  1661/1661, a retail-vs-native decode of all 31 credits pictures.
+- NON_MATCHING EXE leaf support: `e21_leaf.py exe`.
+- The e21 harness mock-stub bug that caused 139 nocompiles in sweep 3 is
+  fixed. `e21_leaf.py --seed-list` added.
+- `tools/analysis/boundary_site_census.py`: 228 production sites, no stale
+  ones.
+- Room NON_MATCHING batch 1 (six leaves from workflow wf_441734e8, each
+  confirmed by an independent verifier) is in `nonmatching.yaml`, waiting on
+  the regeneration gate.
+
+Next:
+- e21 sweep 4 with the fixed harness.
+- The remaining no-C room bodies: the room workflow is still running.
+- The EXE asm-only effect functions, `func_800C3324` first. The generated
+  weapon-effect callbacks `func_800CC644`/`func_800CC878` in the `0x800E0D08`
+  table call it through a boundary.
 
 Pitfall: never symlink `tools/era/maspsx/maspsx.py` into a worktree. Python
 then loads the main checkout's maspsx package, and m0350i's gate FAILed on

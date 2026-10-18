@@ -44,38 +44,41 @@ covers both discs.
 ## Census (2026-10-18)
 
 **Room code**: `PE_DISC1_BIN=<disc 1> python3 pc_port/tools/pe_all_rooms_native_census.py`.
-Registry `zz_dispatch.c`: 5712 thunks. 185 code rooms, 9103 (room x body)
+Registry `zz_dispatch.c`: 5719 thunks. 185 code rooms, 9103 (room x body)
 rows, 2952 unique (vma, size, FNV) bodies.
 
-| | session start | now |
+| | session start | 2026-10-18 02:30 |
 |---|--:|--:|
-| native-generated bodies | 8855 | 9054 (87 via a data head) |
-| not-native bodies (all statically reachable now) | 217 | 47 |
-| direct-addr-guarded (hand port bound by address only) | 31 | 2 |
-| unique not-native bodies | 136 (183,492 bytes) | 49 (90,512 bytes) |
+| native-generated bodies | 8855 | 9061 (87 via a data head) |
+| not-native bodies (all statically reachable) | 217 | 40 |
+| direct-addr-guarded (hand port bound by address only) | 31 | 0 |
+| native-direct (hand port bound by fingerprint) | 0 | 2 |
+| unique not-native bodies | 136 (183,492 bytes) | 40 (79,844 bytes) |
 
 A body resolves only by fingerprint, as `PE_GuestCode_Resolve` does. Rooms are
 never declared resident in production, and closure-equal duplicates count once.
 
-The 47 bodies with no C anywhere are effect and particle callbacks in late
+The 40 bodies with no C anywhere are effect and particle callbacks in late
 rooms:
 
 | room | bodies |
 |---|--:|
-| m0318i | 19 |
-| m0432i | 11 |
-| m0429i | 9 |
+| m0318i | 17 |
+| m0432i | 10 |
+| m0429i | 8 |
 | m0404i | 3 |
-| m0428i | 1 |
-| m0350i | 1 |
-| m0273i | 1 |
 | m0256i | 1 |
+| m0273i | 1 |
 
-This count already excludes m0429i 801982A4, ported below. The vendor
-(khasinski) tree also has them as asm. The two direct-addr-guarded bodies are
-m0005i 8018F614/8018FDC4. They are native hand ports, bound by fingerprint
-after this branch (see Fixed); the census reads that guard form on the next
-regeneration.
+The vendor (khasinski) tree also has them as asm. The two native-direct bodies
+are m0005i 8018F614/8018FDC4: hand ports the effect dispatcher binds by
+fingerprint (efffd7cb).
+
+From the previous census (47) to this one, seven bodies became generated
+NON_MATCHING TUs: m0429i 801982A4 (4dba7922, after that census) and room
+batch 1 (m0318i 80192718/801955E4, m0350i 80196F2C, m0428i 801928CC, m0429i
+80192878, m0432i 801962FC). The earlier statement here that the 47 already
+excluded 801982A4 was wrong; the census listed it as not-native.
 
 **EXE** (`gen_decomp_ports.py --e21 --check`): eligible 1130 verbatim, E21
 lowered 21, 112 matched leaves that a hand port defines. Five uncompilable
