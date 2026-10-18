@@ -273,6 +273,8 @@ int  func_80080D5C(int command, pe_addr_t param, pe_addr_t result);
 /* 1 when a CD provider serves XA-ADPCM streaming through the libcd queue
  * (Setfilter, ReadS in XA mode, GetlocP, Stop); see pe_libcd.c. */
 int PE_Cd_XaServiceAvailable(void);
+/* 1 when the active disc has the file a guest name string names (pe_libcd.c). */
+int PE_Cd_FilePresent(pe_addr_t guest_name);
 /* Mid-game register-level device attachment for a CD-XA consumer: the two
  * hooks host-mode DsInit skips, saved and restored (game/boot/cd_stream_port.c). */
 typedef struct { pe_addr_t irq2, vsync0; int attached; } PeCdAttach;

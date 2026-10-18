@@ -249,14 +249,36 @@ static int PE_Cd_BcdByte(uint8_t b)
 /* XA-ADPCM streaming through the libcd queue: CdlSetmode/CdlSetfilter/
  * CdlReadS in XA mode (func_8007EE84, func_8007F0C8), position reports by
  * CdlGetlocP and CdlStop, each awaited on the completion ring at D_800A3610
- * (func_8007F418).  No provider serves it.  With the device disabled nothing
- * publishes a completion (only the IRQ chain reaches func_8007EB88) and
- * nothing decodes a queued XA read.  The register-level device rejects
- * commands 8, 13 and 0x11 (CD_device_unported_command).  The ending credits
- * (ovl_0457 func_801235DC) are the caller; they must not start without it. */
+ * (func_8007F418).  The host-mode provider does not serve it: with the device
+ * disabled nothing publishes a completion (only the IRQ chain reaches
+ * func_8007EB88) and nothing decodes a queued XA read.  The register-level
+ * device does, attached mid-game by PE_Cd_AttachDevice
+ * (game/boot/cd_stream_port.c): Setfilter, XA routing to the SPU, GetlocP and
+ * Stop per psx-spx.  The ending credits (ovl_0457 func_801235DC) are the
+ * caller; PE_Main_EnterCredits attaches the device around them. */
 int PE_Cd_XaServiceAvailable(void)
 {
-    return 0;
+    return 1;
+}
+
+/* 1 when the active disc holds the file that a guest name string names, by
+ * the same ISO9660 lookup func_80081414 makes.  The credits entry needs it:
+ * func_8012562C retries a failed CdSearchFile forever (for example with
+ * Disc 1 in the drive, which has no XASTREAM directory). */
+int PE_Cd_FilePresent(pe_addr_t guest_name)
+{
+    char name[64], file_id[16];
+    uint32_t lba, size;
+    unsigned i;
+    PE_Disc *d = PE_Disc_GetActive();
+    if (!d || !guest_name || !PE_RangeIsRam(guest_name, sizeof name)) return 0;
+    for (i = 0; i + 1u < sizeof name; i++) {
+        name[i] = (char)PE_LoadU8(guest_name + i);
+        if (!name[i]) break;
+    }
+    name[i] = 0;
+    if (name[0] != '\\') return 0;
+    return PE_Disc_FindFile(d, name, &lba, &size, file_id, sizeof file_id) ? 1 : 0;
 }
 
 /* func_80080D5C is the blocking command wrapper at [0x80080D5C,

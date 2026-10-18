@@ -1,3 +1,36 @@
+## UPDATE 2026-10-18 22:00 UTC: the ending credits run native (unit level)
+
+Lane: claude/native-complete-20261017 (worktree build/wt-native-20261017).
+Nothing pushed, nothing published, no game run.
+
+- 8d5aaa6ce: the register-level CD device serves the credits' commands
+  (Setfilter, XA routing to the SPU, GetlocP, Stop, all per psx-spx).
+  - `func_8007BF44` is a hand port. The Psy-Q allowlist row moved; the count
+    is unchanged at 1421; the move needs owner approval.
+  - The poll quantum is 64 cycles.
+- 4637916e3: `PE_Cd_AttachDevice`/`PE_Cd_DetachDevice` (mid-game attach of
+  the two hooks host-mode DsInit skips).
+  - Bug fixed: with the device attached, `VSync(-1)` now returns the VBlank
+    counter, as its header documents. It used to return the call count, which
+    starved the credits' GetlocP.
+  - `func_801235DC` runs to its exit from production state.
+- Production-wiring commit (after 4637916e3):
+  - `PE_Cd_XaServiceAvailable` = 1.
+  - `PE_Main_EnterCredits` gates the pad-code mode and a missing CREDITS.XA,
+    attaches, arms the new stop escape (`game_port.h`), runs, and detaches.
+  - Injection tests proved every wait class comes back under a stop. The
+    `func_801255A4` Pause wait needed an escape point in `func_80080DC4`.
+- Sweep 8: ok 2041, MISMATCH 8 (the stack-residue set), skipped 5.
+- Gate: pe-native-tests 1675/1675, ctests 6/6, Psy-Q guard 1421, generator
+  0 drifted.
+- Next:
+  - a Disc 2 ending run on the runner (it needs a coordinator admission);
+  - the Day-1 route regression and the Day-2 movies check;
+  - the owner's device gate.
+
+  Full status: `docs/port/NATIVE_COMPLETION.md` ("The ending credits:
+  CD-XA", "Gates on this branch").
+
 ## UPDATE 2026-10-18 UTC: native-completion lane (claude/native-complete-20261017)
 
 Owner goal (direct, 2026-10-17): 100% native completion and every bug or

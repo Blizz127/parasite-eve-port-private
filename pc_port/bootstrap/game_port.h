@@ -60,6 +60,20 @@ PEPortStopReason PE_Port_GetStopReason(void);
 unsigned PE_Port_StopEpoch(void);
 const char *PE_Port_StopReasonName(PEPortStopReason reason);
 
+/* Stop escape for a long-running generated loop that never tests
+ * PE_Port_ShouldStop (the ending credits; PE_Main_EnterCredits is the only
+ * user).  The caller arms it around the loop and disarms it on every path.
+ * While it is armed, PE_Port_EscapePoint() polls PE_Port_ShouldStop(), so a
+ * host quit is seen.  Once a stop is requested it longjmps back to the armed
+ * caller, and taking the escape disarms it.  The escape point sits at the very
+ * entry of HostFB_VSync, PE_GuestCall and HostFB_DevicePoll, before any
+ * device or audio servicing.  It is never taken from PE_Port_RequestStop,
+ * which runs part-way through device updates. */
+#include <setjmp.h>
+void PE_Port_EscapeArm(jmp_buf *escape);
+void PE_Port_EscapeDisarm(void);
+void PE_Port_EscapePoint(void);
+
 /* Deterministic B53I-B2 hardware opportunity.  It captures at most one
  * already-active DMA token, then keeps completion, DICR-edge bridging, and
  * CPU IRQ service as separately callable phases. */

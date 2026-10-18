@@ -13,6 +13,7 @@
 #include "pe_guestcode.h"
 #include "pe_mdec.h"
 #include "pe_audio_driver.h"
+#include "pe_spu.h"
 
 #define CREDITS_LIBPRESS_VMA 0x8010BCF8u
 #define CREDITS_OVL_VMA      0x80120D00u
@@ -216,19 +217,26 @@ static void test_credits_vlc_bounded_resume_oracle(void)
     PASS();
 }
 
-/* No CD provider serves XA streaming (PE_Cd_XaServiceAvailable), so
- * func_8001220C's credits arm stops on the credits_cd_xa_service boundary in
- * every mode instead of entering a loop that would spin.  Nothing of the
- * credits runs: the op-table pointer the loop stores first keeps its sentinel
- * and the libcd queue is untouched. */
+/* func_8001220C's credits arm refuses to enter in the cases the loop cannot
+ * finish, each on a named boundary: the pad-code mode (bit 16: 0x10000 and the
+ * 0x12000 the pad code sets) is credits_pad_code_mode, and modes 0 / 0x20000
+ * without \XASTREAM\CREDITS.XA;1 on the active disc (none here) are
+ * credits_xa_file_absent, because func_8012562C would retry its search
+ * forever.  Nothing of the credits runs: the op-table pointer the loop stores
+ * first keeps its sentinel, the libcd queue is untouched and the device stays
+ * detached. */
 static void test_credits_entry_stops_without_xa_service(void)
 {
     static const uint32_t modes[] = { 0u, 0x10000u, 0x12000u, 0x20000u };
     unsigned m;
     TEST("credits_entry_stops_without_xa_service");
-    ASSERT(PE_Cd_XaServiceAvailable() == 0, "no provider serves XA streaming");
+    ASSERT(PE_Cd_XaServiceAvailable() == 1, "the attached device serves XA streaming");
     for (m = 0; m < 4u; m++) {
+        const char *want = (modes[m] & 0x10000u) ? "credits_pad_code_mode"
+                                                 : "credits_xa_file_absent";
         ResetTestState();
+        PE_CdReg_Reset();
+        PE_Disc_SetActive(NULL);
         PE_StoreU32(0x8009D1A0u, modes[m]);
         PE_StoreU32(0x80172CD0u, 0xC0DEC0DEu);
         PE_StoreU32(0x8009B53Cu, 0x55u);
@@ -236,21 +244,21 @@ static void test_credits_entry_stops_without_xa_service(void)
         ASSERT(PE_Port_ShouldStop() &&
                PE_Port_GetStopReason() == PE_PORT_STOP_UNRESOLVED_BOUNDARY,
                "loud unresolved-boundary stop");
-        ASSERT(g_stub_order_count == 1 &&
-               strcmp(g_stub_order_log[0], "credits_cd_xa_service") == 0,
-               "credits_cd_xa_service boundary identity");
+        ASSERT(g_stub_order_count == 1 && strcmp(g_stub_order_log[0], want) == 0,
+               "credits gate boundary identity");
         ASSERT(g_bootstrap_arg_call_count == 1 &&
                g_bootstrap_arg_calls[0].arg0 == (modes[m] & 0x30000u),
                "boundary records the credits mode bits");
         ASSERT(PE_LoadU32(0x80172CD0u) == 0xC0DEC0DEu, "credits loop not entered");
         ASSERT(PE_LoadU32(0x8009B53Cu) == 0x55u && PE_LoadU32(0x800A3608u) == 0u,
                "libcd queue untouched");
+        ASSERT(!PE_CdReg_DeviceEnabled(), "device not attached");
     }
     PASS();
 }
 
-/* Why the arm stops.  With the device disabled (the production provider) a
- * queued command never completes.  func_80125744 starts with CdlSetmode 0xC8
+/* Why the arm attaches the device.  With the device disabled (production's
+ * host-mode provider) a queued command never completes.  func_80125744 starts with CdlSetmode 0xC8
  * through func_8007EE84(14, mode, 0, -1) and polls func_8007F418 in a
  * for(;;) that only a 2 (or a retry on another nonzero) leaves; here every
  * poll reads 0 (pending) and nothing requests a stop.  The kick latches lane
@@ -310,7 +318,7 @@ void ovl_0457__func_801235DC(void);
 /* total_sectors >= CXA_SECTORS: sectors past CXA_SECTORS are left untouched
  * (calloc'd zero pages, never written) so a long fixture costs no memory; the
  * drive delivers them as zero data sectors. */
-static PE_Disc *CxaBuildDiscSized(uint8_t **out, uint32_t total_sectors)
+static PE_Disc *CxaBuildDiscSized(uint8_t **out, uint32_t total_sectors, int with_file)
 {
     uint8_t *img = calloc(total_sectors, PE_DISC_RAW_SECTOR), *p;
     uint32_t i;
@@ -332,7 +340,8 @@ static PE_Disc *CxaBuildDiscSized(uint8_t **out, uint32_t total_sectors)
     p = FxUser(img, 21);
     n = FxPutDirRec(p, 21, 2048, 0x02, "\0", 1);
     n += FxPutDirRec(p + n, 20, 2048, 0x02, "\1", 1);
-    FxPutDirRec(p + n, CXA_FILE_LBA, CXA_FILE_SECTORS * 2048u, 0x00, "CREDITS.XA;1", 12);
+    if (with_file)
+        FxPutDirRec(p + n, CXA_FILE_LBA, CXA_FILE_SECTORS * 2048u, 0x00, "CREDITS.XA;1", 12);
     for (i = 0; i < CXA_FILE_SECTORS; i++) {
         uint8_t *raw = img + (size_t)(CXA_FILE_LBA + i) * PE_DISC_RAW_SECTOR;
         uint8_t slot = (uint8_t)(i & 7u), audio = slot < 2u;
@@ -348,7 +357,7 @@ static PE_Disc *CxaBuildDiscSized(uint8_t **out, uint32_t total_sectors)
 
 static PE_Disc *CxaBuildDisc(uint8_t **out)
 {
-    return CxaBuildDiscSized(out, CXA_SECTORS);
+    return CxaBuildDiscSized(out, CXA_SECTORS, 1);
 }
 
 static void test_credits_xa_device_path(void)
@@ -482,98 +491,282 @@ static void test_credits_attach_from_host_boot(void)
     PASS();
 }
 
-/* The credits loop func_801235DC itself, mode 0 (Disc 2 ending), from the
- * production entry state on the fixture disc.  It runs in a child process
- * under alarm(): the loop has no stop test, so a hang must fail the test, not
- * the suite.  The exit it must reach: func_80123950 reports the scroll done
- * (state 0 -> 4), then D_80172CE0 = D_80172CE4, which the GetlocP callback
- * sets once the position passes the file end; then the func_801255A4
- * teardown and op 6, and bit 16 of D_8009D1A0 cleared. */
-/* The scroll is 744 lines of 18 px at 1 px per loop iteration after a 224 px
- * lead-in (func_80123E08, the 0x80125C88 line table): about 13600
- * iterations.  The 2x ReadS keeps running past the 48-sector file until the
- * teardown, 2.5 sectors per VBlank, so the disc must outlast that. */
+/* Bounded credits runs from the production entry state: host-mode libds boot
+ * (ResetCallback, host DsInit, CdReset), the pad records and the boot input
+ * config (func_8003E974), no button held, and an 80000-sector fixture.  Each
+ * runs in a forked child under alarm(): the generated loops have no stop test,
+ * so a hang must fail the test, not the suite.  A test VBlank hook in VSync
+ * slot 7 (the game uses 0 and 4) counts VBlanks and injects the stop or the
+ * pad press a case needs.
+ *
+ * The scroll is 744 lines of 18 px at 1 px per loop iteration after a 224 px
+ * lead-in (func_80123E08, the 0x80125C88 line table): about 13600 iterations.
+ * The 2x ReadS keeps running past the 48-sector file until the teardown,
+ * 2.5 sectors per VBlank, so the disc must outlast that.  Only the first 512
+ * sectors are written. */
 #define CXA_LOOP_SECTORS 80000u
+#define CXA_HOOK_ADDR    0x8000FF00u
+enum { CXA_MODE0, CXA_MODE20000, CXA_STOP_IN_LOOP, CXA_QUIT_IN_LOOP,
+       CXA_STOP_LANE_WAIT, CXA_STOP_TEARDOWN, CXA_STOP_SEARCH };
 typedef struct {
-    uint32_t done, stopped, ce0, ce4, iterations, vsyncs, presented, reading, lane, queue, d1a0;
-    uint32_t xa;
-} CxaLoopResult;
+    uint32_t setup, ret, escaped, stopped, reason, attached_after, slots_ok;
+    uint32_t ce0, ce4, iterations, presented, xa, lane, queue, d1a0;
+    uint32_t press_iter, pressed_at, vblanks;
+} CxaRun;
+static unsigned g_cxa_vblanks, g_cxa_stop_at, g_cxa_quit_after, g_cxa_quit_polls;
+static unsigned g_cxa_press_iter, g_cxa_pressed_at;
+static uint16_t g_cxa_press_pad;
+static PeCdAttach g_cxa_at;
 
-static void test_credits_main_loop_runs_to_exit(void)
+static void CxaVBlankHook(void)
+{
+    g_cxa_vblanks++;
+    if (g_cxa_stop_at && g_cxa_vblanks == g_cxa_stop_at)
+        PE_Port_RequestStop(PE_PORT_STOP_UNRESOLVED_BOUNDARY);
+    if (g_cxa_press_iter && !g_cxa_pressed_at) {
+        uint32_t it = PE_LoadU32(0x80172CD4u);      /* the loop counts from 420 */
+        if (it >= 420u && it - 420u >= g_cxa_press_iter) {
+            PE_StoreU16(0x800BE9A2u, g_cxa_press_pad);    /* held from now on */
+            g_cxa_pressed_at = it - 420u;
+        }
+    }
+}
+
+static int CxaQuitPoll(void)
+{
+    return g_cxa_quit_after && ++g_cxa_quit_polls >= g_cxa_quit_after;
+}
+
+/* The pad bits (active low) that make D_8009D26C carry one of the state-2
+ * exit bits 0xF0000004 under the boot config, inverting func_8003EB04's
+ * mapping (m = ~pad & ~0x6000, with buttons 0x2000/0x4000 swapped). */
+static int CxaExitPress(uint16_t *pad)
+{
+    static const unsigned bits[] = { 2u, 28u, 29u, 30u, 31u };
+    unsigned k;
+    for (k = 0; k < 5u; k++) {
+        uint32_t want = PE_LoadU32(0x800A76F0u + bits[k] * 4u), press;
+        if (!want) continue;
+        press = want & ~0x6000u;
+        if (want & 0x4000u) press |= 0x2000u;
+        if (want & 0x2000u) press |= 0x4000u;
+        *pad = (uint16_t)~press;
+        return 1;
+    }
+    return 0;
+}
+
+static void CxaChild(int scenario, CxaRun *r)
+{
+    PE_Disc *d1, *cx;
+    uint8_t *img = NULL;
+    char err[256];
+    uint32_t irq2, vsync0;
+    uint16_t mask, registered;
+    int vs, ds, pr, mk;
+    jmp_buf escape;
+    memset(r, 0, sizeof *r);
+    ResetTestState();
+    PE_CdReg_Reset();
+    err[0] = 0;
+    if (!(d1 = BTL6_OpenDisc1(err, sizeof(err)))) return;
+    PE_Disc_SetActive(d1);
+    if (PE_GuestImage_LoadExe(d1, err, sizeof(err)) != 0 ||
+        PE_Globals_AdoptRetailImage() != 0 || credits_load_overlays() != 0) return;
+    if (!(cx = CxaBuildDiscSized(&img, CXA_LOOP_SECTORS, scenario != CXA_STOP_SEARCH))) return;
+    PE_Disc_SetActive(cx);
+    HostFB_Init(); PE_GPU_Init(); PE_Callback_Init();
+    PE_Spu_SetActive(1);                        /* the SPU decodes routed XA */
+    func_80073C94();
+    Test_SeedDigitalController();               /* boot's pad init: 844E4/84B44 */
+    (void)func_8003E974();                      /* boot's input config */
+    PE_StoreU16(0x800BE9A2u, 0xFFFFu);          /* no button held */
+    if (func_8007EC14() != 1 || func_8007ED58() != 1 || func_8007F72C() != 1) return;
+    irq2 = PE_LoadU32(0x800945E8u + 8u);
+    vsync0 = PE_Callback_GetSlot(0u);
+    mask = PE_IRQ_GetMask();
+    registered = PE_LoadU16(0x80094614u);
+    if (PE_Callback_Bind(CXA_HOOK_ADDR, CxaVBlankHook) != 0) return;
+    (void)func_80073D58(7u, CXA_HOOK_ADDR);
+    PE_StoreU32(0x8009D1A0u, PE_LoadU32(0x8009D1A0u) & ~0x30000u);
+    r->setup = 1;
+    switch (scenario) {
+    case CXA_MODE20000:
+        PE_StoreU32(0x8009D1A0u, PE_LoadU32(0x8009D1A0u) | 0x20000u);
+        if (!CxaExitPress(&g_cxa_press_pad)) { r->setup = 0; return; }
+        g_cxa_press_iter = 14000u;          /* inside state 2, after the scroll */
+        r->ret = (uint32_t)PE_Main_EnterCredits();
+        break;
+    case CXA_STOP_IN_LOOP:
+        g_cxa_stop_at = 600u;
+        r->ret = (uint32_t)PE_Main_EnterCredits();
+        break;
+    case CXA_QUIT_IN_LOOP:
+        g_cxa_quit_after = 200000u;
+        PE_Port_SetQuitPoll(CxaQuitPoll);
+        r->ret = (uint32_t)PE_Main_EnterCredits();
+        break;
+    case CXA_MODE0:
+        r->ret = (uint32_t)PE_Main_EnterCredits();
+        break;
+    default:
+        /* One CD wait class with the stop already requested (or requested by
+         * the hook while it retries), the escape armed directly. */
+        if (!PE_Cd_AttachDevice(&g_cxa_at)) { r->setup = 0; return; }
+        if (setjmp(escape) == 0) {
+            PE_Port_EscapeArm(&escape);
+            if (scenario == CXA_STOP_LANE_WAIT) {
+                PE_StoreU8(0x801E0000u, 0xC8u);
+                (void)func_8007EE84(14u, 0x801E0000u, 0u, 0xFFFFFFFFu);
+                PE_Port_RequestStop(PE_PORT_STOP_UNRESOLVED_BOUNDARY);
+                (void)ovl_0457__func_80125744();
+            } else if (scenario == CXA_STOP_TEARDOWN) {
+                PE_Port_RequestStop(PE_PORT_STOP_UNRESOLVED_BOUNDARY);
+                (void)ovl_0457__func_801255A4();
+            } else {
+                g_cxa_stop_at = 5u;             /* the file is absent: it retries */
+                (void)ovl_0457__func_8012562C();
+            }
+            r->escaped = 0;
+        } else {
+            r->escaped = 1;
+        }
+        PE_Port_EscapeDisarm();
+        PE_Cd_DetachDevice(&g_cxa_at);
+        break;
+    }
+    r->attached_after = (uint32_t)PE_CdReg_DeviceEnabled();
+    r->stopped = (uint32_t)PE_Port_ShouldStop();
+    r->reason = (uint32_t)PE_Port_GetStopReason();
+    r->slots_ok = PE_LoadU32(0x800945E8u + 8u) == irq2 && PE_Callback_GetSlot(0u) == vsync0 &&
+                  PE_IRQ_GetMask() == mask && PE_LoadU16(0x80094614u) == registered;
+    r->ce0 = PE_LoadU32(0x80172CE0u);
+    r->ce4 = PE_LoadU32(0x80172CE4u);
+    r->iterations = PE_LoadU32(0x80172CD4u) - 420u;
+    r->xa = (uint32_t)PE_Spu_XaSectors();
+    r->lane = PE_LoadU32(0x8009B574u);
+    r->queue = PE_LoadU32(0x800A3608u);
+    r->d1a0 = PE_LoadU32(0x8009D1A0u);
+    r->press_iter = g_cxa_press_iter;
+    r->pressed_at = g_cxa_pressed_at;
+    r->vblanks = g_cxa_vblanks;
+    HostFB_GetState(&vs, &ds, &pr, &mk);
+    r->presented = (uint32_t)pr;
+}
+
+/* 1 when the child ran to completion inside the bound and wrote its result. */
+static int CxaFork(int scenario, CxaRun *r, unsigned bound)
 {
     int fds[2], status = 0;
     pid_t pid;
-    CxaLoopResult r;
-    TEST_RETAIL_DISC1("credits_main_loop_runs_to_exit");
-    ASSERT(pipe(fds) == 0, "pipe");
+    ssize_t got;
+    memset(r, 0, sizeof *r);
+    if (pipe(fds) != 0) return 0;
     fflush(NULL);
     pid = fork();
     if (pid == 0) {
-        PE_Disc *d1, *cx;
-        uint8_t *img = NULL;
-        char err[256];
-        PeCdAttach at;
-        PeCdDeviceState dev;
-        int vs, ds, pr, mk;
-        memset(&r, 0, sizeof r);
+        CxaRun mine;
         close(fds[0]);
-        alarm(240);
-        ResetTestState();
-        PE_CdReg_Reset();
-        err[0] = 0;
-        d1 = BTL6_OpenDisc1(err, sizeof(err));
-        if (d1) {
-            PE_Disc_SetActive(d1);
-            if (PE_GuestImage_LoadExe(d1, err, sizeof(err)) == 0 &&
-                PE_Globals_AdoptRetailImage() == 0 && credits_load_overlays() == 0 &&
-                (cx = CxaBuildDiscSized(&img, CXA_LOOP_SECTORS)) != NULL) {
-                PE_Disc_SetActive(cx);
-                HostFB_Init(); PE_GPU_Init(); PE_Callback_Init();
-                func_80073C94();
-                Test_SeedDigitalController();   /* boot's pad init: 844E4/84B44 */
-                if (func_8007EC14() == 1 && func_8007ED58() == 1 && PE_Cd_AttachDevice(&at)) {
-                    PE_StoreU32(0x8009D1A0u, PE_LoadU32(0x8009D1A0u) & ~0x30000u);
-                    ovl_0457__func_801235DC();
-                    PE_CdReg_GetDeviceState(&dev);
-                    r.reading = dev.reading;
-                    r.xa = dev.xa_sectors;
-                    r.lane = PE_LoadU32(0x8009B574u);
-                    r.queue = PE_LoadU32(0x800A3608u);
-                    PE_Cd_DetachDevice(&at);
-                    r.done = 1;
-                }
-            }
-        }
-        r.stopped = (uint32_t)PE_Port_ShouldStop();
-        r.ce0 = PE_LoadU32(0x80172CE0u);
-        r.ce4 = PE_LoadU32(0x80172CE4u);
-        r.iterations = PE_LoadU32(0x80172CD4u) - 420u;
-        r.d1a0 = PE_LoadU32(0x8009D1A0u);
-        HostFB_GetState(&vs, &ds, &pr, &mk);
-        r.vsyncs = (uint32_t)vs;
-        r.presented = (uint32_t)pr;
-        if (write(fds[1], &r, sizeof r) != (ssize_t)sizeof r) _exit(3);
-        _exit(0);
+        alarm(bound);
+        CxaChild(scenario, &mine);
+        _exit(write(fds[1], &mine, sizeof mine) == (ssize_t)sizeof mine ? 0 : 3);
     }
     close(fds[1]);
-    ASSERT(pid > 0, "fork");
-    memset(&r, 0, sizeof r);
-    {
-        ssize_t got = read(fds[0], &r, sizeof r);
-        close(fds[0]);
-        ASSERT(waitpid(pid, &status, 0) == pid, "waitpid");
-        ASSERT(!WIFSIGNALED(status), "the credits loop did not exit within 240 s");
-        ASSERT(got == (ssize_t)sizeof r && WIFEXITED(status) && WEXITSTATUS(status) == 0,
-               "child result");
-    }
-    fprintf(stderr, "[credits] loop: %u iterations, %u vsync calls, %u presents, %u XA sectors\n",
-            r.iterations, r.vsyncs, r.presented, r.xa);
-    ASSERT(r.done && !r.stopped, "setup, attach and the whole loop ran without a stop");
+    if (pid < 0) { close(fds[0]); return 0; }
+    got = read(fds[0], r, sizeof *r);
+    close(fds[0]);
+    if (waitpid(pid, &status, 0) != pid) return 0;
+    return !WIFSIGNALED(status) && WIFEXITED(status) && WEXITSTATUS(status) == 0 &&
+           got == (ssize_t)sizeof *r;
+}
+
+/* Mode 0 (the Disc 2 ending) through main's own entry, PE_Main_EnterCredits:
+ * the file check, the attach, the whole loop, the detach.  It must leave
+ * through D_80172CE0 = D_80172CE4 (set once a GetlocP position passes the
+ * file end) after func_80123950 reports the scroll done, with the teardown
+ * leaving the drive idle, both hooks and masks restored and bit 16 clear. */
+static void test_credits_main_loop_runs_to_exit(void)
+{
+    CxaRun r;
+    TEST_RETAIL_DISC1("credits_main_loop_runs_to_exit");
+    ASSERT(CxaFork(CXA_MODE0, &r, 240u), "the credits loop did not exit within 240 s");
+    fprintf(stderr, "[credits] mode 0: %u iterations, %u presents, %u XA sectors decoded\n",
+            r.iterations, r.presented, r.xa);
+    ASSERT(r.setup && r.ret == 1u && !r.stopped, "entry, attach and the loop ran without a stop");
     ASSERT(r.ce0 == 1u && r.ce4 == 1u, "the loop left through D_80172CE0 = D_80172CE4 = 1");
-    ASSERT(!r.reading && r.lane == 1u && r.queue == 0u,
-           "the teardown left the drive idle and the queue empty");
+    ASSERT(r.iterations >= 13000u && r.presented >= r.iterations, "the whole scroll ran");
+    ASSERT(!r.attached_after && r.slots_ok, "detached; IRQ 2, VSync 0 and both masks restored");
+    ASSERT(r.lane == 1u && r.queue == 0u, "the teardown left the drive idle and the queue empty");
     ASSERT(!(r.d1a0 & 0x10000u), "bit 16 of D_8009D1A0 clear on exit");
-    ASSERT(r.xa >= CXA_FILE_SECTORS / 4u, "the XA channel played");
+    ASSERT(r.xa >= CXA_FILE_SECTORS / 16u, "the XA channel was decoded");
+    PASS();
+}
+
+/* Mode 0x20000 (bit 17): channel 1 (func_80125894(1)), the fade states 1-3 and
+ * the state-2 wait for D_80172CE4 and a held exit button.  No button is held
+ * until the hook presses the one the boot config maps to an exit bit, at
+ * iteration 14000, past the scroll; the loop must wait for it and then leave. */
+static void test_credits_mode_20000_waits_for_press(void)
+{
+    CxaRun r;
+    TEST_RETAIL_DISC1("credits_mode_20000_waits_for_press");
+    ASSERT(CxaFork(CXA_MODE20000, &r, 240u), "the credits loop did not exit within 240 s");
+    fprintf(stderr, "[credits] mode 0x20000: %u iterations, pressed at %u, %u XA sectors decoded\n",
+            r.iterations, r.pressed_at, r.xa);
+    ASSERT(r.setup && r.ret == 1u && !r.stopped, "entry and the loop ran without a stop");
+    ASSERT(r.pressed_at >= r.press_iter && r.pressed_at < r.press_iter + 2u &&
+           r.iterations > r.pressed_at + 60u && r.iterations < r.pressed_at + 80u,
+           "state 2 waited for the press, then the 64-step fade-out ran");
+    ASSERT(r.ce0 == 1u && r.ce4 == 1u, "left through D_80172CE0 with the stream ended");
+    ASSERT(!r.attached_after && r.slots_ok && r.lane == 1u && r.queue == 0u,
+           "detached, hooks restored, drive idle");
+    ASSERT(r.xa >= CXA_FILE_SECTORS / 16u, "the channel-1 XA was decoded");
+    PASS();
+}
+
+/* A stop inside the credits must come back to the entry, not spin: once from
+ * the loop body (a boundary at VBlank 600) and once as a host quit through the
+ * quit poll.  Each must return 0 with the device detached and the hooks and
+ * masks as before the attach. */
+static void test_credits_escape_from_loop(void)
+{
+    CxaRun r;
+    TEST_RETAIL_DISC1("credits_escape_from_loop");
+    ASSERT(CxaFork(CXA_STOP_IN_LOOP, &r, 120u), "a stop in the loop did not come back");
+    ASSERT(r.setup && r.ret == 0u && r.stopped && r.reason == PE_PORT_STOP_UNRESOLVED_BOUNDARY,
+           "boundary stop returns 0 from PE_Main_EnterCredits");
+    ASSERT(r.iterations < 13000u && !r.attached_after && r.slots_ok,
+           "left mid-scroll; detached and restored");
+    ASSERT(CxaFork(CXA_QUIT_IN_LOOP, &r, 120u), "a host quit in the loop did not come back");
+    ASSERT(r.setup && r.ret == 0u && r.stopped && r.reason == PE_PORT_STOP_HOST_QUIT,
+           "host quit returns 0 from PE_Main_EnterCredits");
+    ASSERT(!r.attached_after && r.slots_ok, "detached and restored after the quit");
+    PASS();
+}
+
+/* The CD wait classes in the credits helpers, each with a stop: the empty-body
+ * lane wait in func_80125744 (a queued Setmode keeps DsQueueLen nonzero), the
+ * func_801255A4 teardown's `while (func_80080DC4(9, 0, 0) == 0)`, and
+ * func_8012562C's CdSearchFile retry on a disc without the file. */
+static void test_credits_escape_from_cd_waits(void)
+{
+    static const struct { int scenario; const char *what; } cases[] = {
+        { CXA_STOP_LANE_WAIT, "func_80125744 lane wait" },
+        { CXA_STOP_TEARDOWN,  "func_801255A4 Pause wait" },
+        { CXA_STOP_SEARCH,    "func_8012562C search retry" },
+    };
+    CxaRun r;
+    unsigned k;
+    TEST_RETAIL_DISC1("credits_escape_from_cd_waits");
+    for (k = 0; k < 3u; k++) {
+        if (!CxaFork(cases[k].scenario, &r, 60u)) {
+            fprintf(stderr, "[credits] no escape: %s\n", cases[k].what);
+            FAIL("a CD wait under a stop reached no escape point");
+            return;
+        }
+        ASSERT(r.setup && r.escaped && r.stopped, "the escape was taken");
+        ASSERT(!r.attached_after && r.slots_ok, "detached and restored after the escape");
+    }
     PASS();
 }
 
@@ -588,5 +781,8 @@ static void test_credits_native_all(void)
     test_credits_xa_device_path();
     test_credits_attach_from_host_boot();
     test_credits_main_loop_runs_to_exit();
+    test_credits_mode_20000_waits_for_press();
+    test_credits_escape_from_loop();
+    test_credits_escape_from_cd_waits();
 }
 #endif

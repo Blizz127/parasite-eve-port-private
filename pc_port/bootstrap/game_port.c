@@ -28,6 +28,7 @@ static int g_port_frame_limit = 0;
 static int g_port_main_iteration_limit = 0;
 static int g_port_frame_budget_reached = 0;
 static PEPortQuitPoll g_port_quit_poll = NULL;
+static jmp_buf *g_port_escape = NULL;   /* PE_Port_EscapeArm */
 static PEPortPresentHook g_port_present_hook = NULL;
 static PEPortStopReason g_port_stop_reason = PE_PORT_STOP_NONE;
 static int g_port_dma_irq_checkpoint_enabled = 1;
@@ -143,6 +144,7 @@ void PE_Port_RunControlReset(void)
     g_port_main_iteration_limit = 0;
     g_port_frame_budget_reached = 0;
     g_port_quit_poll = NULL;
+    g_port_escape = NULL;
     g_port_present_hook = NULL;
     g_port_stop_reason = PE_PORT_STOP_NONE;
     g_port_dma_irq_checkpoint_enabled = 1;
@@ -296,6 +298,25 @@ void PE_Port_RequestStop(PEPortStopReason reason)
 unsigned PE_Port_StopEpoch(void)
 {
     return g_port_stop_epoch;
+}
+
+void PE_Port_EscapeArm(jmp_buf *escape)
+{
+    g_port_escape = escape;
+}
+
+void PE_Port_EscapeDisarm(void)
+{
+    g_port_escape = NULL;
+}
+
+void PE_Port_EscapePoint(void)
+{
+    jmp_buf *escape = g_port_escape;
+    if (escape && PE_Port_ShouldStop()) {
+        g_port_escape = NULL;
+        longjmp(*escape, 1);
+    }
 }
 
 int PE_Port_BeginMainIteration(void)

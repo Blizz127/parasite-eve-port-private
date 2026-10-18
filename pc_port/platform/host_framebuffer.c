@@ -278,6 +278,7 @@ uint32_t HostFB_VSyncTimer(void)
 
 uint32_t HostFB_VSync(int mode)
 {
+    PE_Port_EscapePoint();      /* armed only by PE_Main_EnterCredits */
     /* A nonblocking audio upload must complete even when the game only
      * polls its completion flag. Service DMA at the normal host tick. */
     (void)PE_SpuDma_Service();
@@ -378,6 +379,7 @@ const uint8_t *HostFB_GetPixels(void)
  * faster per poll than retail.  No effect with the device detached. */
 void HostFB_DevicePoll(void)
 {
+    PE_Port_EscapePoint();      /* armed only by PE_Main_EnterCredits */
     if (!PE_Port_ShouldStop() && PE_CdReg_DeviceEnabled())
         HostFB_DeviceTime(64u);
 }

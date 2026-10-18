@@ -947,6 +947,7 @@ uint32_t func_8007EE84(uint32_t command,pe_addr_t param,uint32_t extra,uint32_t 
 int func_8007F418(uint32_t sequence,pe_addr_t response)
 {
     uint32_t index;
+    PE_Port_EscapePoint();      /* a DsSync poll: armed only by PE_Main_EnterCredits */
     if(!sequence) {
         /* A sequence-0 read is a plain ring look-up with no func_8007B010
          * VSync queries, so it gets the poll's CPU-time quantum here. */
@@ -990,6 +991,10 @@ int func_8007F418(uint32_t sequence,pe_addr_t response)
  * SDK worker advances the enabled device clock and dispatches real IRQs. */
 int func_80080DC4(int command,pe_addr_t param,pe_addr_t response)
 {
+    /* Under a stop this returns 0 at once (no queue poll), so a caller's
+     * `while (func_80080DC4(..) == 0)` (the credits teardown func_801255A4)
+     * would spin without reaching any other escape point. */
+    PE_Port_EscapePoint();
     /* HOST_ADAPTED (fmv lane): with the CD device disabled the only
      * streaming reader is pe_str_feed; CdlPause(9)/CdlStop(8) end it and
      * complete immediately (no controller response bytes are read by the

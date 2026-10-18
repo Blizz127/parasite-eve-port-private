@@ -185,7 +185,11 @@ Native bodies that replaced boundaries:
     the credits report.
   - Erratum 2: the credits' CD-XA arms spin forever on every provider. Since
     e27fc416a, main's arm stops on `credits_cd_xa_service` before entering, as it did
-    before this branch (see "Reachable gap: the ending credits need CD-XA").
+    before this branch (see "The ending credits: CD-XA").
+  - Since 8d5aaa6ce and 4637916e3 and the production-wiring commit after
+    them, main's arm attaches the register-level CD device, which now serves
+    Setfilter, XA routing, GetlocP and Stop, and runs the credits under the
+    stop escape. Only the pad-code mode stays a stop.
 
 Dangling callbacks (see "Dangling callbacks"):
 
@@ -626,7 +630,7 @@ Verifier verdicts: 36 not reachable, 3 reachable-unported, 30 unknown.
 
 The 3 reachable rows are two defects, both fixed today:
 - `cd_stream_port.c:927` (`CD_command_wait`), the credits' CD-XA arms. The
-  credits now stop before entering (e27fc416a); see "Reachable gap".
+  credits now stop before entering (e27fc416a); see "The ending credits: CD-XA".
 - `func_80063E0C_port.c:54` (`PE_MenuInputCallback`), plus its install row
   `port6_port.c:52`: the item-list and shop callbacks 0x800494AC and
   0x8004A9A0, now native (d3e872a2a); see "Dangling callbacks".
@@ -673,11 +677,25 @@ settled them as follows.
   - Tests: `GFX1_gp0_mirrors_and_copy` and
     `DRW1_chain_long_node_and_copy` (a 20-word node of four 81h copies plus
     NOP mirrors).
-- **Narrowed: `func_80075358_port.c:40`, a GP0 word the GPU model refuses.**
-  The refusals that matter here were the opcodes just implemented. What
-  remains is 03h, 1Fh, F0h..FFh, the READ_DATA state, and A0 sizes outside
-  VRAM. The verifier could not establish the pause packets' (base+0x104 and
-  +0x114) command bytes, so this stays a guard.
+- **Dormant: `func_80075358_port.c:40`, a GP0 word the GPU model refuses.**
+  The opcodes still refused are 03h, 1Fh and F0h..FFh, plus the READ_DATA
+  state and A0 sizes outside VRAM. Neither DrawPrim caller sends any of them:
+  - **The pause overlay** (`func_8006A0E8`) submits `D_800B0CD8+0x114`, then
+    `+0x104`. Only the boot initializer `func_8006A674` writes them
+    (`src/func_8006A674.c:134-166`), once:
+    - `+0x104` has count 3: GP0(62h), a semi-transparent monochrome 320x224
+      rectangle at (0,0) in colour (0x20,0x20,0x20);
+    - `+0x114` has count 1: GP0(E1h) `0xE1000440`.
+
+    No other matched leaf writes `D_800B0CD8+0x104..0x11B`. A grep over
+    `src/` for the base with those offsets finds only arena strides and
+    `+0x11C`. Both opcodes are implemented.
+  - **The title loop** (hand port `game/boot/func_80190660_port.c`) sends
+    GP0(E1h) `0xE1000018` and a 4-word GP0(64h) textured rectangle
+    (`pair[7] = 0x64`, lines 59 and 69). The generated ovl_03D2 TU is not on
+    the production path.
+
+  So the refusal stays a guard but is not reachable in production.
 - **Dormant: `absent_ovl_port.c:77`.** libgte `func_80079178` is called only
   from `func_800C65E4`, and nothing references `func_800C65E4`. There is no
   C caller, no `jal 0x800C65E4` (`0x0C031979`) in the EXE or any of the
@@ -714,7 +732,7 @@ directory).
 code. It counts any body that has a bootstrap marker on any path, and most of
 those are hand ports with one guarded error path.
 
-## Reachable gap: the ending credits need CD-XA
+## The ending credits: CD-XA
 
 The credits loop (`func_801235DC`, ovl_0457) drives the drive itself. main's
 arm (state `0xAA108448` with `D_800B0CD8.fF5` bit 1) enters it in two modes:
@@ -905,18 +923,66 @@ CDS, CDQ, B53, B54K, CDXA).
   the drive read past. After each stop the loop spun until the alarm. That is
   the next blocker.
 
-**Still blocking production** (the service stays 0):
-- **Stop safety.** `PE_Port_RequestStop` only sets a flag. The generated
-  credits loop never tests it, nor do the busy waits in its CD helpers
-  (`func_801255A4`'s `while (func_80080DC4(9, 0, 0) == 0) {}`, the lane-1
-  waits). A boundary, or a host quit such as closing the window, inside the
-  credits would then spin forever instead of exiting. The test proved this
-  twice.
-- **A disc without CREDITS.XA.** `func_8012562C` retries its CdSearchFile
-  forever when the file is missing (for example Disc 1 in the drive). The entry
-  must check for the file and stop with a named boundary.
-- The pad-code mode (bit 16) stays gated: nothing shows what retail's ring
-  holds there.
+**Production wiring (this commit).** `PE_Cd_XaServiceAvailable()` now returns
+1, and `PE_Main_EnterCredits` (`bootstrap/func_8001220C_port.c`) runs the
+credits in production. Its order:
+1. Bit 16 (the pad-code mode: the nine-step code in `func_8003EB04` sets
+   0x12000) stops on `credits_pad_code_mode`. That mode waits for
+   `func_8007F418(0, 0) == 2` with no XA setup, and nothing shows what retail's
+   ring holds there.
+2. `PE_Cd_FilePresent` (`platform/pe_libcd.c`) looks up the overlay's own name
+   (`*0x80125B48` -> `\XASTREAM\CREDITS.XA;1`) on the active disc. Without
+   it, the entry stops on `credits_xa_file_absent`, because `func_8012562C`
+   retries a failed CdSearchFile forever (Disc 1 has no XASTREAM).
+3. `PE_Cd_AttachDevice`, or a stop on `credits_cd_attach`.
+4. The **stop escape** (`game_port.h`) is armed around
+   `PE_GuestCall(0x801235DC)`. The generated loops never test
+   `PE_Port_ShouldStop`, so while armed `PE_Port_EscapePoint()` polls it and
+   longjmps back to the entry once a stop is requested. It is the only user;
+   disarmed, the point is one load and a branch. The escape points sit at the
+   entry of:
+   - `HostFB_VSync`, `PE_GuestCall` (`guest_call`) and `HostFB_DevicePoll`;
+   - `func_8007F418` (DsSync);
+   - `func_80080DC4` (DsControlB). Under a stop it returns 0 at once, so the
+     teardown's `while (func_80080DC4(9, 0, 0) == 0)` reached no other point.
+     The injection test proved this: that case spun until its 60 s alarm
+     before the point was added.
+
+   The escape is never taken from `PE_Port_RequestStop` itself. The attach
+   record is static, so it stays valid across the longjmp.
+5. Detach on both paths. The return is `!PE_Port_ShouldStop()`.
+
+**Tests** (forked children under `alarm()`, from the production entry state:
+host libds boot, pad records, the boot input config `func_8003E974`, no button
+held, SPU active, an 80000-sector fixture; a test VBlank hook in VSync slot 7):
+- `credits_main_loop_runs_to_exit`, mode 0 through `PE_Main_EnterCredits`:
+  - 13608 iterations and 13608 presents; 6 XA sectors decoded (the
+    fixture's channel 0);
+  - it left through `D_80172CE0 = D_80172CE4 = 1`;
+  - after detach: IRQ 2, VSync 0 and both masks restored, lane 1, queue empty,
+    bit 16 clear.
+- `credits_mode_20000_waits_for_press`, mode 0x20000:
+  - channel 1 via `func_80125894(1)`, and the fade states 1-3;
+  - state 2 waited until the hook held the button the boot config maps to an
+    exit bit (iteration 14000), then the 64-step fade-out ran; 14068
+    iterations in all;
+  - 6 channel-1 sectors decoded.
+- `credits_escape_from_loop`: a boundary from the loop body (VBlank 600) and a
+  host quit through the quit poll. Each returns 0 mid-scroll, detached and
+  restored.
+- `credits_escape_from_cd_waits`: a stop in the `func_80125744` lane wait, in
+  the `func_801255A4` Pause wait and in the `func_8012562C` search retry.
+  Each comes back through the escape, detached and restored.
+- `credits_entry_stops_without_xa_service` now checks the two gate boundaries
+  (`credits_pad_code_mode` for 0x10000/0x12000, `credits_xa_file_absent` for
+  0/0x20000 with no disc). In both, the device stays detached and nothing of
+  the credits runs.
+
+**What this does not establish.** The credits are native at unit level on a
+synthetic disc. Nothing has played the real Disc 2 CREDITS.XA, run the
+end-of-music timing, or run what follows the credits (the EX save prompt, the
+return to the title). Those need a game run on the runner. The ending is not
+verified until that run.
 
 ### Generated CD waits (a class the boundary census misses)
 
@@ -984,7 +1050,7 @@ loop sentinel, 9 boundary arguments, and one word in the EXE data:
 | 0x8004A9A0 | shop window update (`func_8004A570`, from the equip-slot list's Confirm) | first key press -> stop | native, NON_MATCHING (d3e872a2a) |
 | 0x800DD9E4 | rising-sparks particle callback (`func_800DDD70` pool) | first pool tick -> `PE_EffectCallback` -> stop | native, NON_MATCHING (f1a1b1c74) |
 | 0x800DB6BC | field effect type 16 main (EXE data 0x800E1CF8, node 16 of `D_800E1044`) | command code 0x55 with type 16 -> `PE_EffectCallback` -> stop | native, NON_MATCHING (f1a1b1c74) |
-| 0x80083944, 0x800846AC, 0x800847B0, 0x8008486C | Psy-Q libpad/libcard hooks: card record +0x18 (`func_800837C8`) and slots `D_8009B724/72C/730` (`func_800844E4`, installed at boot) | only through the libcard driver hand ports in `absent_cd_port.c` (`cd_icall`) | open: Psy-Q, so they cannot be `func_<addr>` definitions; production saves through the host memory card (`PE_Memcard_*` in `func_80041108_port.c`), and whether the libcard driver hooks ever run in production is not established |
+| 0x80083944, 0x800846AC, 0x800847B0, 0x8008486C | Psy-Q libpad/libcard hooks: card record +0x18 (`func_800837C8`) and slots `D_8009B724/72C/730` (`func_800844E4`, installed at boot) | only through the libcard driver hand ports in `absent_cd_port.c` (`cd_icall`) | dormant: those ports (`func_80082E00`, `func_80083014`, `func_800840DC`, `func_80084168`) have no direct C caller, only registry rows, and are entered only from MemCard_TimerCallback `0x80082B70`. That callback is stored into `D_800A5AB4` (`func_80082ADC`, `pe_save.c:86`), and no production code reads `D_800A5AB4` to dispatch it (`grep -rn 800A5AB4 pc_port`, tests excluded). As Psy-Q functions they would need host replacements, not `func_<addr>` definitions, if a later change ever dispatched that table |
 
 After f1a1b1c74 the census reported 4 stored, 9 boundary arguments and
 1 comparison. The ninth boundary argument was room_m0017i `func_8018F0F0`'s
@@ -1040,6 +1106,40 @@ substitutes silently in production.
   `func_8006B4F8_port.c`.
 
 ## Gates on this branch
+
+Current tree: HEAD after the credits production wiring, 2026-10-18 21:53-21:57
+UTC (incremental build in /dev/shm):
+- `pe-native-tests`: 1675/1675. New since regen25:
+  `credits_xa_device_path`, `CDXA_device_commands`,
+  `credits_attach_from_host_boot`, `credits_main_loop_runs_to_exit`,
+  `credits_mode_20000_waits_for_press`, `credits_escape_from_loop`,
+  `credits_escape_from_cd_waits`, `GFX1_gp0_mirrors_and_copy`,
+  `DRW1_chain_long_node_and_copy` and `PV_4D5CC_card_slot_runs_registry_callback`.
+- ctests park/GTE/dev-menu 6/6.
+- `psyq_port_guard.py` on both binaries: PASS (1421). One row moved:
+  0x8007BF44 from the generated TU to `cd_stream_port.c` (see the CD-XA
+  spike). This needs the owner's approval as an allowlist edit.
+- Generator drift: 1049 EXE TUs, 0 drifted; the overlay TUs and the registry
+  are up to date.
+- Sweep 8 (every e21 candidate at the shipped flags, `--coverage --min-ok 4
+  --max-seeds 256`, tree at 18:37:58Z, 18:37-20:14 UTC):
+
+      e21_diff: MISMATCH: 8      the stack-residue set
+      e21_diff: ok: 2041
+      e21_diff: skipped: 5       ovl_0700 8018F55C/80191C94, ovl_03D2 8018F958/8018FBC0/80192CE8 (dormant)
+
+  No E21 TU changed after it started. The two generated TUs that did change
+  (`func_80080AE4`, `func_80080F98`) are verbatim, and e21 sweeps only E21
+  TUs.
+- Still not run, owed through the runner (it needs a coordinator admission),
+  plus the owner's own device gate:
+  - the Day-1 route regression;
+  - the movies-on Day-2 check;
+  - an ending run on Disc 2: the credits through the real CREDITS.XA, and the
+    EX save prompt and return to the title after them;
+  - the owner device gate;
+  - any visual check.
+
 
 Current tree: regen25, HEAD d9db7fcfb plus doc commits, 2026-10-18 18:26 UTC.
 - `pe-native-tests`: 1665/1665. Four tests are new since regen20:
@@ -1131,13 +1231,20 @@ Earlier gates:
 
 ## Open
 
-- The ending credits need a CD-XA provider. Until one exists they stop on
-  `credits_cd_xa_service`; see "Reachable gap".
-- The four Psy-Q libcard hooks in "Dangling callbacks". As Psy-Q functions
-  they need host replacements, not `func_<addr>` definitions, if the libcard
-  driver ever runs them in production.
-- The seven boundary conditions the triage could not settle (listed under
-  "Boundary-site census").
+- The ending credits run natively in production through the attached
+  register-level device, at unit level only (see "The ending credits:
+  CD-XA"). Owed: a Disc 2 ending run on the runner. Still gated: the pad-code
+  mode (bit 16, `credits_pad_code_mode`).
+- The four Psy-Q libcard hooks are dormant (see the "Dangling callbacks"
+  table): the only path to them, the MemCard_TimerCallback table
+  `D_800A5AB4`, is never dispatched in production.
+- Of the seven boundary conditions (under "Boundary-site census"), two are
+  fixed and five are settled: three dormant (`func_80075358`'s GP0 refusals,
+  `absent_ovl_port.c:77`, and with them the libcard hooks), one
+  error-defensive (`actor_contact_port.c:183`), and one stack residue
+  (`func_80028574` shot counts 11-15). The stack-residue one stays a stop:
+  retail reads uninitialized stack there, and whether a weapon record can
+  carry 11-15 is not established.
 
 - No room body is without C any more (census 0). The NON_MATCHING bodies are
   behaviour C proven by the e21 differential, not byte matches. The room workflow (wf_9660d38d) is working through them.

@@ -67,25 +67,51 @@ static void PE_Port_ScratchpadCall(void (*overlay)(void))
  * anything else is a loud boundary, never a silent return.
  *
  * The loop drives the drive itself.  With D_8009D1A0 bit 16 clear it opens
- * \XASTREAM\CREDITS.XA;1 (Disc 2) and queues CdlSetmode 0xC8 and CdlSetfilter
- * through func_8007EE84, waiting on func_8007F418 for each, then plays the
- * stream by CdlReadS and CdlGetlocP (func_801258EC, func_80125A40).  With bit
- * 16 set, an edge on D_8009D1F4 bit 26 or 27 runs func_80125894, which waits
- * for func_8007F418(0, 0) == 2 before CdlSetfilter.  No CD provider serves
- * those commands (PE_Cd_XaServiceAvailable), and the generated ovl_0457 loops
- * never test PE_Port_ShouldStop, so either mode would spin forever.  Without
- * the service the credits stay a loud boundary, as they were before their
- * TUs were registered. */
+ * \XASTREAM\CREDITS.XA;1 (Disc 2) and queues CdlSetmode 0xC8 and
+ * CdlSetfilter through func_8007EE84, waiting on func_8007F418 for each.  It
+ * then plays the stream by CdlReadS and CdlGetlocP (func_801258EC,
+ * func_80125A40).  Production's host-mode libds does not serve those commands,
+ * so the entry attaches the register-level device around the loop
+ * (PE_Cd_AttachDevice) and detaches it afterwards.
+ *
+ * Three cases stop on a named boundary instead of entering:
+ *   - credits_pad_code_mode: bit 16 is set (the nine-step pad code in
+ *     func_8003EB04 sets 0x12000).  There an edge on D_8009D1F4 bit 26 or
+ *     27 runs func_80125894, which waits for func_8007F418(0, 0) == 2 with no
+ *     XA setup, and nothing shows what retail's ring holds there.
+ *   - credits_xa_file_absent: the active disc lacks the overlay's own file
+ *     name (D_80125B48).  func_8012562C would retry CdSearchFile forever.
+ *   - credits_cd_attach: the device cannot attach (libds busy, or already
+ *     attached).
+ *
+ * The generated ovl_0457 loops never test PE_Port_ShouldStop.  The entry arms
+ * the stop escape (game_port.h) around the loop, so a stop inside it (a
+ * boundary, or a host quit) returns here instead of spinning.  The attach
+ * record is static, so it stays valid across the longjmp. */
+static PeCdAttach g_credits_cd;
+
+static int credits_boundary(const char *name)
+{
+    Bootstrap_ReturnVoid1(name, "func_8001220C", D_8009D1A0 & 0x30000u);
+    PE_Port_RequestStop(PE_PORT_STOP_UNRESOLVED_BOUNDARY);
+    return 0;
+}
+
 int PE_Main_EnterCredits(void)
 {
-    if (!PE_Cd_XaServiceAvailable()) {
-        Bootstrap_ReturnVoid1("credits_cd_xa_service", "func_8001220C",
-                              D_8009D1A0 & 0x30000u);
-        PE_Port_RequestStop(PE_PORT_STOP_UNRESOLVED_BOUNDARY);
-        return 0;
+    jmp_buf escape;
+    if (D_8009D1A0 & 0x10000u) return credits_boundary("credits_pad_code_mode");
+    if (!PE_Cd_XaServiceAvailable()) return credits_boundary("credits_cd_xa_service");
+    if (!PE_Cd_FilePresent(PE_LoadU32(0x80125B48u)))
+        return credits_boundary("credits_xa_file_absent");
+    if (!PE_Cd_AttachDevice(&g_credits_cd)) return credits_boundary("credits_cd_attach");
+    if (setjmp(escape) == 0) {
+        PE_Port_EscapeArm(&escape);
+        (void)PE_GuestCall("func_8001220C", 0x801235DCu, 0u, 0u, 0u, 0u, 0u);
     }
-    (void)PE_GuestCall("func_8001220C", 0x801235DCu, 0u, 0u, 0u, 0u, 0u);
-    return 1;
+    PE_Port_EscapeDisarm();
+    PE_Cd_DetachDevice(&g_credits_cd);
+    return !PE_Port_ShouldStop();
 }
 
 /* ── Main — adapted from PARKED candidate ──────────────────────────── */

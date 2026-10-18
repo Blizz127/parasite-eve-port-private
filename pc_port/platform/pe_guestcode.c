@@ -1,5 +1,6 @@
 /* Guest-code dispatch; contract in pe_guestcode.h. */
 #include "pe_guestcode.h"
+#include "game_port.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -228,7 +229,9 @@ const PeGuestCodeEntry *PE_GuestCode_Resolve(pe_addr_t addr)
 static int guest_call(const char *site, pe_addr_t fn, unsigned arity,
                       const uintptr_t a[PE_GUESTCALL_MAX_ARGS])
 {
-    const PeGuestCodeEntry *e = fn ? PE_GuestCode_Resolve(fn) : NULL;
+    const PeGuestCodeEntry *e;
+    PE_Port_EscapePoint();      /* armed only by PE_Main_EnterCredits */
+    e = fn ? PE_GuestCode_Resolve(fn) : NULL;
     record_call(fn, a);
     if (e && e->thunk)
         return e->thunk(a[0], a[1], a[2], a[3]);
