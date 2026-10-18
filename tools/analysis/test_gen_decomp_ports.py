@@ -1138,5 +1138,59 @@ class RoomIdiomRewriteTests(unittest.TestCase):
         self.assertEqual(g.rewrite_code_pointer_members(src), src)
 
 
+class CallSiteSignednessTests(unittest.TestCase):
+    """E22: a callee whose host prototype flips the leaf's 32-bit return
+    signedness is cast back to the leaf's type where the value is used."""
+    SIGS = {"func_800C6CE0": {"ret": "int", "params": ["pe_addr_t slot"]},
+            "func_80071A54": {"ret": "unsigned int", "params": []},
+            "func_80077DC4": {"ret": "int32_t", "params": ["int"]}}
+
+    def cast(self, src):
+        return g.cast_leaf_call_returns("func_8018F054", src, self.SIGS)
+
+    def test_unsigned_leaf_compare(self):
+        # room_m0065i 8018F054: `if (func_800C6CE0(o) >= 2)` is sltiu in retail
+        out = self.cast("extern unsigned int func_800C6CE0();\nint func_8018F054(int o)\n{\n"
+                        "    if (func_800C6CE0(o) >= 2) { return 1; }\n    return 0;\n}\n")
+        self.assertIn("if (((unsigned int)/* E22 leaf type */func_800C6CE0(o)) >= 2)", out)
+
+    def test_signed_leaf_rand(self):
+        # room_m0418i 80193480: `func_80071A54() % 256 < t` is a signed compare
+        out = self.cast("extern int func_80071A54();\nint func_8018F054(int t)\n{\n"
+                        "    return func_80071A54() % 256 < t;\n}\n")
+        self.assertIn("return ((int)/* E22 leaf type */func_80071A54()) % 256 < t;", out)
+
+    def test_implicit_int_is_the_leaf_type(self):
+        out = self.cast("int func_8018F054(int t)\n{\n    return func_80071A54() % 3;\n}\n")
+        self.assertIn("((int)/* E22 leaf type */func_80071A54())", out)
+
+    def test_statement_calls_declarations_and_same_signedness_untouched(self):
+        src = ("extern unsigned int func_800C6CE0();\nextern int func_80077DC4();\n"
+               "int func_8018F054(int o)\n{\n    func_800C6CE0(o);\n"
+               "    if (o) func_800C6CE0(o); else func_800C6CE0(o);\n"
+               "    /* func_800C6CE0(o) */\n    return func_80077DC4(o);\n}\n")
+        out = self.cast(src)
+        self.assertEqual(out.split("*/\n", 1)[1], src)
+
+    def test_nested_calls(self):
+        out = self.cast("extern unsigned int func_800C6CE0();\nint func_8018F054(int o)\n{\n"
+                        "    return f(func_800C6CE0(func_800C6CE0(o)), 3);\n}\n")
+        self.assertIn("f(((unsigned int)/* E22 leaf type */func_800C6CE0(((unsigned int)/* E22 leaf type */"
+                      "func_800C6CE0(o)))), 3)", out)
+
+
+class ReturnSegmentTests(unittest.TestCase):
+    def test_symbol_address_returns(self):
+        # room_m0432i 80199048 returns &D_801994F4 whatever D_8009D254's segment
+        self.assertTrue(g.returns_symbol_addresses(
+            "short *f(int a){ if (a) return 0; return &D_801994F4; }"))
+        self.assertTrue(g.returns_symbol_addresses("int *f(){ return (int *)&D_80199500[3]; }"))
+
+    def test_root_derived_returns(self):
+        self.assertFalse(g.returns_symbol_addresses("int *f(){ return D_8009D254; }"))
+        self.assertFalse(g.returns_symbol_addresses("int *f(int *p){ return p + 4; }"))
+        self.assertFalse(g.returns_symbol_addresses("int *f(){ return 0; }"))
+
+
 if __name__ == "__main__":
     unittest.main()

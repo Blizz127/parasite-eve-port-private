@@ -959,10 +959,127 @@ def era_ilp32(text: str) -> str:
                            and len(m.group(0).split()) == 2 else "int", text)
 
 
+SIGNED32 = {"int", "signed", "signed int", "int32_t", "s32"}
+UNSIGNED32 = {"unsigned", "unsigned int", "uint32_t", "pe_addr_t", "u32"}
+LEAF_CALLEE_DECL_RE = re.compile(
+    r"^[ \t]*(?:extern[ \t]+)?([A-Za-z_][\w \t\*]*?)[ \t]*\b(func_[0-9A-Fa-f]{8})[ \t]*\(([^;{}]*)\)[ \t]*;",
+    re.M)
+
+
+def _code_mask(text: str) -> list[bool]:
+    """True at every offset inside a comment or a string/char literal."""
+    mask, i, n = [False] * len(text), 0, len(text)
+    while i < n:
+        c = text[i]
+        if text.startswith("/*", i):
+            j = text.find("*/", i + 2)
+            j = n if j < 0 else j + 2
+        elif text.startswith("//", i):
+            j = text.find("\n", i)
+            j = n if j < 0 else j
+        elif c in "\"'":
+            j = i + 1
+            while j < n and text[j] != c:
+                j += 2 if text[j] == "\\" else 1
+            j = min(n, j + 1)
+        else:
+            i += 1
+            continue
+        for k in range(i, j):
+            mask[k] = True
+        i = j
+    return mask
+
+
+STMT_WORDS = {"return", "if", "else", "while", "for", "do", "switch", "case", "goto", "sizeof"}
+
+
+def leaf_callee_decls(text: str) -> list:
+    """Function declarations (`T func_X(...);`) at file scope, or block-scope
+    ones that say `extern`; a statement such as `return func_X(o);` is not."""
+    mask = _code_mask(text)
+    depth, depth_at = 0, [0] * (len(text) + 1)
+    for i, c in enumerate(text):
+        depth_at[i] = depth
+        if not mask[i]:
+            depth += c == "{"
+            depth -= c == "}"
+    out = []
+    for m in LEAF_CALLEE_DECL_RE.finditer(text):
+        words = m.group(1).split()
+        if not words or words[0] in STMT_WORDS or mask[m.start(2)]:
+            continue
+        if depth_at[m.start(2)] == 0 or "extern" in m.group(0).split("(")[0].split():
+            out.append(m)
+    return out
+
+
+def cast_leaf_call_returns(name: str, text: str, sigs: dict[str, dict]) -> str:
+    """E22: neutralize_declarations replaces a leaf's own callee declaration by
+    the host prototype, so the host type decides how the caller reads the
+    result.  When the two 32-bit return types differ only in signedness (the
+    leaves' `unsigned int func_800C6CE0()` vs pe_port_compat.h's `int`; rand
+    `func_80071A54`, `int` in the leaves and `unsigned int` on the host), a
+    comparison or division on the result flips between retail and the port.
+    Every call whose value is used is cast back to the leaf's type; a callee
+    the leaf calls without a declaration is C89 implicit `int`.  Statement
+    calls, declarations and bare function names are left alone."""
+    code = strip_comments(text)
+    declared: dict[str, str] = {}
+    for m in leaf_callee_decls(code):
+        declared.setdefault(m.group(2), _norm_type(m.group(1)))
+    defined = set(re.findall(r"^[ \t]*[A-Za-z_][\w \t\*]*?\b(func_[0-9A-Fa-f]{8})\s*\([^;{}()]*\)\s*\{",
+                             code, re.M))
+    called = set(re.findall(r"\b(func_[0-9A-Fa-f]{8})\s*\(", code)) - defined - {name}
+    casts: dict[str, str] = {}
+    for fn in sorted(called):
+        s = sigs.get(fn)
+        if not s:
+            continue
+        lt, ht = declared.get(fn, "int"), _norm_type(s["ret"])
+        if (lt in SIGNED32 and ht in UNSIGNED32) or (lt in UNSIGNED32 and ht in SIGNED32):
+            casts[fn] = lt
+    if not casts:
+        return text
+    mask = _code_mask(text)
+    decl_spans = [(m.start(), m.end()) for m in leaf_callee_decls(text)]
+    edits = []
+    for m in re.finditer(r"\b(" + "|".join(casts) + r")\s*\(", text):
+        st = m.start()
+        if mask[st] or any(a <= st < b for a, b in decl_spans):
+            continue
+        depth, j = 0, m.end() - 1
+        while j < len(text):
+            if not mask[j]:
+                if text[j] == "(":
+                    depth += 1
+                elif text[j] == ")":
+                    depth -= 1
+                    if depth == 0:
+                        break
+            j += 1
+        if j >= len(text):
+            continue
+        prev = text[:st].rstrip()
+        nxt = text[j + 1:].lstrip()
+        if nxt.startswith(";") and (not prev or prev[-1] in ";{})" or re.search(r"\belse$", prev)):
+            continue          # statement call (also after `if (...)` / `else`): the value is unused
+        edits.append((st, j + 1, casts[m.group(1)]))
+    # Nested casts (`f(g(h(x)))`): every prefix and suffix is an insertion at
+    # an original offset, applied from the highest offset down.
+    ins = sorted([(en, 0, ")") for st, en, lt in edits] +
+                 [(st, 1, f"(({lt})/* E22 leaf type */") for st, en, lt in edits], reverse=True)
+    for pos, _k, s_ in ins:
+        text = text[:pos] + s_ + text[pos:]
+    note = "; ".join(f"{fn}: leaf {lt}, host {_norm_type(sigs[fn]['ret'])}" for fn, lt in casts.items())
+    return f"/* E22 call-site casts to the leaf's return type ({note}) */\n" + text
+
+
 def analyze(name: str, src_text: str, matched: dict,
             known: set[str], existing_macros: set[str],
             proto: dict[str, int], sigs: dict[str, dict]) -> dict:
     src_text = era_ilp32(src_text)
+    src_text = cast_leaf_call_returns(name, src_text, sigs)
     # E2b guard: a pin *without* an initialiser that is read before it is
     # written captures a live retail register — that is semantics, not a hint.
     pin_text = rewrite_tied_moves(strip_comments(src_text))
@@ -2208,6 +2325,24 @@ def return_root(text: str, roots: set[str]) -> str | None:
     return found.pop() if len(found) == 1 else None
 
 
+def returns_symbol_addresses(text: str) -> bool:
+    """Every non-null `return` of the leaf takes a data symbol's address
+    (`&D_X` or `&D_X[k]`, optionally cast).  A bare `D_X` is not accepted:
+    for a pointer global it is the root's value, not a constant."""
+    text = strip_comments(text)
+    rets = [_strip_parens(m.group(1)) for m in re.finditer(r"\breturn\b([^;]*);", text)]
+    rets = [r for r in rets if r not in ("", "0", "NULL")
+            and not re.fullmatch(r"\(\s*\w[\w\s\*]*\)\s*0", r)]
+    if not rets:
+        return False
+    for r in rets:
+        r = re.sub(r"^\(\s*[A-Za-z_][\w\s]*\*+\s*\)\s*", "", r)        # pointer cast
+        r = _strip_parens(r)
+        if not re.fullmatch(r"&\s*D_[0-9A-Fa-f]{8}(?:\s*\[[^\]]*\])?", r):
+            return False
+    return True
+
+
 def ptr_roots_expr(plan: dict, pparams_names: set[str] | None = None) -> list[str]:
     """Guest-address expression(s) of the pointer root(s) a pointer-return
     leaf's result derives from, for PE_DecompReturnSegment.  With several
@@ -2217,6 +2352,11 @@ def ptr_roots_expr(plan: dict, pparams_names: set[str] | None = None) -> list[st
     exprs = {sym: f"PE_LoadU32(0x{sym[2:]}u)" for sym in plan.get("d_syms_used", [])
              if classify_data(plan["data_types"][sym], sym) == "ptrglobal"}
     exprs.update({p: f"pe_{p}" for p in sorted(pparams_names or ())})
+    if exprs and returns_symbol_addresses(plan.get("body", "")):
+        # Every result is a data symbol's own address (m0432i 80199048
+        # `return &D_801994F4;`): retail returns that KSEG0 constant whatever
+        # the segment of an unrelated pointer global the body reads.
+        return []
     if len(exprs) > 1:
         r = return_root(plan.get("body", ""), set(exprs))
         if r is not None:
