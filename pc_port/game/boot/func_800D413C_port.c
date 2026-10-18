@@ -192,11 +192,16 @@ int PE_EffectCallback(pe_addr_t fn, int32_t mode, pe_addr_t data, pe_addr_t extr
         }
     }
     if(effect_stack.active)effect_stack.known=0;
-    if (fn==0x8018F330u) return func_8018F330(mode,data);
-    if (fn==0x8018F018u) return func_8018F018(mode,data);
-    if (fn==0x8018F614u) return func_8018F614(mode,data);
-    if (fn==0x8018FB84u) return func_8018FB84(mode,data);
-    if (fn==0x8018FDC4u) return func_8018FDC4(mode,data);
+    /* M0005I (Eve's charge effect) hand ports are that room's code only:
+     * other rooms put different bodies at these addresses (m0113i 8018F018,
+     * the m0412i 8018F614, m0205i/m0243i/m0406i/m0410i 8018FB84, m0256i
+     * 80190A6C), which must reach their own registry entries below.  Match
+     * the m0005i body's fingerprint (all-rooms census) before binding. */
+    if (fn==0x8018F330u && PE_GuestCode_Fnv1a(fn,0x2E4u)==0xB8920712u) return func_8018F330(mode,data);
+    if (fn==0x8018F018u && PE_GuestCode_Fnv1a(fn,0x318u)==0xE679E906u) return func_8018F018(mode,data);
+    if (fn==0x8018F614u && PE_GuestCode_Fnv1a(fn,0x570u)==0xF57D2D68u) return func_8018F614(mode,data);
+    if (fn==0x8018FB84u && PE_GuestCode_Fnv1a(fn,0x240u)==0xE0EA576Eu) return func_8018FB84(mode,data);
+    if (fn==0x8018FDC4u && PE_GuestCode_Fnv1a(fn,0xCA8u)==0x5F89BFF3u) return func_8018FDC4(mode,data);
     if (fn==0x800D751Cu) return func_800D751C(mode,data);
     if (fn==0x800D71B8u) return func_800D71B8(mode,data);
     if (fn==0x800D70C0u) return func_800D70C0(mode,data);
@@ -204,7 +209,7 @@ int PE_EffectCallback(pe_addr_t fn, int32_t mode, pe_addr_t data, pe_addr_t extr
     if (fn==0x800D4928u) return func_800D4928(mode,data);
     if (fn==0x800DF87Cu) return func_800DF87C(mode,data);
     /* M0005's descriptor command callback (80190A6C..80190A98). */
-    if (fn==0x80190A6Cu) {
+    if (fn==0x80190A6Cu && PE_GuestCode_Fnv1a(fn,0x2Cu)==0x02F26EECu) {
         if (mode==1) PE_StoreU16(PE_LoadU32(0x800E2368u)+18u,1u);
         return (int32_t)0x80190B80u;
     }
