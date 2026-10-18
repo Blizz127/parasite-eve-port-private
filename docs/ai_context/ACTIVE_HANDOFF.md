@@ -62,11 +62,12 @@ Later on 2026-10-18 (all committed, none pushed):
   differently with those. The hand-written code has no `long` over guest
   memory (func_80191FB8's hand port copies 0x5C-byte DRAWENVs as bytes).
   Details: NATIVE_COMPLETION.md, "Host compile semantics".
-- Moved off the full root disk, not deleted:
-  /dev/shm/pe-native-34f506ce/scratch_moved/ holds old scratch census and
-  harvest outputs and the agent transcripts of the finished workflows
-  wf_441734e8 and wf_b3938761 (their journal.jsonl files stayed in place).
-  /dev/shm is lost on reboot.
+- While the root disk was full, old scratch census and harvest outputs and
+  the agent transcripts of the finished workflows wf_441734e8 and
+  wf_b3938761 sat in /dev/shm/pe-native-34f506ce/scratch_moved/. They were
+  moved back to their original places by 2026-10-18 13:15:59 UTC (the
+  directory's mtime); it now holds only empty directories. Nothing was
+  deleted.
 
 - Room batch 6 (m0432i 8019702C, m0429i 80196748/801972EC/80196CCC, m0318i
   80197CBC/801944E8): census 28 -> 22 (59,452 bytes). regen14: suite
@@ -112,8 +113,26 @@ Later on 2026-10-18 (all committed, none pushed):
   801247F4 passed PutDispEnv/DrawOTagEnv byte values instead of the
   DISPENV/DRAWENV row addresses: a 2-D array extern had been flattened.
   It is now E21-lowered and proven 42/42 against retail.
+- The native credits had replaced a clean stop with hangs. Their CD-XA arms
+  (Setmode/Setfilter/ReadS/GetlocP through the libcd queue, and the
+  pad-code channel switch's `func_8007F418(0, 0) == 2` wait) spin forever,
+  because no provider completes those commands. Shown by
+  `credits_xa_commands_never_complete_without_device`.
+  - e27fc416a: main's arm now calls `PE_Main_EnterCredits`, which stops on
+    `credits_cd_xa_service` while `PE_Cd_XaServiceAvailable()` is 0.
+  - The ending credits stay a reachable native gap (needs a CD-XA provider
+    and Disc 2).
+  - Census of generated CD busy-waits: the credits were the only reachable
+    case.
+- 54fff9664, host read mismatch: `func_8006E6D4` (pe_libcd.c) wrote 1 to `0x8009B6D4`,
+  which no retail code references. Retail `func_80080E34` sets the DsRead
+  busy word `0x8009B6CC` (sw at 0x80080F3C, s0 = 0x8009B6C4), and every
+  completion clears it through `func_80081268`. The completed host read now
+  leaves `0x8009B6CC` = 0, and the five tests that encoded the stray write
+  were updated.
 
 Open (NATIVE_COMPLETION.md has each):
+- the ending credits need a CD-XA provider (gated to a loud stop);
 - latent verbatim-TU classes that no fix closes: 32-bit address wrap on
   out-of-range indices (func_800428D4 with D_800A1860 == 0 is the one
   plausible in play), narrow returns, parameter-width drift;

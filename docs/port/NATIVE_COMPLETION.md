@@ -174,6 +174,27 @@ Native bodies that replaced boundaries:
     passed PutDispEnv/DrawOTagEnv byte values instead of env addresses. No
     credits test covered op 6. See the E23 entry below and the erratum in
     the credits report.
+  - Erratum 2: the credits' CD-XA arms spin forever on every provider. Since
+    e27fc416a, main's arm stops on `credits_cd_xa_service` before entering, as it did
+    before this branch (see "Reachable gap: the ending credits need CD-XA").
+
+Host providers:
+
+- **54fff9664, DsRead busy word.** The synchronous host read `func_8006E6D4`
+  (`platform/pe_libcd.c`) wrote 1 to `0x8009B6D4` as "retail post-issue
+  state". Retail `func_80080E34` stores that 1 at `0x8009B6CC` (`li v0,1` /
+  `sw v0,8(s0)` at 0x80080F38, with `s0 = 0x8009B6C4` from 0x80080F10).
+  Both completion paths clear it in `func_80081268`, inside the same
+  callback that drops the pending count `D_8009B6B4` to 0. No retail EXE
+  code references `0x8009B6D4` (no `-18732` displacement in the
+  disassembly), and no overlay assembly references any `D_8009B6xx`.
+  - The completed host read now writes `0x8009B6CC = 0` and leaves
+    `0x8009B6D4` alone.
+  - The five tests that asserted the stray write now assert the busy word.
+  - Effect today: none observable. Nothing read `0x8009B6D4`, and
+    `0x8009B6CC` was already 0. The write was a transcription of the first
+    `s0` base (`0x8009B6CC`, used for the -32/-28/-24 stores) applied to the
+    final `sw v0,8(s0)`, after `s0` had been reloaded.
 
 - **d0c4075e**: GTE command engine for all 22 documented COP2 commands. The
   `gte-native-hardware` ctest has 1100 real-console cases and 231741 checks,
@@ -560,6 +581,112 @@ port has explicit cases for every id 0..60.
 `pc_port_coverage.py`'s "stub" bucket (36 leaves) is not a list of non-native
 code. It counts any body that has a bootstrap marker on any path, and most of
 those are hand ports with one guarded error path.
+
+## Reachable gap: the ending credits need CD-XA
+
+The credits loop (`func_801235DC`, ovl_0457) drives the drive itself. main's
+arm (state `0xAA108448` with `D_800B0CD8.fF5` bit 1) enters it in two modes:
+
+- **`D_8009D1A0` bit 16 clear (the Disc 2 ending).**
+  - `func_8012562C` opens `\XASTREAM\CREDITS.XA;1`. Only Disc 2 has it (LBA
+    204531, 144080896 bytes); Disc 1 has no XASTREAM directory.
+  - `func_80125744` queues CdlSetmode 0xC8 and CdlSetfilter (file 1,
+    channel 0) through `func_8007EE84`, and spins on `func_8007F418` until
+    each completes.
+  - It then registers two callbacks:
+    - `func_80125980`, the data-ready callback: CdGetSector into the ring at
+      `D_80172D00`.
+    - `func_80125A40`, the VSync callback, every 32 frames: CdlGetlocP
+      (0x11), whose callback `func_80125AF0` stores the position in
+      `D_80172CF0`; or a CdlReadS restart through `func_801258EC` ->
+      `func_8007F0C8`; or, once the position passes the end,
+      `D_80172CE4 = 1`. That store is the only way this mode ends.
+- **Bit 16 set (the second op table, after the nine-step pad code).** There
+  is no XA setup. An edge on `D_8009D1F4` bit 26 or 27 calls
+  `func_80125894(0 or 1)`, which spins until `func_8007F418(0, 0) == 2` and
+  then sends CdlSetfilter through `func_80080DC4`.
+
+No CD provider serves any of this:
+- With the device disabled (production), nothing publishes a completion.
+  Only `func_8007EB88` on the IRQ chain writes the ring at `D_800A3610`.
+- Nothing decodes a queued XA read.
+- The register-level device (test-only) rejects commands 8, 13 and 0x11
+  (`CD_device_unported_command`).
+- The generated ovl_0457 loops never test `PE_Port_ShouldStop`.
+
+`credits_xa_commands_never_complete_without_device` shows it on the retail
+EXE image, with the device disabled, after CdInit and CdReset:
+- CdlSetmode is queued and kicked (`D_800A3608 = 1`, no stop);
+- 100000 polls of `func_8007F418(seq)` all return 0;
+- lane `D_8009B574` stays 2, so `func_8007F72C()` returns 2;
+- `func_8007F418(0, 0)` returns 6.
+
+So `func_80125744` would spin silently without presenting a frame, and so
+would the channel switch.
+
+This made the native credits of f91561717 a regression in failure mode. The
+arm used to be a clean CPU_BOUNDARY stop, and it became a hang.
+
+**The fix (e27fc416a).** main's arm now goes through `PE_Main_EnterCredits`
+(`bootstrap/func_8001220C_port.c`). While `PE_Cd_XaServiceAvailable()`
+(`platform/pe_libcd.c`) returns 0, it stops on the `credits_cd_xa_service`
+boundary, whose argument is `D_8009D1A0 & 0x30000`.
+`credits_entry_stops_without_xa_service` checks the four mode values 0,
+0x10000, 0x12000 and 0x20000:
+- the call returns 0;
+- the stop is an unresolved-boundary stop;
+- the boundary name and the mode bits are recorded;
+- the loop's first store (`0x80172CD0`) is never made;
+- the libcd queue is untouched.
+
+The generated credits TUs, the libpress replacements, the E23 frame flip and
+their tests all stay.
+
+**What closes the gap** is a CD-XA provider. That is a feature milestone, not
+a fix. It needs:
+- CdlSetmode and CdlSetfilter completions;
+- CdlReadS in XA mode at 2x, with the file/channel filter, into the SPU CD
+  input (`PE_Spu_CdSector` already decodes XA for the movie feeder);
+- CdlGetlocP positions;
+- data-ready sectors;
+- CdlStop and CdlPause;
+- Disc 2 in the drive at the ending.
+
+Verifying its end-of-music timing needs a game run.
+
+The device model's Setfilter arm is dead code. `pe_cdreg.c` stores the
+filter when command 13 completes, but the accept list omits 13. Its two
+parameters would also fail the parameter-count check, which allows only
+Setloc's 3 and Setmode's 1. The device model is test-only, so this is
+documented and not fixed.
+
+### Generated CD waits (a class the boundary census misses)
+
+A busy-wait on CD state that production never advances has no boundary site.
+The table covers the generated TUs that call the libcd queue or status
+(`func_8007EE84`, `func_8007F0C8`, `func_8007F418`, `func_8007F72C`,
+`func_8007F778`, `func_80080DC4`, `func_80080D5C`), found by grep over
+`pc_port/game/decomp*`. No room TU calls any of them.
+
+| TUs | what they wait on | reachable in production |
+|---|---|---|
+| ovl_0457 80125744, 8012562C, 80125894, 801255A4, 80125980, 80125A40, 801258EC | queue completions, lane 1 | only through `func_801235DC`, now gated |
+| ovl_03C5 80121C04, 80122040, 80122354 | lane 1, `func_80080DC4` / `func_80080D5C` | no: the EXE ports call the hand-ported movie player by name (`game/boot/movie_overlay_port.c`) |
+| ovl_03D2 801924F8, 80192934, 80192C48, 80192CE8 | the same | no: the title loop is a hand port (see Open) |
+| EXE `func_8006A5BC` | `func_8007ED58() != 1`, then `func_8007F72C() != 1`, each polling VSync | yes, and it ends: the host CdReset completes synchronously and sets lane 1 |
+| EXE `func_80081DF8` | queues CdlPause raw when `D_8009B70C == 1` | the flag is never set (see below) |
+| EXE `func_80081268` | queues CdlPause raw when `D_8009B6CC == 1` | the flag is never set: only `func_80080E34` sets it, and production's `func_8006E6D4` reads synchronously instead |
+| EXE `func_80080D34` (CdControlF) | queues any command | no direct caller; only reachable through the registry |
+
+`D_8009B70C` is set only by `func_80081D74`. That is called only from the
+`func_80080F64` and `func_80082400` callbacks, which are registered only by
+raw-queue reads (`func_80080E34`, `func_80082314`). Production replaces both
+reads with host reads.
+
+So the credits were the only reachable case. One raw-queue command in
+production latches lane 2 for good, because only the IRQ chain or a CdReset
+clears it. Every later `func_8007F72C() == 1` wait would then spin too, which
+is why the gate stops before the first such command.
 
 ## Known residuals (documented, not hidden)
 

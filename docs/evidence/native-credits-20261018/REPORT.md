@@ -180,3 +180,38 @@ proven against retail:
     ok func_801247F4_port.c: 32 seeds, retail coverage 42/42 words
 
 No game ran, so the credits picture itself has not been checked visually.
+
+## Erratum 2 (2026-10-18): the native credits hung where they used to stop
+
+"The credits run native" also hid a failure-mode regression. The credits
+loop drives the CD drive itself. In the Disc 2 ending (`D_8009D1A0` bit 16
+clear), `func_80125744` queues CdlSetmode and CdlSetfilter through
+`func_8007EE84` and spins on `func_8007F418`. In the pad-code mode (bit 16
+set), a press of `D_8009D1F4` bit 26 or 27 makes `func_80125894` spin until
+`func_8007F418(0, 0) == 2`.
+
+No CD provider completes those commands. With the device disabled
+(production) the completion ring at `D_800A3610` is never written, and the
+register-level device rejects commands 8, 13 and 0x11. The generated loops
+never test `PE_Port_ShouldStop`. So after f91561717 these arms spun forever
+without presenting a frame. Before that commit they were a clean
+CPU_BOUNDARY stop.
+
+`credits_xa_commands_never_complete_without_device` shows the spin's cause
+on the retail EXE image:
+- CdlSetmode is queued with no stop;
+- 100000 polls all read 0;
+- lane `D_8009B574` stays 2;
+- `func_8007F418(0, 0)` returns 6.
+
+The fix (e27fc416a) restores the stop, now with a name. main's arm calls
+`PE_Main_EnterCredits`, which records the `credits_cd_xa_service` boundary
+(argument `D_8009D1A0 & 0x30000`) and requests a stop while
+`PE_Cd_XaServiceAvailable()` is 0. `credits_entry_stops_without_xa_service`
+covers modes 0, 0x10000, 0x12000 and 0x20000.
+
+The ending credits stay a reachable native gap until a CD-XA provider
+exists: Setmode/Setfilter completions, XA ReadS into the SPU CD input,
+GetlocP positions, Stop/Pause, and Disc 2 at the ending. See
+`docs/port/NATIVE_COMPLETION.md`, "Reachable gap: the ending credits need
+CD-XA".
