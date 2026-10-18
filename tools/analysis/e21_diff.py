@@ -237,8 +237,11 @@ class Gte:
 
     def native_command(self, cmd):
         """Copy the architectural state into the native engine, run the
-        command there, copy it back.  Data 15 (SXYP), 28/29 (IRGB/ORGB) and
-        31 (LZCR) are views of other registers and are not written."""
+        command there, copy back what a command can change: data 0-27 (but
+        15, SXYP, a view of SXY2) and FLAG.  Data 28/29 (IRGB/ORGB) and 31
+        (LZCR) are views of other registers and are not written; LZCS/LZCR
+        and the other control registers are never command outputs, so the
+        oracle keeps its own (writing LZCS here recomputes LZCR)."""
         g = native_gte()
         for r in range(32):
             g.PE_GTE_WriteCtrl(r, self.c[r] & 0xFFFFFFFF)
@@ -246,10 +249,10 @@ class Gte:
             if r not in (15, 28, 29, 31):
                 g.PE_GTE_WriteData(r, self.d[r] & 0xFFFFFFFF)
         g.PE_GTE_Command(cmd & 0x1FFFFFF)
-        for r in range(32):
-            if r not in (15, 28, 29):
+        for r in range(28):
+            if r != 15:
                 self.d[r] = g.PE_GTE_ReadData(r)
-            self.c[r] = g.PE_GTE_ReadCtrl(r)
+        self.c[31] = g.PE_GTE_ReadCtrl(31)
 
 
 OUT_LEN_SHIFT = 40                      # out=FN:K:LEN keeps LEN above the FN<<4|K key
