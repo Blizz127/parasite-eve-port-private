@@ -44,28 +44,27 @@ covers both discs.
 ## Census (2026-10-18)
 
 **Room code**: `PE_DISC1_BIN=<disc 1> python3 pc_port/tools/pe_all_rooms_native_census.py`.
-Registry `zz_dispatch.c`: 5759 thunks. 185 code rooms, 9103 (room x body)
+Registry `zz_dispatch.c`: 5765 thunks. 185 code rooms, 9103 (room x body)
 rows, 2952 unique (vma, size, FNV) bodies.
 
-| | session start | 2026-10-18 10:45 |
+| | session start | 2026-10-18 11:20 |
 |---|--:|--:|
-| native-generated bodies | 8855 | 9089 (87 via a data head) |
-| not-native bodies (all statically reachable) | 217 | 12 |
+| native-generated bodies | 8855 | 9095 (87 via a data head) |
+| not-native bodies (all statically reachable) | 217 | 6 |
 | direct-addr-guarded (hand port bound by address only) | 31 | 0 |
 | native-direct (hand port bound by fingerprint) | 0 | 2 |
-| unique not-native bodies | 136 (183,492 bytes) | 12 (41,216 bytes) |
+| unique not-native bodies | 136 (183,492 bytes) | 6 (27,184 bytes) |
 
 A body resolves only by fingerprint, as `PE_GuestCode_Resolve` does. Rooms are
 never declared resident in production, and closure-equal duplicates count once.
 
-The 12 bodies with no C anywhere are effect and particle callbacks in late
+The 6 bodies with no C anywhere are effect and particle callbacks in late
 rooms:
 
 | room | bodies |
 |---|--:|
-| m0318i | 1 |
-| m0432i | 5 |
-| m0429i | 4 |
+| m0432i | 2 |
+| m0429i | 2 |
 | m0404i | 1 |
 | m0256i | 1 |
 
@@ -91,6 +90,8 @@ Batch 7 (m0429i 801960C4, m0318i 80198268/80197618/80194AAC, m0432i
 8019485C) took it from 22 to 17.
 Batch 8 (m0432i 80193940/80195B40, m0318i 80195D20/80196E4C, m0273i
 80194E6C) took it from 17 to 12.
+Batch 9 (m0432i 8019408C/80194F60/80196554, m0429i 80198914/801978EC,
+m0318i 801988F8) took it from 12 to 6.
 
 **EXE** (`gen_decomp_ports.py --e21`): eligible 1130 verbatim, E21 lowered
 21, 112 matched leaves that a hand port defines. Five uncompilable verbatim
@@ -540,7 +541,7 @@ those are hand ports with one guarded error path.
 ## Gates on this branch
 
 - `pe-native-tests` (isolated HOME, Disc 1 configured, built in /dev/shm from
-  the regeneration with room batch 8, 2026-10-18 10:44 UTC): 1661/1661, 0
+  the regeneration with room batch 9, 2026-10-18 11:18 UTC): 1661/1661, 0
   skipped. The four `credits_*` tests and 8 more NAM9 retail cases are new
   since 4dba7922.
 - ctests `park-m0086-full`, `park-m0089-full`, `gte-native-fixed`,
@@ -551,7 +552,7 @@ those are hand ports with one guarded error path.
   - field VM 693/693
 - `retail_data_guard.py --strict` on every commit's files: OK.
 - `psyq_port_guard.py --binary parasite-eve-port --binary pe-native-tests`
-  (regenerations of f91561717, 249e76f38, bfdf402af and room batches 5-8): PASS relative to the
+  (regenerations of f91561717, 249e76f38, bfdf402af and room batches 5-9): PASS relative to the
   allowlist, 1421 entries, unchanged. This is not a public-binary clearance.
 - Not run on the devbox, by rule:
   - the Day-1 route regression;
@@ -561,8 +562,7 @@ those are hand ports with one guarded error path.
 
 ## Open
 
-- The 12 remaining no-C room bodies (m0432i 5, m0429i 4, m0318i 1, m0404i 1,
-  m0256i 1). The room workflow (wf_9660d38d) is working through them.
+- The 6 remaining no-C room bodies (m0429i 2, m0432i 2, m0404i 1, m0256i 1). The room workflow (wf_9660d38d) is working through them.
 - Intra-overlay boundaries in generated subsystem-overlay TUs. These calls go
   to a non-emitted leaf of the same overlay that only a hand port implements:
   - ovl_03D2 `80191B64`, from 801924F8 and 80192934;
