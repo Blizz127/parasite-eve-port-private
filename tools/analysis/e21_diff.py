@@ -987,6 +987,9 @@ STACK_EXTENTS = {
     (0x800D2370, 9): 3, (0x800D2370, 10): 3,
     (0x800D004C, 0): 6, (0x800D004C, 4): 8,
     (0x800D004C, 7): 3, (0x800D004C, 8): 3,
+    # func_800D1384 (trail-ribbon GTE wrapper): col0 = a3 -> t2, col1 = sp+0x90 -> t4,
+    # each read only as lbu 0/1/2 (retail 800D1538..800D1604).
+    (0x800D1384, 3): 3, (0x800D1384, 4): 3,
 }
 
 
