@@ -40,6 +40,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import gen_overlay_ports as o  # noqa: E402
+import guest_lower as gl  # noqa: E402
 
 RAM_BASE, RAM_SIZE = 0x80000000, 0x200000
 SPAD = 0x400                             # scratchpad, stored after RAM
@@ -359,8 +360,26 @@ def prologue_save_instructions(ram: bytearray, entry: int) -> frozenset[int]:
     return frozenset(pcs)
 
 
+def narrow_ret(value: int, ty: str | None) -> int:
+    """A mocked callee's v0 as its declared return type leaves it: retail code
+    returning a 16/8-bit value zero- or sign-extends it, and the caller relies on
+    that (no re-masking), so a full 32-bit mock would be a value no real callee
+    returns.  The native stub casts to the same type."""
+    if not ty:
+        return value & 0xFFFFFFFF
+    t = re.sub(r"\b(?:extern|static|const|volatile)\b", "", ty).strip()
+    signed = not re.search(r"\bunsigned\b|\bu(?:int)?(?:8|16)(?:_t)?\b", t)
+    if re.search(r"\bshort\b|\bu?int16_t\b|\b[us]16\b", t):
+        return (sx16(value) if signed else value & 0xFFFF) & 0xFFFFFFFF
+    if re.search(r"\bchar\b|\bu?int8_t\b|\b[us]8\b", t):
+        v = value & 0xFF
+        return ((v - 0x100) if signed and v & 0x80 else v) & 0xFFFFFFFF
+    return value & 0xFFFFFFFF
+
+
 def run_mips(ram: bytearray, entry: int, args: list[int], seed: int, outs: frozenset = frozenset(),
-             gte_state: list | None = None):
+             gte_state: list | None = None, ret_types: dict | None = None):
+    ret_types = ret_types or {}
     r = [0] * 32
     r[4:8] = args
     r[29] = SP0
@@ -428,7 +447,7 @@ def run_mips(ram: bytearray, entry: int, args: list[int], seed: int, outs: froze
                 tgt = A
                 # mocked callee: the delay slot runs first (it may set an
                 # argument register), then the call is recorded and "returns"
-                pend_ret = mock_ret(tgt, seed)
+                pend_ret = narrow_ret(mock_ret(tgt, seed), ret_types.get(tgt))
                 run_slot(ram, r, pc, ld, st)
                 calls.append((tgt, tuple(r[4:8])))
                 r[2] = pend_ret
@@ -487,7 +506,7 @@ def run_mips(ram: bytearray, entry: int, args: list[int], seed: int, outs: froze
                     o_ = av[k] & 0x1FFFFFFF
                     ram[o_:o_ + n_] = out_bytes(tgt, k, seed, n_)
                     written.update(range(o_, o_ + n_))
-            r[2] = mock_ret(tgt, seed)
+            r[2] = narrow_ret(mock_ret(tgt, seed), ret_types.get(tgt))
             r[31] = cur + 8
             pc, npc = cur + 8, cur + 12
             continue
@@ -721,20 +740,25 @@ def candidates(with_calls: bool = False) -> list[tuple[Path, str, str]]:
     with_calls takes those too: their host-prototyped callees are mocked
     exactly like NON_MATCHING ones (host_stubs)."""
     out = []
-    for p in sorted((o.REPO_ROOT / o.ROOMS_DIR).glob("*_port.c")):
+    tus = sorted((o.REPO_ROOT / o.ROOMS_DIR).glob("*_port.c"))
+    # subsystem overlays (ovl_0457 credits, ovl_03D2 title, ...): one TU per leaf
+    tus += sorted((o.REPO_ROOT / o.OUT_ROOT).glob("ovl_*/*_port.c"))
+    for p in tus:
         t = p.read_text()
         if "E21 guest-memory" not in t:
             continue
-        name = p.name.split("__")[0]
+        name = p.name.split("__")[0][: -len("_port.c")] if p.name.endswith("_port.c") and "__" not in p.name \
+            else p.name.split("__")[0]
         body = re.sub(r'"[^"]*"', '""', t.split("*/", 1)[1])
         calls = set(re.findall(r"\b(func_[0-9A-F]{8})\s*\(", body)) - {name}
-        m0 = re.search(r"decomp-source-overlay: (room_\w+)/", t)
-        nonmatching = bool(m0) and name in o.nonmatching_leaves().get(m0.group(1), {})
+        m0 = re.search(r"decomp-source-overlay: ((?:room|ovl)_\w+)/", t)
+        if not m0:
+            continue
+        nonmatching = name in o.nonmatching_leaves().get(m0.group(1), {})
         if "PE_HostToGuest" in t or ((calls or "host prototypes" in t) and not nonmatching
                                      and not with_calls):
             continue
-        m = re.search(r"decomp-source-overlay: (room_\w+)/", t)
-        out.append((p, name, m.group(1)))
+        out.append((p, name, m0.group(1)))
     return out
 
 
@@ -779,6 +803,18 @@ def narrow_mask(ty: str) -> int:
 # (PE_Printf_Guest) receives 0 where a call site passes fewer than seven.
 # Compare the format pointer only.
 TTY_ONLY_ARGS = {0x80071A74: [0xFFFFFFFF, 0, 0, 0, 0, 0, 0, 0]}
+
+
+def dead_param_masks(t: str) -> dict[int, list[int]]:
+    """Arguments guest_lower.DEAD_TRAILING_PARAMS documents as never read by the
+    callee (func_8010C89C's a3 is recomputed from a2 before its first use): the
+    lowering passes 0 there, retail leaves whatever the register held."""
+    out = {}
+    for name, live in gl.DEAD_TRAILING_PARAMS.items():
+        if name == "func_80071A74":
+            continue
+        out[int(name[5:], 16)] = [0xFFFFFFFF] * live + [0] * (8 - live)
+    return out
 
 
 def host_masks(t: str) -> dict[int, list[int]]:
@@ -859,6 +895,7 @@ STACK_EXTENTS = {
     (0x800C5EB0, 1): 0, (0x800C5EB0, 2): 0,  # a1 unread; a2 pure output
     (0x800D3114, 10): 4, (0x800D3114, 11): 4,  # col0/col1: one CV each (r,g,b read)
     (0x8007506C, 0): 8, (0x800750CC, 0): 8, (0x8007512C, 0): 8,   # one RECT
+    (0x80074F44, 0): 8,                     # ClearImage: one RECT
     (0x800794C4, 0): 6, (0x800794C4, 1): 0,
     (0x800C4FC4, 1): 32,                                            # ring renderer matrix
     (0x80079754, 0): 6, (0x80079754, 1): 0,
@@ -884,13 +921,15 @@ def directed_specs() -> dict[tuple[str, str], list[tuple[str, int, list[int]]]]:
     """Directed inputs for NON_MATCHING leaves, from configs/USA/overlays/nonmatching.yaml:
     `inputs: [ovl, name, "a0=1,2; h(a1+0x10)=0..5"]`.  Each seed takes the
     (seed mod product)-th combination: `aN=` sets argument N, `h(aN+OFF)=` /
-    `w(aN+OFF)=` store a halfword / word there (value lists or LO..HI ranges)."""
+    `w(aN+OFF)=` store a halfword / word there (value lists or LO..HI ranges).
+    A leaf may have several lines (one per mode, say): each is a spec of its
+    own and runs the full seed count, so the value is a list of specs."""
     out: dict = {}
     if not o.NONMATCH_MANIFEST.exists():
         return out
     for m in re.finditer(r'^\s*-\s*\[\s*(\w+)\s*,\s*(\w+)\s*,\s*"([^"]*)"\s*\]',
                          o.NONMATCH_MANIFEST.read_text().split("inputs:", 1)[-1], re.M):
-        out[(m.group(1), m.group(2))] = parse_directed(m.group(3))
+        out.setdefault((m.group(1), m.group(2)), []).append(parse_directed(m.group(3)))
     return out
 
 
@@ -939,7 +978,9 @@ def inputs(name, ov, data, seeds, recorded, spec):
                 continue                       # another overlay's code was resident: not this leaf
             yield k, bytearray(b[:RAM_SIZE + SPAD]), list(struct.unpack_from("<4I", b, RAM_SIZE + SPAD))
         return
-    for seed in (SEED_LIST if SEED_LIST is not None else range(seeds)):
+    specs = spec if spec and isinstance(spec[0], list) else [spec]
+    for spec, seed in ((sp, sd) for sp in specs
+                       for sd in (SEED_LIST if SEED_LIST is not None else range(seeds))):
         rng = random.Random(f"{name}:{seed}")
         ram = bytearray(RAM_SIZE + SPAD)
         # Seeded pointers stay below both stack windows (as mock returns do):
@@ -996,11 +1037,15 @@ def one(p: Path, name: str, ovl: str, seeds: int, cc: str, cover: bool = False,
         call = (f"uint32_t rv = (uint32_t)(int32_t){name}({argl}); "
                 f"fprintf(logf_, \"R %08X\\n\", rv);")
     stubs = host_stubs(t)
-    masks = {**host_masks(t), **TTY_ONLY_ARGS}
+    masks = {**host_masks(t), **TTY_ONLY_ARGS, **dead_param_masks(t)}
+    ret_types = {address: ret for ret, _fn, _prm, address in host_prototypes(t)}
     with tempfile.TemporaryDirectory() as d:
         d = Path(d)
         (d / "pe_guest_decomp.h").write_text(MOCK_H)
-        outs = frozenset(v for lhs, vs in directed.get((ovl, name), []) if lhs == "out" for v in vs)
+        dspec = directed.get((ovl, name)) or []
+        if dspec and not isinstance(dspec[0], list):
+            dspec = [dspec]                    # one spec (e21_leaf --inputs)
+        outs = frozenset(v for sp in dspec for lhs, vs in sp if lhs == "out" for v in vs)
         # A callee whose output extent is known writes it on both sides even
         # without a directed out= term, so a caller that reads its own stack
         # buffer back after the call (a RotMatrix into a local matrix) compares
@@ -1036,12 +1081,12 @@ def one(p: Path, name: str, ovl: str, seeds: int, cc: str, cover: bool = False,
         if r.returncode:
             return "nocompile", r.stderr[:300]
         ran = 0
-        for seed, ram, args in inputs(name, ov, data, seeds, recorded, directed.get((ovl, name))):
+        for seed, ram, args in inputs(name, ov, data, seeds, recorded, dspec or None):
             r_ram = bytearray(ram)
             try:
                 gte_state = []
                 v0, calls = run_mips(r_ram, leaf["vram"], list(args), seed, outs,
-                                     gte_state if check_gte else None)
+                                     gte_state if check_gte else None, ret_types=ret_types)
             except Fault:
                 continue
             (d / "in.bin").write_bytes(ram)
