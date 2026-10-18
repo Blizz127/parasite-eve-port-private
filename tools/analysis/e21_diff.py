@@ -1040,9 +1040,10 @@ def parse_directed(spec: str) -> list[tuple[str, list[int]]]:
 SEED_LIST: list[int] | None = None
 
 
-def inputs(name, ov, data, seeds, recorded, spec):
+def inputs(name, ov, data, seeds, recorded, spec, seed_range=None):
     """(seed, ram, args): recorded game snapshots if given, else seeded random
-    RAM (pointer-heavy) with the directed terms applied on top."""
+    RAM (pointer-heavy) with the directed terms applied on top.  seed_range,
+    when given, replaces SEED_LIST / range(seeds) (the E21_MIN_OK extension)."""
     if recorded:
         for k, f in enumerate(sorted(Path(recorded).glob("rec_*.bin"))):
             b = f.read_bytes()
@@ -1056,7 +1057,8 @@ def inputs(name, ov, data, seeds, recorded, spec):
         return
     specs = spec if spec and isinstance(spec[0], list) else [spec]
     for spec, seed in ((sp, sd) for sp in specs
-                       for sd in (SEED_LIST if SEED_LIST is not None else range(seeds))):
+                       for sd in (seed_range if seed_range is not None else
+                                  SEED_LIST if SEED_LIST is not None else range(seeds))):
         rng = random.Random(f"{name}:{seed}")
         ram = bytearray(RAM_SIZE + SPAD)
         # Seeded pointers stay below both stack windows (as mock returns do):
@@ -1176,7 +1178,29 @@ def one(p: Path, name: str, ovl: str, seeds: int, cc: str, cover: bool = False,
         if r.returncode:
             return "nocompile", r.stderr[:300]
         ran = 0
-        for seed, ram, args, rets in inputs(name, ov, data, seeds, recorded, dspec or None):
+        # E21_MIN_OK=K (e21_diff --min-ok): when fewer than K of the first
+        # `seeds` seeds survive the oracle (a body that chases pointers
+        # through its arguments and mock returns faults on most random RAM
+        # images), go on with seeds `seeds`, `seeds`+1, ... up to
+        # E21_MAX_SEEDS until K have run.  Off by default, so a run without
+        # it is the same as before; the first `seeds` seeds are identical
+        # either way.
+        min_ok = int(os.environ.get("E21_MIN_OK", "0") or 0)
+        max_seeds = int(os.environ.get("E21_MAX_SEEDS", "256") or 256)
+        ext = {"to": 0}
+
+        def runs():
+            yield from inputs(name, ov, data, seeds, recorded, dspec or None)
+            if ran >= min_ok or recorded or SEED_LIST is not None or max_seeds <= seeds:
+                return
+            for item in inputs(name, ov, data, seeds, recorded, dspec or None,
+                               seed_range=range(seeds, max_seeds)):
+                if ran >= min_ok:
+                    return
+                ext["to"] = item[0] + 1
+                yield item
+
+        for seed, ram, args, rets in runs():
             r_ram = bytearray(ram)
             try:
                 gte_state = []
@@ -1271,7 +1295,8 @@ def one(p: Path, name: str, ovl: str, seeds: int, cc: str, cover: bool = False,
             lo_, hi_ = leaf["vram"], leaf["vram"] + leaf["file_size"]
             hit = sum(1 for a in COVER if lo_ <= a < hi_)
             cov = f", retail coverage {hit}/{leaf['file_size'] // 4} words"
-        return ("ok" if ran else "skipped"), f"{ran} seeds{cov}"
+        more = f" (seed range extended to {ext['to']})" if ext["to"] else ""
+        return ("ok" if ran else "skipped"), f"{ran} seeds{more}{cov}"
 
 
 def main() -> int:
@@ -1285,12 +1310,21 @@ def main() -> int:
     ap.add_argument("--check-gte", action="store_true", help="also compare final GTE data/control registers")
     ap.add_argument("--with-calls", action="store_true",
                     help="also test matched TUs that make calls (callees mocked as for NON_MATCHING)")
-    ap.add_argument("--only", default="", help="substring of the TU file name or source overlay")
+    ap.add_argument("--only", default="",
+                    help="substring of the TU file name or source overlay (comma-separated: any of them)")
+    ap.add_argument("--min-ok", type=int, default=0,
+                    help="extend the seed range of a TU until this many seeds survive the oracle (E21_MIN_OK)")
+    ap.add_argument("--max-seeds", type=int, default=256,
+                    help="last seed + 1 the --min-ok extension may use (E21_MAX_SEEDS)")
     args = ap.parse_args()
+    if args.min_ok:
+        os.environ["E21_MIN_OK"] = str(args.min_ok)
+        os.environ["E21_MAX_SEEDS"] = str(args.max_seeds)
     cc = shutil.which("cc") or shutil.which("gcc")
     cands = candidates(args.with_calls)
     if args.only:
-        cands = [c for c in cands if args.only in c[0].name or args.only == c[2]]
+        only = [s for s in args.only.split(",") if s]
+        cands = [c for c in cands if any(s in c[0].name or s == c[2] for s in only)]
     if args.limit:
         cands = cands[: args.limit]
     res: dict[str, list] = {}
