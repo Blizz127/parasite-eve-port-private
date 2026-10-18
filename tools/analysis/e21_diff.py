@@ -752,6 +752,18 @@ int main(int argc, char **argv)
 """
 
 
+EXE_IMAGE = Path("build/extracted/disc1/SLUS_006.62")
+
+
+def exe_overlay() -> dict:
+    """The EXE as a pseudo-overlay: the SLUS file mapped so that its offset 0x800
+    lands at 0x80010000, every matched and NON_MATCHING EXE leaf by name."""
+    import gen_decomp_ports as g
+    leaves = {n: lf for n, lf in g.parse_matched().items()}
+    leaves.update(g.nonmatching_exe_leaves())
+    return {"id": "exe", "vram": g.EXE_FILE_VRAM, "end": 0x800E4000, "leaves": leaves}
+
+
 def candidates(with_calls: bool = False) -> list[tuple[Path, str, str]]:
     """Generated E21 room TUs to differential-test.  By default a matched TU
     that makes calls is left out (NON_MATCHING TUs with calls are always in);
@@ -761,6 +773,18 @@ def candidates(with_calls: bool = False) -> list[tuple[Path, str, str]]:
     tus = sorted((o.REPO_ROOT / o.ROOMS_DIR).glob("*_port.c"))
     # subsystem overlays (ovl_0457 credits, ovl_03D2 title, ...): one TU per leaf
     tus += sorted((o.REPO_ROOT / o.OUT_ROOT).glob("ovl_*/*_port.c"))
+    # E21-lowered EXE leaves (matched and NON_MATCHING): pc_port/game/decomp
+    for p in sorted((o.REPO_ROOT / "pc_port/game/decomp").glob("func_*_port.c")):
+        t = p.read_text()
+        if "E21 guest-memory" not in t:
+            continue
+        name = p.name[: -len("_port.c")]
+        body = re.sub(r'"[^"]*"', '""', t.split("*/", 1)[1])
+        calls = set(re.findall(r"\b(func_[0-9A-F]{8})\s*\(", body)) - {name}
+        if "PE_HostToGuest" in t or ((calls or "host prototypes" in t) and not with_calls
+                                     and "(NON_MATCHING)" not in t):
+            continue
+        out.append((p, name, "exe"))
     for p in tus:
         t = p.read_text()
         if "E21 guest-memory" not in t:
@@ -1046,8 +1070,13 @@ def one(p: Path, name: str, ovl: str, seeds: int, cc: str, cover: bool = False,
     directed = directed or {}
     global COVER
     COVER = set() if cover else None
-    ov = o.parse_overlay(ovl)
-    blob = o.blob_path(ovl)
+    if ovl == "exe":
+        ov, blob = exe_overlay(), o.REPO_ROOT / EXE_IMAGE
+        if not blob.is_file():
+            return "noblob", ""
+    else:
+        ov = o.parse_overlay(ovl)
+        blob = o.blob_path(ovl)
     if blob is None:
         return "noblob", ""
     leaf = ov["leaves"][name]
