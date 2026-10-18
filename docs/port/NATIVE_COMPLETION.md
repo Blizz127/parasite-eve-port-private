@@ -44,29 +44,29 @@ covers both discs.
 ## Census (2026-10-18)
 
 **Room code**: `PE_DISC1_BIN=<disc 1> python3 pc_port/tools/pe_all_rooms_native_census.py`.
-Registry `zz_dispatch.c`: 5728 thunks. 185 code rooms, 9103 (room x body)
+Registry `zz_dispatch.c`: 5739 thunks. 185 code rooms, 9103 (room x body)
 rows, 2952 unique (vma, size, FNV) bodies.
 
-| | session start | 2026-10-18 03:40 |
+| | session start | 2026-10-18 05:40 |
 |---|--:|--:|
-| native-generated bodies | 8855 | 9064 (87 via a data head) |
-| not-native bodies (all statically reachable) | 217 | 37 |
+| native-generated bodies | 8855 | 9069 (87 via a data head) |
+| not-native bodies (all statically reachable) | 217 | 32 |
 | direct-addr-guarded (hand port bound by address only) | 31 | 0 |
 | native-direct (hand port bound by fingerprint) | 0 | 2 |
-| unique not-native bodies | 136 (183,492 bytes) | 37 (77,272 bytes) |
+| unique not-native bodies | 136 (183,492 bytes) | 32 (72,580 bytes) |
 
 A body resolves only by fingerprint, as `PE_GuestCode_Resolve` does. Rooms are
 never declared resident in production, and closure-equal duplicates count once.
 
-The 37 bodies with no C anywhere are effect and particle callbacks in late
+The 32 bodies with no C anywhere are effect and particle callbacks in late
 rooms:
 
 | room | bodies |
 |---|--:|
-| m0318i | 15 |
+| m0318i | 11 |
 | m0432i | 9 |
 | m0429i | 8 |
-| m0404i | 3 |
+| m0404i | 2 |
 | m0256i | 1 |
 | m0273i | 1 |
 
@@ -82,6 +82,8 @@ excluded 801982A4 was wrong; the census listed it as not-native.
 
 Batch 2 (after that census: m0318i 80192A7C/80193638, m0432i 801957CC) took it
 from 40 to 37.
+Batch 4 (m0318i 80194164/8019646C/80192ED4/8019326C, m0404i 80193A6C) took it
+from 37 to 32.
 
 **EXE** (`gen_decomp_ports.py --e21`): eligible 1130 verbatim, E21 lowered
 21, 112 matched leaves that a hand port defines. Five uncompilable verbatim
@@ -242,7 +244,26 @@ batch 1 included), with the f91561717 harness fix:
 All 1895 room candidates ran, with 0 nocompile. The 139 TUs sweep 3 could not
 compile all pass. The 8 mismatches are the same stack-residue TUs.
 
-Subsystem overlays had never been swept. The sweep took only room TUs until
+Sweep 5 (2026-10-18 04:30-05:04 UTC, all 2012 candidates on the bfdf402af
+tree: 1898 room, 81 subsystem-overlay and 33 EXE TUs):
+
+    e21_diff: MISMATCH: 11
+    e21_diff: nocompile: 7
+    e21_diff: ok: 1954
+    e21_diff: skipped: 40
+
+- The 8 room mismatches are the stack-residue set again.
+- The other 10 findings were all subsystem-overlay TUs swept for the first
+  time, and every one was a harness artifact, fixed in 3af74726a:
+  - a parameter named `a_t`;
+  - a mock symbol duplicated by `pe_gte.c`;
+  - callee outputs the mocks did not write (VectorNormal, RotTrans,
+    Akao_Calc3DPan, ovl_0700 8018F55C);
+  - stack-pointer logging at boundary calls.
+- Each of the 10 TUs then matched, 9 of them with every word covered. No
+  subsystem-overlay or EXE TU showed a port difference.
+
+Subsystem overlays had never been swept before this. The sweep took only room TUs until
 495b7c1c4, which adds the 81 E21 TUs of ovl_03C5/03C9/03D2/0457/0700.
 `--only ovl_0457` gives 15 ok, 3 skipped, 0 MISMATCH. The three skipped
 (func_8012562C, func_80125744, func_80125894) are CD-status busy-waits that
@@ -318,7 +339,7 @@ those are hand ports with one guarded error path.
 
 ## Open
 
-- The 37 remaining no-C room bodies (m0318i 15, m0432i 9, m0429i 8, m0404i 3,
+- The 32 remaining no-C room bodies (m0318i 11, m0432i 9, m0429i 8, m0404i 2,
   m0256i 1, m0273i 1). The room workflow (wf_9660d38d) is working through them.
 - Intra-overlay boundaries in generated subsystem-overlay TUs. These calls go
   to a non-emitted leaf of the same overlay that only a hand port implements:
@@ -326,8 +347,22 @@ those are hand ports with one guarded error path.
   - ovl_03C5 `80121270`, from 80121C04 and 80122040;
   - ovl_0700 `8018F344`, `80193B5C` and `80197BA0`.
 
-  They matter only if those generated TUs are dispatched through the
-  registry, whose callers are hand ports. Reachability is unknown.
+  They are dormant on the native path today:
+  - The ovl_03D2 chain is reached in retail from the title loop
+    (`func_801909B4`, jal 80190660 at 80190D74 and 80192CE8 at 80190D84).
+    The port runs the title loop as a hand port, which calls the hand-ported
+    `func_80190660` and no `func_80192CE8` at all.
+  - ovl_03C5 80121C04/80122040 are reached from the EXE (jal at 80014FA4 and
+    8003F520), whose ports call the hand-ported movie player by name.
+  - The ovl_0700 TUs have no generated caller.
+
+  If any of these generated TUs is ever dispatched through the registry, the
+  boundary would stop it.
+- 40 swept TUs run 0 seeds (sweep 5 "skipped"): every seeded input faults
+  in the oracle or spins on a mocked callee. 34 are room bodies, also
+  skipped in sweep 4. Each needs a directed spec, as `func_8006B4F8` (the
+  room loader) got: with `r(0x8006E6A8)=0;r(0x8006E7E8)=0` it runs 7 seeds,
+  267/540 words, ok.
 - `func_800339A0` with style >= 4 stays a loud boundary. Retail reads the
   stack above a 16-byte local there.
 - The retail stack-residue residuals and m0023i's `[DAY1_SHIM]` (above).
