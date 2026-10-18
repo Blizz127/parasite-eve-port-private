@@ -587,6 +587,38 @@ those are hand ports with one guarded error path.
 
 ## Gates on this branch
 
+Final tree (regen20, HEAD 99fad1188 and later doc commits), 2026-10-18:
+
+- Generator drift: `gen_decomp_ports.py --e21 --verify` reports 1046 TUs up to
+  date, 0 drifted. `gen_overlay_ports.py --verify` reports rooms 2951,
+  ovl_0700 45, ovl_0457 27, ovl_03D2 26, ovl_03C9 18 and ovl_03C5 8, all with
+  0 drifted, and the dispatch registry up to date. So the built tree is what
+  HEAD generates.
+- Sweep 7, every e21 candidate with the shipped flags
+  (`E21_CFLAGS="-O3 -fno-strict-aliasing -fwrapv" E21_GTE_CFLAGS=-O3`,
+  `--min-ok 4 --max-seeds 256`, 13:16-14:54 UTC):
+
+      e21_diff: MISMATCH: 8      the stack-residue set
+      e21_diff: ok: 2037
+      e21_diff: skipped: 5       ovl_0700 8018F55C/80191C94, ovl_03D2 8018F958/8018FBC0/80192CE8 (dormant)
+
+  No nocompile and no error. This includes every NON_MATCHING TU of room
+  batches 1-12 and the E23 credits TU.
+- `scripts/run_native_oracle_harnesses.sh`: font 54, animation 117, field VM
+  693, all PASS with zero skipped (NATIVE_ORACLE_HARNESSES=PASS). It builds
+  its own tests at -O2.
+- Registry: no overlay entry at fingerprint 0. The 2164 fnv-0 rows are
+  always-resident EXE functions, bound by address.
+- Not run (owed through the runner before anything is packaged; the shipped
+  code changed in this session: decomp compile flags, ILP32 `long`, E22
+  casts, the E23 credits frame flip, 47 NON_MATCHING room bodies):
+  - the Day-1 route regression (`day1_route_regress.sh`);
+  - the movies-on Day-2 check;
+  - the owner device gate;
+  - any visual check (the credits picture included).
+
+Earlier gates:
+
 - `pe-native-tests` (isolated HOME, Disc 1 configured, built in /dev/shm from
   the regeneration with room batch 12, 2026-10-18 13:08 UTC): 1661/1661, 0
   skipped. The four `credits_*` tests and 8 more NAM9 retail cases are new
