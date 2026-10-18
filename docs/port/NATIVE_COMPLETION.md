@@ -849,22 +849,72 @@ Tests:
   - the channel switch `func_80125894(1)`;
   - the `func_801255A4` teardown, leaving the drive idle and the queue empty.
 
-**Still blocking production** (the service stays 0):
-- `credits_xa_device_path` starts from the retail image, where
-  `D_8009B554 = 0`, so its DsInit takes the device branch. Production boots
-  libds in host mode (`D_8009B554 = 1`), and the overlay's own DsInit call is
-  then a no-op. Attaching the device mid-game must therefore supply what the
-  host branch skipped:
-  - the IRQ 2 handler (`InterruptCallback(2, 0x8007C13C)`);
-  - the VBlank tick `0x8007FE24` (`VSyncCallbacks(0, ..)`).
+**Production entry state (resolved).** Production boots libds in host mode:
+`func_8003E610` runs ResetCallback and the host DsInit (`D_8009B554 = 1`), and
+`func_8006A5BC`'s CdReset leaves lane 1. The overlay's own DsInit is then a
+no-op, and the libcd state block the device branch fills (`func_8007FA2C`,
+`D_8009B558..B590`) stays mostly zero. `PE_Cd_AttachDevice`
+(`game/boot/cd_stream_port.c`) supplies exactly the two hooks host mode
+skipped:
+- `InterruptCallback(2, 0x8007C13C)`;
+- `VSyncCallbacks(0, 0x8007FE24)`.
 
-  Detaching must take both off again. A production-state test is owed: host
-  boot, attach, credits, detach, slots byte-identical, and a host-mode read
-  still working.
-- `func_801235DC` itself has not run yet; only its sub-steps have. It ends
-  when `func_80123950` reports the scroll finished and then `D_80172CE4` is
-  set, or at once when `D_8009D1A0 & 0x30000`. A bounded run on the fixture
-  is owed.
+It attaches the drive with interrupt enable 7 and reissues nothing: no
+Getstat, Init or Demute. It refuses unless libds is host-booted and idle.
+`PE_Cd_DetachDevice` restores both slots, and with them I_MASK and the
+registered-source mask, then resets the device model. The zero state block did
+not matter: the first device responses overwrite what the credits read.
+
+**VSync(-1) with the device attached (fixed).** The production-state test
+first failed because GetlocP was never sent. `func_80125A40` issues it only
+when `VSync(-1) & 0x1F == 0`, and host `VSync(-1)` returned `fb_vsync_count`,
+which every query increments. Inside a once-per-frame VSync callback that
+value moves by 2 per frame (the callback's own query plus the wait), so it
+locked onto odd values and never fired. `host_framebuffer.h` documents
+`VSync(-1)` as the VBlank counter `D_800956AC`. With the device attached it now
+returns that counter: VBlanks come from device time, and each query still adds
+its 1024 device cycles, so a busy loop on `VSync(-1)` still advances. Without
+the device the host keeps its call count, because no VBlank happens inside a
+busy loop there. All the device-mode filters still pass (DAY2_cd, DAY2_movie,
+CDS, CDQ, B53, B54K, CDXA).
+
+**Tests:**
+- `credits_attach_from_host_boot`:
+  - host boot;
+  - attach installs both hooks, and a second attach is refused;
+  - the CD steps run: CdSearchFile, then Setmode, Setfilter and ReadS, then
+    the GetlocP loop until `D_80172CE4 == 1`, then teardown;
+  - detach restores the IRQ 2 slot, VSync slot 0, I_MASK and the
+    registered-source mask exactly;
+  - a host-mode `func_8006E6D4` read of the fixture's PVD then completes.
+- `credits_main_loop_runs_to_exit` runs `func_801235DC` itself in mode 0 from
+  that state:
+  - It runs in a forked child under `alarm(240)`, on an 80000-sector fixture.
+    Only the first 512 sectors are written; the rest are zero pages that are
+    never touched.
+  - The loop made 13608 iterations, which matches the 13623 estimated from the
+    744-line table at 1 px per iteration after a 224 px lead-in. It presented
+    13608 frames, played the XA channel and left through
+    `D_80172CE0 = D_80172CE4 = 1`.
+  - The teardown left the drive idle and the queue empty, and bit 16 of
+    `D_8009D1A0` was clear.
+  - It takes 5.6 s of wall time.
+
+  On the way there, the alarm caught two stops: an unseeded pad record, which
+  is a fixture gap (`Test_SeedDigitalController`), and a 512-sector disc that
+  the drive read past. After each stop the loop spun until the alarm. That is
+  the next blocker.
+
+**Still blocking production** (the service stays 0):
+- **Stop safety.** `PE_Port_RequestStop` only sets a flag. The generated
+  credits loop never tests it, nor do the busy waits in its CD helpers
+  (`func_801255A4`'s `while (func_80080DC4(9, 0, 0) == 0) {}`, the lane-1
+  waits). A boundary, or a host quit such as closing the window, inside the
+  credits would then spin forever instead of exiting. The test proved this
+  twice.
+- **A disc without CREDITS.XA.** `func_8012562C` retries its CdSearchFile
+  forever when the file is missing (for example Disc 1 in the drive). The entry
+  must check for the file and stop with a named boundary.
 - The pad-code mode (bit 16) stays gated: nothing shows what retail's ring
   holds there.
 

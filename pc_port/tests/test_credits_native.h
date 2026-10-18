@@ -305,10 +305,14 @@ int32_t ovl_0457__func_8012562C(void);
 int32_t ovl_0457__func_80125744(void);
 int32_t ovl_0457__func_80125894(uint8_t a_a0);
 int ovl_0457__func_801255A4(void);
+void ovl_0457__func_801235DC(void);
 
-static PE_Disc *CxaBuildDisc(uint8_t **out)
+/* total_sectors >= CXA_SECTORS: sectors past CXA_SECTORS are left untouched
+ * (calloc'd zero pages, never written) so a long fixture costs no memory; the
+ * drive delivers them as zero data sectors. */
+static PE_Disc *CxaBuildDiscSized(uint8_t **out, uint32_t total_sectors)
 {
-    uint8_t *img = calloc(CXA_SECTORS, PE_DISC_RAW_SECTOR), *p;
+    uint8_t *img = calloc(total_sectors, PE_DISC_RAW_SECTOR), *p;
     uint32_t i;
     int n;
     if (!img) return NULL;
@@ -339,7 +343,12 @@ static PE_Disc *CxaBuildDisc(uint8_t **out)
         raw[19] = raw[23] = audio ? 1u : 0u;
     }
     *out = img;
-    return PE_Disc_OpenMemory(img, (size_t)CXA_SECTORS * PE_DISC_RAW_SECTOR);
+    return PE_Disc_OpenMemory(img, (size_t)total_sectors * PE_DISC_RAW_SECTOR);
+}
+
+static PE_Disc *CxaBuildDisc(uint8_t **out)
+{
+    return CxaBuildDiscSized(out, CXA_SECTORS);
 }
 
 static void test_credits_xa_device_path(void)
@@ -396,6 +405,178 @@ static void test_credits_xa_device_path(void)
     PASS();
 }
 
+/* The credits CD steps from production's entry state.  Production boots libds
+ * in host mode: func_8003E610 runs ResetCallback and the host DsInit
+ * (D_8009B554 = 1), and func_8006A5BC's CdReset leaves lane 1.  The overlay's
+ * own DsInit is then a no-op, so PE_Cd_AttachDevice must supply the device
+ * branch's two hooks, and PE_Cd_DetachDevice must take both off again.
+ * Afterwards the IRQ 2 slot, VSync slot 0, I_MASK and the registered-source
+ * mask must equal their pre-attach values.  A host-mode read must still
+ * complete. */
+static void test_credits_attach_from_host_boot(void)
+{
+    PE_Disc *d1, *cx;
+    uint8_t *img = NULL;
+    char err[256];
+    PeCdDeviceState dev;
+    PeCdAttach at;
+    uint32_t irq2, vsync0;
+    uint16_t mask, registered;
+    unsigned t;
+    TEST_RETAIL_DISC1("credits_attach_from_host_boot");
+    ResetTestState();
+    PE_CdReg_Reset();
+    err[0] = 0;
+    d1 = BTL6_OpenDisc1(err, sizeof(err));
+    ASSERT(d1 != NULL, err[0] ? err : "PE_Disc_Open failed");
+    PE_Disc_SetActive(d1);
+    ASSERT(PE_GuestImage_LoadExe(d1, err, sizeof(err)) == 0, err);
+    ASSERT(PE_Globals_AdoptRetailImage() == 0, "retail startup globals");
+    ASSERT(credits_load_overlays() == 0, "ovl_039F/ovl_0457 from PE.IMG");
+    cx = CxaBuildDisc(&img);
+    ASSERT(cx != NULL, "credits disc fixture");
+    PE_Disc_SetActive(cx);
+    HostFB_Init(); PE_GPU_Init(); PE_Callback_Init();
+    func_80073C94();
+    ASSERT(!PE_CdReg_DeviceEnabled() && func_8007EC14() == 1 &&
+           PE_LoadU32(0x8009B554u) == 1u && func_8007ED58() == 1 &&
+           func_8007F72C() == 1 && !PE_Port_ShouldStop(),
+           "host-mode boot: DsInit host branch, CdReset, lane 1");
+    irq2 = PE_LoadU32(0x800945E8u + 8u);
+    vsync0 = PE_Callback_GetSlot(0u);
+    mask = PE_IRQ_GetMask();
+    registered = PE_LoadU16(0x80094614u);
+    ASSERT(irq2 == 0u && vsync0 == 0u, "host boot installs neither device hook");
+    ASSERT(PE_Cd_AttachDevice(&at) && PE_CdReg_DeviceEnabled() &&
+           PE_LoadU32(0x800945E8u + 8u) == 0x8007C13Cu &&
+           PE_Callback_GetSlot(0u) == 0x8007FE24u && (PE_IRQ_GetMask() & 4u),
+           "attach installs InterruptCallback(2) and VSyncCallbacks(0)");
+    {
+        PeCdAttach again;
+        ASSERT(!PE_Cd_AttachDevice(&again) && !again.attached, "attach refuses twice");
+    }
+    ASSERT(ovl_0457__func_8012562C() == 0 && !PE_Port_ShouldStop(),
+           "func_8012562C: DsInit no-op, CdSearchFile");
+    ASSERT(PE_LoadU32(0x80172CE8u) == CXA_FILE_LBA, "credits start LBA");
+    ASSERT(ovl_0457__func_80125744() == 0 && !PE_Port_ShouldStop(),
+           "func_80125744 through the attached drive");
+    for (t = 0; t < 600u && !PE_LoadU32(0x80172CE4u) && !PE_Port_ShouldStop(); t++)
+        HostFB_VSync(0);
+    PE_CdReg_GetDeviceState(&dev);
+    ASSERT(!PE_Port_ShouldStop() && PE_LoadU32(0x80172CE4u) == 1u &&
+           dev.xa_sectors >= CXA_FILE_SECTORS / 4u, "XA stream played to its end");
+    ASSERT(ovl_0457__func_801255A4() == 0 && !PE_Port_ShouldStop(), "teardown");
+    PE_Cd_DetachDevice(&at);
+    ASSERT(!PE_CdReg_DeviceEnabled(), "detach disables the device");
+    ASSERT(PE_LoadU32(0x800945E8u + 8u) == irq2 && PE_Callback_GetSlot(0u) == vsync0 &&
+           PE_IRQ_GetMask() == mask && PE_LoadU16(0x80094614u) == registered,
+           "detach restores the IRQ 2 slot, VSync slot 0 and both masks");
+    ASSERT(func_8006E6D4(16, 0, 0x801E0000u, 1) == 1 && !PE_Port_ShouldStop() &&
+           memcmp(PE_Translate(0x801E0001u, 5u), "CD001", 5) == 0,
+           "a host-mode read completes after detach");
+    PE_CdReg_Reset();
+    PE_Disc_SetActive(NULL);
+    PE_Disc_Close(cx);
+    PE_Disc_Close(d1);
+    free(img);
+    PASS();
+}
+
+/* The credits loop func_801235DC itself, mode 0 (Disc 2 ending), from the
+ * production entry state on the fixture disc.  It runs in a child process
+ * under alarm(): the loop has no stop test, so a hang must fail the test, not
+ * the suite.  The exit it must reach: func_80123950 reports the scroll done
+ * (state 0 -> 4), then D_80172CE0 = D_80172CE4, which the GetlocP callback
+ * sets once the position passes the file end; then the func_801255A4
+ * teardown and op 6, and bit 16 of D_8009D1A0 cleared. */
+/* The scroll is 744 lines of 18 px at 1 px per loop iteration after a 224 px
+ * lead-in (func_80123E08, the 0x80125C88 line table): about 13600
+ * iterations.  The 2x ReadS keeps running past the 48-sector file until the
+ * teardown, 2.5 sectors per VBlank, so the disc must outlast that. */
+#define CXA_LOOP_SECTORS 80000u
+typedef struct {
+    uint32_t done, stopped, ce0, ce4, iterations, vsyncs, presented, reading, lane, queue, d1a0;
+    uint32_t xa;
+} CxaLoopResult;
+
+static void test_credits_main_loop_runs_to_exit(void)
+{
+    int fds[2], status = 0;
+    pid_t pid;
+    CxaLoopResult r;
+    TEST_RETAIL_DISC1("credits_main_loop_runs_to_exit");
+    ASSERT(pipe(fds) == 0, "pipe");
+    fflush(NULL);
+    pid = fork();
+    if (pid == 0) {
+        PE_Disc *d1, *cx;
+        uint8_t *img = NULL;
+        char err[256];
+        PeCdAttach at;
+        PeCdDeviceState dev;
+        int vs, ds, pr, mk;
+        memset(&r, 0, sizeof r);
+        close(fds[0]);
+        alarm(240);
+        ResetTestState();
+        PE_CdReg_Reset();
+        err[0] = 0;
+        d1 = BTL6_OpenDisc1(err, sizeof(err));
+        if (d1) {
+            PE_Disc_SetActive(d1);
+            if (PE_GuestImage_LoadExe(d1, err, sizeof(err)) == 0 &&
+                PE_Globals_AdoptRetailImage() == 0 && credits_load_overlays() == 0 &&
+                (cx = CxaBuildDiscSized(&img, CXA_LOOP_SECTORS)) != NULL) {
+                PE_Disc_SetActive(cx);
+                HostFB_Init(); PE_GPU_Init(); PE_Callback_Init();
+                func_80073C94();
+                Test_SeedDigitalController();   /* boot's pad init: 844E4/84B44 */
+                if (func_8007EC14() == 1 && func_8007ED58() == 1 && PE_Cd_AttachDevice(&at)) {
+                    PE_StoreU32(0x8009D1A0u, PE_LoadU32(0x8009D1A0u) & ~0x30000u);
+                    ovl_0457__func_801235DC();
+                    PE_CdReg_GetDeviceState(&dev);
+                    r.reading = dev.reading;
+                    r.xa = dev.xa_sectors;
+                    r.lane = PE_LoadU32(0x8009B574u);
+                    r.queue = PE_LoadU32(0x800A3608u);
+                    PE_Cd_DetachDevice(&at);
+                    r.done = 1;
+                }
+            }
+        }
+        r.stopped = (uint32_t)PE_Port_ShouldStop();
+        r.ce0 = PE_LoadU32(0x80172CE0u);
+        r.ce4 = PE_LoadU32(0x80172CE4u);
+        r.iterations = PE_LoadU32(0x80172CD4u) - 420u;
+        r.d1a0 = PE_LoadU32(0x8009D1A0u);
+        HostFB_GetState(&vs, &ds, &pr, &mk);
+        r.vsyncs = (uint32_t)vs;
+        r.presented = (uint32_t)pr;
+        if (write(fds[1], &r, sizeof r) != (ssize_t)sizeof r) _exit(3);
+        _exit(0);
+    }
+    close(fds[1]);
+    ASSERT(pid > 0, "fork");
+    memset(&r, 0, sizeof r);
+    {
+        ssize_t got = read(fds[0], &r, sizeof r);
+        close(fds[0]);
+        ASSERT(waitpid(pid, &status, 0) == pid, "waitpid");
+        ASSERT(!WIFSIGNALED(status), "the credits loop did not exit within 240 s");
+        ASSERT(got == (ssize_t)sizeof r && WIFEXITED(status) && WEXITSTATUS(status) == 0,
+               "child result");
+    }
+    fprintf(stderr, "[credits] loop: %u iterations, %u vsync calls, %u presents, %u XA sectors\n",
+            r.iterations, r.vsyncs, r.presented, r.xa);
+    ASSERT(r.done && !r.stopped, "setup, attach and the whole loop ran without a stop");
+    ASSERT(r.ce0 == 1u && r.ce4 == 1u, "the loop left through D_80172CE0 = D_80172CE4 = 1");
+    ASSERT(!r.reading && r.lane == 1u && r.queue == 0u,
+           "the teardown left the drive idle and the queue empty");
+    ASSERT(!(r.d1a0 & 0x10000u), "bit 16 of D_8009D1A0 clear on exit");
+    ASSERT(r.xa >= CXA_FILE_SECTORS / 4u, "the XA channel played");
+    PASS();
+}
+
 static void test_credits_native_all(void)
 {
     test_credits_libpress_replacements();
@@ -405,5 +586,7 @@ static void test_credits_native_all(void)
     test_credits_entry_stops_without_xa_service();
     test_credits_xa_commands_never_complete_without_device();
     test_credits_xa_device_path();
+    test_credits_attach_from_host_boot();
+    test_credits_main_loop_runs_to_exit();
 }
 #endif

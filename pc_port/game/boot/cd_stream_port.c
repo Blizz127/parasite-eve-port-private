@@ -111,6 +111,41 @@ int func_8007F994(void)
     return 1;
 }
 
+/* Mid-game device attachment for a CD-XA consumer (the ending credits).
+ * Production boots libds in host mode.  func_8007EC14's host branch publishes
+ * D_8009B554 = 1 and the four handler words, but not the two hooks that only
+ * the device branch above installs.  Any later DsInit (func_8012562C makes
+ * one) is then a no-op.  Attach supplies exactly those hooks, in the device
+ * branch's order:
+ *   InterruptCallback(2, 0x8007C13C)   (func_8007BBFC)
+ *   VSyncCallbacks(0, 0x8007FE24)      (func_8007F994)
+ * It attaches the drive with interrupt enable 7, as func_8007BBFC writes it.
+ * It does not reissue Getstat/Init/Demute or clear the libcd state block:
+ * retail sends those at boot, not at the credits.  It refuses unless libds is
+ * host-booted and idle (lane 1, queue empty).  Detach puts both previous slot
+ * values back; InterruptCallback also restores the I_MASK and
+ * registered-source bits.  Detach then resets the device model. */
+int PE_Cd_AttachDevice(PeCdAttach *saved)
+{
+    memset(saved,0,sizeof *saved);
+    if(PE_CdReg_DeviceEnabled() || PE_LoadU32(0x8009B554u)!=1u ||
+       func_8007F72C()!=1 || func_8007F778()!=0) return 0;
+    if(!PE_CdReg_EnableDevice(7u)) return 0;
+    if(PE_Callback_Bind(0x8007FE24u,func_8007FE24)!=0) {PE_CdReg_Reset();return 0;}
+    saved->irq2=func_80073CC4(2u,0x8007C13Cu);
+    saved->vsync0=func_80073D58(0u,0x8007FE24u);
+    saved->attached=1;
+    return 1;
+}
+
+void PE_Cd_DetachDevice(const PeCdAttach *saved)
+{
+    if(!saved->attached) return;
+    (void)func_80073D58(0u,saved->vsync0);
+    (void)func_80073CC4(2u,saved->irq2);
+    PE_CdReg_Reset();
+}
+
 /* 800F4..80164: timed-out command reset and asynchronous reissue. */
 void func_800800F4(void)
 {

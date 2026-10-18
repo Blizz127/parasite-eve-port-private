@@ -316,9 +316,17 @@ uint32_t HostFB_VSync(int mode)
      * 0xFFFF` for every non-negative mode; waiting modes then re-latch the
      * baseline to the post-wait value (this is what makes a following
      * mode-1 query read the elapsed scanlines) and negative modes instead
-     * return the absolute VBlank counter (D_800956AC). */
+     * return the absolute VBlank counter (D_800956AC).  With the device
+     * attached, that counter is the real one: VBlanks come from device time,
+     * the libetc source-0 handler 8007440C bumps it once per VBlank, and each
+     * query adds its 1024 device cycles above, so a busy loop on VSync(-1)
+     * still advances.  Without the device no VBlank happens inside a busy
+     * loop, so the host keeps its call count there.  The call count moves
+     * twice per frame inside a VSync callback (its own query plus the wait),
+     * so a callback testing `VSync(-1) & 0x1F` (the credits' func_80125A40)
+     * can lock onto odd values and never fire. */
     if (mode < 0)
-        return (uint32_t)fb_vsync_count;
+        return device ? PE_LoadU32(0x800956ACu) : (uint32_t)fb_vsync_count;
     uint32_t entry = fb_vsync_timer;
     uint32_t ret = (entry - fb_vsync_baseline) & 0xFFFFu;
     fb_vsync_timer = (fb_vsync_timer + 1u) & 0xFFFFu;
