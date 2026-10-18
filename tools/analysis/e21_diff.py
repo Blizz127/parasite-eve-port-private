@@ -990,6 +990,10 @@ STACK_EXTENTS = {
     # func_800D1384 (trail-ribbon GTE wrapper): col0 = a3 -> t2, col1 = sp+0x90 -> t4,
     # each read only as lbu 0/1/2 (retail 800D1538..800D1604).
     (0x800D1384, 3): 3, (0x800D1384, 4): 3,
+    # func_800D1DEC (glow point): pos = a0 -> lwc2 $0/$1 at 0/4 (VZ0 keeps the
+    # low halfword: 6 bytes); col = a1 -> s2, read only as lbu 0/1/2
+    # (retail 800D1E60/64 and 800D1E90..800D1EE0).
+    (0x800D1DEC, 0): 6, (0x800D1DEC, 1): 3,
 }
 
 
