@@ -297,32 +297,40 @@ those are hand ports with one guarded error path.
 ## Gates on this branch
 
 - `pe-native-tests` (isolated HOME, Disc 1 configured, built in /dev/shm from
-  the 2026-10-18 regeneration at 4dba7922): 1657/1657, 0 skipped.
-- ctests `park-m0086-full` (2653/0), `park-m0089-full` (1071/0),
-  `gte-native-fixed` (118/0), `gte-native-hardware` (231741/0), and the two
-  dev-menu ctests: all pass.
+  the regeneration of bfdf402af, 2026-10-18 04:28 UTC): 1661/1661, 0
+  skipped. The four `credits_*` tests and 8 more NAM9 retail cases are new
+  since 4dba7922.
+- ctests `park-m0086-full`, `park-m0089-full`, `gte-native-fixed`,
+  `gte-native-hardware`, and the two dev-menu ctests: 6/6 pass.
 - `scripts/run_native_oracle_harnesses.sh`:
   - font 54/54
   - animation 117/117
   - field VM 693/693
 - `retail_data_guard.py --strict` on every commit's files: OK.
-- `psyq_port_guard.py`: PASS relative to the allowlist. This is unchanged and
-  is not a public-binary clearance.
+- `psyq_port_guard.py --binary parasite-eve-port --binary pe-native-tests`
+  (regenerations of f91561717, 249e76f38 and bfdf402af): PASS relative to the
+  allowlist, 1421 entries, unchanged. This is not a public-binary clearance.
 - Not run on the devbox, by rule:
   - the Day-1 route regression;
   - the movies-on Day-2 check;
   - any game run;
   - the owner device gate.
 
-## Next
+## Open
 
-1. The full e21 sweep on the 2026-10-18 regeneration (the oracle fixes plus
-   the new lowering).
-2. The 46 remaining no-C room bodies as NON_MATCHING C. Each is proven by
-   `e21_leaf.py --nonmatching OFF:SIZE --check-gte --uncovered --inputs <spec>`
-   with every uncovered word justified, then recorded in `nonmatching.yaml`
-   with its inputs.
-3. A directed retail differential of the Items/Equipment paths
-   (`func_80057834`, `func_800466C0`, `func_8005A318`).
-4. A recorded-residue fix for the stack-residue residuals. The hand-versus-
-   generated decision for m0005i.
+- The 37 remaining no-C room bodies (m0318i 15, m0432i 9, m0429i 8, m0404i 3,
+  m0256i 1, m0273i 1). The room workflow (wf_9660d38d) is working through them.
+- Intra-overlay boundaries in generated subsystem-overlay TUs. These calls go
+  to a non-emitted leaf of the same overlay that only a hand port implements:
+  - ovl_03D2 `80191B64`, from 801924F8 and 80192934;
+  - ovl_03C5 `80121270`, from 80121C04 and 80122040;
+  - ovl_0700 `8018F344`, `80193B5C` and `80197BA0`.
+
+  They matter only if those generated TUs are dispatched through the
+  registry, whose callers are hand ports. Reachability is unknown.
+- `func_800339A0` with style >= 4 stays a loud boundary. Retail reads the
+  stack above a 16-byte local there.
+- The retail stack-residue residuals and m0023i's `[DAY1_SHIM]` (above).
+- A directed retail differential of the Items/Equipment paths
+  (`func_80057834`, `func_800466C0`, `func_8005A318`).
+- m0005i: decide between its hand ports and the generated TUs.

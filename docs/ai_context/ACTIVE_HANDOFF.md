@@ -26,29 +26,43 @@ direct calls (bug), fingerprint-guarded m0005i effect bindings (bug: other
 rooms' callbacks at the same VMAs ran Eve's charge code), and m0429i
 801982A4 NON_MATCHING.
 
-Later on 2026-10-18 (commits d11531b7e, f91561717):
-- The ending credits now run native. `func_8001220C` called the ovl_0457
-  loop through a `psx_compat.h` Bootstrap stub; it now goes through the
-  registry. The credits' libpress calls and printf have host replacements.
-  The `func_8004DCA4` nonzero mode follows the matched C, with 8 new retail
-  cases.
-  Evidence: `docs/evidence/native-credits-20261018/REPORT.md`, suite
-  1661/1661, a retail-vs-native decode of all 31 credits pictures.
-- NON_MATCHING EXE leaf support: `e21_leaf.py exe`.
-- The e21 harness mock-stub bug that caused 139 nocompiles in sweep 3 is
-  fixed. `e21_leaf.py --seed-list` added.
-- `tools/analysis/boundary_site_census.py`: 228 production sites, no stale
-  ones.
-- Room NON_MATCHING batch 1 (six leaves from workflow wf_441734e8, each
-  confirmed by an independent verifier) is in `nonmatching.yaml`, waiting on
-  the regeneration gate.
+Later on 2026-10-18 (all committed, none pushed):
+- f91561717: the ending credits run native.
+  - main reaches ovl_0457 through the registry.
+  - libpress and printf have host replacements.
+  - `func_8004DCA4`'s nonzero mode follows the matched C, with 8 new retail
+    cases.
+- 3c103eb4e, 249e76f38, bfdf402af: NON_MATCHING batches 1-3.
+  - 9 room callbacks and all 12 asm-only EXE effect functions.
+  - `func_800C3324` was the weapon-effect STOP.
+  - Room census 47 -> 37.
+- e21 harness:
+  - subsystem overlays and EXE TUs are now in the sweep;
+  - callee return widths, with a narrow return checked rather than assumed;
+  - dead-parameter masks;
+  - multi-spec inputs;
+  - directed mock returns `r(0xADDR)=V`;
+  - the `unsigned code` nocompile bug that hit 139 TUs in sweep 3 is fixed.
+- `tools/analysis/boundary_site_census.py`: 228 production sites, none
+  stale.
+- Sweep 4 (rooms): 1853 ok, 8 MISMATCH (the known stack residue), 34 skipped.
 
-Next:
-- e21 sweep 4 with the fixed harness.
-- The remaining no-C room bodies: the room workflow is still running.
-- The EXE asm-only effect functions, `func_800C3324` first. The generated
-  weapon-effect callbacks `func_800CC644`/`func_800CC878` in the `0x800E0D08`
-  table call it through a boundary.
+In flight:
+- e21 sweep 5 over all 2012 TUs on the bfdf402af tree;
+- the room workflow wf_9660d38d on the remaining 37 bodies.
+
+Integrate a confirmed leaf this way:
+1. Add its yaml line and specs.
+2. Regenerate (`regen_build_suite.sh`), build and run the suite.
+3. Re-run its e21_leaf proof.
+4. Write its report and commit.
+
+Do NOT `resumeFromRunId` a pooled workflow: it re-ran a finished decomp and
+overwrote a committed source. Launch a fresh run with the remaining targets
+instead.
+
+Next: triage sweep 5's subsystem-overlay and EXE results, then the room
+batches, then the open list in NATIVE_COMPLETION.md.
 
 Pitfall: never symlink `tools/era/maspsx/maspsx.py` into a worktree. Python
 then loads the main checkout's maspsx package, and m0350i's gate FAILed on
