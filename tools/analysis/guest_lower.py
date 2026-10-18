@@ -48,6 +48,9 @@ class LowerError(Exception):
 # original refusal (plus the lowering's own reason).  Shared by
 # gen_overlay_ports.py (room code) and gen_decomp_ports.py --e21 (EXE leaves).
 LOWER_REASONS = ("pointer parameter", "leaf struct with pointer members",
+                 # E23: a row of a multi-dimensional array extern is a guest
+                 # address (ovl_0457 801247F4's DRAWENV/DISPENV rows).
+                 "multi-dimensional array extern",
                  "callee result dereferenced", "guest-address result of",
                  "pointer-to-pointer cast", "pointer cast of non-D_",
                  "host pointer", "relational compare of pointers",

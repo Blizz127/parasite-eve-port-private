@@ -1192,5 +1192,21 @@ class ReturnSegmentTests(unittest.TestCase):
         self.assertFalse(g.returns_symbol_addresses("int *f(){ return 0; }"))
 
 
+class MultiDimArrayTests(unittest.TestCase):
+    def test_two_dimensional_array_extern_is_not_verbatim(self):
+        # ovl_0457 801247F4: `D_800BCDC8[k]` is a DRAWENV row, not a byte
+        src = ("extern int D_8009CDDC;\nextern unsigned char D_800BCDC8[][92];\n"
+               "extern void func_800754E4();\n"
+               "void func_80099990(void) {\n    func_800754E4(0, D_800BCDC8[D_8009CDDC]);\n}\n")
+        plan = analyze(src)
+        self.assertFalse(plan["eligible"])
+        self.assertIn("multi-dimensional array extern D_800BCDC8", plan["reason"])
+
+    def test_one_dimensional_array_extern_stays_eligible(self):
+        src = ("extern unsigned char D_800BCDC8[184];\n"
+               "int func_80099990(int k) {\n    return D_800BCDC8[k];\n}\n")
+        self.assertTrue(analyze(src)["eligible"], analyze(src).get("reason"))
+
+
 if __name__ == "__main__":
     unittest.main()

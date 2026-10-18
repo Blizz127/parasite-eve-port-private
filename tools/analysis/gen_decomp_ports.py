@@ -87,6 +87,8 @@ Later additions (see docs/ai_context/PC_PORT_FROM_DECOMP.md §3):
       `&D_X[k]`, `D_X + k` become retail guest addresses where the callee's
       host parameter takes one;
   E18 no leaf struct with pointer members (guest layout has 4-byte pointers).
+  E23 no multi-dimensional array extern (PE_DECOMP_ARRAY is one-dimensional;
+      such a leaf is E21-lowered instead).
   RECT a leaf-local `typedef struct { short x, y, w, h; } RECT;` is the
       psx_compat.h RECT (identical layout) and is replaced by a comment.
   E20 a leaf whose own canonical pc_port header prototype differs from the
@@ -1129,6 +1131,17 @@ def analyze(name: str, src_text: str, matched: dict,
         if re.search(r"\*\s*[A-Za-z_]\w*\s*(?:\[[^\]]*\])?\s*[;,]", m.group(1)):
             return {"eligible": False,
                     "reason": "leaf struct with pointer members (guest layout)"}
+
+    # E23 — a multi-dimensional array extern (`extern unsigned char
+    # D_800BCDC8[][92];`) cannot be a PE_DECOMP_ARRAY of its element type:
+    # that macro is one-dimensional, so `D_800BCDC8[k]` (row k, a 92-byte
+    # DRAWENV whose address retail passes) became the byte at offset k.
+    # ovl_0457 801247F4 (the credits frame flip, op table 1 entry 6) handed
+    # PutDispEnv/DrawOTagEnv `movzbl` byte values instead of env addresses.
+    # Such a leaf goes to the E21 lowering, which computes guest addresses.
+    for m in re.finditer(r"\bextern\b[^;{}()]*?\b(D_[0-9A-Fa-f]{8})\s*(?:\[[^\]]*\]\s*){2,};", stripped):
+        return {"eligible": False,
+                "reason": f"multi-dimensional array extern {m.group(1)}"}
 
     hdr = HDR_RE.search(stripped)
     if hdr is None:
