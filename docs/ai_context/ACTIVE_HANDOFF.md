@@ -97,11 +97,21 @@ Later on 2026-10-18 (all committed, none pushed):
   ctests 6/6, psyq PASS. The unclamped e21_verbatim run after E22: 1908 ok,
   18 latent MISMATCH, 0 new; the two E22/segment cases now pass.
 
+- Room batch 9 (92e89b492): census 12 -> 6 (27,184 bytes). regen17: suite
+  1661/1661, ctests 6/6, psyq PASS. E22's note is now written only when a
+  cast is inserted (6d701009a).
+
+- Room batch 10: census 6 -> 3 (17,816 bytes). regen18: suite 1661/1661,
+  ctests 6/6, psyq PASS.
+
 In flight:
-- room batch 9 (m0432i 8019408C/80194F60, m0429i 80198914): yaml applied,
-  e21_leaf reruns running; next regen.
-- the room workflow wf_9660d38d on the last 12 bodies (the largest:
-  m0429i 80192F9C, 0x2500 bytes, no near twin).
+- the room workflow wf_9660d38d on the last 3 bodies: m0404i 80192540
+  (0xE28), m0256i 801940B0 (0x1270), m0429i 80192F9C (0x2500, no near twin).
+
+Batch recipe (each batch's yaml lines are applied AFTER the previous
+regen's GEN_DONE, so a gate never builds an unproven leaf; if a later
+batch's lines are already in the yaml when you commit, strip them from the
+staged copy and restore the file afterwards).
 
 Integrate a confirmed leaf this way:
 1. Add its yaml line and specs.
