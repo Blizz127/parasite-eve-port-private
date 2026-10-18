@@ -8,8 +8,11 @@ Base: the Decomp Bot lineage `cursor/pe-native-only-akao-6f51` 52bade3d (Day-5
 route) merged with `claude/pe-db9ca12b-private-test1` db9ca12b (the owner's
 controller/dev-menu test build), merge commit dce6091b.
 
-Nothing here is published, pushed or installed. No game run happens on the
-devbox; verification is builds, unit tests and differential oracles.
+Nothing here is published, pushed or installed. No game ran on the devbox.
+Verification is builds, unit tests and differential oracles. Every number
+below comes from a command named next to it. Matched C, behaviour (NON_MATCHING)
+C, hand ports and generated TUs are counted separately; none of this is a
+"% native" or a playable-slice claim.
 
 ## What "interpreter" means in this port
 
@@ -19,112 +22,227 @@ The shipping native-only binary has **no CPU interpreter and no CPU emulation**:
   (`tests/pe_akao_interp_oracle.c`) only into the test executables
   `pe-native-tests`, `pe-leaf-oracle-tests` and `pe-akao-tick-oracle-tests`.
 - `pc_port/platform/pe_audio_driver.c`: the AKAO sound driver runs the matched
-  C; "the old in-runtime R3000A interpreter moved to the test-only oracle".
-- `pc_port/src/port_main.c`: boundary policy defaults to `stop` and prints
+  C. "The old in-runtime R3000A interpreter moved to the test-only oracle."
+- `pc_port/src/port_main.c`: the boundary policy defaults to `stop` and prints
   `[NATIVE] boundary policy=stop (no MIPS interpreter, no CPU emulation in this
   binary)`.
 
-What is still not native is code the port has **no host C for**. Each kind
+What is still not native is code the port has **no host C for**. Each case
 ends the game for the player (exit 0, no core) when it is reached:
 
 | Kind | Mechanism | Owner-visible effect |
 |---|---|---|
 | Boundary | `PE_D_COMP_BOUNDARY*`, `PE_Decomp_Boundary*`, `PE_GuestCall` with no registry entry | `CPU_BOUNDARY/REFUSED`, `[STOP] reason=unresolved-boundary` |
 | Stub | `Bootstrap_ReturnVoid` on a normal path | stop (strict) |
-| Shim | `[DAY1_SHIM]` skip | silent skip in record policy; stop in the native-only policy |
-| GTE | `PE_GTE_Command` `abort()` on an unimplemented cop2 command; `PE_GTE_MVMVA` silently returns for LLM/LCM, V1/V2, BK/FC | crash, or wrong geometry/colour with no error |
-| Field VM | an opcode handler with no native body | `[VM] unported script opcode`, stop |
-| Disc swap | `func_80069B08` is a stub (KNOWN_DIVERGENCES #28) | Disc 2 movies are read from Disc 1 |
+| Shim | `[DAY1_SHIM]` skip | silent skip under the record policy; stop under the native-only policy (one exception, below) |
+| Disc swap | `func_80069B08` is a native hand port with a host tray; it stops only when no `--disc2-image` is configured. `package_runtime.sh` ships `data/disc2.bin`. | stop without a Disc 2 image |
 
 Both discs carry a byte-identical EXE (`452fb033...`) and PE.IMG
-(`146c0ce7308bf9fdc2ba5a84230e198db0663f3b`, 206,213,120 bytes); only the
-`FMV1/` and `FMV2/` movie files differ. One code census covers both discs.
+(`146c0ce7...`). Only the `FMV1/` and `FMV2/` movies differ, so one code census
+covers both discs.
 
-## Census (2026-10-17)
+## Census (2026-10-18)
 
-Separate numbers, never one "% native" (docs: separate coverage reporting).
+**Room code**: `PE_DISC1_BIN=<disc 1> python3 pc_port/tools/pe_all_rooms_native_census.py`.
+Registry `zz_dispatch.c`: 5712 thunks. 185 code rooms, 9103 (room x body)
+rows, 2952 unique (vma, size, FNV) bodies.
 
-**Room code** (`PE_DISC1_BIN=<disc 1> python3 -I pc_port/tools/pe_all_rooms_native_census.py`,
-registry `pc_port/game/decomp_ovl/_dispatch/zz_dispatch.c` sha256 42c50d58...,
-5531 entries, 75 tables, overlay entries with fingerprint 0: none):
-
-| | bodies (room x body) | statically reachable |
+| | session start | now |
 |---|--:|--:|
-| native-generated | 8855 | 4340 |
-| not-native | 217 | 177 |
-| direct-addr-guarded (hand binding by address only; not counted native) | 31 | 24 |
+| native-generated bodies | 8855 | 9054 (87 via a data head) |
+| not-native bodies (all statically reachable now) | 217 | 47 |
+| direct-addr-guarded (hand port bound by address only) | 31 | 2 |
+| unique not-native bodies | 136 (183,492 bytes) | 49 (90,512 bytes) |
 
-185 code rooms; 2952 unique (vma, size, FNV) bodies; **136 unique not-native
-bodies (183,492 bytes)**, of which 10 have a masked-body C twin in another
-room. Rooms are never declared resident in production, so a body resolves
-only by fingerprint (closure-equal duplicates count once, as in
-`PE_GuestCode_Resolve`).
+A body resolves only by fingerprint, as `PE_GuestCode_Resolve` does. Rooms are
+never declared resident in production, and closure-equal duplicates count once.
 
-**Matched room C on other lineages.** 90 overlay C files exist on other refs
-and not here. About 59 close census gaps, e.g. m0023i 8018F004/8018F3C8/8018F710/
-8018FC14, the shared 0xA48 effect callback (m0012i 8018F20C and 9 twins),
-m0418i x7, m0269i x5 and m0428i x4. The other 21 are byte-matched
-versions of this lineage's NON_MATCHING ports. The plan is in the session
-scratchpad (`harvest_plan.json`).
+The 47 bodies with no C anywhere are effect and particle callbacks in late
+rooms:
 
-**EXE** (`tools/analysis/pc_port_coverage.py`): matched 2253; generated from
-decomp 1013; hand translated 1119; stub 37; absent 84. "Absent" includes the
-Psy-Q libgte helpers the port implements under `PE_` names, so it overcounts.
-EXE generator: eligible 1130, ineligible 1123. The top reasons are pointer
-models (pointer-to-pointer 153, struct with pointer members 147, inline asm
-123), which the room path's E21 guest-memory lowering handles.
+| room | bodies |
+|---|--:|
+| m0318i | 19 |
+| m0432i | 11 |
+| m0429i | 9 |
+| m0404i | 3 |
+| m0428i | 1 |
+| m0350i | 1 |
+| m0273i | 1 |
+| m0256i | 1 |
 
-**GTE** (read-only census of every cop2 command word): the game issues 22
-variants. No room code issues a command outside `PE_GTE_Command`. The 6
-unimplemented variants (INTPL, SQR lm1, DCPL, DPCT, and the only LCM/IR/BK
-MVMVA `0x4A4DA412` in LightColor `func_80079034`) are in Psy-Q libgte helpers
-with no static reference. The exception is `func_80078194`, whose reachable
-path is emulated natively (`PE_NormalizeVectorRetail`).
+This count already excludes m0429i 801982A4, ported below. The vendor
+(khasinski) tree also has them as asm. The two direct-addr-guarded bodies are
+m0005i 8018F614/8018FDC4. They are native hand ports, bound by fingerprint
+after this branch (see Fixed); the census reads that guard form on the next
+regeneration.
 
-**Explicit boundary/stub/shim sites** (103 lines in production code):
-CALL-GAP 29, DISPATCH 20, TRAP 19 (retail-faithful divide/stack guards),
-WAIT/IO 11, OTHER 11, infrastructure 13. The native-only binary stops on
-boundaries, so 5 of the 6 `[DAY1_SHIM]` paths are unreachable there; the Eve
-flash substitution (`m0023i_effect_port.c`, KNOWN_DIVERGENCES #17) runs
-silently.
+**EXE** (`gen_decomp_ports.py --e21 --check`): eligible 1130 verbatim, E21
+lowered 21, 112 matched leaves that a hand port defines. Five uncompilable
+verbatim TUs remain: 80072F64, 80073A44, 8007A244, 80080E34 and 80081A7C,
+all in the Psy-Q band, where the port's own `PE_` models are the
+implementation.
+
+**Subsystem overlays**:
+
+| overlay | TUs | note |
+|---|--:|---|
+| ovl_0457 | 27/27 | credits, CREDITS.XA |
+| ovl_0700 | 45/46 | |
+| ovl_03D2 | 26/27 | |
+| ovl_03C9 | 18/18 | |
+| ovl_03C5 | 8/9 | |
+
+Every skipped leaf has a native hand port.
 
 ## Fixed in this branch
 
-- **Seven stale boundaries** (0a2adc74): the target had host C but the call
-  site still stopped the game. Items -> Use for item kinds 2, 4-6 and 12-14;
-  Equipment top menu rows 2/3; the Equipment tool mode (cancel, tool window,
-  confirm, back); effect `func_800DEA30` mode 1, whose particle velocity is now
-  rotated by the actor matrix as in retail. Verification: rewritten against the
-  matched C by reading; the native suite passes and `PA_ovl2_DEA30` checks the
-  rotation. **No test drives the Items/Equipment branches yet**; a directed
-  retail differential of `func_80057834`/`func_800466C0` is still to do.
-- **e21 oracle** (c0dc1e9f, dd4151ce): merged the 10-15 tightening (prologue-only
-  register-save exclusion, 12 stack arguments, 32-byte pointer snapshots,
-  per-callee extents, GTE state compare). A first-branch delay-slot spill now
-  counts as a save; this cleared the two false MISMATCHes it caused (m0188i
-  80195A14, m0273i 801981A4). The sweep finds 660 ok, 28 skipped and 0
-  unexplained mismatches over all current candidates.
+Boundaries and dispatch:
 
-## Gates on this branch (2026-10-17)
+- **0a2adc74** (seven stale boundaries; the target had host C):
+  - Items -> Use for item kinds 2, 4-6 and 12-14
+  - Equipment top menu rows 2/3
+  - Equipment tool cancel, window, confirm and back
+  - effect `func_800DEA30` mode 1, now rotated by the actor matrix.
+- **bc80e0ce**: seven callback dispatchers try the registry before stopping:
+  - menu cell predicate
+  - inventory sort item and compare
+  - actor contact
+  - CD, SDK and card-hook indirect calls.
 
-- `pe-native-tests` (isolated HOME, Disc 1 configured): 1657 run, 1657 passed,
-  0 failed, 0 skipped.
-- `retail_data_guard.py --strict --exe ... --peimg ...`: OK, 20540 files.
-- `psyq_port_guard.py --binary build/pcport/parasite-eve-port --require-exe`:
-  PASS relative to the allowlist, 976 offenders. This is unchanged and is not a
-  clearance; the public-binary hold stands.
-- No game run, runner job, package or publication.
+  `func_800CF5B0` and `func_800DB25C` are called with their matched C's
+  arguments.
+- **69ec7e0e**:
+  - Equipment confirm calls the generated `func_8005A318`; it was a boundary.
+  - `func_800D5898` and `func_800DAB98` call the generated `func_800D27FC`.
+- **efffd7cb**: the effect dispatcher (`func_800D413C_port.c`) bound m0005i's
+  hand ports by address alone. Other rooms put different code at those addresses:
+  - m0113i 8018F018, the pool callback of its 0xA48 effect
+  - m0412i 8018F614
+  - m0205i/m0243i/m0406i/m0410i 8018FB84
+  - m0256i 80190A6C
 
-## Work packages
+  For those rooms, Eve's charge-effect code would have run on the wrong data.
+  Each binding now requires the m0005i body's FNV. The Eve charge, flare and
+  beam retail tests now place those code bytes from PE.IMG, as retail has
+  them resident.
 
-1. Integrate the 2026-10-15 source packets (`docs/evidence/native-*-20261015/`)
-   by source, regenerating the registry instead of applying staged edits:
-   complete native GTE commands plus the matching lowering policy; m0086i
-   8018F004/8018F734/801900CC and m0089i 801924F8; the 80190574 return fix;
-   80078004 LZCS/LZCR; AVSZ3/AVSZ4 FLAG; field-VM opcodes 0x83/0xB6; font-page
-   initializer 80038D74; animation decoders 80039B74/80039D24/80039ED4.
-2. Room census and conversion of reachable not-native bodies, twins first.
-3. Differential sweep: e21 over every generated room TU (today only TUs without
-   calls, plus NON_MATCHING leaves, are tested).
-4. EXE: replace hand ports and close stubs/absent leaves from matched C.
-5. Disc swap (#28).
+Native bodies that replaced boundaries:
+
+- **d0c4075e**: GTE command engine for all 22 documented COP2 commands. The
+  `gte-native-hardware` ctest has 1100 real-console cases and 231741 checks,
+  with 0 failures.
+- **97b02098**: font-page initializer `80038D74` and animation decoders
+  `80039B74/D24/ED4`.
+- **de55f637**: m0086i 8018F734 (NON_MATCHING).
+- **60bc8623 / 69ec7e0e**: E21 lowering of matched EXE leaves no hand port
+  defines, 21 of them. They include field-VM 0x83/0xB6, `8005A318`,
+  `800D27FC`, `8006B4F8` (room loader; reached only via `8003F074` through the
+  registry), `800CF5B0` and `800DB25C`.
+
+Room and overlay leaves:
+
+- **9bafd689 / 7cb8ed02**: 59 + 5 byte-matched leaves harvested from other
+  lineages, each `EXACT_REBUILD_GATE=PASS`.
+- **0b71115e**: 15 functions carved after rooms' data heads (gates PASS).
+- **c71599ad / 69ec7e0e**: lowering of bitfields, `__builtin_memcpy`,
+  `func_`-named data, integer inline asm, file-local static helpers and dead
+  trailing parameters. This unlocked 11 room bodies and 16 subsystem-overlay
+  bodies.
+- **4dba7922** m0429i 801982A4 (NON_MATCHING): near twin of m0269i
+  8019070C. `e21_leaf.py` passes 91 directed seeds, covering 401/412 words; a
+  supplementary spec covers the 11 default arms.
+
+Lowering bugs found by the differential:
+
+- **60bc8623**: narrow prototype arguments on jalr. m0429i 80191928 passed
+  0x801063EC where retail passes 0x63EC.
+- **6c802c38**: call-containing arguments are evaluated in source order. In
+  m0418i 80190914, GetTPage runs before GetClut.
+- **a1eb0f38**: narrow prototype arguments on *direct* calls. In m0429i
+  801982A4 and its twin m0269i 8019070C, `func_800CFB7C(void *, short, void *)`
+  received 0x0007A24A where retail passes 0xFFFFA24A.
+
+Tools:
+
+- **ada567f6 / 4850836a**:
+  - The e21 oracle GTE models FLAG and the 44-bit MAC, and runs every other
+    command on the port's hardware-checked engine.
+  - Harness extent, seeding and mock fixes.
+  - `e21_leaf.py` proves one room leaf privately, with `--nonmatching`,
+    `--inputs` and `--uncovered`.
+- **08cf6870 / d6fcf88b**: the census data-head rule, matching how retail
+  addresses those words.
+
+## e21 differential sweep (`e21_diff.py --with-calls --check-gte`)
+
+Before the oracle fixes: 1716 ok, 113 MISMATCH, 41 skipped, 1 nocompile. Of
+the 113:
+
+| count | cause | status |
+|--:|---|---|
+| 96 | oracle FLAG / 44-bit MAC | oracle fixed |
+| 8 | harness extents, mocks, seeding | harness fixed |
+| 1 | real argument-order bug | fixed in 6c802c38 |
+| 8 | retail reads uninitialized stack | residual, below |
+
+The 41 skipped TUs now run their unmodelled GTE commands on the native engine.
+The full re-sweep on the 2026-10-18 regeneration is the next gate. Its result
+goes here.
+
+## Known residuals (documented, not hidden)
+
+- **Retail stack residue.** `RotMatrix` (80079754) sets only a matrix's 3x3.
+  The code then reads that matrix's translation from stack the call never
+  wrote:
+  - the 0x4A0 body in m0065i/m0087i/m0391i/m0393i/m0399i/m0401i loads it as
+    TR;
+  - m0034i/m0174i `gte_CompMatrix(&o->m, &m20, ...)` uses `m20.t`, so
+    `o->m.t` follows the residue.
+
+  Native residue differs, so effect placement can differ. A fix needs recorded
+  retail stack contents (a runner `--recorded` snapshot), not zero-fill. This
+  is the same class as KNOWN_DIVERGENCES #17.
+- **m0023i flash `[DAY1_SHIM]`** (`m0023i_effect_port.c`, KNOWN_DIVERGENCES
+  #17) is the one shim that substitutes silently in production. Retail reads
+  the stack residue of the previous mode-2 call.
+- **m0005i hand ports versus generated TUs.** 8018F018, 8018F330 and 8018FB84
+  now have matched C (harvested), but the effect dispatcher still sends
+  m0005i's own bytes to the hand ports. Switching needs an e21 parity check of
+  the hand ports.
+- `func_8003F074` -> `func_8006B4F8` (room loader) is generated and reached only
+  by a guest jalr. The production room transition uses the hand cuts in
+  `func_8006B4F8_port.c`.
+
+## Gates on this branch
+
+- `pe-native-tests` (isolated HOME, Disc 1 configured, built in /dev/shm from
+  the 2026-10-18 regeneration at 4dba7922): 1657/1657, 0 skipped.
+- ctests `park-m0086-full` (2653/0), `park-m0089-full` (1071/0),
+  `gte-native-fixed` (118/0), `gte-native-hardware` (231741/0), and the two
+  dev-menu ctests: all pass.
+- `scripts/run_native_oracle_harnesses.sh`:
+  - font 54/54
+  - animation 117/117
+  - field VM 693/693
+- `retail_data_guard.py --strict` on every commit's files: OK.
+- `psyq_port_guard.py`: PASS relative to the allowlist. This is unchanged and
+  is not a public-binary clearance.
+- Not run on the devbox, by rule:
+  - the Day-1 route regression;
+  - the movies-on Day-2 check;
+  - any game run;
+  - the owner device gate.
+
+## Next
+
+1. The full e21 sweep on the 2026-10-18 regeneration (the oracle fixes plus
+   the new lowering).
+2. The 46 remaining no-C room bodies as NON_MATCHING C. Each is proven by
+   `e21_leaf.py --nonmatching OFF:SIZE --check-gte --uncovered --inputs <spec>`
+   with every uncovered word justified, then recorded in `nonmatching.yaml`
+   with its inputs.
+3. A directed retail differential of the Items/Equipment paths
+   (`func_80057834`, `func_800466C0`, `func_8005A318`).
+4. A recorded-residue fix for the stack-residue residuals. The hand-versus-
+   generated decision for m0005i.

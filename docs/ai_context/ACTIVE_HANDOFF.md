@@ -1,3 +1,38 @@
+## UPDATE 2026-10-18 UTC: native-completion lane (claude/native-complete-20261017)
+
+Owner goal (direct, 2026-10-17): 100% native completion and every bug or
+mismatch fixed. Worktree `build/wt-native-20261017` = Bot 52bade3d + db9ca12b
+(merge dce6091b). Full status, census and residuals are in
+`docs/port/NATIVE_COMPLETION.md`; this entry only points there.
+
+Done and committed (no push, no publication, no game run):
+- E21 lowering extended to absent EXE leaves and subsystem overlays. Closed:
+  Items/Equipment stale boundaries; seven dispatch sites now try the registry
+  first; GTE engine with 22 commands (hardware log 231741/0); font and
+  animation decoders; 64 harvested and 15 carved room leaves (gates PASS);
+  lowering of bitfields, memcpy, integer asm, static helpers and dead
+  trailing parameters.
+- e21 oracle and harness fixes (FLAG, 44-bit MAC, native-engine fallback,
+  extents, seeding). Two real lowering bugs fixed: narrow jalr arguments and
+  argument order. New `tools/analysis/e21_leaf.py` proves one room leaf in a
+  private directory.
+- Room census: not-native bodies 217 -> 47 (unique 136 -> 49).
+
+Verified: pe-native-tests 1657/1657; park/GTE/dev-menu ctests; font,
+animation and VM oracle harnesses 54/117/693.
+
+In the working tree, gated by the running regeneration: narrow arguments on
+direct calls (bug), fingerprint-guarded m0005i effect bindings (bug: other
+rooms' callbacks at the same VMAs ran Eve's charge code), and m0429i
+801982A4 NON_MATCHING.
+
+Next: full e21 sweep, then the 46 no-C room bodies (m0318i 19, m0432i 11,
+m0429i 9, ...) as NON_MATCHING C, each proven with e21_leaf.
+
+Pitfall: never symlink `tools/era/maspsx/maspsx.py` into a worktree. Python
+then loads the main checkout's maspsx package, and m0350i's gate FAILed on
+K3c. Copy the file instead.
+
 ## UPDATE 2026-09-30 UTC (September 29 CDT): r6 controller development menu lane
 
 Branch `codex/r6-menu`, base `bcbea70f`, isolated `build/wt-codex-menu`.
