@@ -408,9 +408,11 @@ def run_mips(ram: bytearray, entry: int, args: list[int], seed: int, outs: froze
     calls = []
     gte = Gte()
 
+    cur_pc = [entry]
+
     def addr(a, n):
         if a & (n - 1):
-            raise Fault("unaligned")
+            raise Fault(f"unaligned {n}-byte access {a:08X} at pc {cur_pc[0]:08X}")
         if (a & 0x1FFFFC00) == 0x1F800000:
             return RAM_SIZE + (a & 0x3FF)
         off = (a & 0x1FFFFFFF)
@@ -450,6 +452,7 @@ def run_mips(ram: bytearray, entry: int, args: list[int], seed: int, outs: froze
         sh, fn, imm = (w >> 6) & 31, w & 63, w & 0xFFFF
         simm = imm - 0x10000 if imm & 0x8000 else imm
         cur, pc, npc = pc, npc, npc + 4
+        cur_pc[0] = cur
         A, B = r[rs], r[rt]
         wr = None
         if op == 0:
@@ -1180,7 +1183,9 @@ def one(p: Path, name: str, ovl: str, seeds: int, cc: str, cover: bool = False,
                 v0, calls = run_mips(r_ram, leaf["vram"], list(args), seed, outs,
                                      gte_state if check_gte else None, ret_types=ret_types,
                                      ret_override=rets)
-            except Fault:
+            except Fault as exc:
+                if os.environ.get("E21_FAULTS"):   # why a seed was dropped
+                    print(f"e21_diff: {name} seed {seed}: oracle fault: {exc}", file=sys.stderr)
                 continue
             (d / "in.bin").write_bytes(ram)
             r = subprocess.run([str(d / "t"), str(d / "in.bin"), str(d / "out.bin"),

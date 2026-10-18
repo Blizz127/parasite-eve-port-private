@@ -360,8 +360,13 @@ those are hand ports with one guarded error path.
   boundary would stop it.
 - 40 swept TUs run 0 seeds (sweep 5 "skipped"): every seeded input faults
   in the oracle or spins on a mocked callee. 34 are room bodies, also
-  skipped in sweep 4. Each needs a directed spec, as `func_8006B4F8` (the
-  room loader) got: with `r(0x8006E6A8)=0;r(0x8006E7E8)=0` it runs 7 seeds,
+  skipped in sweep 4. `E21_FAULTS=1 e21_diff.py --only <TU>` prints why
+  each seed was dropped. In the four sampled (8018F240, 801909A0, 80192D8C,
+  80199CA4), every seed loads a "pointer" from the room's own data area and
+  faults on it (for example "unaligned 4-byte access 0000023A at pc 8018F280").
+  The harness places the blob's raw bytes there, while room init fills or
+  relocates those words at runtime. Each TU needs a directed spec that sets
+  them, as `func_8006B4F8` (the room loader) got: with `r(0x8006E6A8)=0;r(0x8006E7E8)=0` it runs 7 seeds,
   267/540 words, ok.
 - `func_800339A0` with style >= 4 stays a loud boundary. Retail reads the
   stack above a 16-byte local there.
