@@ -270,6 +270,22 @@ OUT_EXTENTS = {
     # colour lookup (src/func_800C3134.c: a2[0..2] = lerped r,g,b) and the
     # range test's result word (src/func_800C5EB0.c: *a2 = 0 / hit)
     (0x800C3134, 2): 3, (0x800C5EB0, 2): 4,
+    # libgte VectorNormal(v0, v1) writes v1's three words; RotTrans(v0, v1,
+    # flag) writes v1 and *flag; Akao_Calc3DPan (src/func_8006DFA8.c) writes
+    # *pan and *vol.  Callers read all of them back from their own frames.
+    (0x80078134, 1): 12, (0x800792D4, 1): 12, (0x800792D4, 2): 4,
+    (0x8006DFA8, 1): 4, (0x8006DFA8, 2): 4,
+}
+# Per overlay, for callees inside an arena other overlays reuse: ovl_0700's
+# spline sampler (src/overlays/ovl_0700/func_8018F55C.c) writes out->vx/vy/vz
+# and rot->vx/vy/vz, which its callers read back from their own frames.
+OUT_EXTENTS_OVL = {
+    "ovl_0700": {(0x8018F55C, 3): 12, (0x8018F55C, 4): 6},
+}
+# Read extents of the same callees' pointer arguments, per overlay (both are
+# pure outputs of func_8018F55C).
+STACK_EXTENTS_OVL = {
+    "ovl_0700": {(0x8018F55C, 3): 0, (0x8018F55C, 4): 0},
 }
 
 
@@ -688,7 +704,14 @@ uint32_t mock_call(uint32_t fn, unsigned n, uint32_t a0, uint32_t a1, uint32_t a
     uint32_t a[4] = {a0, a1, a2, a3}, h = fn * 2654435761u + seed_ * 40503u;
     unsigned i;
     fprintf(logf_, "C %08X", fn);
-    for (i = 0; i < n && i < 4; i++) fprintf(logf_, " %08X", a[i]);
+    for (i = 0; i < n && i < 4; i++) {
+        if (a[i] >= 0x801FE000u && a[i] < 0x801FF000u) {   /* a guest-frame pointer, as mock_args */
+            unsigned j;
+            fprintf(logf_, " S:%08X:", a[i]);
+            for (j = 0; j < 32; j++) fprintf(logf_, "%02X", ram[(a[i] & 0x1FFFFFu) + j]);
+        } else
+            fprintf(logf_, " %08X", a[i]);
+    }
     fprintf(logf_, "\n");
     { uint32_t v; if (rov_get(fn, &v)) return v; }
     if (((seed_ * 2654435761u) >> 16) & 1u) return (uint32_t)((int32_t)(h & 0x1FFFu) - 0x1000);
@@ -873,16 +896,18 @@ _C_TYPE_WORDS = {"int", "char", "short", "long", "unsigned", "signed", "float", 
 
 
 def param_is_named(ty: str) -> bool:
-    """True when a prototype parameter carries a name: its last word follows a
-    space or `*` and is not itself a type word (`unsigned int` and `uint32_t`
-    are unnamed, `unsigned code` and `const char *s` are named)."""
-    m = re.search(r"[\s*](\w+)$", ty.strip())
-    if not m:
+    """True when a prototype parameter carries a name.  Qualifiers aside, one
+    token is a bare type (`uint32_t`, `RECT`), all-keyword tokens are a
+    multi-word C type (`unsigned int`), `struct X` is a type; otherwise the
+    last token is the name (`unsigned code`, `uint32_t a_t`, `RECT *r`)."""
+    toks = [w for w in re.findall(r"\w+", ty) if w not in ("const", "volatile")]
+    if len(toks) <= 1:
         return False
-    last = m.group(1)
-    if last in _C_TYPE_WORDS or last.endswith("_t"):
+    if all(w in _C_TYPE_WORDS for w in toks):
         return False
-    return not re.fullmatch(r"(?:struct|union|enum)\s+\w+", ty.strip())
+    if len(toks) == 2 and toks[0] in ("struct", "union", "enum"):
+        return False
+    return True
 
 
 def host_stubs(t: str) -> str:
@@ -942,6 +967,9 @@ STACK_EXTENTS = {
     (0x800C4FC4, 1): 32,                                            # ring renderer matrix
     (0x80079754, 0): 6, (0x80079754, 1): 0,
     (0x80078CC4, 0): 20, (0x80078CC4, 1): 12,
+    # pure outputs (the callee writes them before any read): nothing to compare
+    (0x80078134, 1): 0, (0x800792D4, 1): 0, (0x800792D4, 2): 0,
+    (0x8006DFA8, 1): 0, (0x8006DFA8, 2): 0,
     (0x800C71E4, 1): 32,
     (0x800C6B90, 0): 6,
     (0x800CE8F0, 2): 6, (0x800CE8F0, 3): 0,
@@ -1107,6 +1135,9 @@ def one(p: Path, name: str, ovl: str, seeds: int, cc: str, cover: bool = False,
         # the same bytes instead of two different stack fills.
         keyed = {out_key(v) for v in outs}
         outs = outs | frozenset(fn << 4 | k for (fn, k) in OUT_EXTENTS if (fn << 4 | k) not in keyed)
+        outs = outs | frozenset((fn << 4 | k) | (n << OUT_LEN_SHIFT)
+                                for (fn, k), n in OUT_EXTENTS_OVL.get(ovl, {}).items()
+                                if (fn << 4 | k) not in keyed)
         harness = HARNESS.replace("static unsigned seed_;", "static unsigned seed_;\nstatic const uint32_t outs_[] = {"
                                   + ", ".join(f"0x{out_key(v) & 0xFFFFFFFF:X}u" for v in sorted(outs) or [0xFFFFFFFF]) + "};\n"
                                   + "static const unsigned outl_[] = {"
@@ -1118,12 +1149,18 @@ def one(p: Path, name: str, ovl: str, seeds: int, cc: str, cover: bool = False,
         # The native GTE: pe_gte.c plus, when present, the command engine it
         # dispatches to (pe_gte_commands.c).
         gte_objs = []
+        stubbed = set(re.findall(r"^\S[^\n]*?\b(func_[0-9A-F]{8})\(", stubs, re.M))
         for unit in ("pe_gte.c", "pe_gte_commands.c"):
             src_ = pc / "platform" / unit
             if not src_.exists():
                 continue
             obj = d / (unit[:-2] + ".o")
-            r = subprocess.run([cc, "-O1", "-std=gnu11", "-funsigned-char", "-w", "-c",
+            # a callee the TU mocks may also be defined by the native GTE unit
+            # (func_80079004 in pe_gte.c): rename the unit's copy so the mock,
+            # which logs the call as retail's jal does, is the one linked
+            ren = [f"-D{n}=pe_harness_{n}" for n in sorted(stubbed)
+                   if re.search(r"\b" + n + r"\s*\(", src_.read_text(errors="replace"))]
+            r = subprocess.run([cc, "-O1", "-std=gnu11", "-funsigned-char", "-w", "-c", *ren,
                                 "-I", str(pc / "include"), "-I", str(pc / "platform"), "-I", str(pc),
                                 "-I", str(pc / "bootstrap"), "-o", str(obj), str(src_)],
                                capture_output=True, text=True)
@@ -1194,7 +1231,7 @@ def one(p: Path, name: str, ovl: str, seeds: int, cc: str, cover: bool = False,
                         nb = bytes.fromhex(pv.split(":")[2]) if pv.startswith("S:") else b""
                         # Matrix consumers read translations at +20/+24/+28;
                         # the old 16-byte probe could miss misplaced meshes.
-                        extent = STACK_EXTENTS.get((tgt, k), 16)
+                        extent = STACK_EXTENTS_OVL.get(ovl, {}).get((tgt, k), STACK_EXTENTS.get((tgt, k), 16))
                         if not (isinstance(rv_, tuple) and len(nb) == 32 and
                                 all(nb[j] == rv_[1][j] for j in range(extent) if rv_[2][j])):
                             return "MISMATCH", (f"seed {seed}: call {tgt:08X} a{k} stack arg "
