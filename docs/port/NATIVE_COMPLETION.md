@@ -170,6 +170,10 @@ Native bodies that replaced boundaries:
     and is checked against 8 new retail cases.
   - The decode differential (31 pictures x 3 bounds, 558 resumed calls) is the
     first run of the `func_8010C89C` hand port's resume path.
+  - Erratum: until f452c3594 (E23) the credits frame flip, op 6 of table 1,
+    passed PutDispEnv/DrawOTagEnv byte values instead of env addresses. No
+    credits test covered op 6. See the E23 entry below and the erratum in
+    the credits report.
 
 - **d0c4075e**: GTE command engine for all 22 documented COP2 commands. The
   `gte-native-hardware` ctest has 1100 real-console cases and 231741 checks,

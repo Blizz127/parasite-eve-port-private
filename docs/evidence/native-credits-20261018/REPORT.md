@@ -157,3 +157,26 @@ in `a3`, which the format never reads.
 
 The full build and suite with that TU regenerated runs in the next
 regeneration.
+
+## Erratum (2026-10-18, later the same day)
+
+The statement above that the credits run native held for dispatch, but one
+op ran wrong until f452c3594. Op table 1 entry 6 is the frame flip, ovl_0457
+`func_801247F4`. It passes rows of `D_800BCE80[][20]` (DISPENV) and
+`D_800BCDC8[][92]` (DRAWENV) to PutDispEnv (`func_800755F0`) and DrawOTagEnv
+(`func_800754E4`). The verbatim lowering had flattened both two-dimensional
+externs to one-dimensional byte arrays. The generated TU therefore passed the
+byte at offset k (`movzbl` in the object code) where retail passes
+0x800BCE80 + 20k and 0x800BCDC8 + 92k. Every frame of op table 1 read its
+display and draw environment from the low-RAM vector area.
+
+None of the credits tests here exercised op 6. They check the registry
+binding, the libpress replacements and the picture decode. The bug was found
+by reading the one ovl_0457 mismatch from `tools/analysis/e21_verbatim.py`.
+Rule E23 (f452c3594) sends such a leaf to the E21 lowering. The fixed TU is
+proven against retail:
+
+    e21_diff.py --with-calls --check-gte --coverage --verbose --jobs 1 --seeds 32 --only func_801247F4_port.c
+    ok func_801247F4_port.c: 32 seeds, retail coverage 42/42 words
+
+No game ran, so the credits picture itself has not been checked visually.
