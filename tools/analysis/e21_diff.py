@@ -1097,6 +1097,14 @@ def inputs(name, ov, data, seeds, recorded, spec, seed_range=None):
         yield seed, ram, args, rets
 
 
+def e21_cflags(gte: bool = False) -> list[str]:
+    """Native-side optimisation flags, -O1 by default.  E21_CFLAGS sets them
+    for the TU and E21_GTE_CFLAGS for pe_gte.c / pe_gte_commands.c.  The
+    production build compiles decomp TUs with `-O3 -fno-strict-aliasing
+    -fwrapv` (pc_port/CMakeLists.txt) and the GTE units with plain -O3."""
+    return (os.environ.get("E21_GTE_CFLAGS" if gte else "E21_CFLAGS") or "-O1").split()
+
+
 def one(p: Path, name: str, ovl: str, seeds: int, cc: str, cover: bool = False,
         recorded: str = "", directed: dict | None = None,
         check_gte: bool = False) -> tuple[str, str]:
@@ -1165,14 +1173,14 @@ def one(p: Path, name: str, ovl: str, seeds: int, cc: str, cover: bool = False,
             # which logs the call as retail's jal does, is the one linked
             ren = [f"-D{n}=pe_harness_{n}" for n in sorted(stubbed)
                    if re.search(r"\b" + n + r"\s*\(", src_.read_text(errors="replace"))]
-            r = subprocess.run([cc, "-O1", "-std=gnu11", "-funsigned-char", "-w", "-c", *ren,
+            r = subprocess.run([cc, *e21_cflags(gte=True), "-std=gnu11", "-funsigned-char", "-w", "-c", *ren,
                                 "-I", str(pc / "include"), "-I", str(pc / "platform"), "-I", str(pc),
                                 "-I", str(pc / "bootstrap"), "-o", str(obj), str(src_)],
                                capture_output=True, text=True)
             if r.returncode:
                 return "nocompile", f"{unit}: " + r.stderr[:300]
             gte_objs.append(str(obj))
-        r = subprocess.run([cc, "-O1", "-std=gnu11", "-funsigned-char", "-w", "-I", str(d),
+        r = subprocess.run([cc, *e21_cflags(), "-std=gnu11", "-funsigned-char", "-w", "-I", str(d),
                             "-o", str(d / "t"), str(d / "t.c"), str(d / "gte_ext.c"),
                             *gte_objs], capture_output=True, text=True)
         if r.returncode:

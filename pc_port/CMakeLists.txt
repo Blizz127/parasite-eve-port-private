@@ -442,8 +442,15 @@ list(SORT DECOMP_SRCS)
 # same char signedness or e.g. src/func_80052BCC.c's `c &= 0xFF; if (c == t)`
 # never sees the 0xFF terminator on an x86 host (portverify, retail oracle
 # INV8 case 80).
+# The era compiler also had no type-based aliasing (-fstrict-aliasing came in
+# GCC 2.95), and retail's addu/subu wrap.  Verbatim decomp C reads guest RAM
+# through typed host pointers (`*(short *)(p + 8)` beside `*(int *)p`) and
+# relies on wrapping arithmetic, so at -O3 GCC must not assume either away:
+# 88 decomp TUs compile differently with these two options, 16 because of
+# -fno-strict-aliasing and 73 because of -fwrapv (docs/port/NATIVE_COMPLETION.md,
+# "Host compile semantics").
 set_source_files_properties(${DECOMP_SRCS} PROPERTIES COMPILE_OPTIONS
-    "$<IF:$<C_COMPILER_ID:MSVC>,/J,-funsigned-char>")
+    "$<IF:$<C_COMPILER_ID:MSVC>,/J,-funsigned-char>;$<$<NOT:$<C_COMPILER_ID:MSVC>>:-fno-strict-aliasing>;$<$<NOT:$<C_COMPILER_ID:MSVC>>:-fwrapv>")
 list(LENGTH DECOMP_SRCS PE_DECOMP_TU_COUNT)
 message(STATUS "pe: ${PE_DECOMP_TU_COUNT} decomp-derived port TUs")
 

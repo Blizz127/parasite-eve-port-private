@@ -272,6 +272,60 @@ Subsystem overlays had never been swept before this. The sweep took only room TU
 no seeded mock exits; they need directed mock return values, which the
 harness does not have yet.
 
+## Host compile semantics (verbatim TUs)
+
+1016 of the 2923 room TUs, and most generated EXE TUs, are verbatim lowerings,
+not E21. The leaf's C body is copied and guest data is reached through typed
+host pointers (`PE_DECOMP_SCALAR` / `PE_DECOMP_ARRAY` / `PE_Translate`). The
+e21 sweep takes only E21 TUs (`candidates()` needs the "E21 guest-memory"
+marker), so no sweep has compared these TUs with retail. Static checks on the
+2026-10-18 tree:
+
+- **`long` was 64-bit (bug, fixed in the generator).** gcc-2.7.2-psx is
+  ILP32. ovl_03C5 `80121A00` and ovl_03D2 `801922F4` define
+  `D_800BCDC8 PE_DECOMP_ARRAY(0x800BCDC8u, DRAWENV)` with a DRAWENV that ends
+  in `unsigned long dr_env[16]`. On x86-64 that struct is 160 bytes instead of
+  retail's 0x5C. `D_800BCDC8[i] = D_801D13AC[i]` for i = 0, 1 then copies at
+  the wrong stride and runs past the two entries, over `D_800BCE80` (both
+  DISPENVs) and 96 more bytes of EXE globals. Both TUs are fingerprint-bound
+  in the dispatch registry (0CA880D5 and DB91F7BC). A scan of the EXE and
+  all 515 PE.IMG blobs found:
+  - one jal to 80121A00 and none to 801922F4;
+  - no aligned word holding either address;
+  - no `lui` + `addiu`/`ori` pair (within 24 instructions) building either.
+
+  The one jal is in `func_8003F3C4` (EXE 8003F534), whose hand port calls the
+  hand-ported `func_80121A00` by name. So no static reference reaches either
+  generated TU. `gen_decomp_ports.era_ilp32` now spells `long` as `int`
+  (outside `long long`) in every verbatim plan; the E21 lowering already typed
+  `long` as 4 bytes. A scan of every verbatim struct that overlays guest
+  memory found no other host-width member (no pointer members; E18 rejects
+  those).
+- **Strict aliasing and signed overflow.** Production compiles decomp TUs at
+  `-O3` (Release), while the era compiler had no type-based aliasing and
+  retail's addu/subu wrap. Compiling every decomp TU at the production flags
+  with and without the two options (4093 TUs, no compile failures): 88
+  compile differently, 16 because of `-fno-strict-aliasing` and 73 because of
+  `-fwrapv` (one because of both).
+  The aliasing ones that were read (for example the libspu-style
+  `func_80085F74`: `*(unsigned int *)a0` and `*(short *)(a0 + 8)`) only
+  reschedule loads. The wrapv ones fold comparisons such as
+  `0x1400 - r > 0x1000` (`func_80019C4C`) on the assumption that nothing
+  overflows. Decomp TUs are now built with `-fno-strict-aliasing -fwrapv`
+  (pc_port/CMakeLists.txt). The e21 harness compiles at `-O1` unless
+  `E21_CFLAGS` (the TU) and `E21_GTE_CFLAGS` (pe_gte.c and pe_gte_commands.c,
+  plain `-O3` in production) are set.
+- **Unsequenced calls.** 13 verbatim statements have the shape
+  `r = func_800C251C(o, ...) | func_800C2758(o, ...)`, where C leaves the
+  order unspecified. Retail calls func_800C251C first (for example
+  `func_800C7D54`: jal 800C251C at 800C7D6C, then jal 800C2758 at
+  800C7D88). The relocations in all 13 host objects show the same order
+  under GCC -O3. This is a latent hazard for another compiler, not a live bug.
+  The 60 E21 groups are rand() (`func_80071A54`) beside the pure sin/cos table
+  getters `func_80077DC4` / `80077CF4`, where order cannot change a result.
+  (Scanner: siblings in one full-expression, `&&`, `||`, `?:`, `,` and `;`
+  treated as sequence points.)
+
 ## Boundary-site census
 
 `python3 tools/analysis/boundary_site_census.py` lists every Bootstrap /
@@ -311,8 +365,8 @@ those are hand ports with one guarded error path.
   the stack residue of the previous mode-2 call.
 - **m0005i hand ports versus generated TUs.** 8018F018, 8018F330 and 8018FB84
   now have matched C (harvested), but the effect dispatcher still sends
-  m0005i's own bytes to the hand ports. Switching needs an e21 parity check of
-  the hand ports.
+  m0005i's own bytes to the hand ports. Those hand ports are checked against
+  retail by the ATK25/ATK26/ATK29 retail-case tests (Open, below).
 - `func_8003F074` -> `func_8006B4F8` (room loader) is generated and reached only
   by a guest jalr. The production room transition uses the hand cuts in
   `func_8006B4F8_port.c`.
@@ -360,19 +414,28 @@ those are hand ports with one guarded error path.
 
   If any of these generated TUs is ever dispatched through the registry, the
   boundary would stop it.
-- 40 swept TUs run 0 seeds (sweep 5 "skipped"): every seeded input faults
-  in the oracle or spins on a mocked callee. 34 are room bodies, also
-  skipped in sweep 4. `E21_FAULTS=1 e21_diff.py --only <TU>` prints why
-  each seed was dropped. In the four sampled (8018F240, 801909A0, 80192D8C,
-  80199CA4), every seed loads a "pointer" from the room's own data area and
-  faults on it (for example "unaligned 4-byte access 0000023A at pc 8018F280").
-  The harness places the blob's raw bytes there, while room init fills or
-  relocates those words at runtime. Each TU needs a directed spec that sets
-  them, as `func_8006B4F8` (the room loader) got: with `r(0x8006E6A8)=0;r(0x8006E7E8)=0` it runs 7 seeds,
-  267/540 words, ok.
+- 40 swept TUs ran 0 seeds in sweep 5 ("skipped"): every one of the 6
+  default seeds faulted in the oracle or spun on a mocked callee. 34 are
+  room bodies, also skipped in sweep 4. `E21_FAULTS=1` prints why each seed
+  was dropped. The earlier reading here, that the seeds fault on the room's
+  own data, does not hold for m0348i 8018F240. Its loads chase pointers
+  through the argument (`lw v1,8(a0)` then `lw v1,0x238(v1)`) and through
+  mocked returns (`lw v0,0(v0)` after `jal 800C2B28`). A small seeded word
+  there (`0000023A` = 2 + 0x238) faults, and a chain of about six loads
+  survives about one random image in eight. The opt-in seed extension
+  (`E21_MIN_OK=4`, 8c6a2fbf7) alone gives `ok, 4 seeds (seed range extended
+  to 21), retail coverage 200/200 words`. A sweep of all 40 with
+  `--min-ok 4 --max-seeds 512` is running. Bodies that still run no seed need
+  a directed spec, as `func_8006B4F8` (the room loader) got: with
+  `r(0x8006E6A8)=0;r(0x8006E7E8)=0` it runs 7 seeds, 267/540 words, ok.
 - `func_800339A0` with style >= 4 stays a loud boundary. Retail reads the
   stack above a 16-byte local there.
 - The retail stack-residue residuals and m0023i's `[DAY1_SHIM]` (above).
 - A directed retail differential of the Items/Equipment paths
   (`func_80057834`, `func_800466C0`, `func_8005A318`).
-- m0005i: decide between its hand ports and the generated TUs.
+- m0005i: hand ports or generated TUs. The hand ports that the effect
+  dispatcher binds for m0005i's own bytes (8018F018, 8018F330, 8018FB84)
+  have retail-case tests generated from the original Disc 1 code:
+  ATK25 charge (`retail_eve_charge_cases.h`), ATK26 flare and ATK29 beam.
+  The generated TUs are the e21-checked alternative. No change is needed
+  for native coverage; switching is a cleanup choice.
