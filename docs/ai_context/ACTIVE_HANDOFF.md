@@ -131,8 +131,33 @@ Later on 2026-10-18 (all committed, none pushed):
   leaves `0x8009B6CC` = 0, and the five tests that encoded the stray write
   were updated.
 
+- Boundary-site triage (wf_8fa94741), all 228 sites. Buckets: dormant 70,
+  error-defensive 68, test-fixture 44, unknown 41, no-disc/device 3,
+  reachable-unported 3. The 3 reachable rows were the credits CD wait and
+  the menu-callback default arm, both fixed today. Seven conditions remain
+  unknown; NATIVE_COMPLETION.md lists them.
+- `tools/analysis/dangling_callback_census.py` is new. It scans the hex
+  literals of production C, the retail EXE image and the 515 overlay blobs
+  for EXE function starts that have no registry row and no dispatcher arm.
+  It found four stored callbacks that stopped the game in normal play, now
+  native:
+  - d3e872a2a: the item-list update 0x800494AC (E21; "address of function"
+    is now lowerable) and the shop update 0x8004A9A0 (NON_MATCHING:
+    retail's `$a1 = D_8009CFDC` made explicit). The PV_494AC/PV_4A9A0 tests
+    showed `[MENU] Unported input callback` stops before the fix.
+  - f1a1b1c74: the rising-sparks particle callback 0x800DD9E4 and field
+    effect type 16's main 0x800DB6BC (NON_MATCHING, lowering-only type
+    edits). The e21 harness gained `func_800D1DEC`'s 6/3-byte argument
+    extents.
+
+  Left: four Psy-Q libcard hooks (whether production runs them is not
+  established) and m0017i -> `func_8003A088` (GTE asm).
+
 Open (NATIVE_COMPLETION.md has each):
 - the ending credits need a CD-XA provider (gated to a loud stop);
+- room_m0017i `func_8018F0F0` -> `func_8003A088` (generated boundary; GTE
+  asm does not lower; route position unknown);
+- the four Psy-Q libcard hooks, and the seven unsettled boundary conditions;
 - latent verbatim-TU classes that no fix closes: 32-bit address wrap on
   out-of-range indices (func_800428D4 with D_800A1860 == 0 is the one
   plausible in play), narrow returns, parameter-width drift;

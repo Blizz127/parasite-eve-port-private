@@ -44,7 +44,7 @@ covers both discs.
 ## Census (2026-10-18)
 
 **Room code**: `PE_DISC1_BIN=<disc 1> python3 pc_port/tools/pe_all_rooms_native_census.py`.
-Registry `zz_dispatch.c`: 5771 thunks. 185 code rooms, 9103 (room x body)
+Registry `zz_dispatch.c`: 5771 thunks; 5775 after the four EXE callbacks of "Dangling callbacks" (regen24; the room census is unchanged). 185 code rooms, 9103 (room x body)
 rows, 2952 unique (vma, size, FNV) bodies.
 
 | | session start | 2026-10-18 13:10 |
@@ -57,6 +57,13 @@ rows, 2952 unique (vma, size, FNV) bodies.
 
 A body resolves only by fingerprint, as `PE_GuestCode_Resolve` does. Rooms are
 never declared resident in production, and closure-equal duplicates count once.
+
+"0 not-native" means that every room body has compiled host code. It does not
+mean that no room body can stop: a native body can still call something with
+no native code. The known case is room_m0017i `func_8018F0F0`, which calls the
+full `func_8003A088` through a generated boundary. The port has only that
+function's mode-0 cuts, and its GTE asm does not lower. See "Dangling callbacks"
+and Open.
 
 No body is left without C. The last 47 were effect and particle callbacks of the
 late rooms. 4dba7922 covered m0429i 801982A4 and the room batches 1-12 the other
@@ -177,6 +184,20 @@ Native bodies that replaced boundaries:
   - Erratum 2: the credits' CD-XA arms spin forever on every provider. Since
     e27fc416a, main's arm stops on `credits_cd_xa_service` before entering, as it did
     before this branch (see "Reachable gap: the ending credits need CD-XA").
+
+Dangling callbacks (see "Dangling callbacks"):
+
+- **d3e872a2a**: the item-list update 0x800494AC (E21, after
+  `guest_lower.LOWER_REASONS` gained "address of function") and the shop
+  update 0x8004A9A0 (NON_MATCHING: retail's `$a1 = D_8009CFDC` to
+  `func_8005BBE4` made explicit). Both used to be `PE_MenuInputCallback`
+  stops; `PV_494AC_item_list_confirm_runs_native` and
+  `PV_4A9A0_slot_detail_input_runs_native` showed the stops and now pass.
+- **f1a1b1c74**: the rising-sparks particle callback 0x800DD9E4 and field
+  effect type 16's main 0x800DB6BC, both NON_MATCHING with
+  lowering-only type edits. Both used to stop in `PE_EffectCallback`. The e21
+  harness gained `func_800D1DEC`'s argument extents (pos 6 bytes, col 3
+  bytes, from its retail reads).
 
 Host providers:
 
@@ -578,6 +599,60 @@ the 28 was read, and none is stale:
 `func_8004C608`'s "unported help selection" default is unreachable: the hand
 port has explicit cases for every id 0..60.
 
+**Full triage of all 228 sites** (workflow wf_8fa94741, 2026-10-18 13:35-17:10
+UTC):
+- Ten classifier agents took 23 sites each. Each one read the site, the
+  condition that reaches it and the callers.
+- Every site a classifier called reachable or unknown then went to an
+  independent verifier, 69 checks in all.
+- One extra row is the install site of a callback whose stop is another
+  row, so there are 229 rows.
+
+| bucket | rows |
+|---|--:|
+| dormant (no production path sets the condition) | 70 |
+| error-defensive (retail error or trap path, or a state shipped data never produces) | 68 |
+| test-fixture (only a test or a test-only mode reaches it) | 44 |
+| unknown | 41 |
+| no disc or device | 3 |
+| reachable-unported | 3 |
+
+Verifier verdicts: 36 not reachable, 3 reachable-unported, 30 unknown.
+
+The 3 reachable rows are two defects, both fixed today:
+- `cd_stream_port.c:927` (`CD_command_wait`), the credits' CD-XA arms. The
+  credits now stop before entering (e27fc416a); see "Reachable gap".
+- `func_80063E0C_port.c:54` (`PE_MenuInputCallback`), plus its install row
+  `port6_port.c:52`: the item-list and shop callbacks 0x800494AC and
+  0x8004A9A0, now native (d3e872a2a); see "Dangling callbacks".
+
+The 41 unknown rows break down as follows:
+- 20 are sinks that other sites call: the `pe_bootstrap.c` helpers,
+  `PE_Decomp_BoundaryFrom`, the `guest_call` wrappers and the
+  `PE_D_COMP_BOUNDARYn` macro bodies. Their reachability is the union of
+  their callers'.
+- 15 were found not reachable by the verifiers. Examples are the
+  `func_8003A088` stack guards, the MDEC waits and the `func_800638D8` /
+  `func_8005C498` wrappers.
+- 6 remain unknown.
+
+Those 6, plus one dormant row whose verifier said unknown, are seven specific
+conditions that nobody could confirm or exclude:
+- `func_80028574_port.c:81`: a shot count (`wf & 15`) of 11 or more, past the
+  scales table;
+- `actor_contact_port.c:183`: an actor +0x194 contact callback that neither
+  resolves nor is 0x8001D268;
+- `absent_ovl_port.c:77`: libgte `func_80079178`, if `func_800C65E4` runs;
+- `func_80075358_port.c:40`: a GP0 word that `PE_GPU_WriteGP0` refuses;
+- `func_8007512C_port.c:61` and `:95`: a draw node over 15 words, or a GP0
+  opcode the packet tables cannot size;
+- `func_80041108_port.c:32`: the card-operation frontier, used only in the
+  test-only boundary mode and by the legacy frame functions.
+
+Per-site conditions and evidence are in the workflow journal
+(`subagents/workflows/wf_8fa94741-8da/journal.jsonl` in the session
+directory).
+
 `pc_port_coverage.py`'s "stub" bucket (36 leaves) is not a list of non-native
 code. It counts any body that has a bootstrap marker on any path, and most of
 those are hand ports with one guarded error path.
@@ -688,6 +763,50 @@ production latches lane 2 for good, because only the IRQ chain or a CdReset
 clears it. Every later `func_8007F72C() == 1` wait would then spin too, which
 is why the gate stops before the first such command.
 
+## Dangling callbacks (another class the boundary census misses)
+
+A code address that some code or data stores, but that neither resolves
+through the generated registry nor matches an arm of a hand dispatcher, stops
+the game when it is called. Under the default stop policy, `menu_callback`,
+`PE_EffectCallback`, `cd_icall` and `PE_GuestCall` all end in a boundary. The
+boundary census does not see these: the stop is in the generic dispatcher,
+far from the store.
+
+`python3 tools/analysis/dangling_callback_census.py` scans for EXE function
+starts (`configs/USA/disc1.yaml`) in three places:
+- the hex literals of production C;
+- every word of the retail EXE image;
+- every word of the 515 PE.IMG overlay blobs.
+
+It reports each start with no fnv-0 registry row and no `case`/`==` arm. A
+literal inside a boundary call is reported as a boundary argument (the call is
+already a boundary site), and a literal after `!=` as a comparison.
+
+Before today's fixes it found 7 stored callbacks with no native code, one
+loop sentinel, 9 boundary arguments, and one word in the EXE data:
+
+| address | what it is | how production reached it | now |
+|---|---|---|---|
+| 0x800494AC | 0x0D item-list update (`func_80048918`, 12 menu paths incl. field-VM `func_8004DCA4`) | Confirm/Cancel/unhandled keys -> `menu_callback` -> stop | native, E21 (d3e872a2a) |
+| 0x8004A9A0 | shop window update (`func_8004A570`, from the equip-slot list's Confirm) | first key press -> stop | native, NON_MATCHING (d3e872a2a) |
+| 0x800DD9E4 | rising-sparks particle callback (`func_800DDD70` pool) | first pool tick -> `PE_EffectCallback` -> stop | native, NON_MATCHING (f1a1b1c74) |
+| 0x800DB6BC | field effect type 16 main (EXE data 0x800E1CF8, node 16 of `D_800E1044`) | command code 0x55 with type 16 -> `PE_EffectCallback` -> stop | native, NON_MATCHING (f1a1b1c74) |
+| 0x80083944, 0x800846AC, 0x800847B0, 0x8008486C | Psy-Q libpad/libcard hooks: card record +0x18 (`func_800837C8`) and slots `D_8009B724/72C/730` (`func_800844E4`, installed at boot) | only through the libcard driver hand ports in `absent_cd_port.c` (`cd_icall`) | open: Psy-Q, so they cannot be `func_<addr>` definitions; production saves through the host memory card (`PE_Memcard_*` in `func_80041108_port.c`), and whether the libcard driver hooks ever run in production is not established |
+
+After f1a1b1c74 the census reports:
+
+    dangling_callback_census: 4 stored unresolved, 9 boundary arguments, 1 comparisons
+
+The 4 are the libcard hooks. The boundary arguments are the Psy-Q-band
+generated TUs, `func_80079178`, `func_80080E34`, the card frontier, and
+room_m0017i `func_8018F0F0` -> `func_8003A088` (Open). The comparison is
+`port6_port.c`'s `0x8007E3B4` loop sentinel.
+
+`PE_EffectCallback` has a `[DAY1_SHIM]` arm that skips an unresolved effect
+callback instead of stopping. It runs only under `PE_BOUNDARY_POLICY=record`,
+the diagnostic policy, so production stops. m0023i stays the one shim that
+substitutes silently in production.
+
 ## Known residuals (documented, not hidden)
 
 - **Retail stack residue.** `RotMatrix` (80079754) sets only a matrix's 3x3.
@@ -767,6 +886,19 @@ Earlier gates:
   - the owner device gate.
 
 ## Open
+
+- The ending credits need a CD-XA provider. Until one exists they stop on
+  `credits_cd_xa_service`; see "Reachable gap".
+- room_m0017i `func_8018F0F0` calls the full `func_8003A088` (model matrix
+  walk) through a generated boundary. The port has only mode-0 cuts of it
+  (`game/boot/func_8003A088_port.c`), and the matched leaf's GTE asm does not
+  lower ("asm: instruction $13"). Where m0017i falls on the route is not
+  established.
+- The four Psy-Q libcard hooks in "Dangling callbacks". As Psy-Q functions
+  they need host replacements, not `func_<addr>` definitions, if the libcard
+  driver ever runs them in production.
+- The seven boundary conditions the triage could not settle (listed under
+  "Boundary-site census").
 
 - No room body is without C any more (census 0). The NON_MATCHING bodies are
   behaviour C proven by the e21 differential, not byte matches. The room workflow (wf_9660d38d) is working through them.
