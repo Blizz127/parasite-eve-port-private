@@ -1151,6 +1151,14 @@ class Lowerer:
             else:
                 if isinstance(t, THostPtr):
                     raise LowerError(f"host pointer passed to {name} parameter {p.strip()}")
+                # The leaf's own prototype converts a narrow argument before the
+                # call, whatever the callee's host prototype says (retail
+                # `sll 4; sra 16` for a `short` parameter: room_m0429i 801982A4
+                # / room_m0269i 8019070C -> func_800CFB7C(void *, short, void *)).
+                k = len(out) - len(live)
+                fp = ft.params[k] if isinstance(ft, TFunc) and ft.params and k < len(ft.params) else None
+                if isinstance(fp, TInt) and fp.size < 4:
+                    c = f"(int32_t)({htype(fp)})({c})"
                 out.append(c)
         out += ["0"] * pad
         fname = sig.get('host') or name
