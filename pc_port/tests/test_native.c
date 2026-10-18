@@ -2188,7 +2188,7 @@ static void test_B54KY_saved_bit_zero_skips_disc_prefix(void)
     HostFB_Init();
     B54KQ_SeedOverlayPrefix(0x4Du);
     PE_StoreU8(0x801D0E18u, 0xA6u);
-    PE_StoreU32(0x8009B6D4u, 0xA5A55A5Au);
+    PE_StoreU32(0x8009B6ACu, 0xA5A55A5Au);
     PE_StoreU8(0x800B0DBFu, 0x5Au);
     PE_StoreU32(0x801D11ACu, 0xA5A55A5Au);
 
@@ -2204,7 +2204,7 @@ static void test_B54KY_saved_bit_zero_skips_disc_prefix(void)
                "func_801909B4_title_loop_3EB04"),
            "saved-bit-zero arm did not reach exact 0x801911F8 cut");
     ASSERT(PE_LoadU8(0x801D0E18u) == 0xA6u &&
-           PE_LoadU32(0x8009B6D4u) == 0xA5A55A5Au &&
+           PE_LoadU32(0x8009B6ACu) == 0xA5A55A5Au &&
            (PE_LoadU32(0x800B0CD8u) & 0x200u) == 0u,
            "saved-bit-zero arm entered the disc prefix");
     func_801918F8(0, 0);
@@ -20061,7 +20061,8 @@ static void test_read_happy_guest_bytes(void) {
            "sectors-pending must be 0 after sync read");
     ASSERT(PE_LoadU32(0x8009B6B0u) == D_80011614, "dest register wrong");
     ASSERT(PE_LoadU32(0x8009B6ACu) == 0x200u, "mode register wrong");
-    ASSERT(PE_LoadU32(0x8009B6D4u) == 1, "read-active flag wrong");
+    ASSERT(PE_LoadU32(0x8009B6CCu) == 0u && PE_LoadU32(0x8009B6D4u) == 0u,
+           "completed read: DsRead busy word clear, 0x8009B6D4 untouched");
     FxFree(&fx);
     PASS();
 }
@@ -21549,7 +21550,7 @@ static void test_6A9E4_zero_cycles_footprint(void) {
         else if (a == 0x8009B6B0u) want = B16_STREAM;  /* last dest */
         else if (a == 0x8009B6B4u) want = 0;
         else if (a == 0x8009B6C4u) want = 0;           /* vs = 0 */
-        else if (a == 0x8009B6D4u) want = 1;
+        else if (a == 0x8009B6CCu) want = 0;           /* DsRead busy clear */
         /* B38: func_8008CBA8 clears D_8009D268 (busy flag) on exit,
          * and RingAlloc increments D_8009D2F4 from 0 to 1. */
         else if (a == 0x8009D268u) want = 0;
@@ -27423,7 +27424,7 @@ static void test_6AD40_complete_effect_allowlist(void)
            PE_LoadU32(0x8009B6B0u) == B50_3126_DEST &&
            PE_LoadU32(0x8009B6B4u) == 0u &&
            PE_LoadU32(0x8009B6C4u) == 1u &&
-           PE_LoadU32(0x8009B6D4u) == 1u,
+           PE_LoadU32(0x8009B6CCu) == 0u,
            "prefix D_800930E0 provider state differs from retail adapter");
     for (uint32_t a = PE_RAM_BASE; a < PE_RAM_END; a++) {
         if ((a >= 0x800957B8u && a < 0x800957CCu) ||
@@ -27431,7 +27432,7 @@ static void test_6AD40_complete_effect_allowlist(void)
             (a >= 0x800B0CD8u && a < 0x800B0CDCu) ||
             (a >= 0x8009B6ACu && a < 0x8009B6B8u) ||
             (a >= 0x8009B6C4u && a < 0x8009B6C8u) ||
-            (a >= 0x8009B6D4u && a < 0x8009B6D8u) ||
+            (a >= 0x8009B6CCu && a < 0x8009B6D0u) ||
             (a >= 0x8009D268u && a < 0x8009D26Cu) ||
             (a >= 0x8009D2F4u && a < 0x8009D2F8u) ||
             (a >= 0x800B8628u && a < 0x800B863Cu) ||
@@ -29415,7 +29416,7 @@ static void test_B54KJ_6AD40_f0_completion_and_frontier(void)
     ASSERT(PE_LoadU32(0x8009B6ACu) == 0x200u &&
            PE_LoadU32(0x8009B6B0u) == B50_3126_DEST &&
            PE_LoadU32(0x8009B6B4u) == 0u &&
-           PE_LoadU32(0x8009B6D4u) == 1u,
+           PE_LoadU32(0x8009B6CCu) == 0u,
            "E0 completion changed the synchronous provider contract");
     ASSERT(PE_Port_GetStopReason() == PE_PORT_STOP_NONE,
            "B54KJ complete path requested a host stop");

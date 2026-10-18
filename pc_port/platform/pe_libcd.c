@@ -62,7 +62,9 @@
  *                  is 0 instead of `sectors`; all other guest state matches
  *                  the retail
  *                  post-issue values (D_8009B6AC=0x200, D_8009B6B0=dest,
- *                  D_8009B6C4=vsync timestamp, D_8009B6D4=1).
+ *                  D_8009B6C4=vsync timestamp), and the DsRead busy word
+ *                  D_8009B6CC reads 0 as it does once retail's completion
+ *                  callback has run func_80081268.
  *                  Collapsed: func_800719E4(1) (BIOS B(38h) CD mode set —
  *                  never taken at boot, D_8009B590 == D_800B0DD4 == 0),
  *                  func_80080B44/func_80080E34/func_8007F0C8 issue layer,
@@ -394,14 +396,19 @@ int func_8006E6D4(int lba_base, int lba_off, pe_addr_t dest, int sectors)
     /* sectors == 0 completes trivially (no data access). Bootstrap fixtures
      * use that explicit path; authenticated retail images adopt 6E834's
      * nonzero rodata range before entering the boot loop. */
-    /* Retail post-issue state (asm func_80080E34); the transfer is already
-     * complete on the host, so D_8009B6B4 (sectors pending) reads 0. */
+    /* Retail post-issue state (func_80080E34); the transfer is already
+     * complete on the host, so D_8009B6B4 (sectors pending) reads 0.
+     * func_80080E34 sets the DsRead busy word D_8009B6CC to 1 (li v0,1 /
+     * sw v0,8(s0) at 0x80080F38 with s0 = 0x8009B6C4).  Every completion
+     * path (func_80080F98, func_80081110) clears it through func_80081268
+     * in the same callback that drops the pending count to 0, so a read
+     * that is complete on return leaves it 0. */
     PE_StoreU32(0x8009B6ACu, 0x200u);
     PE_StoreU32(0x8009B6B0u, dest);
     PE_StoreU32(0x8009B6B4u, 0u);
     HostFB_GetState(&vs, &ds, &pr, &mk);
     PE_StoreU32(0x8009B6C4u, (uint32_t)vs);
-    PE_StoreU32(0x8009B6D4u, 1u);
+    PE_StoreU32(0x8009B6CCu, 0u);
     return 1;
 }
 
