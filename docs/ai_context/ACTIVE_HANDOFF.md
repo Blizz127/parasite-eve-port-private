@@ -47,9 +47,19 @@ Later on 2026-10-18 (all committed, none pushed):
   stale.
 - Sweep 4 (rooms): 1853 ok, 8 MISMATCH (the known stack residue), 34 skipped.
 
+- Sweep 5 (all 2012 TUs): the 10 new findings were harness artifacts
+  (3af74726a); room batch 4 (c1c9533ff) took the census 37 -> 32.
+- Room batch 5 (m0318i 80196820/80195904/80195190, m0404i 801935E0): census
+  32 -> 28. Gates on that regeneration: suite 1661/1661, ctests 6/6,
+  psyq_port_guard PASS (1421, unchanged). The batch-4 reports cited the
+  wrong workflow id (wf_441734e8 for leaves of wf_9660d38d); fixed.
+
 In flight:
-- e21 sweep 5 over all 2012 TUs on the bfdf402af tree;
-- the room workflow wf_9660d38d on the remaining 37 bodies.
+- the room workflow wf_9660d38d on the remaining 28 bodies (m0432i
+  8019702C and m0429i 80196748 are confirmed and wait for batch 6);
+- a sweep of the 40 sweep-5 skipped TUs with the new opt-in seed extension
+  (`e21_diff.py --min-ok K`, env `E21_MIN_OK`): most of them chase pointers
+  through arguments and mock returns, so 6 random RAM images all fault.
 
 Integrate a confirmed leaf this way:
 1. Add its yaml line and specs.

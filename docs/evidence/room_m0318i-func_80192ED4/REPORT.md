@@ -4,7 +4,7 @@ Blob offset 0x3EEC, 0x398 bytes, VMA 0x80192ED4. The span is `asm` in `configs/U
 Source: `src/nonmatching/overlays/room_m0318i/func_80192ED4.c`. It is behaviour C, not a byte match,
 recorded in `configs/USA/overlays/nonmatching.yaml` with its directed inputs.
 
-Written from the retail disassembly by a decomp agent (workflow wf_441734e8). An
+Written from the retail disassembly by a decomp agent (workflow wf_9660d38d). An
 independent verifier agent then re-ran the claim, added edge-value runs and read
 the C against the asm.
 
