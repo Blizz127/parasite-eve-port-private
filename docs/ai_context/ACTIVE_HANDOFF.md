@@ -54,12 +54,39 @@ Later on 2026-10-18 (all committed, none pushed):
   psyq_port_guard PASS (1421, unchanged). The batch-4 reports cited the
   wrong workflow id (wf_441734e8 for leaves of wf_9660d38d); fixed.
 
+- Verbatim TUs (1016 room, most EXE) are not in any e21 sweep. Static scans
+  of them found one real bug class: era `long` is 32-bit, and two dormant
+  DRAWENV TUs (ovl_03C5 80121A00, ovl_03D2 801922F4) copied at a 160-byte
+  stride. Fixed in the generator (f1ef6f3f5). Decomp TUs now build with
+  `-fno-strict-aliasing -fwrapv` (2e8d8da38); 88 of 4093 TUs compile
+  differently with those. The hand-written code has no `long` over guest
+  memory (func_80191FB8's hand port copies 0x5C-byte DRAWENVs as bytes).
+  Details: NATIVE_COMPLETION.md, "Host compile semantics".
+- Moved off the full root disk, not deleted:
+  /dev/shm/pe-native-34f506ce/scratch_moved/ holds old scratch census and
+  harvest outputs and the agent transcripts of the finished workflows
+  wf_441734e8 and wf_b3938761 (their journal.jsonl files stayed in place).
+  /dev/shm is lost on reboot.
+
+- Room batch 6 (m0432i 8019702C, m0429i 80196748/801972EC/80196CCC, m0318i
+  80197CBC/801944E8): census 28 -> 22 (59,452 bytes). regen14: suite
+  1661/1661, ctests 6/6, psyq_port_guard PASS (1421).
+
 In flight:
-- the room workflow wf_9660d38d on the remaining 28 bodies (m0432i
-  8019702C and m0429i 80196748 are confirmed and wait for batch 6);
-- a sweep of the 40 sweep-5 skipped TUs with the new opt-in seed extension
-  (`e21_diff.py --min-ok K`, env `E21_MIN_OK`): most of them chase pointers
-  through arguments and mock returns, so 6 random RAM images all fault.
+- the room workflow wf_9660d38d on the remaining 22 bodies;
+- `tools/analysis/e21_verbatim.py` (new, pilot), the first retail
+  differential of verbatim room TUs, run over all 1016. A 20-TU pilot was
+  20/20 ok once callees whose host prototype flips the leaf's 32-bit return
+  signedness get bit-31-clear mock returns. Example: `func_800C6CE0` is
+  `unsigned int` in the leaves and `int` in pe_port_compat.h. It returns
+  0..5, so no live divergence; about 180 such leaf/host return-type
+  disagreements exist in verbatim TUs;
+- a sweep of the 40 sweep-5 skipped TUs with the opt-in seed extension
+  (`e21_diff.py --min-ok 4 --max-seeds 512`). One TU, ovl_0700
+  func_80191C94, has run since 06:08 and looks like a spinner;
+- next: sweep 6, every candidate with `E21_CFLAGS="-O3 -fno-strict-aliasing
+  -fwrapv" E21_GTE_CFLAGS=-O3`, on the regen14 tree. Then a pilot e21
+  harness for about 20 simple verbatim room TUs.
 
 Integrate a confirmed leaf this way:
 1. Add its yaml line and specs.
