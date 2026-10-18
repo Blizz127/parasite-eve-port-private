@@ -122,4 +122,9 @@ uint16_t PE_Port_ReadPadRaw(void);
 /* Trace helper available to game code */
 void Trace_Direct(const char *event);
 
+/* func_8001220C's credits arm (state 0xAA108448 with flag F5 bit 1): runs the
+ * ovl_0457 credits loop and returns 1, or records the credits_cd_xa_service
+ * boundary, requests a stop and returns 0 (bootstrap/func_8001220C_port.c). */
+int PE_Main_EnterCredits(void);
+
 #endif

@@ -268,6 +268,9 @@ int func_8007FC64(pe_addr_t pe_result);
 int func_8007F418(uint32_t sequence,pe_addr_t response);
 int func_80080DC4(int command,pe_addr_t param,pe_addr_t response);
 int  func_80080D5C(int command, pe_addr_t param, pe_addr_t result);
+/* 1 when a CD provider serves XA-ADPCM streaming through the libcd queue
+ * (Setfilter, ReadS in XA mode, GetlocP, Stop); see pe_libcd.c. */
+int PE_Cd_XaServiceAvailable(void);
 uint32_t PE_Cd_GetSetlocRaw(void);    /* host telemetry: last proven CdlLOC */
 int func_800824C8(int value);
 pe_addr_t func_800824F0(pe_addr_t callback);

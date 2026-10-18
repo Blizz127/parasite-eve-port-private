@@ -216,11 +216,90 @@ static void test_credits_vlc_bounded_resume_oracle(void)
     PASS();
 }
 
+/* No CD provider serves XA streaming (PE_Cd_XaServiceAvailable), so
+ * func_8001220C's credits arm stops on the credits_cd_xa_service boundary in
+ * every mode instead of entering a loop that would spin.  Nothing of the
+ * credits runs: the op-table pointer the loop stores first keeps its sentinel
+ * and the libcd queue is untouched. */
+static void test_credits_entry_stops_without_xa_service(void)
+{
+    static const uint32_t modes[] = { 0u, 0x10000u, 0x12000u, 0x20000u };
+    unsigned m;
+    TEST("credits_entry_stops_without_xa_service");
+    ASSERT(PE_Cd_XaServiceAvailable() == 0, "no provider serves XA streaming");
+    for (m = 0; m < 4u; m++) {
+        ResetTestState();
+        PE_StoreU32(0x8009D1A0u, modes[m]);
+        PE_StoreU32(0x80172CD0u, 0xC0DEC0DEu);
+        PE_StoreU32(0x8009B53Cu, 0x55u);
+        ASSERT(PE_Main_EnterCredits() == 0, "credits arm reports not run");
+        ASSERT(PE_Port_ShouldStop() &&
+               PE_Port_GetStopReason() == PE_PORT_STOP_UNRESOLVED_BOUNDARY,
+               "loud unresolved-boundary stop");
+        ASSERT(g_stub_order_count == 1 &&
+               strcmp(g_stub_order_log[0], "credits_cd_xa_service") == 0,
+               "credits_cd_xa_service boundary identity");
+        ASSERT(g_bootstrap_arg_call_count == 1 &&
+               g_bootstrap_arg_calls[0].arg0 == (modes[m] & 0x30000u),
+               "boundary records the credits mode bits");
+        ASSERT(PE_LoadU32(0x80172CD0u) == 0xC0DEC0DEu, "credits loop not entered");
+        ASSERT(PE_LoadU32(0x8009B53Cu) == 0x55u && PE_LoadU32(0x800A3608u) == 0u,
+               "libcd queue untouched");
+    }
+    PASS();
+}
+
+/* Why the arm stops.  With the device disabled (the production provider) a
+ * queued command never completes.  func_80125744 starts with CdlSetmode 0xC8
+ * through func_8007EE84(14, mode, 0, -1) and polls func_8007F418 in a
+ * for(;;) that only a 2 (or a retry on another nonzero) leaves; here every
+ * poll reads 0 (pending) and nothing requests a stop.  The kick latches lane
+ * D_8009B574 = 2 and only the IRQ chain clears it, so every later
+ * func_8007F72C() == 1 wait (func_801255A4's drain among them) would spin as
+ * well.  The completion ring stays empty, so func_80125894's
+ * func_8007F418(0, 0) reads 6, never 2. */
+static void test_credits_xa_commands_never_complete_without_device(void)
+{
+    const pe_addr_t mode = 0x801F0000u, resp = 0x801F0010u;
+    PE_Disc *disc;
+    char err[256];
+    uint32_t seq;
+    unsigned i;
+    TEST_RETAIL_DISC1("credits_xa_commands_never_complete_without_device");
+    ResetTestState();
+    PE_CdReg_Reset();
+    err[0] = 0;
+    disc = BTL6_OpenDisc1(err, sizeof(err));
+    ASSERT(disc != NULL, err[0] ? err : "PE_Disc_Open failed");
+    PE_Disc_SetActive(disc);
+    ASSERT(PE_GuestImage_LoadExe(disc, err, sizeof(err)) == 0, err);
+    ASSERT(PE_Globals_AdoptRetailImage() == 0, "retail startup globals");
+    ASSERT(!PE_CdReg_DeviceEnabled(), "production provider: device disabled");
+    ASSERT(func_8007EC14() == 1 && func_8007ED58() == 1, "CdInit and reset");
+    ASSERT(func_8007F72C() == 1 && func_8007F778() == 0, "drive idle, queue empty");
+    PE_StoreU8(mode, 200u);
+    seq = func_8007EE84(14u, mode, 0u, 0xFFFFFFFFu);
+    ASSERT(seq != 0u && !PE_Port_ShouldStop() && PE_LoadU32(0x800A3608u) == 1u,
+           "CdlSetmode queued and kicked");
+    for (i = 0; i < 100000u; i++)
+        if (func_8007F418(seq, resp) != 0) break;
+    ASSERT(i == 100000u && !PE_Port_ShouldStop(),
+           "CdlSetmode stays pending for 100000 polls with no stop");
+    ASSERT(PE_LoadU32(0x8009B574u) == 2u && func_8007F72C() == 2,
+           "lane stays 2, so later idle waits cannot pass");
+    ASSERT(func_8007F418(0u, 0u) == 6, "empty completion ring: the channel-switch wait reads 6");
+    PE_Disc_SetActive(NULL);
+    PE_Disc_Close(disc);
+    PASS();
+}
+
 static void test_credits_native_all(void)
 {
     test_credits_libpress_replacements();
     test_credits_libpress_retail_oracle();
     test_credits_registry_dispatch();
     test_credits_vlc_bounded_resume_oracle();
+    test_credits_entry_stops_without_xa_service();
+    test_credits_xa_commands_never_complete_without_device();
 }
 #endif

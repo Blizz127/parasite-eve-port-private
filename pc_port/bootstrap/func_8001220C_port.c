@@ -12,6 +12,7 @@
 #include "game_port.h"
 #include "stub_registry.h"
 #include "pe_guestcode.h"
+#include "pe_sdk.h"
 #include <stdio.h>
 
 /* ── Declarations ──────────────────────────────────────────────────── */
@@ -57,6 +58,34 @@ static void PE_Port_ScratchpadCall(void (*overlay)(void))
     Stub_Record("scratchpad_stack_handoff", "HOST_ADAPTED");
     if (overlay) overlay();
     Trace_Direct("scratchpad_atom_end");
+}
+
+/* func_801235DC is the credits main loop in ovl_0457.  func_8006F044 has
+ * just reloaded PE.IMG [0x39F,0x3C5) (ovl_039F, libpress) to 0x8010BCF8 and
+ * [0x457,0x4FC) (ovl_0457) to 0x80120D00.  The registry binds the address by
+ * the fingerprint of the bytes now there (generated ovl_0457__func_801235DC);
+ * anything else is a loud boundary, never a silent return.
+ *
+ * The loop drives the drive itself.  With D_8009D1A0 bit 16 clear it opens
+ * \XASTREAM\CREDITS.XA;1 (Disc 2) and queues CdlSetmode 0xC8 and CdlSetfilter
+ * through func_8007EE84, waiting on func_8007F418 for each, then plays the
+ * stream by CdlReadS and CdlGetlocP (func_801258EC, func_80125A40).  With bit
+ * 16 set, an edge on D_8009D1F4 bit 26 or 27 runs func_80125894, which waits
+ * for func_8007F418(0, 0) == 2 before CdlSetfilter.  No CD provider serves
+ * those commands (PE_Cd_XaServiceAvailable), and the generated ovl_0457 loops
+ * never test PE_Port_ShouldStop, so either mode would spin forever.  Without
+ * the service the credits stay a loud boundary, as they were before their
+ * TUs were registered. */
+int PE_Main_EnterCredits(void)
+{
+    if (!PE_Cd_XaServiceAvailable()) {
+        Bootstrap_ReturnVoid1("credits_cd_xa_service", "func_8001220C",
+                              D_8009D1A0 & 0x30000u);
+        PE_Port_RequestStop(PE_PORT_STOP_UNRESOLVED_BOUNDARY);
+        return 0;
+    }
+    (void)PE_GuestCall("func_8001220C", 0x801235DCu, 0u, 0u, 0u, 0u, 0u);
+    return 1;
 }
 
 /* ── Main — adapted from PARKED candidate ──────────────────────────── */
@@ -161,14 +190,7 @@ void func_8001220C(void)
                     if (*flagbyte & 0x2) {
                         func_8006F044();
                         if (PE_Port_ShouldStop()) return;
-                        /* func_801235DC is the credits main loop in ovl_0457.
-                         * func_8006F044 has just reloaded PE.IMG [0x39F,0x3C5)
-                         * (ovl_039F, libpress) to 0x8010BCF8 and [0x457,0x4FC)
-                         * (ovl_0457) to 0x80120D00.  The registry binds the
-                         * address by the fingerprint of the bytes now there
-                         * (generated ovl_0457__func_801235DC); anything else is
-                         * a loud boundary, never a silent return. */
-                        (void)PE_GuestCall("func_8001220C", 0x801235DCu, 0u, 0u, 0u, 0u, 0u);
+                        if (!PE_Main_EnterCredits()) return;
                         if (PE_Port_ShouldStop()) return;
                         D_8009D280 = 0xA80830C8u;
                         *data |= 0x1;

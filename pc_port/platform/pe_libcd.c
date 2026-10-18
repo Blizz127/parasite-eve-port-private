@@ -242,6 +242,19 @@ static int PE_Cd_BcdByte(uint8_t b)
 
 /* func_80080C48: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80080C48_port.c (src/func_80080C48.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
+/* XA-ADPCM streaming through the libcd queue: CdlSetmode/CdlSetfilter/
+ * CdlReadS in XA mode (func_8007EE84, func_8007F0C8), position reports by
+ * CdlGetlocP and CdlStop, each awaited on the completion ring at D_800A3610
+ * (func_8007F418).  No provider serves it.  With the device disabled nothing
+ * publishes a completion (only the IRQ chain reaches func_8007EB88) and
+ * nothing decodes a queued XA read.  The register-level device rejects
+ * commands 8, 13 and 0x11 (CD_device_unported_command).  The ending credits
+ * (ovl_0457 func_801235DC) are the caller; they must not start without it. */
+int PE_Cd_XaServiceAvailable(void)
+{
+    return 0;
+}
+
 /* func_80080D5C is the blocking command wrapper at [0x80080D5C,
  * 0x80080DC4). With the device enabled it uses the original queue/poll
  * graph shared with80DC4. With the device disabled, retain the legacy proven
