@@ -104,9 +104,27 @@ Later on 2026-10-18 (all committed, none pushed):
 - Room batch 10: census 6 -> 3 (17,816 bytes). regen18: suite 1661/1661,
   ctests 6/6, psyq PASS.
 
-In flight:
-- the room workflow wf_9660d38d on the last 3 bodies: m0404i 80192540
-  (0xE28), m0256i 801940B0 (0x1270), m0429i 80192F9C (0x2500, no near twin).
+- Room batches 11-12: census 0. Every one of the 2952 unique room bodies
+  (9103 room x body rows) has native code: 9101 generated TUs and 2
+  fingerprint-bound hand ports. regen20: suite 1661/1661, ctests 6/6, psyq
+  PASS (1421).
+- E23 (f452c3594): a live bug in the native credits frame flip. ovl_0457
+  801247F4 passed PutDispEnv/DrawOTagEnv byte values instead of the
+  DISPENV/DRAWENV row addresses: a 2-D array extern had been flattened.
+  It is now E21-lowered and proven 42/42 against retail.
+
+Open (NATIVE_COMPLETION.md has each):
+- latent verbatim-TU classes that no fix closes: 32-bit address wrap on
+  out-of-range indices (func_800428D4 with D_800A1860 == 0 is the one
+  plausible in play), narrow returns, parameter-width drift;
+- 21 dormant generated EXE TUs with `#define` boundary bindings, and the
+  dormant intra-overlay boundaries;
+- stack-residue residuals (8 TUs) and m0023i's DAY1_SHIM, which need
+  recorded retail stack contents (a runner job);
+- func_800339A0 style >= 4 (retail reads stack garbage too);
+- 7 e21 TUs and 87 verbatim TUs that run no seed (most need directed
+  specs), and 35 verbatim TUs the harness cannot model (boundaries,
+  struct-by-value S64).
 
 Batch recipe (each batch's yaml lines are applied AFTER the previous
 regen's GEN_DONE, so a gate never builds an unproven leaf; if a later
