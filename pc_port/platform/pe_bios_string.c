@@ -220,3 +220,13 @@ int32_t PE_Bios_Printf(pe_addr_t fmt, const uint32_t *args, int nargs)
     fprintf(stderr, "[TTY] %s%s", buf, (len && buf[len - 1u] == '\n') ? "" : "\n");
     return n;
 }
+
+/* Host replacement for func_80071A74 (printf through the BIOS A(3Fh) vector;
+ * pe_port_compat.h): lowered code calls it with the guest format and up to
+ * seven word arguments (0 past the call site's own). */
+int32_t PE_Printf_Guest(pe_addr_t fmt, uint32_t a1, uint32_t a2, uint32_t a3,
+                        uint32_t a4, uint32_t a5, uint32_t a6, uint32_t a7)
+{
+    const uint32_t args[7] = {a1, a2, a3, a4, a5, a6, a7};
+    return PE_Bios_Printf(fmt, args, 7);
+}

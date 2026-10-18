@@ -35806,6 +35806,7 @@ static void test_ATK3_retail_attack_initialization(void)
 #include "test_d3bc8_sprite.h"
 #include "test_cf844_orbit.h"
 #include "test_disc_swap.h"
+#include "test_credits_native.h"
 #include "pe_drive_tray.h"
 #include "test_drive_tray.h"
 #include "host_pad.h"
@@ -40917,6 +40918,7 @@ int main(void)
     test_D3BC8_sprite();
     test_CF844_orbit();
     test_disc_swap_boundary_stops();
+    test_credits_native_all();
     test_drive_tray_swap();
     test_DAY1_m0034i_model();
     test_DAY1_m0034i_setup();

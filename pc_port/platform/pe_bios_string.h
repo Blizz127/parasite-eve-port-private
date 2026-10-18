@@ -45,6 +45,9 @@ int32_t PE_Bios_SprintfHost(char *dst, uint32_t cap, pe_addr_t fmt, const uint32
  * "[TTY] ").  Retail prints to the debug TTY and continues, so this is not
  * a boundary.  Returns the length. */
 int32_t PE_Bios_Printf(pe_addr_t fmt, const uint32_t *args, int nargs);
+/* Host replacement for func_80071A74 (pe_port_compat.h): format plus seven words. */
+int32_t PE_Printf_Guest(pe_addr_t fmt, uint32_t a1, uint32_t a2, uint32_t a3,
+                        uint32_t a4, uint32_t a5, uint32_t a6, uint32_t a7);
 /* Test hook: calls since the last reset, and the last call's format
  * address and first four argument words. */
 unsigned PE_Bios_PrintfLog(pe_addr_t *last_fmt, uint32_t last_args[4]);

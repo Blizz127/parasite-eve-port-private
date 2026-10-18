@@ -232,6 +232,13 @@ def run_overlay(ovl: dict, args, windows) -> tuple[int, int, list, dict, dict]:
         g._ADDR_KNOWN.clear()
         g._ADDR_KNOWN.update(known)
         shim_macros = g.pc_port_macros()
+        # host replacements: the lowering only, as in run_rooms (ovl_0457's
+        # credits call ovl_039F's libpress entries, which the port reimplements)
+        rnp = retail_nparams()
+        repl = {n: s for n, s in host_replacements().items() if not in_window(ovl, n)}
+        low_known = known | set(repl)
+        low_sigs = {**sigs, **{a: {**b, "retail_nparams": rnp.get(a)} for a, b in repl.items()}}
+        low_dsigs = {**dsigs, **repl}
 
         plans: dict[str, dict] = {}
         lowered: dict[str, str] = {}
@@ -248,7 +255,7 @@ def run_overlay(ovl: dict, args, windows) -> tuple[int, int, list, dict, dict]:
                 # E21, as for room code: a pointer-model refusal is lowered to
                 # explicit guest-memory C instead (guest_lower.py).
                 txt = lowered_tu(name, text, ovl["leaves"][name], plan["reason"],
-                                 known, sigs, dsigs)
+                                 low_known, low_sigs, low_dsigs)
                 if isinstance(txt, str) and txt.startswith("/*"):
                     lowered[name] = txt
                     continue
@@ -285,7 +292,8 @@ def run_overlay(ovl: dict, args, windows) -> tuple[int, int, list, dict, dict]:
                     if n not in plans:
                         continue
                     text = leaf_src(ov, n).read_text(encoding="utf-8", errors="replace")
-                    txt = lowered_tu(n, text, ovl["leaves"][n], None, known, sigs, dsigs)
+                    txt = lowered_tu(n, text, ovl["leaves"][n], None, low_known, low_sigs,
+                                     low_dsigs)
                     if isinstance(txt, str) and txt.startswith("/*"):
                         retry.append((n, post_process(ovl, n, txt, local, windows)))
                 if retry:
@@ -386,25 +394,10 @@ def group_symbol(key: str, name: str) -> str:
 LOWER_REASONS = gl.LOWER_REASONS
 
 
-# A Psy-Q SDK entry the port reimplements on the host under its own name
-# (psyq_port_guard forbids defining func_<psyq address>).  pe_port_compat.h
-# marks it `/* host-replacement: func_X ... */` right before the host
-# prototype; lowered room code then calls the host function directly.
-HOST_REPL_RE = re.compile(
-    r"/\*\s*host-replacement:\s*(func_[0-9A-Fa-f]{8})\b.*?\*/\s*"
-    r"([A-Za-z_][\w \t\*]*?)\b(PE_\w+)\s*\(([^;{}()]*)\)\s*;", re.S)
-
-
-def host_replacements() -> dict[str, dict]:
-    """func_X -> host signature plus {'host': PE_name, 'decl': prototype}."""
-    text = (REPO_ROOT / "pc_port/include/pe_port_compat.h").read_text(
-        encoding="utf-8", errors="replace")
-    out: dict[str, dict] = {}
-    for m in HOST_REPL_RE.finditer(text):
-        ret, host, prm = m.group(2).strip(), m.group(3), m.group(4).strip()
-        out[m.group(1)] = {"ret": ret, "params": g.split_top(prm), "host": host,
-                           "decl": f"{ret} {host}({prm or 'void'});"}
-    return out
+# Host replacements (`/* host-replacement: func_X */` in pe_port_compat.h):
+# gen_decomp_ports owns the parser, the EXE E21 lowering uses it too.
+HOST_REPL_RE = g.HOST_REPL_RE
+host_replacements = g.host_replacements
 
 
 _RETAIL_NPARAMS: dict[str, int] | None = None

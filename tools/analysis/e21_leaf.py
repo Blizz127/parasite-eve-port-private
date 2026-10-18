@@ -123,9 +123,15 @@ def main() -> int:
     ap.add_argument("--keep", type=Path, help="write the room's TUs here (kept)")
     ap.add_argument("--nonmatching", metavar="OFF:SIZE",
                     help="treat the leaf as NON_MATCHING at this blob offset/size for this run")
+    ap.add_argument("--seed-list", metavar="N,N,...",
+                    help="run exactly these seeds instead of 0..SEEDS-1 (one random RAM image "
+                         "and mock-return stream per seed)")
     ap.add_argument("--inputs", metavar="SPEC",
                     help='directed inputs for this run, nonmatching.yaml syntax: "a0=1,2; h(a1+0x10)=0..2"')
     ns = ap.parse_args()
+    if ns.seed_list:
+        e.SEED_LIST = [int(x, 0) for x in ns.seed_list.split(",") if x.strip()]
+        ns.seeds = len(e.SEED_LIST)
     if ns.room == "exe":
         return exe_mode(ns)
     if not ns.room.startswith("room_"):

@@ -30,6 +30,7 @@ set(PLATFORM_SRCS
     platform/pe_gte.c
     platform/pe_gte_commands.c
     platform/pe_mdec.c
+    platform/pe_libpress.c
     platform/pe_str_feed.c
     platform/pe_libetc.c
     platform/pe_libgpu.c

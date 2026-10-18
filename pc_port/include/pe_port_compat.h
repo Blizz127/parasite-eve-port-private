@@ -1100,6 +1100,26 @@ pe_addr_t PE_MulMatrix0_Guest(pe_addr_t left, pe_addr_t right, pe_addr_t out);
  * code calls this host function by name; no func_80078BE4 is defined. */
 pe_addr_t PE_ApplyMatrix_Guest(pe_addr_t m, pe_addr_t v, pe_addr_t out);
 void PE_RotMatrix794C4_values(const int16_t angles[3], int16_t out[9]);
+/* host-replacement: func_80071A74 (Psy-Q libapi printf, the BIOS A(3Fh)
+ * vector stub; guest format plus up to seven word arguments -> the host TTY
+ * through PE_Bios_Printf, as the console's debug TTY receives it).  A call
+ * site with fewer arguments passes 0 for the rest (guest_lower
+ * DEAD_TRAILING_PARAMS); printf reads only what its format names.
+ * platform/pe_bios_string.c. */
+int32_t PE_Printf_Guest(pe_addr_t fmt, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5, uint32_t a6, uint32_t a7);
+/* host-replacement: func_8010BF94 (Psy-Q libpress DecDCTBufSize in ovl_039F;
+ * guest bitstream -> its first halfword).  The credits overlay (ovl_0457)
+ * calls it; implemented in platform/pe_libpress.c, no func_8010BF94 is
+ * defined. */
+uint32_t PE_DecDCTBufSize_Guest(pe_addr_t bs);
+/* host-replacement: func_8010C86C (Psy-Q libpress DecDCTvlcSize, handwritten
+ * asm in ovl_039F: the VLC output bound [0x8011EB8C] becomes size << 1, or
+ * 0xFFFFFF for size <= 1; returns the previous bound).  platform/pe_libpress.c. */
+int32_t PE_DecDCTvlcSize_Guest(uint32_t size);
+/* host-replacement: func_8010C078 (Psy-Q libpress DecDCToutSync in ovl_039F;
+ * mode != 0: MDEC1 status bit 24; mode 0: wait for DMA1, -1 on timeout).
+ * platform/pe_libpress.c. */
+int32_t PE_DecDCToutSync_Guest(int32_t mode);
 
 void func_800783E4(pe_addr_t a, pe_addr_t b, int32_t wa, int32_t wb, pe_addr_t out);
 void func_80078554(pe_addr_t a, pe_addr_t b, int32_t wa, int32_t wb, pe_addr_t out);

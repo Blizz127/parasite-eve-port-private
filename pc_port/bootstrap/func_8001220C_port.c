@@ -11,6 +11,7 @@
 #include "psx_compat.h"
 #include "game_port.h"
 #include "stub_registry.h"
+#include "pe_guestcode.h"
 #include <stdio.h>
 
 /* ── Declarations ──────────────────────────────────────────────────── */
@@ -27,7 +28,6 @@ extern void func_8006F044(void);
 extern int  func_8006E834(void);
 extern void func_80069B08(int);
 extern void func_8003F3C4(void);
-extern void func_801235DC(void);
 extern void func_8019234C(void);
 extern int  func_801909B4(void);
 extern int  func_8006E9A0(int);
@@ -160,7 +160,16 @@ void func_8001220C(void)
                 if (v == 0xAA108448u) {
                     if (*flagbyte & 0x2) {
                         func_8006F044();
-                        func_801235DC();
+                        if (PE_Port_ShouldStop()) return;
+                        /* func_801235DC is the credits main loop in ovl_0457.
+                         * func_8006F044 has just reloaded PE.IMG [0x39F,0x3C5)
+                         * (ovl_039F, libpress) to 0x8010BCF8 and [0x457,0x4FC)
+                         * (ovl_0457) to 0x80120D00.  The registry binds the
+                         * address by the fingerprint of the bytes now there
+                         * (generated ovl_0457__func_801235DC); anything else is
+                         * a loud boundary, never a silent return. */
+                        (void)PE_GuestCall("func_8001220C", 0x801235DCu, 0u, 0u, 0u, 0u, 0u);
+                        if (PE_Port_ShouldStop()) return;
                         D_8009D280 = 0xA80830C8u;
                         *data |= 0x1;
                     } else {

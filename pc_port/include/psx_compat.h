@@ -129,7 +129,8 @@ void func_80069B08(int a0);
 /* func_8003F3C4 / func_80066B60 / func_80068E24 are REAL native ports
  * (game/boot/func_8003F3C4_port.c, func_80066B60_port.c,
  * func_80068E24_port.c). Prototypes live in pe_port_compat.h. */
-static inline void func_801235DC(void)   { Bootstrap_ReturnVoid("func_801235DC", "func_8001220C"); }
+/* func_801235DC (credits main loop, ovl_0457) is reached from func_8001220C
+ * through the guest-code registry (bootstrap/func_8001220C_port.c). */
 /* func_8019234C is a REAL translation of the M0000I transition outer loop
  * (game/boot/func_8019234C_port.c); the former Bootstrap_ReturnVoid stub
  * was removed once its callees, VSync return contract and ordering-table

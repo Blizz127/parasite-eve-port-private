@@ -1643,6 +1643,7 @@ def decay_param(t: T) -> T:
 DEAD_TRAILING_PARAMS = {
     "func_8010BD4C": 1,   # count: clobbered by the first datum before any use
     "func_8010C89C": 3,   # a3: recomputed from a2 before its first use
+    "func_80071A74": 1,   # printf: reads only the arguments its format names
 }
 
 FUNC_NAME_RE = re.compile(r"func_[0-9A-Fa-f]{8}")

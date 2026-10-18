@@ -129,6 +129,22 @@ Boundaries and dispatch:
 
 Native bodies that replaced boundaries:
 
+- **ending credits** (docs/evidence/native-credits-20261018/REPORT.md):
+  - `func_8001220C` reached the credits main loop `0x801235DC` through a
+    `psx_compat.h` Bootstrap stub. It now calls through the registry, which
+    binds the generated ovl_0457 TU by the fingerprint of the bytes
+    `func_8006F044` just reloaded.
+  - The credits' libpress calls (DecDCTBufSize, DecDCTvlcSize, DecDCToutSync)
+    run on host replacements (`platform/pe_libpress.c`).
+  - Subsystem overlays and E21 EXE leaves now apply host replacements, as
+    rooms did.
+  - printf (`func_80071A74`) has a host replacement. room_m0318i
+    `func_80192560` had stopped on its actor-not-found debug print.
+  - The `func_8004DCA4` nonzero mode (field-VM menu op) follows the matched C
+    and is checked against 8 new retail cases.
+  - The decode differential (31 pictures x 3 bounds, 558 resumed calls) is the
+    first run of the `func_8010C89C` hand port's resume path.
+
 - **d0c4075e**: GTE command engine for all 22 documented COP2 commands. The
   `gte-native-hardware` ctest has 1100 real-console cases and 231741 checks,
   with 0 failures.
@@ -187,8 +203,41 @@ the 113:
 | 8 | retail reads uninitialized stack | residual, below |
 
 The 41 skipped TUs now run their unmodelled GTE commands on the native engine.
-The full re-sweep on the 2026-10-18 regeneration is the next gate. Its result
-goes here.
+
+Sweep 3 (2026-10-18 00:32-01:01 UTC, `e21_diff.py --with-calls --check-gte
+--jobs 4 --verbose`): 1711 ok, 8 MISMATCH, 139 nocompile, 31 skipped.
+
+- The 8 mismatches are exactly the stack-residue set below: the 0x4A0 body in
+  m0065i/m0087i/m0391i/m0393i/m0399i/m0401i, and the 0x3FC CompMatrix body in
+  m0034i/m0174i.
+- The 139 nocompiles were a harness bug from ada567f6. Its mock-stub
+  parameter heuristic read `unsigned code` (type `unsigned`, name `code`) as
+  an unnamed two-word type and emitted `unsigned code p1`. So those 139 TUs
+  were not tested in sweep 3. `e21_diff.param_is_named` now treats a last word
+  as a type only when it is a C type keyword or a `_t` typedef.
+
+The full re-sweep with the fixed harness (sweep 4) goes here.
+
+## Boundary-site census
+
+`python3 tools/analysis/boundary_site_census.py` lists every Bootstrap /
+boundary call site in production pc_port code, including calls of file-local
+wrappers such as `menu_boundary("name")`. On 2026-10-18 it found 228 sites.
+60 name a function exactly, and 28 of those name one that has host C. Each of
+the 28 was read, and none is stale:
+
+- a jump-table or callback target other than the retail default;
+- the bootstrap-disc test fixture in `func_800698D4`;
+- a no-disc or no-MDEC condition;
+- retail `BREAK 7` divide traps;
+- the memory-card boundary test mode.
+
+`func_8004C608`'s "unported help selection" default is unreachable: the hand
+port has explicit cases for every id 0..60.
+
+`pc_port_coverage.py`'s "stub" bucket (36 leaves) is not a list of non-native
+code. It counts any body that has a bootstrap marker on any path, and most of
+those are hand ports with one guarded error path.
 
 ## Known residuals (documented, not hidden)
 

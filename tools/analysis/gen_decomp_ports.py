@@ -689,6 +689,28 @@ def inline_shims() -> dict[str, dict]:
     return out
 
 
+# A Psy-Q SDK entry the port reimplements on the host under its own name
+# (psyq_port_guard forbids defining func_<psyq address>).  pe_port_compat.h
+# marks it `/* host-replacement: func_X ... */` right before the host
+# prototype; lowered code (rooms, subsystem overlays, E21 EXE leaves) then
+# calls the host function directly.
+HOST_REPL_RE = re.compile(
+    r"/\*\s*host-replacement:\s*(func_[0-9A-Fa-f]{8})\b.*?\*/\s*"
+    r"([A-Za-z_][\w \t\*]*?)\b(PE_\w+)\s*\(([^;{}()]*)\)\s*;", re.S)
+
+
+def host_replacements() -> dict[str, dict]:
+    """func_X -> host signature plus {'host': PE_name, 'decl': prototype}."""
+    text = (REPO_ROOT / "pc_port/include/pe_port_compat.h").read_text(
+        encoding="utf-8", errors="replace")
+    out: dict[str, dict] = {}
+    for m in HOST_REPL_RE.finditer(text):
+        ret, host, prm = m.group(2).strip(), m.group(3), m.group(4).strip()
+        out[m.group(1)] = {"ret": ret, "params": split_top(prm), "host": host,
+                           "decl": f"{ret} {host}({prm or 'void'});"}
+    return out
+
+
 def pc_port_macros() -> set[str]:
     """D_ symbols already provided as macros by the pc_port shim headers."""
     names: set[str] = set()
@@ -2950,13 +2972,17 @@ def e21_render(name: str, text: str, leaf: dict, known: set, sigs: dict, dsigs: 
     """One leaf's E21 TU text, or None when it does not lower or its public
     signature would disagree with a canonical prototype."""
     import guest_lower as gl
+    # host replacements: the lowering calls the PE_ host function by name (a
+    # verbatim TU would call func_X, which the port never defines)
+    repl = {n: s for n, s in host_replacements().items() if n not in known}
+    low_sigs = {**sigs, **repl}
     try:
-        res = gl.lower_leaf(name, text, known, sigs, strip_asm=strip_era_asm)
+        res = gl.lower_leaf(name, text, known | set(repl), low_sigs, strip_asm=strip_era_asm)
     except gl.LowerError:
         return None
     protos = []
     for c in res["callees"]:
-        sg = dsigs.get(c) or sigs.get(c)
+        sg = repl.get(c) or dsigs.get(c) or sigs.get(c)
         if sg is None:
             return None
         prm = ", ".join(sg["params"]) or "void"

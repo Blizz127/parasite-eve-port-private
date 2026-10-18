@@ -774,6 +774,13 @@ def narrow_mask(ty: str) -> int:
     return 0xFFFFFFFF
 
 
+# printf (func_80071A74, the BIOS A(3Fh) stub): its arguments after the format
+# only shape debug TTY text, never guest state, and the host replacement
+# (PE_Printf_Guest) receives 0 where a call site passes fewer than seven.
+# Compare the format pointer only.
+TTY_ONLY_ARGS = {0x80071A74: [0xFFFFFFFF, 0, 0, 0, 0, 0, 0, 0]}
+
+
 def host_masks(t: str) -> dict[int, list[int]]:
     """{callee vma: per-argument compare mask} for host-prototyped callees."""
     out = {}
@@ -781,6 +788,23 @@ def host_masks(t: str) -> dict[int, list[int]]:
         ps = [] if prm.strip() == "void" else [x.strip() for x in prm.split(",")]
         out[address] = [narrow_mask(ty) for ty in ps]
     return out
+
+
+_C_TYPE_WORDS = {"int", "char", "short", "long", "unsigned", "signed", "float", "double",
+                 "void", "const", "volatile"}
+
+
+def param_is_named(ty: str) -> bool:
+    """True when a prototype parameter carries a name: its last word follows a
+    space or `*` and is not itself a type word (`unsigned int` and `uint32_t`
+    are unnamed, `unsigned code` and `const char *s` are named)."""
+    m = re.search(r"[\s*](\w+)$", ty.strip())
+    if not m:
+        return False
+    last = m.group(1)
+    if last in _C_TYPE_WORDS or last.endswith("_t"):
+        return False
+    return not re.fullmatch(r"(?:struct|union|enum)\s+\w+", ty.strip())
 
 
 def host_stubs(t: str) -> str:
@@ -795,8 +819,7 @@ def host_stubs(t: str) -> str:
         names, logs = [], []
         for k, ty in enumerate(ps):
             nm = f"p{k}"
-            named = re.search(r"[\s*]\w+$", ty) and not re.fullmatch(
-                r"(?:const\s+|volatile\s+|unsigned\s+|signed\s+)*\w+", ty.strip())
+            named = param_is_named(ty)
             names.append(re.sub(r"\w+$", nm, ty) if named else f"{ty} {nm}")
             w = f"0x{narrow_mask(ty):X}u"
             if "*" in ty:            # host pointer parameter: log the guest address it maps
@@ -895,6 +918,13 @@ def parse_directed(spec: str) -> list[tuple[str, list[int]]]:
     return terms
 
 
+# Explicit seeds instead of range(seeds) (e21_leaf.py --seed-list): a seed is
+# the RNG key of one random RAM image and of every mocked callee's return
+# value, so a listed seed reproduces one exact input, for example the first
+# seeds whose mock makes a callee return 0.
+SEED_LIST: list[int] | None = None
+
+
 def inputs(name, ov, data, seeds, recorded, spec):
     """(seed, ram, args): recorded game snapshots if given, else seeded random
     RAM (pointer-heavy) with the directed terms applied on top."""
@@ -909,7 +939,7 @@ def inputs(name, ov, data, seeds, recorded, spec):
                 continue                       # another overlay's code was resident: not this leaf
             yield k, bytearray(b[:RAM_SIZE + SPAD]), list(struct.unpack_from("<4I", b, RAM_SIZE + SPAD))
         return
-    for seed in range(seeds):
+    for seed in (SEED_LIST if SEED_LIST is not None else range(seeds)):
         rng = random.Random(f"{name}:{seed}")
         ram = bytearray(RAM_SIZE + SPAD)
         # Seeded pointers stay below both stack windows (as mock returns do):
@@ -966,7 +996,7 @@ def one(p: Path, name: str, ovl: str, seeds: int, cc: str, cover: bool = False,
         call = (f"uint32_t rv = (uint32_t)(int32_t){name}({argl}); "
                 f"fprintf(logf_, \"R %08X\\n\", rv);")
     stubs = host_stubs(t)
-    masks = host_masks(t)
+    masks = {**host_masks(t), **TTY_ONLY_ARGS}
     with tempfile.TemporaryDirectory() as d:
         d = Path(d)
         (d / "pe_guest_decomp.h").write_text(MOCK_H)
