@@ -44,27 +44,27 @@ covers both discs.
 ## Census (2026-10-18)
 
 **Room code**: `PE_DISC1_BIN=<disc 1> python3 pc_port/tools/pe_all_rooms_native_census.py`.
-Registry `zz_dispatch.c`: 5719 thunks. 185 code rooms, 9103 (room x body)
+Registry `zz_dispatch.c`: 5728 thunks. 185 code rooms, 9103 (room x body)
 rows, 2952 unique (vma, size, FNV) bodies.
 
-| | session start | 2026-10-18 02:30 |
+| | session start | 2026-10-18 03:40 |
 |---|--:|--:|
-| native-generated bodies | 8855 | 9061 (87 via a data head) |
-| not-native bodies (all statically reachable) | 217 | 40 |
+| native-generated bodies | 8855 | 9064 (87 via a data head) |
+| not-native bodies (all statically reachable) | 217 | 37 |
 | direct-addr-guarded (hand port bound by address only) | 31 | 0 |
 | native-direct (hand port bound by fingerprint) | 0 | 2 |
-| unique not-native bodies | 136 (183,492 bytes) | 40 (79,844 bytes) |
+| unique not-native bodies | 136 (183,492 bytes) | 37 (77,272 bytes) |
 
 A body resolves only by fingerprint, as `PE_GuestCode_Resolve` does. Rooms are
 never declared resident in production, and closure-equal duplicates count once.
 
-The 40 bodies with no C anywhere are effect and particle callbacks in late
+The 37 bodies with no C anywhere are effect and particle callbacks in late
 rooms:
 
 | room | bodies |
 |---|--:|
-| m0318i | 17 |
-| m0432i | 10 |
+| m0318i | 15 |
+| m0432i | 9 |
 | m0429i | 8 |
 | m0404i | 3 |
 | m0256i | 1 |
@@ -79,6 +79,9 @@ NON_MATCHING TUs: m0429i 801982A4 (4dba7922, after that census) and room
 batch 1 (m0318i 80192718/801955E4, m0350i 80196F2C, m0428i 801928CC, m0429i
 80192878, m0432i 801962FC). The earlier statement here that the 47 already
 excluded 801982A4 was wrong; the census listed it as not-native.
+
+Batch 2 (after that census: m0318i 80192A7C/80193638, m0432i 801957CC) took it
+from 40 to 37.
 
 **EXE** (`gen_decomp_ports.py --e21 --check`): eligible 1130 verbatim, E21
 lowered 21, 112 matched leaves that a hand port defines. Five uncompilable
@@ -219,7 +222,22 @@ Sweep 3 (2026-10-18 00:32-01:01 UTC, `e21_diff.py --with-calls --check-gte
   were not tested in sweep 3. `e21_diff.param_is_named` now treats a last word
   as a type only when it is a C type keyword or a `_t` typedef.
 
-The full re-sweep with the fixed harness (sweep 4) goes here.
+Sweep 4 (2026-10-18 02:38-03:10 UTC): the generated tree of 3c103eb4e (room
+batch 1 included), with the f91561717 harness fix:
+
+    e21_diff: MISMATCH: 8
+    e21_diff: ok: 1853
+    e21_diff: skipped: 34
+
+All 1895 room candidates ran, with 0 nocompile. The 139 TUs sweep 3 could not
+compile all pass. The 8 mismatches are the same stack-residue TUs.
+
+Subsystem overlays had never been swept. The sweep took only room TUs until
+495b7c1c4, which adds the 81 E21 TUs of ovl_03C5/03C9/03D2/0457/0700.
+`--only ovl_0457` gives 15 ok, 3 skipped, 0 MISMATCH. The three skipped
+(func_8012562C, func_80125744, func_80125894) are CD-status busy-waits that
+no seeded mock exits; they need directed mock return values, which the
+harness does not have yet.
 
 ## Boundary-site census
 
