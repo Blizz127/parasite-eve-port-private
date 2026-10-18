@@ -53,6 +53,7 @@ TU_FLAGS = ["-O3", "-fno-strict-aliasing", "-fwrapv", "-std=gnu11", "-funsigned-
 # Off by default: since E22 (gen_decomp_ports.cast_leaf_call_returns) the TU
 # casts those results back to the leaf's type, and unclamped returns test that.
 CLAMP_SIGN_SPLIT = os.environ.get("E21V_CLAMP_SIGN_SPLIT") == "1"
+SHIMS: dict[str, int] = {}             # filled in main() from the headers (shim_map)
 CALLEE = re.compile(r"(?:room_[0-9a-f]{8}__|ovl_\w+?__)?func_([0-9A-F]{8})")
 # provided by the harness runtime below, libc, or the GTE objects
 RUNTIME = {"PE_Translate", "PE_TranslateConst", "PE_HostToGuest", "PE_LoadU8", "PE_LoadU16",
@@ -147,6 +148,42 @@ int PE_GuestCall(const char *s, pe_addr_t fn, unsigned n, uintptr_t a0, uintptr_
     return (int)vh_ret(fn);
 }
 """
+
+
+SHIM_RE = re.compile(r"static\s+inline\s+[\w\s\*]+?\b(func_([0-9A-F]{8}))\s*\([^)]*\)\s*"
+                     r"\{\s*(?:return\s+)?(?:\([^)]*\)\s*)?([A-Za-z_]\w*)\s*\(")
+
+
+def shim_map() -> dict[str, int]:
+    """Host function -> retail address, from the headers' one-line static
+    inline wrappers (psx_compat.h `func_80073A44(m) { return HostFB_VSync(m); }`):
+    a TU that calls the wrapper links against the host function."""
+    out: dict[str, int] = {}
+    for h in sorted((PC / "include").glob("*.h")) + sorted((PC / "platform").glob("*.h")):
+        for m in SHIM_RE.finditer(h.read_text(errors="replace")):
+            if not m.group(3).startswith("func_"):
+                out.setdefault(m.group(3), int(m.group(2), 16))
+    return out
+
+
+def tu_typedefs(text: str) -> str:
+    """The TU's own file-scope typedefs, in order (the harness declares the
+    mocks with the same types the TU sees)."""
+    out, i, n = [], 0, len(text)
+    body = re.sub(r"/\*.*?\*/", lambda m: " " * len(m.group(0)), text, flags=re.S)
+    for m in re.finditer(r"(?m)^typedef\b", body):
+        depth, j = 0, m.start()
+        while j < n:
+            c = body[j]
+            if c == "{":
+                depth += 1
+            elif c == "}":
+                depth -= 1
+            elif c == ";" and depth == 0:
+                break
+            j += 1
+        out.append(text[m.start():j + 1])
+    return "\n".join(out) + "\n"
 
 
 def split_params(s: str) -> list[str]:
@@ -279,17 +316,17 @@ def one(tu: Path, seeds: int, cc: str, check_gte: bool, specs: dict) -> tuple[st
             if u in RUNTIME or u.startswith("PE_GTE_") or u.startswith("pe_gte"):
                 continue
             mm = CALLEE.fullmatch(u)
-            if not mm or u not in aux:
+            if (not mm and u not in SHIMS) or u not in aux:
                 return "unsupported", f"callee {u}"
             ret, types, _ = aux[u]
             if any("(*" in x.replace(" ", "") for x in types):
                 return "unsupported", f"callee {u} takes a function pointer"
             if len(types) > 16:
                 return "unsupported", f"callee {u}: {len(types)} arguments"
-            addr = int(mm.group(1), 16)
-            lt = leaf_rets.get("func_" + mm.group(1))
+            addr = int(mm.group(1), 16) if mm else SHIMS[u]
+            lt = leaf_rets.get(f"func_{addr:08X}")
             if lt and sign_split(lt, ret):
-                split[addr] = f"func_{mm.group(1)} (leaf {lt}, host {ret})"
+                split[addr] = f"func_{addr:08X} (leaf {lt}, host {ret})"
             mocks.append(mock_source(u, addr, ret, types))
             masks[addr] = [0xFFFFFFFF if "*" in x else e.narrow_mask(x) for x in types]
             if "*" not in ret and ret.strip() != "void":
@@ -313,7 +350,7 @@ def one(tu: Path, seeds: int, cc: str, check_gte: bool, specs: dict) -> tuple[st
         else:
             call = (f"uint32_t rv = (uint32_t)(int32_t){entry}({argl}); "
                     f"fprintf(logf_, \"R %08X\\n\", rv);")
-        main = (RUNTIME_C
+        main = ('#include "pe_guest_decomp.h"\n' + tu_typedefs(t) + RUNTIME_C
                 + "".join(mocks)
                 + f"{ret_t} {entry}({', '.join(ptypes) or 'void'});\n"
                 + "uint32_t PE_GTE_ReadData(uint32_t reg);\nuint32_t PE_GTE_ReadCtrl(uint32_t reg);\n"
@@ -365,7 +402,8 @@ int main(int argc, char **argv)
             if rr.returncode:
                 return "nocompile", f"{unit}: {rr.stderr[:200]}"
             gte.append(str(ob))
-        r = subprocess.run([cc, "-O1", "-std=gnu11", "-w", "-o", str(d / "t"), str(d / "h.c"), str(obj), *gte],
+        r = subprocess.run([cc, *DEFS, *INCS, "-O1", "-std=gnu11", "-funsigned-char", "-w", "-o", str(d / "t"),
+                            str(d / "h.c"), str(obj), *gte],
                            capture_output=True, text=True)
         if r.returncode:
             miss = re.findall(r"undefined reference to `(\w+)'", r.stderr)
@@ -487,6 +525,7 @@ def main() -> int:
     if a.limit:
         tus = tus[: a.limit]
     specs = e.directed_specs()
+    SHIMS.update(shim_map())
     res: dict[str, list] = {}
     with concurrent.futures.ProcessPoolExecutor(max_workers=max(1, a.jobs)) as ex:
         futs = {ex.submit(one, p, a.seeds, cc, a.check_gte, specs): p.name for p in tus}
