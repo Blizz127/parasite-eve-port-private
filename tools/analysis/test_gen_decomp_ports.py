@@ -1170,7 +1170,7 @@ class CallSiteSignednessTests(unittest.TestCase):
                "    if (o) func_800C6CE0(o); else func_800C6CE0(o);\n"
                "    /* func_800C6CE0(o) */\n    return func_80077DC4(o);\n}\n")
         out = self.cast(src)
-        self.assertEqual(out.split("*/\n", 1)[1], src)
+        self.assertEqual(out, src)          # nothing cast: no note, byte-identical (func_80077294)
 
     def test_nested_calls(self):
         out = self.cast("extern unsigned int func_800C6CE0();\nint func_8018F054(int o)\n{\n"

@@ -1044,6 +1044,7 @@ def cast_leaf_call_returns(name: str, text: str, sigs: dict[str, dict]) -> str:
     mask = _code_mask(text)
     decl_spans = [(m.start(), m.end()) for m in leaf_callee_decls(text)]
     edits = []
+    cast_names: set[str] = set()
     for m in re.finditer(r"\b(" + "|".join(casts) + r")\s*\(", text):
         st = m.start()
         if mask[st] or any(a <= st < b for a, b in decl_spans):
@@ -1065,13 +1066,17 @@ def cast_leaf_call_returns(name: str, text: str, sigs: dict[str, dict]) -> str:
         if nxt.startswith(";") and (not prev or prev[-1] in ";{})" or re.search(r"\belse$", prev)):
             continue          # statement call (also after `if (...)` / `else`): the value is unused
         edits.append((st, j + 1, casts[m.group(1)]))
+        cast_names.add(m.group(1))
     # Nested casts (`f(g(h(x)))`): every prefix and suffix is an insertion at
     # an original offset, applied from the highest offset down.
     ins = sorted([(en, 0, ")") for st, en, lt in edits] +
                  [(st, 1, f"(({lt})/* E22 leaf type */") for st, en, lt in edits], reverse=True)
     for pos, _k, s_ in ins:
         text = text[:pos] + s_ + text[pos:]
-    note = "; ".join(f"{fn}: leaf {lt}, host {_norm_type(sigs[fn]['ret'])}" for fn, lt in casts.items())
+    if not edits:
+        return text            # only statement calls: nothing read the result
+    note = "; ".join(f"{fn}: leaf {lt}, host {_norm_type(sigs[fn]['ret'])}"
+                     for fn, lt in casts.items() if fn in cast_names)
     return f"/* E22 call-site casts to the leaf's return type ({note}) */\n" + text
 
 
