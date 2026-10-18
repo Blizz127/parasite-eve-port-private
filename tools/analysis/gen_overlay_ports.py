@@ -205,6 +205,7 @@ def run_overlay(ovl: dict, args, windows) -> tuple[int, int, list, dict, dict]:
     uncompilable: dict[str, str] = {}
     local_emitted = {p.name[: -len("_port.c")]
                      for p in out_dir.glob("func_*_port.c")} if out_dir.is_dir() else set()
+    total_changed = 0
     for _round in range(8):
         defs = g.pc_port_definitions()
         # Plain pc_port names inside this window may implement another
@@ -327,9 +328,10 @@ def run_overlay(ovl: dict, args, windows) -> tuple[int, int, list, dict, dict]:
                     changed += 1
         stable = emitted == local_emitted
         local_emitted = emitted
+        total_changed += changed       # every pass's writes, not just the last (converged) one
         if args.verify or (changed == 0 and stable):
             break
-    return written, changed, drift, skipped, uncompilable
+    return written, total_changed, drift, skipped, uncompilable
 
 
 # ── rooms: one TU per deduplicated body (step 4) ─────────────────────────
@@ -456,6 +458,7 @@ def run_rooms(args, windows) -> tuple[int, int, dict, dict]:
     skipped: dict[str, str] = {}
     uncompilable: dict[str, str] = {}
     written = changed = 0
+    total_changed = 0
     for _round in range(8):
         defs = g.pc_port_definitions()
         canon_sigs = g.canonical_signatures()
@@ -595,9 +598,10 @@ def run_rooms(args, windows) -> tuple[int, int, dict, dict]:
                 changed += 1
         stable = new_keys == emitted_keys
         emitted_keys = new_keys
+        total_changed += changed       # every pass's writes, not just the last (converged) one
         if args.verify or (changed == 0 and stable):
             break
-    return written, changed, skipped, uncompilable
+    return written, total_changed, skipped, uncompilable
 
 
 # ── guest-code dispatch registry (step 3) ────────────────────────────────
