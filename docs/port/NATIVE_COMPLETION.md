@@ -328,6 +328,57 @@ marker), so no sweep has compared these TUs with retail. Static checks on the
   (Scanner: siblings in one full-expression, `&&`, `||`, `?:`, `,` and `;`
   treated as sequence points.)
 
+### Verbatim room TUs against retail (`tools/analysis/e21_verbatim.py`)
+
+The new harness compiles a verbatim TU the way production does: real
+pc_port headers, `-O3 -fno-strict-aliasing -fwrapv -funsigned-char`. It
+links the TU against:
+- `PE_Translate` and friends over its own RAM;
+- a logging mock for every undefined `func_X` callee, built from its
+  `gcc -aux-info` prototype;
+- the native GTE.
+
+Retail runs in e21_diff's oracle on the same seeded RAM, and the results are
+compared with e21_diff's rules. A callee whose host prototype flips the
+leaf's 32-bit return signedness gets mock returns with bit 31 clear, the
+range where both types agree. The result names it. For example,
+`func_800C6CE0` is `unsigned int` in the leaves and `int` in
+pe_port_compat.h; it returns 0..5.
+
+All 1016 verbatim room TUs (2026-10-18 07:16-07:45 UTC, regen14 tree):
+
+    e21_verbatim.py --seeds 6 --jobs 3 --check-gte --verbose
+    e21_verbatim: MISMATCH: 3
+    e21_verbatim: ok: 1004
+    e21_verbatim: skipped: 9
+
+The three mismatches were each read. All three are latent, with no
+divergence for the values the game passes:
+
+- m0429i `80192B10`, seed 3: `call 8001AA78 a0 00000000 vs 80000000`. The
+  seeded actor pointer `D_8009D254` was NULL. `PE_DECOMP_PTRGLOBAL`
+  translates guest 0 to RAM's base, so the TU's writes through it land on
+  the same physical words retail writes (KUSEG 0x1D8...). The round trip
+  `PE_HostToGuest(d)` hands the callee the KSEG0 alias 0x80000000 of that
+  NULL. `func_8001AA78` dereferences it at once (`o->f98`), the same physical
+  RAM.
+- m0418i `80193480`, seed 0: `RAM 0x8015BEA8 retail 00 native 01`. The leaf
+  declares `int func_80071A54()` (rand); pe_port_compat.h declares it
+  `unsigned int`. `func_80071A54() % 256 < t` is a signed compare in retail
+  and an unsigned one in the TU. A negative threshold `t` (a random word
+  here) stores 1 instead of 0. `t` is a 0..255 percentage in play.
+- m0432i `80199048`, seed 4: `v0 801994F4 vs 001994F4`. The pointer-return
+  adapter moves the result into the segment of the root pointer
+  `D_8009D254` (`PE_DecompReturnSegment`). This leaf returns the constant
+  `&D_801994F4`, which retail returns as 0x801994F4 whatever the root's
+  segment. They differ only when the actor pointer is a KUSEG address; the
+  game's is KSEG0.
+
+The 9 skipped TUs ran no seed (`func_8018FDF8`, `801906EC`, `80190A7C`,
+`80190E98`, `801929F8`, `801932EC`, `80193F70`, `801942F0`, `80194440`); they
+need directed specs. The harness covers room TUs only so far, not the EXE's
+or the subsystem overlays' verbatim TUs.
+
 ## Boundary-site census
 
 `python3 tools/analysis/boundary_site_census.py` lists every Bootstrap /
@@ -426,10 +477,28 @@ those are hand ports with one guarded error path.
   there (`0000023A` = 2 + 0x238) faults, and a chain of about six loads
   survives about one random image in eight. The opt-in seed extension
   (`E21_MIN_OK=4`, 8c6a2fbf7) alone gives `ok, 4 seeds (seed range extended
-  to 21), retail coverage 200/200 words`. A sweep of all 40 with
-  `--min-ok 4 --max-seeds 512` is running. Bodies that still run no seed need
-  a directed spec, as `func_8006B4F8` (the room loader) got: with
-  `r(0x8006E6A8)=0;r(0x8006E7E8)=0` it runs 7 seeds, 267/540 words, ok.
+  to 21), retail coverage 200/200 words`.
+
+  Sweep of all 40 (2026-10-18 06:00-07:13 UTC, on the regen12 tree with
+  batch 5 in the working tree):
+
+      e21_diff.py --with-calls --check-gte --coverage --verbose --jobs 3 --min-ok 4 --max-seeds 512 --only <the 40>
+      e21_diff: ok: 33
+      e21_diff: skipped: 7
+
+  - 0 MISMATCH. 31 of the 33 reached 4 seeds within seeds 0..54.
+    `func_8006B4F8` ran on its directed spec (4 seeds, 267/540 words).
+    `func_80192560` ran on its r() spec (6 seeds, 48/48 words).
+  - Still 0 seeds with 512:
+    - ovl_0700 `8018F55C` and `80191C94`;
+    - ovl_03D2 `8018F958`, `8018FBC0` and `80192CE8`;
+    - m0017i `8018F580`;
+    - m0273i `80193114`.
+
+    They need a directed spec, as `func_8006B4F8` (the room loader) got
+    (`r(0x8006E6A8)=0;r(0x8006E7E8)=0`). ovl_03D2's three are title-loop
+    code, which the port runs as hand ports (see the intra-overlay
+    boundaries above).
 - `func_800339A0` with style >= 4 stays a loud boundary. Retail reads the
   stack above a 16-byte local there.
 - The retail stack-residue residuals and m0023i's `[DAY1_SHIM]` (above).
