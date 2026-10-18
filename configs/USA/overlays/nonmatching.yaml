@@ -37,8 +37,10 @@ leaves:
   - [room_m0231i, func_80193650, 0x4668, 0xDDC]   # museum 2F enemy acid-spit particle callback (m0231i); handwritten cop2 loads
   - [room_m0231i, func_80192548, 0x3560, 0x3F8]   # museum 2F enemy spore-cloud particle callback (m0231i / m0234i)
   - [room_m0086i, func_8018F734, 0x74C, 0x998]   # park effect handler (m0086i); 2026-10-15 park packet, directed inputs in tools/analysis/park_native
+  - [room_m0429i, func_801982A4, 0x92BC, 0x670]   # particle callback, near twin of room_m0269i func_8019070C (m0429i)
 # Directed differential inputs (seed k takes the k-th combination; see e21_diff.py).
 inputs:
+  - [room_m0429i, func_801982A4, "a0=1,2; h(a1+0x10)=0,1,2; h(a1+0x12)=0,11,12,24; h(0x800F336C)=4,0; w(0x800F3428)=1,0; out=800783E4:4"]
   - [room_m0156i, func_8018F058, "a0=1,2; h(a1+0x10)=0..5; h(a1+0x12)=0,1,7,8,23; h(0x800F336C)=4,0; w(0x800F3428)=1,0; out=800CFB7C:2,800783E4:4,800CF3AC:1,800CE8F0:3"]
   - [room_m0156i, func_80192208, "a0=0,1,2; w(0x800E27EC)=1,2,3,32,33,0; w(0x800B0E64)=0,0x80100000"]
   - [room_m0156i, func_80191B94, "a0=1,2,0; h(a1+0x10)=0,1,2,3,-1; h(a1+0x12)=0,5,19,20,31,32; h(a1+0x6)=0,1; h(0x800F336C)=4,1; w(0x800F3428)=1,0; out=800CFB7C:2,800783E4:4,800CF3AC:1,800CE8F0:3"]
