@@ -392,9 +392,18 @@ divergence for the values the game passes:
   segment. They differ only when the actor pointer is a KUSEG address; the
   game's is KSEG0.
 
-The 9 skipped TUs ran no seed (`func_8018FDF8`, `801906EC`, `80190A7C`,
-`80190E98`, `801929F8`, `801932EC`, `80193F70`, `801942F0`, `80194440`); they
-need directed specs.
+The 9 skipped TUs (`func_8018FDF8`, `801906EC`, `80190A7C`, `80190E98`,
+`801929F8`, `801932EC`, `80193F70`, `801942F0`, `80194440`) are one family:
+the slot setter `Slot *p = &D_X[a1]`. A seeded pointer-sized `a1` puts every
+store outside RAM, so they ran no seed even with 96 (`E21_FAULTS=1`: "bad
+address 81xxxxxx" on every seed). With the directed specs `a0=0,1; a1=0,1,2,3`
+in nonmatching.yaml (a0 up to 4 for 801906EC's switch):
+
+    e21_verbatim.py --set rooms --seeds 24 --jobs 3 --check-gte --verbose --only <the 9>
+    e21_verbatim: ok: 9          (24 seeds each)
+
+So every verbatim room TU now runs against retail. The only room mismatch
+left is the m0429i 80192B10 NULL alias, a harness artifact.
 
 The EXE's and the subsystem overlays' verbatim TUs (1013 + 41,
 2026-10-18 07:49-08:36 UTC, same tree; run with the bit-31 clamp then on):

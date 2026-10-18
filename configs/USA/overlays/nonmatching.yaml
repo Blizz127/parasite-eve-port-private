@@ -120,6 +120,17 @@ inputs:
 # room_m0017i func_8018F580 (matched): model draw; geometry header, index and record tables, the
 # frame index D_8009CDDC and both OT bases D_800B0E38.ordering[] pinned (sweep 5 skipped it).
   - [room_m0017i, func_8018F580, "a0=0x80130000; w(a0+0)=0x80130400; w(a0+0x10)=0x80131000; w(a0+0x54)=0x80134000; w(0x800B0E38)=0x80150000; w(0x800B0E3C)=0x80158000; h(0x80130408)=0,1,3; h(0x8013040A)=0,2; h(0x8013040C)=0,2; h(0x8013040E)=0,2; w(0x8009CDDC)=0,1"]
+# Matched verbatim slot setters `Slot *p = &D_X[a1]` (e21_verbatim): a1 is a slot index; a seeded
+# pointer-sized a1 puts every store outside RAM, so random seeds never ran (0 of 96).
+  - [room_m0104i, func_8018FDF8, "a0=0,1; a1=0,1,2,3"]
+  - [room_m0430i, func_801906EC, "a0=0,1,2,3,4; a1=0,1,2,3"]
+  - [room_m0113i, func_80190A7C, "a0=0,1; a1=0,1,2,3"]
+  - [room_m0122i, func_80190E98, "a0=0,1; a1=0,1,2,3"]
+  - [room_m0156i, func_801929F8, "a0=0,1; a1=0,1,2,3"]
+  - [room_m0116i, func_801932EC, "a0=0,1; a1=0,1,2,3"]
+  - [room_m0263i, func_80193F70, "a0=0,1; a1=0,1,2,3"]
+  - [room_m0391i, func_801942F0, "a0=0,1; a1=0,1,2,3"]
+  - [room_m0392i, func_80194440, "a0=0,1; a1=0,1,2,3"]
   - [room_m0318i, func_801955E4, "a0=0,1,2,3,-1;h(a1+0xA)=2,3,27,40;w(a2+0)=0,1;w(a2+4)=20;w(a2+8)=-7,300;w(a2+0xC)=5"]
   - [room_m0318i, func_80192718, "a0=1,2;h(a1+0)=0,1,2;h(a1+4)=0,0xC,0xB,0xFFF5;h(0x800F336C)=4,0;w(0x800F3428)=1,0;w(0x800E27EC)=0x23,0x24,0xFFFFFFF0,0x1000"]
   - [room_m0318i, func_80192718, "a0=0,3,-1,5"]

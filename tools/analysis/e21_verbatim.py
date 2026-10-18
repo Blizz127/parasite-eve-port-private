@@ -383,7 +383,9 @@ int main(int argc, char **argv)
                 v0, calls = e.run_mips(r_ram, leaf["vram"], list(args), seed, outs,
                                        gte_state if check_gte else None, ret_types=ret_types,
                                        ret_override=rets)
-            except e.Fault:
+            except e.Fault as exc:
+                if os.environ.get("E21_FAULTS"):       # why a seed was dropped
+                    print(f"e21_verbatim: {leafname} seed {seed}: oracle fault: {exc}", file=sys.stderr)
                 continue
             (d / "in.bin").write_bytes(ram)
             r = subprocess.run([str(d / "t"), str(d / "in.bin"), str(d / "out.bin"),
