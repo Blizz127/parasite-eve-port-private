@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Retail differential for VERBATIM generated room TUs (pilot).
+"""Retail differential for VERBATIM generated TUs (rooms, EXE, subsystem overlays).
 
 e21_diff.py sweeps only E21-lowered TUs: their guest memory goes through
 PE_LoadU32/PE_StoreU32, which its mock header replaces.  A verbatim TU copies
@@ -24,8 +24,8 @@ the return value are compared with e21_diff's rules.  A TU with a callee or
 runtime symbol this harness does not model is reported `unsupported`, never
 guessed.
 
-usage: e21_verbatim.py [--only SUBSTR,...] [--seeds N] [--jobs J] [--limit N]
-                       [--check-gte] [--verbose]
+usage: e21_verbatim.py [--set rooms,exe,ovl] [--only SUBSTR,...] [--seeds N] [--jobs J]
+                       [--limit N] [--check-gte] [--verbose]
 """
 from __future__ import annotations
 
@@ -48,6 +48,11 @@ PC = o.REPO_ROOT / "pc_port"
 INCS = [f"-I{PC / d}" for d in ("", "include", "platform", "bootstrap", "src")]
 DEFS = ["-DPE_PORT_FB_HEIGHT=240", "-DPE_PORT_FB_WIDTH=320", "-DPE_PORT_HEADLESS=1"]
 TU_FLAGS = ["-O3", "-fno-strict-aliasing", "-fwrapv", "-std=gnu11", "-funsigned-char", "-w"]
+# --clamp-sign-split: give a callee whose host prototype flips the leaf's
+# 32-bit return signedness bit-31-clear mock returns (where both types agree).
+# Off by default: since E22 (gen_decomp_ports.cast_leaf_call_returns) the TU
+# casts those results back to the leaf's type, and unclamped returns test that.
+CLAMP_SIGN_SPLIT = os.environ.get("E21V_CLAMP_SIGN_SPLIT") == "1"
 CALLEE = re.compile(r"(?:room_[0-9a-f]{8}__|ovl_\w+?__)?func_([0-9A-F]{8})")
 # provided by the harness runtime below, libc, or the GTE objects
 RUNTIME = {"PE_Translate", "PE_TranslateConst", "PE_HostToGuest", "PE_LoadU8", "PE_LoadU16",
@@ -235,11 +240,18 @@ def one(tu: Path, seeds: int, cc: str, check_gte: bool, specs: dict) -> tuple[st
     if "E21 guest-memory" in t:
         return "not-verbatim", ""
     m0 = re.search(r"decomp-source-overlay: ((?:room|ovl)_\w+)/(func_[0-9A-F]{8})", t)
-    if not m0:
-        return "unsupported", "no decomp-source-overlay header"
-    ovl, leafname = m0.group(1), m0.group(2)
-    ov = o.parse_overlay(ovl)
-    blob = o.blob_path(ovl)
+    m1 = re.search(r"decomp-source: (func_[0-9A-F]{8})\b", t)
+    if m0:
+        ovl, leafname = m0.group(1), m0.group(2)
+        ov = o.parse_overlay(ovl)
+        blob = o.blob_path(ovl)
+    elif m1:                                   # an EXE leaf: the SLUS image as a pseudo-overlay
+        ovl, leafname = "exe", m1.group(1)
+        ov, blob = e.exe_overlay(), o.REPO_ROOT / e.EXE_IMAGE
+        if not blob.is_file():
+            return "noblob", ""
+    else:
+        return "unsupported", "no decomp-source header"
     if blob is None or leafname not in ov["leaves"]:
         return "noblob", ""
     leaf = ov["leaves"][leafname]
@@ -363,7 +375,7 @@ int main(int argc, char **argv)
             # A callee whose return signedness the host prototype changed: its
             # mock return (constant per seed) keeps bit 31 clear, the range in
             # which the leaf's and the host's types agree.  Listed in the result.
-            for a_ in split:
+            for a_ in (split if CLAMP_SIGN_SPLIT else ()):
                 rets.setdefault(a_, e.mock_ret(a_, seed) & 0x7FFFFFFF)
             r_ram = bytearray(ram)
             try:
@@ -442,7 +454,7 @@ int main(int argc, char **argv)
                 elif nv != v0:
                     return "MISMATCH", f"seed {seed}: v0 {v0:08X} vs {rl}"
             ran += 1
-        note = ("; bit-31-clear returns for " + ", ".join(sorted(split.values()))) if split else ""
+        note = ("; bit-31-clear returns for " + ", ".join(sorted(split.values()))) if split and CLAMP_SIGN_SPLIT else ""
         return ("ok" if ran else "skipped"), f"{ran} seeds{note}"
 
 
@@ -454,9 +466,18 @@ def main() -> int:
     ap.add_argument("--only", default="", help="comma-separated substrings of the TU file name")
     ap.add_argument("--check-gte", action="store_true")
     ap.add_argument("--verbose", action="store_true")
+    ap.add_argument("--set", default="rooms", help="comma list of rooms, exe, ovl (generated TU trees)")
+    ap.add_argument("--clamp-sign-split", action="store_true",
+                    help="bit-31-clear returns for callees whose host prototype flips the leaf's signedness")
     a = ap.parse_args()
+    if a.clamp_sign_split:
+        os.environ["E21V_CLAMP_SIGN_SPLIT"] = "1"      # read by the worker processes
+        global CLAMP_SIGN_SPLIT
+        CLAMP_SIGN_SPLIT = True
     cc = shutil.which("cc") or shutil.which("gcc")
-    tus = [p for p in sorted((o.REPO_ROOT / o.ROOMS_DIR).glob("*_port.c"))
+    roots = {"rooms": [o.REPO_ROOT / o.ROOMS_DIR], "exe": [o.REPO_ROOT / "pc_port/game/decomp"],
+             "ovl": sorted((o.REPO_ROOT / o.OUT_ROOT).glob("ovl_*"))}
+    tus = [p for k in a.set.split(",") for r in roots[k] for p in sorted(r.glob("*_port.c"))
            if "E21 guest-memory" not in p.read_text(errors="replace")]
     if a.only:
         only = [s for s in a.only.split(",") if s]

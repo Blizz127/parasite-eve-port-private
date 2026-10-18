@@ -376,8 +376,69 @@ divergence for the values the game passes:
 
 The 9 skipped TUs ran no seed (`func_8018FDF8`, `801906EC`, `80190A7C`,
 `80190E98`, `801929F8`, `801932EC`, `80193F70`, `801942F0`, `80194440`); they
-need directed specs. The harness covers room TUs only so far, not the EXE's
-or the subsystem overlays' verbatim TUs.
+need directed specs.
+
+The EXE's and the subsystem overlays' verbatim TUs (1013 + 41,
+2026-10-18 07:49-08:36 UTC, same tree; run with the bit-31 clamp then on):
+
+    e21_verbatim.py --set exe,ovl --seeds 6 --jobs 2 --check-gte --verbose
+    e21_verbatim: MISMATCH: 17
+    e21_verbatim: ok: 902
+    e21_verbatim: skipped: 78
+    e21_verbatim: unsupported: 57
+
+Every mismatch was read. None diverges for the values the game passes:
+
+- 4, NULL alias (`a0 00000000 vs 80000000`): 80018004, 80018164, 80020D50,
+  8002F300. These are the 80192B10 case above.
+- 12, 32-bit address wrap: retail's address arithmetic wraps mod 2^32 and the
+  host pointer model does not. Nine native SIGSEGVs (800428D4, 80047040,
+  80050AD8, 80050F10, 8005DC28, 80065D44, 80065DCC, 80076B44) and three
+  `PE_HostToGuest` aborts (80018A9C, 800C2B10, 800C2B28). Two examples:
+  - 80076B44 `D_800A3348[a0]` with a seeded a0 of 0x80123456. In retail that
+    is KUSEG 0x001C679E, inside RAM. In the port it is the host array
+    pointer plus 0x80123456.
+  - 80065D44 `q += *(unsigned int *)(p + 0x1C)` with a seeded "negative"
+    offset.
+
+  In play these are small table indices and positive block offsets. One is
+  plausible in play: `func_800428D4` writes record `D_800A1860 - 1` (an
+  unsigned index). It is a menu callback (`func_80050580` registers it with
+  `func_80042B50`). If it ever ran with `D_800A1860 == 0`, retail would write
+  the record before the table (0x800A0ABD) and the port would fault.
+- 1, narrow return (800184EC): the leaf declares `signed char
+  func_8002FAF8()`, the host `int`. The real callee returns 0, 1 or 2.
+- 1, out-of-range local table index (800323C8): a seeded `signed char a0`
+  indexes the 18-byte local tables beyond their end, so each side reads its
+  own stack. In play a0 is 0..8.
+
+57 TUs are unsupported:
+- 20 call a loud boundary (next item);
+- 10 call the host shims `HostFB_VSync` / `HostFB_SetDispMask`;
+- the rest declare callees with TU-local types (S64, RECT), which the
+  generated mocks do not see.
+
+The 78 skipped TUs need directed specs. Narrow returns, parameter-width
+drift (a K&R leaf passing a full `int` where the host prototype narrows to
+`short`; both harnesses mask narrow parameters to their width) and
+out-of-range indices are not closed by any generator change. They are
+recorded here as residuals.
+
+**Generated-TU boundaries.** The verbatim path does not apply host
+replacements. 21 generated EXE TUs bind a callee with no host C to a loud
+boundary, `#define func_X(...) PE_D_COMP_BOUNDARYn("func_X", ...)`: printf
+(`func_80071A74`) in 6 of them, and libspu/libcd-band internals
+(`func_8007E1F4`, `8007E22C`, `8007BDDC`, ...) in the rest.
+`boundary_site_census.py` skipped `#define` lines and so missed them; it now
+counts each binding. `--generated` gives 39 sites (it was 8): the 8 overlay
+sites above plus 31 bindings in these 21 TUs. None of the 21 is reached:
+- a reverse call-graph walk over pc_port finds no hand, platform or src
+  caller, only other generated Psy-Q-band TUs that nothing reaches;
+- the EXE and the 515 PE.IMG blobs hold no aligned word with any of their
+  addresses and no `lui` + `addiu`/`ori` pair building one.
+
+In retail they are library-internal jal chains, which the port replaces with
+its hand ports and `PE_` models.
 
 ## Boundary-site census
 

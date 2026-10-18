@@ -7,8 +7,10 @@ Generated TUs (pc_port/game/decomp, pc_port/game/decomp_ovl) and tests are
 excluded; generated-TU boundaries are reported separately (--generated).
 
 Sites: calls of Bootstrap_Return*, BOOTSTRAP_RET*, PE_Decomp_Boundary*,
-PE_D_COMP_BOUNDARY*, and calls of file-local wrappers whose body forwards a
-`const char *` parameter to one of those (`menu_boundary("name")`).
+PE_D_COMP_BOUNDARY*, calls of file-local wrappers whose body forwards a
+`const char *` parameter to one of those (`menu_boundary("name")`), and
+`#define func_X(...) PE_D_COMP_BOUNDARYn("func_X", ...)` bindings (the
+generator's form for a callee with no host C; one site per binding).
 
     python3 tools/analysis/boundary_site_census.py [--json OUT] [--generated]
 
@@ -31,6 +33,8 @@ ROOT = cov.REPO_ROOT
 MACROS = (r"Bootstrap_Return[A-Za-z0-9_]*|BOOTSTRAP_RET[A-Za-z0-9_]*|"
           r"PE_Decomp_Boundary(?:From|Name)?|PE_D_COMP_BOUNDARY[0-9n]?")
 MAC_RE = re.compile(r"\b(" + MACROS + r")\s*\(")
+DEFINE_BOUNDARY_RE = re.compile(r"#define\s+(func_[0-9A-Fa-f]{8})\s*\(\s*\.\.\.\s*\)\s+(" + MACROS
+                                + r")\s*\(\s*\"([^\"]*)\"")
 WRAPPER_RE = re.compile(r"static\s+(?:inline\s+)?\w[\w\s\*]*?\b(\w+)\s*\(\s*const\s+char\s*\*\s*(\w+)[^)]*\)\s*\{")
 GEN_DIRS = ("pc_port/game/decomp/", "pc_port/game/decomp_ovl/")
 
@@ -78,6 +82,17 @@ def census(generated: bool) -> list[dict]:
                          + r")\s*\(")
         for i, ln in enumerate(lines):
             s = ln.lstrip()
+            # `#define func_X(...) PE_D_COMP_BOUNDARYn("func_X", ...)` binds every
+            # call of func_X in this file to a boundary (the generator's form
+            # for a callee with no host C): one site per binding.
+            dm = DEFINE_BOUNDARY_RE.match(s)
+            if dm:
+                fm = re.match(r"(?:[\w]+:)?(func_[0-9A-Fa-f]{8})$", dm.group(3))
+                fn = "func_" + fm.group(1)[5:].upper() if fm else ""
+                rows.append({"file": rel, "line": i + 1, "macro": "#define " + dm.group(2),
+                             "name": dm.group(3), "func": fn,
+                             "host_c": defs.get(fn, []) if fn else []})
+                continue
             if s.startswith(("#define", "//", "*", "/*")):
                 continue
             for m in pat.finditer(ln):
