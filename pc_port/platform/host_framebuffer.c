@@ -358,6 +358,22 @@ const uint8_t *HostFB_GetPixels(void)
     return fb;
 }
 
+/* One guest CD-status poll (func_8007F418 DsSync(0), func_8007F72C
+ * DsSystemStatus).  Retail's drive runs while the CPU spins on these; a C
+ * busy loop over them (the generated ending-credits waits, e.g.
+ * `while (DsSystemStatus() != 1 || DsQueueLen() != 0) {}`) makes no
+ * progress unless each poll stands for some CPU time.  64 cycles is the
+ * retail cost of one such iteration, to within about a factor of two:
+ * func_8007F72C (19 words) + func_8007FBF0 + func_8007F778 (4 words) + the
+ * loop test, about 31 instructions with ~10 uncached RAM accesses.  It is
+ * not the 1024-cycle VSync(-1) quantum, which would advance the drive ~16x
+ * faster per poll than retail.  No effect with the device detached. */
+void HostFB_DevicePoll(void)
+{
+    if (!PE_Port_ShouldStop() && PE_CdReg_DeviceEnabled())
+        HostFB_DeviceTime(64u);
+}
+
 /* One guest poll-loop iteration of a CD stream wait.  HostFB_VSync(-1)
  * services MDEC/SPU/GPU and the DMA IRQ checkpoint and advances the modeled
  * device by the 1024-cycle counter-query quantum; the extra 3072 cycles make

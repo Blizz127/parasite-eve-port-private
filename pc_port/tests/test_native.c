@@ -40972,6 +40972,7 @@ int main(void)
     test_DAY2_cd_stream();
     test_DAY2_cd_ack();
     test_DAY2_cd_device();
+    test_CDXA_device_commands();
     test_DAY2_cd_sector_device();
     test_DAY2_cd_dma();
     test_DAY2_mdec_pixels();

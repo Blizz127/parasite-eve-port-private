@@ -39,6 +39,8 @@ void HostFB_SetVBlankDispatch(int (*dispatch)(void));
  * guest's own retry budget and the player restarts mid-frame from sector 0.
  * Read-only on guest state beyond the device/IRQ model. */
 void HostFB_StreamTick(void);
+/* One CD-status poll: device time with the device attached (pe_cdreg). */
+void HostFB_DevicePoll(void);
 void HostFB_DrawSync(int mode);
 int  HostFB_WritePPM(const char *path);
 const uint8_t *HostFB_GetPixels(void);

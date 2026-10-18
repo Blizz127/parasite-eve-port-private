@@ -44,7 +44,19 @@ static int CdOutputDmaBusy(void)
         return (PE_LoadU32(reg)&0x01000000u)!=0;
     return 0;
 }
-static uint8_t CdDeviceStatus(void) { return 2u|(g_device.reading?0x20u:0u); }
+/* Stat byte: bit1 motor on, bit5 reading.  Stop's second response clears
+ * bit1 (psx-spx "Stop - Command 08h --> INT3(stat) --> INT2(stat)"). */
+static uint8_t CdDeviceStatus(void) { return (g_device.motor_off?0u:2u)|(g_device.reading?0x20u:0u); }
+/* psx-spx (CDROM, Setmode): "If XA-ADPCM (and/or XA-Filter) is enabled via
+ * Setmode, then INT1 is generated only for non-ADPCM sectors."  The decoder
+ * takes Mode 2 sectors whose submode has audio and real-time (bits 2 and 6),
+ * and the CPU path rejects those whenever the filter is on, so such a sector
+ * never reaches the data FIFO while either mode bit is set. */
+static uint8_t CdBcd(uint32_t v) { return (uint8_t)(((v/10u)<<4)|(v%10u)); }
+static int CdSectorIsRoutedAdpcm(void)
+{
+    return (g_device.mode&0x48u) && g_sector[15]==2u && (g_sector[18]&0x44u)==0x44u;
+}
 static uint8_t g_audio_pending[4],g_audio_active[4];
 static uint8_t g_xa_filter[2];   /* audio lane: Setfilter file/channel */
 static void CdAudioTap(void)
@@ -81,12 +93,18 @@ static void CdDeviceCommand(uint8_t command)
         if(command==10u && g_command==10u) {g_parameter_count=0;return;}
         CdDeviceBoundary("CD_device_busy_command",command);return;
     }
-    if(command!=2u && command!=6u && command!=9u && command!=21u && command!=22u && command!=27u && command!=1u && command!=10u && command!=11u && command!=12u && command!=14u && command!=15u && command!=19u) {
+    if(command!=2u && command!=6u && command!=9u && command!=21u && command!=22u && command!=27u && command!=1u && command!=10u && command!=11u && command!=12u && command!=14u && command!=15u && command!=19u &&
+       command!=8u && command!=13u && command!=17u) {
         CdDeviceBoundary("CD_device_unported_command",command);return;
     }
     if(g_device.commands<16u) g_device.command_log[g_device.commands]=command;
     g_device.commands++;g_command=command;
-    g_parameter_error=g_parameter_count!=(command==2u?3u:command==14u?1u:0u);
+    /* Setloc mm,ss,ff; Setfilter file,channel; Setmode mode. */
+    g_parameter_error=g_parameter_count!=(command==2u?3u:command==13u?2u:command==14u?1u:0u);
+    /* Reads, seeks and Init spin a stopped motor back up ("almost any
+     * command will restart it" -- psx-spx names Init as the official way). */
+    if(command==6u || command==27u || command==10u || command==21u || command==22u)
+        g_device.motor_off=0u;
     for(unsigned i=0;i<3u;i++) g_command_parameters[i]=i<g_parameter_count?g_parameters[i]:0u;
     g_command_parameter=g_parameter_count?g_parameters[0]:0u;g_parameter_count=0;
     g_phase=1;g_remaining_cycles=command==10u?0x13CCEu:0xC4E1u;
@@ -112,9 +130,10 @@ void PE_CdReg_ServiceDevice(uint32_t elapsed_cycles)
     if(g_phase) {
         g_remaining_cycles=elapsed_cycles>=g_remaining_cycles?0u:g_remaining_cycles-elapsed_cycles;
         if(!g_remaining_cycles && !g_response_tag && g_response_pos==g_response_size) {
-            uint8_t response[5]={CdDeviceStatus(),0u,0u,0u,0u};uint32_t size=1u;uint8_t tag=3u;
+            uint8_t response[8]={CdDeviceStatus(),0u,0u,0u,0u,0u,0u,0u};uint32_t size=1u;uint8_t tag=3u;
             if(g_phase==2u) {
                 tag=2u;g_phase=0;response[0]=2u;
+                if(g_command==8u) {g_device.motor_off=1u;response[0]=0u;}
                 if(g_command==21u || g_command==22u) {
                     g_device.next_lba=g_target_lba;g_target_pending=0;
                 }
@@ -142,14 +161,33 @@ void PE_CdReg_ServiceDevice(uint32_t elapsed_cycles)
                     else {g_target_lba=frame-150u;g_target_pending=1;}
                 } else if(g_command==6u || g_command==27u) {
                     /* Every read mode is served from the raw sector: mode bit5
-                     * selects the 2048/2340-byte FIFO window and no other mode
-                     * bit (XA select 0x40, double speed 0x80, ignore 0x10)
-                     * changes the bytes the drive hands over. The movie stream
-                     * opens ReadS with mode 0x1E0 (double speed + XA + 2340). */
+                     * selects the 2048/2340-byte FIFO window, and double speed
+                     * (0x80) and ignore (0x10) do not change the bytes handed
+                     * over.  XA-ADPCM (0x40) and the XA filter (0x08) decide
+                     * which sectors are handed over at all: audio+real-time
+                     * sectors go to the SPU instead (CdSectorIsRoutedAdpcm).
+                     * The movie stream opens ReadS with mode 0x1E0 (double
+                     * speed + XA + 2340); the credits with 0xC8. */
                     if(g_target_pending) {g_device.next_lba=g_target_lba;g_target_pending=0;}
                     g_device.reading=1;g_read_cycles=CdSectorCycles();
-                } else if(g_command==9u || g_command==21u || g_command==22u) {
+                } else if(g_command==9u || g_command==21u || g_command==22u || g_command==8u) {
+                    /* Stop's first INT3 already has bit5 clear; its INT2 then
+                     * clears bit1.  The braking time ("stops within a second
+                     * or so") is not modelled: the second response uses
+                     * Pause's delay. */
                     g_device.reading=0;g_phase=2;g_remaining_cycles=0x100000u;
+                    if(g_command==8u) response[0]=CdDeviceStatus();
+                } else if(g_command==17u) {
+                    /* GetlocP: INT3(track,index,mm,ss,sect,amm,ass,asect),
+                     * BCD, no stat byte.  The one data track starts at
+                     * 00:02:00, so the in-track position is the LBA and the
+                     * disc position LBA + 150. */
+                    uint32_t lba=g_device.next_lba?g_device.next_lba-1u:0u,abs=lba+150u,rel=lba;
+                    if(g_device.motor_off) {CdDeviceBoundary("CD_device_getlocp_spun_down",lba);return;}
+                    response[0]=1u;response[1]=1u;
+                    response[2]=CdBcd(rel/4500u);response[3]=CdBcd(rel/75u%60u);response[4]=CdBcd(rel%75u);
+                    response[5]=CdBcd(abs/4500u);response[6]=CdBcd(abs/75u%60u);response[7]=CdBcd(abs%75u);
+                    size=8u;
                 }
                 else if(g_command==11u) g_device.muted=1u;
                 else if(g_command==12u) g_device.muted=0u;
@@ -189,8 +227,10 @@ void PE_CdReg_ServiceDevice(uint32_t elapsed_cycles)
                             CdDeviceBoundary("CD_device_sector_read",g_device.next_lba);return;
                         }
                         CdAudioTap();   /* audio lane: XA-ADPCM -> SPU CD input */
-                        g_device.next_lba++;g_device.sectors++;g_sector_pending=1;g_read_cycles=CdSectorCycles();
-                        {
+                        g_device.next_lba++;g_device.sectors++;g_read_cycles=CdSectorCycles();
+                        if(CdSectorIsRoutedAdpcm()) {g_device.xa_sectors++;}
+                        else {
+                        g_sector_pending=1;
                             uint8_t status=CdDeviceStatus();
                             if(!PE_CdReg_PushResponse(1u,&status,1u)) {CdDeviceBoundary("CD_device_response_queue",1u);return;}
                             if(g_device.responses<16u) g_device.response_log[g_device.responses]=1u;
@@ -205,11 +245,15 @@ void PE_CdReg_ServiceDevice(uint32_t elapsed_cycles)
                 CdDeviceBoundary("CD_device_sector_read",g_device.next_lba);return;
             }
             CdAudioTap();   /* audio lane: XA-ADPCM -> SPU CD input */
-            g_device.next_lba++;g_device.sectors++;g_sector_pending=1;g_read_cycles=CdSectorCycles();
+            g_device.next_lba++;g_device.sectors++;g_read_cycles=CdSectorCycles();
+            if(CdSectorIsRoutedAdpcm()) g_device.xa_sectors++;   /* no INT1 */
+            else {
+            g_sector_pending=1;
             uint8_t status=CdDeviceStatus();
             if(!PE_CdReg_PushResponse(1u,&status,1u)) {CdDeviceBoundary("CD_device_response_queue",1u);return;}
             if(g_device.responses<16u) g_device.response_log[g_device.responses]=1u;
             g_device.responses++;
+            }
             }
         }
     }

@@ -209,7 +209,9 @@ int func_8007FBF0(int idx)
 
 int func_8007F72C(void)
 {
-    int st = func_8007FBF0(0);
+    int st;
+    HostFB_DevicePoll();   /* the CPU time one CdReady poll stands for */
+    st = func_8007FBF0(0);
     if (st != 1) {
         return st;
     }

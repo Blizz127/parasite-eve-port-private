@@ -742,8 +742,8 @@ No CD provider serves any of this:
 - With the device disabled (production), nothing publishes a completion.
   Only `func_8007EB88` on the IRQ chain writes the ring at `D_800A3610`.
 - Nothing decodes a queued XA read.
-- The register-level device (test-only) rejects commands 8, 13 and 0x11
-  (`CD_device_unported_command`).
+- The register-level device (test-only) rejected commands 8, 13 and 0x11
+  (`CD_device_unported_command`) until the spike below.
 - The generated ovl_0457 loops never test `PE_Port_ShouldStop`.
 
 `credits_xa_commands_never_complete_without_device` shows it on the retail
@@ -786,11 +786,87 @@ a fix. It needs:
 
 Verifying its end-of-music timing needs a game run.
 
-The device model's Setfilter arm is dead code. `pe_cdreg.c` stores the
-filter when command 13 completes, but the accept list omits 13. Its two
-parameters would also fail the parameter-count check, which allows only
-Setloc's 3 and Setmode's 1. The device model is test-only, so this is
-documented and not fixed.
+### CD-XA spike: the register-level device serves the credits (unit level)
+
+The spike takes the register-level device (`platform/pe_cdreg.c`) as the
+provider, so the game's own libds/libcd code and the generated ovl_0457 TUs
+run unchanged. Production is not changed by it: `PE_Cd_XaServiceAvailable()`
+still returns 0 and the device is never attached in production.
+
+Device model changes, each from psx-spx (CDROM chapter):
+- **Setfilter (0Dh)** is accepted with its 2 parameters, INT3(stat).
+- **XA routing.** "If XA-ADPCM (and/or XA-Filter) is enabled via Setmode,
+  then INT1 is generated only for non-ADPCM sectors." With mode bit 6 or 3
+  set, a Mode 2 sector whose submode has audio and real-time (0x44) goes to
+  the SPU CD input and raises no INT1 (`xa_sectors` counts them). Mode 0
+  still delivers such a sector as data.
+- **GetlocP (11h)** answers INT3 with 8 BCD bytes and no stat: track 1,
+  index 1, the in-track position (the LBA; the one data track starts at
+  00:02:00) and the disc position (LBA + 150). On a stopped motor it is a
+  named boundary (`CD_device_getlocp_spun_down`), not a made-up position.
+- **Stop (08h)**: INT3(stat) with bit 5 clear, then INT2 with bit 1 (motor
+  on) clear. Reads, seeks and Init spin the motor back up. The braking time
+  is not modelled; the second response uses Pause's delay.
+
+Port changes:
+- `func_8007BF44` (CdGetSector, libcd) is a hand port in
+  `game/boot/cd_stream_port.c`. The generated verbatim TU dereferenced the
+  `D_8009B27C..` register pointers as guest RAM (`PE_Translate` fatal at
+  0x1F801800) and busy-waited on two hardware bits. The hand port uses the
+  same register models as `func_8007CEAC`. A request or DMA channel still not
+  ready after one DMA3 service is an explicit stop, never a spin.
+  - **Psy-Q guard: an allowlist row moved.** `pc_port/psyq_guard_allowlist.txt`
+    row `func 0x8007BF44 pc_port/game/decomp/func_8007BF44_port.c` became
+    `func 0x8007BF44 pc_port/game/boot/cd_stream_port.c`. The two binary rows
+    are unchanged, and so is the offender count (1421). This is still a
+    translation of a Psy-Q leaf, so it is disclosed here rather than renamed:
+    a `PE_*` name would hide Psy-Q content from the guard. It is an allowlist
+    edit, and allowlist edits go to the coordinator for approval.
+- `PE_Cd_DispatchDataCallback`'s default arm runs a target the guest-code
+  registry resolves (retail's `jalr (status, response)`), and only an
+  unresolved target stops. This arm is reachable in production. It turns a
+  stop into the retail callback, natively. The credits' `func_80125980` and
+  `func_80125AF0` are such targets.
+- **Poll time.** `func_8007F72C` (DsSystemStatus) and `func_8007F418(0, ..)`
+  each cost 64 device cycles while the device is attached
+  (`HostFB_DevicePoll`). The generated waits
+  `while (DsSystemStatus() != 1 || DsQueueLen() != 0) {}` have empty bodies,
+  and without that cost they never advance the drive. 64 cycles is the retail
+  cost of one iteration to within about a factor of two (about 31
+  instructions with about 10 uncached RAM accesses). With the 1024-cycle
+  VSync(-1) quantum, the drive in `DAY2_movie_player` read past the end of
+  its fixture disc (`CD_device_sector_read` instead of `movie_retry_wait`).
+
+Tests:
+- `CDXA_device_commands` covers the device rules above.
+- `credits_xa_device_path` runs the credits CD steps on the retail EXE and
+  ovl_0457, using a fixture disc with a 48-sector CREDITS.XA in the real
+  1-in-8 interleave:
+  - `func_8012562C` CdSearchFile and the start/end LBA;
+  - `func_80125744`'s Setmode 0xC8, Setfilter and ReadS through the real
+    queue;
+  - the VSync GetlocP loop until `D_80172CE4 == 1`;
+  - the channel switch `func_80125894(1)`;
+  - the `func_801255A4` teardown, leaving the drive idle and the queue empty.
+
+**Still blocking production** (the service stays 0):
+- `credits_xa_device_path` starts from the retail image, where
+  `D_8009B554 = 0`, so its DsInit takes the device branch. Production boots
+  libds in host mode (`D_8009B554 = 1`), and the overlay's own DsInit call is
+  then a no-op. Attaching the device mid-game must therefore supply what the
+  host branch skipped:
+  - the IRQ 2 handler (`InterruptCallback(2, 0x8007C13C)`);
+  - the VBlank tick `0x8007FE24` (`VSyncCallbacks(0, ..)`).
+
+  Detaching must take both off again. A production-state test is owed: host
+  boot, attach, credits, detach, slots byte-identical, and a host-mode read
+  still working.
+- `func_801235DC` itself has not run yet; only its sub-steps have. It ends
+  when `func_80123950` reports the scroll finished and then `D_80172CE4` is
+  set, or at once when `D_8009D1A0 & 0x30000`. A bounded run on the fixture
+  is owed.
+- The pad-code mode (bit 16) stays gated: nothing shows what retail's ring
+  holds there.
 
 ### Generated CD waits (a class the boundary census misses)
 

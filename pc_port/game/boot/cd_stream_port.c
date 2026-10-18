@@ -13,6 +13,7 @@
 #include "pe_spu_dma.h"
 #include "pe_callback.h"
 #include "game_port.h"
+#include "pe_guestcode.h"
 
 static uint16_t CdSpuRead(pe_addr_t base,uint32_t offset)
 {
@@ -305,6 +306,36 @@ void func_8007CEAC(uint32_t channel,pe_addr_t address,uint32_t blocks,uint32_t w
     PE_CdReg_WriteU32(PE_CDREG_DMA3+4u,(blocks<<16u)|words);
     if(!(PE_CdLoadU8(PE_LoadU32(0x8009B32Cu))&0x40u)) {StreamStop("func_8007CEAC_data_wait");return;}
     PE_CdReg_WriteU32(PE_CDREG_DMA3+8u,control);
+}
+
+/* 7BF44..7C044 (src/func_8007BF44.c): CdGetSector, one sector-buffer DMA3
+ * transfer of a1 words to a0.  Retail drives the CD index/request registers,
+ * COM_DELAY, DPCR and DMA3 through the D_8009B27C.. register-pointer table.
+ * Every access here goes through the register models func_8007CEAC uses
+ * (pe_cdreg, pe_gpu); the generated verbatim TU dereferenced the pointers as
+ * host memory, which cannot reach them.  Retail's two busy waits (data request
+ * bit 6, then DMA3 busy) are answered by the device without the CPU: one
+ * DMA3 service runs the transfer, and a request or channel still not ready
+ * after it is an explicit stop, never a spin. */
+int func_8007BF44(unsigned int a0,unsigned int a1)
+{
+    pe_addr_t index=PE_LoadU32(0x8009B27Cu),dpcr=PE_LoadU32(0x8009B2B4u);
+    pe_addr_t chcr=PE_LoadU32(0x8009B2C0u);
+    PE_CdStoreU8(index,0u);
+    PE_CdStoreU8(PE_LoadU32(0x8009B288u),0x80u);          /* BFRD: want data */
+    PE_CdStoreU32(PE_LoadU32(0x8009B2B0u),0x20943u);
+    PE_CdStoreU32(PE_LoadU32(0x8009B28Cu),0x1323u);
+    if(dpcr==0x1F8010F0u) PE_GPU_WriteDPCR(PE_GPU_ReadDPCR()|0x8000u);
+    else PE_StoreU32(dpcr,PE_LoadU32(dpcr)|0x8000u);
+    PE_CdStoreU32(PE_LoadU32(0x8009B2B8u),a0);
+    PE_CdStoreU32(PE_LoadU32(0x8009B2BCu),a1|0x10000u);
+    if(!(PE_CdLoadU8(index)&0x40u)) {StreamStop("func_8007BF44_data_wait");return 0;}
+    PE_CdStoreU32(chcr,0x11000000u);
+    PE_CdReg_ServiceDMA3();
+    if(PE_Port_ShouldStop()) return 0;
+    if(PE_CdLoadU32(chcr)&0x1000000u) {StreamStop("func_8007BF44_dma_busy");return 0;}
+    PE_CdStoreU32(PE_LoadU32(0x8009B28Cu),0x1325u);
+    return 0;
 }
 
 static void StreamResetPartial(void)
@@ -783,6 +814,15 @@ int PE_Cd_DispatchDataCallback(pe_addr_t target,uint32_t status,pe_addr_t respon
         /* Original8-word wrapper ignores incoming arguments. */
         func_8007C564();return 1;
     default:
+        /* Any other target is retail's jalr (status, response) through the
+         * guest-code registry: the ending credits' data-ready callback
+         * 0x80125980 and GetlocP callback 0x80125AF0 are generated ovl_0457
+         * TUs.  Unresolved stays a stop. */
+        if(PE_GuestCode_Resolve(target)) {
+            (void)PE_GuestCall("CD_data_dispatch",target,2u,(uintptr_t)status,
+                               (uintptr_t)response,0u,0u);
+            return 1;
+        }
         Bootstrap_ReturnVoid4Indirect("CD_data_callback","CD_data_dispatch",
             target,status,response,0u,0u);
         PE_Port_RequestStop(PE_PORT_STOP_UNRESOLVED_BOUNDARY);return 0;
@@ -872,6 +912,12 @@ uint32_t func_8007EE84(uint32_t command,pe_addr_t param,uint32_t extra,uint32_t 
 int func_8007F418(uint32_t sequence,pe_addr_t response)
 {
     uint32_t index;
+    if(!sequence) {
+        /* A sequence-0 read is a plain ring look-up with no func_8007B010
+         * VSync queries, so it gets the poll's CPU-time quantum here. */
+        HostFB_DevicePoll();
+        if(PE_Port_ShouldStop()) return 0;
+    }
     if(sequence) {
         (void)func_8007FC64(0u);
         if(PE_Port_ShouldStop()) return 0;

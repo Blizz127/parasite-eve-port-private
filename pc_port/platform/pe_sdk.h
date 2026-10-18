@@ -267,6 +267,8 @@ void func_80080998(pe_addr_t pe_a0, pe_addr_t pe_a1);
 int func_8007FC64(pe_addr_t pe_result);
 int func_8007F418(uint32_t sequence,pe_addr_t response);
 int func_80080DC4(int command,pe_addr_t param,pe_addr_t response);
+/* CdGetSector: one DMA3 sector-buffer transfer (game/boot/cd_stream_port.c). */
+int func_8007BF44(unsigned int a0,unsigned int a1);
 int  func_80080D5C(int command, pe_addr_t param, pe_addr_t result);
 /* 1 when a CD provider serves XA-ADPCM streaming through the libcd queue
  * (Setfilter, ReadS in XA mode, GetlocP, Stop); see pe_libcd.c. */

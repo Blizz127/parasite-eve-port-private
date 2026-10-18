@@ -657,7 +657,7 @@ func	0x8007BBFC	bin:pe-native-tests
 func	0x8007BBFC	pc_port/game/boot/cd_stream_port.c
 func	0x8007BF44	bin:parasite-eve-port
 func	0x8007BF44	bin:pe-native-tests
-func	0x8007BF44	pc_port/game/decomp/func_8007BF44_port.c
+func	0x8007BF44	pc_port/game/boot/cd_stream_port.c
 func	0x8007C044	bin:parasite-eve-port
 func	0x8007C044	bin:pe-native-tests
 func	0x8007C044	pc_port/game/decomp/func_8007C044_port.c

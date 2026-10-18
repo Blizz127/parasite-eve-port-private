@@ -293,6 +293,109 @@ static void test_credits_xa_commands_never_complete_without_device(void)
     PASS();
 }
 
+/* The ending credits' CD-XA path on the register-level device: the retail
+ * EXE image, ovl_039F/ovl_0457 from PE.IMG, and a synthetic Disc-2-like
+ * image holding \XASTREAM\CREDITS.XA;1 laid out as the real file is
+ * (file 1; channels 0 and 1 one sector in 8 with submode 64h, EOF-flagged
+ * last ones; null sectors between).  No retail byte is in the fixture. */
+#define CXA_SECTORS      512u
+#define CXA_FILE_LBA     64u
+#define CXA_FILE_SECTORS 48u
+int32_t ovl_0457__func_8012562C(void);
+int32_t ovl_0457__func_80125744(void);
+int32_t ovl_0457__func_80125894(uint8_t a_a0);
+int ovl_0457__func_801255A4(void);
+
+static PE_Disc *CxaBuildDisc(uint8_t **out)
+{
+    uint8_t *img = calloc(CXA_SECTORS, PE_DISC_RAW_SECTOR), *p;
+    uint32_t i;
+    int n;
+    if (!img) return NULL;
+    for (i = 0; i < CXA_SECTORS; i++) {
+        uint8_t *raw = img + (size_t)i * PE_DISC_RAW_SECTOR;
+        memset(raw + 1, 0xFF, 10);
+        raw[15] = 2u;
+    }
+    p = FxUser(img, 16);
+    p[0] = 1; memcpy(p + 1, "CD001", 5); p[6] = 1;
+    memcpy(p + 40, "PARASITE_EVE                    ", 32);
+    FxPutDirRec(p + 156, 20, 2048, 0x02, "\0", 1);
+    p = FxUser(img, 20);
+    n = FxPutDirRec(p, 20, 2048, 0x02, "\0", 1);
+    n += FxPutDirRec(p + n, 20, 2048, 0x02, "\1", 1);
+    FxPutDirRec(p + n, 21, 2048, 0x02, "XASTREAM", 8);
+    p = FxUser(img, 21);
+    n = FxPutDirRec(p, 21, 2048, 0x02, "\0", 1);
+    n += FxPutDirRec(p + n, 20, 2048, 0x02, "\1", 1);
+    FxPutDirRec(p + n, CXA_FILE_LBA, CXA_FILE_SECTORS * 2048u, 0x00, "CREDITS.XA;1", 12);
+    for (i = 0; i < CXA_FILE_SECTORS; i++) {
+        uint8_t *raw = img + (size_t)(CXA_FILE_LBA + i) * PE_DISC_RAW_SECTOR;
+        uint8_t slot = (uint8_t)(i & 7u), audio = slot < 2u;
+        uint8_t sm = audio ? (i + 8u >= CXA_FILE_SECTORS ? 0xE4u : 0x64u) : 0x00u;
+        raw[16] = raw[20] = 1u;
+        raw[17] = raw[21] = audio ? slot : 0u;
+        raw[18] = raw[22] = sm;
+        raw[19] = raw[23] = audio ? 1u : 0u;
+    }
+    *out = img;
+    return PE_Disc_OpenMemory(img, (size_t)CXA_SECTORS * PE_DISC_RAW_SECTOR);
+}
+
+static void test_credits_xa_device_path(void)
+{
+    PE_Disc *d1, *cx;
+    uint8_t *img = NULL;
+    char err[256];
+    PeCdDeviceState dev;
+    unsigned t;
+    TEST_RETAIL_DISC1("credits_xa_device_path");
+    ResetTestState();
+    PE_CdReg_Reset();
+    err[0] = 0;
+    d1 = BTL6_OpenDisc1(err, sizeof(err));
+    ASSERT(d1 != NULL, err[0] ? err : "PE_Disc_Open failed");
+    PE_Disc_SetActive(d1);
+    ASSERT(PE_GuestImage_LoadExe(d1, err, sizeof(err)) == 0, err);
+    ASSERT(PE_Globals_AdoptRetailImage() == 0, "retail startup globals");
+    ASSERT(credits_load_overlays() == 0, "ovl_039F/ovl_0457 from PE.IMG");
+    cx = CxaBuildDisc(&img);
+    ASSERT(cx != NULL, "credits disc fixture");
+    PE_Disc_SetActive(cx);
+    HostFB_Init(); PE_GPU_Init(); PE_Callback_Init();
+    ASSERT(PE_CdReg_EnableDevice(7u) && func_8007EC14() == 1 && !PE_Port_ShouldStop(),
+           "CdInit on the device");
+    for (t = 0; t < 20u && PE_LoadU32(0x8009B574u) != 1u && !PE_Port_ShouldStop(); t++)
+        HostFB_VSync(0);
+    ASSERT(PE_LoadU32(0x8009B574u) == 1u && !PE_Port_ShouldStop(), "drive ready");
+    ASSERT(ovl_0457__func_8012562C() == 0 && !PE_Port_ShouldStop(), "func_8012562C: CdSearchFile");
+    ASSERT(PE_LoadU32(0x80172CE8u) == CXA_FILE_LBA &&
+           PE_LoadU32(0x80172CECu) == CXA_FILE_LBA + CXA_FILE_SECTORS, "credits start and end LBA");
+    ASSERT(ovl_0457__func_80125744() == 0 && !PE_Port_ShouldStop(),
+           "func_80125744: Setmode, Setfilter and ReadS complete through the real queue");
+    PE_CdReg_GetDeviceState(&dev);
+    ASSERT(dev.reading && dev.mode == 0xC8u, "ReadS running in mode 0xC8");
+    for (t = 0; t < 600u && !PE_LoadU32(0x80172CE4u) && !PE_Port_ShouldStop(); t++)
+        HostFB_VSync(0);
+    PE_CdReg_GetDeviceState(&dev);
+    ASSERT(!PE_Port_ShouldStop(), "no stop while the XA stream plays");
+    ASSERT(PE_LoadU32(0x80172CE4u) == 1u, "GetlocP positions carried the credits past the file end");
+    ASSERT((int32_t)PE_LoadU32(0x80172CF0u) > (int32_t)(CXA_FILE_LBA + CXA_FILE_SECTORS),
+           "position past the end");
+    ASSERT(dev.xa_sectors >= CXA_FILE_SECTORS / 4u, "every audio sector went to the SPU");
+    ASSERT(ovl_0457__func_80125894(1u) == 0 && !PE_Port_ShouldStop(), "channel switch to 1");
+    ASSERT(ovl_0457__func_801255A4() == 0 && !PE_Port_ShouldStop(), "func_801255A4 teardown");
+    PE_CdReg_GetDeviceState(&dev);
+    ASSERT(!dev.reading && PE_LoadU32(0x8009B574u) == 1u && PE_LoadU32(0x800A3608u) == 0u,
+           "after teardown the drive is idle and the queue empty");
+    PE_CdReg_Reset();
+    PE_Disc_SetActive(NULL);
+    PE_Disc_Close(cx);
+    PE_Disc_Close(d1);
+    free(img);
+    PASS();
+}
+
 static void test_credits_native_all(void)
 {
     test_credits_libpress_replacements();
@@ -301,5 +404,6 @@ static void test_credits_native_all(void)
     test_credits_vlc_bounded_resume_oracle();
     test_credits_entry_stops_without_xa_service();
     test_credits_xa_commands_never_complete_without_device();
+    test_credits_xa_device_path();
 }
 #endif
