@@ -1112,6 +1112,25 @@ def e21_cflags(gte: bool = False) -> list[str]:
     return (os.environ.get("E21_GTE_CFLAGS" if gte else "E21_CFLAGS") or "-O1").split()
 
 
+def retail_frame_size(data: bytes, leaf: dict) -> int:
+    """The retail prologue's `addiu $sp,$sp,-N` (first 16 words), or 0."""
+    off = leaf["file_offset"]
+    for i in range(16):
+        if off + 4 * i + 4 > len(data):
+            break
+        w = struct.unpack_from("<I", data, off + 4 * i)[0]
+        if w >> 16 == 0x27BD and w & 0x8000:
+            return 0x10000 - (w & 0xFFFF)
+    return 0
+
+
+def native_frame_size(text: str, name: str) -> int:
+    """The guest frame the lowered public wrapper of `name` enters, or 0."""
+    m = re.search(r"^\w[\w \*]*\b" + name + r"\([^;{]*\)\s*\{(.*?)^\}", text, re.M | re.S)
+    g = re.search(r"PE_GuestFrame_Enter\((\d+)u?\)", m.group(1)) if m else None
+    return int(g.group(1)) if g else 0
+
+
 def one(p: Path, name: str, ovl: str, seeds: int, cc: str, cover: bool = False,
         recorded: str = "", directed: dict | None = None,
         check_gte: bool = False) -> tuple[str, str]:
@@ -1162,6 +1181,18 @@ def one(p: Path, name: str, ovl: str, seeds: int, cc: str, cover: bool = False,
                                   + ", ".join(f"0x{out_key(v) & 0xFFFFFFFF:X}u" for v in sorted(outs) or [0xFFFFFFFF]) + "};\n"
                                   + "static const unsigned outl_[] = {"
                                   + ", ".join(f"{out_len(v)}u" for v in sorted(outs) or [0]) + "};")
+        # E21_STACK_COINCIDE=1: put the native frame where retail's locals
+        # are, so a body that reads its own uninitialized stack (the RotMatrix
+        # TR residue class) reads the same seeded bytes on both sides.  The
+        # lowered frame drops retail's 16-byte argument home area, so its
+        # base is retail sp+16 = SP0 - N + 16 (N from the prologue's addiu).
+        # Off by default.
+        if os.environ.get("E21_STACK_COINCIDE") == "1":
+            n_ret, n_nat = retail_frame_size(data, leaf), native_frame_size(t, name)
+            if n_ret and n_nat:
+                harness = (harness.replace("static pe_addr_t fsp = 0x801FEC00u;",
+                                           f"static pe_addr_t fsp = 0x{SP0 - n_ret + 16 + ((n_nat + 7) & ~7):08X}u;")
+                           .replace("a[i] < 0x801FF000u", "a[i] < 0x80200000u"))
         src = t + harness.replace("CALL_LINE", call) + stubs
         (d / "t.c").write_text(src)
         (d / "gte_ext.c").write_text(GTE_EXT)

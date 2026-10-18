@@ -189,7 +189,7 @@ Native bodies that replaced boundaries:
   - Since 8d5aaa6ce and 4637916e3 and the production-wiring commit after
     them, main's arm attaches the register-level CD device, which now serves
     Setfilter, XA routing, GetlocP and Stop, and runs the credits under the
-    stop escape. Only the pad-code mode stays a stop.
+    stop escape. Since the host-read ring model, the pad-code mode runs too.
 
 Dangling callbacks (see "Dangling callbacks"):
 
@@ -343,6 +343,39 @@ Subsystem overlays had never been swept before this. The sweep took only room TU
 (func_8012562C, func_80125744, func_80125894) are CD-status busy-waits that
 no seeded mock exits; they need directed mock return values, which the
 harness does not have yet.
+
+Sweep 8 (every candidate at the shipped flags, `--coverage --min-ok 4
+--max-seeds 256`, tree at 18:37:58Z, 18:37-20:14 UTC): ok 2041, MISMATCH 8,
+skipped 5. The 8 are the stack-residue set again.
+
+**The 8 stack-residue mismatches are a harness artefact (2026-10-18).** The
+mismatches came from where each side's frame sat:
+- The oracle enters retail with `sp = SP0` (0x801FFF00), so retail's locals
+  sit at `SP0 - N + X`, with N taken from the prologue's `addiu $sp,$sp,-N`.
+- The native harness allocated guest frames from 0x801FEC00.
+- So both sides read uninitialized locals, but at two addresses holding
+  different seeded bytes.
+
+The lowered frame is retail's frame minus the 16-byte argument home area. In
+`func_8018F388` retail has N = 144 and its matrices at sp+40/sp+72, and the
+lowered TU has them at pe_fp+24/+56. So pe_fp corresponds to retail sp+16.
+
+`E21_STACK_COINCIDE=1` (opt-in, `e21_diff.py`) places the native top frame at
+`SP0 - N + 16` and widens the native stack-pointer window to match:
+
+    E21_STACK_COINCIDE=1 E21_CFLAGS="-O3 -fno-strict-aliasing -fwrapv" E21_GTE_CFLAGS=-O3 \
+      e21_diff.py --with-calls --check-gte --coverage --verbose --jobs 2 --min-ok 4 --max-seeds 256 \
+      --only <the 8>
+    e21_diff: ok: 8      (each 4 seeds; retail coverage 296/296 or 255/255 words)
+
+Without the mode the same 8 still mismatch. The native code therefore reads
+the same uninitialized frame offsets as retail. What remains is the
+production question in "Known residuals": what the guest stack holds there,
+which depends on what ran before.
+
+The mode is not the default yet. A full sweep with it is owed before
+switching, and that is a heavy job, so it waits for a free turn. `+16` assumes
+a frame with the home area, which every one of the 8 has.
 
 ## Host compile semantics (verbatim TUs)
 
@@ -926,14 +959,14 @@ CDS, CDQ, B53, B54K, CDXA).
 **Production wiring (this commit).** `PE_Cd_XaServiceAvailable()` now returns
 1, and `PE_Main_EnterCredits` (`bootstrap/func_8001220C_port.c`) runs the
 credits in production. Its order:
-1. Bit 16 (the pad-code mode: the nine-step code in `func_8003EB04` sets
-   0x12000) stops on `credits_pad_code_mode`. That mode waits for
-   `func_8007F418(0, 0) == 2` with no XA setup, and nothing shows what retail's
-   ring holds there.
-2. `PE_Cd_FilePresent` (`platform/pe_libcd.c`) looks up the overlay's own name
-   (`*0x80125B48` -> `\XASTREAM\CREDITS.XA;1`) on the active disc. Without
-   it, the entry stops on `credits_xa_file_absent`, because `func_8012562C`
-   retries a failed CdSearchFile forever (Disc 1 has no XASTREAM).
+1. Bit 16 is the pad-code mode: the nine-step code in `func_8003EB04` sets
+   0x12000. It runs too (see "The pad-code mode" below). It opens no file, so
+   the next step skips it.
+2. With bit 16 clear, `PE_Cd_FilePresent` (`platform/pe_libcd.c`) looks up the
+   overlay's own name (`*0x80125B48` -> `\XASTREAM\CREDITS.XA;1`) on the
+   active disc. Without the file, the entry stops on `credits_xa_file_absent`,
+   because `func_8012562C` retries a failed CdSearchFile forever (Disc 1 has no
+   XASTREAM).
 3. `PE_Cd_AttachDevice`, or a stop on `credits_cd_attach`.
 4. The **stop escape** (`game_port.h`) is armed around
    `PE_GuestCall(0x801235DC)`. The generated loops never test
@@ -990,10 +1023,49 @@ held, SPU active, an 80000-sector fixture; a test VBlank hook in VSync slot 7):
   the `func_801255A4` Pause wait and in the `func_8012562C` search retry.
   Each comes back through the escape, detached and restored.
 - `credits_entry_gates` (renamed from
-  `credits_entry_stops_without_xa_service`) checks the two gate boundaries
-  (`credits_pad_code_mode` for 0x10000/0x12000, `credits_xa_file_absent` for
-  0/0x20000 with no disc). In both, the device stays detached and nothing of
-  the credits runs.
+  `credits_entry_stops_without_xa_service`) checks the two gate boundaries:
+  `credits_xa_file_absent` for 0/0x20000 with no disc, and `credits_cd_attach`
+  for 0x10000/0x12000, which need the drive but open no file. In both, the
+  device stays detached and nothing of the credits runs.
+
+**The pad-code mode (bit 16).** Its op table (0x80125B68) runs the scroll with
+no XA setup. A press mapped to `D_8009D1F4` bit 26 or 27 runs
+`func_80125894(0/1)`, which waits for `func_8007F418(0, 0) == 2` and then
+sends CdlSetfilter through `func_80080DC4`.
+
+That 2 is retail's ring state after any read, from the matched C:
+- `func_8006E6D4` -> `func_80080E34` (DsRead) queues one packet under one id
+  (`func_8007F0C8`'s `push`: CdlPause, CdlSetmode, CdlSetloc, CdlReadN), which
+  is finished at the ReadN acknowledge.
+- It sets `D_8009B6CC = 1`.
+- At read end `func_80081268` sees that, and queues CdlPause through the
+  libds queue (`func_8007EE84(9, 0, 0, -1)`), finished at its INT2.
+
+The ring's last record is therefore the Pause's CdlComplete, and
+`DsSync(0)` returns its status byte.
+
+The host read completes synchronously and used to queue neither, so the ring
+stayed as DsInit left it and `DsSync(0)` read 6 ("no command"). That was a
+wait that never ends.
+
+`func_8006E6D4` now publishes both completions through the IRQ chain's own
+path (`PE_Cd_HostCompletion`), the same model as `PE_Tray_HostStop`:
+- the answer goes into the command-lane response buffer `0x800A3460`, with
+  stat 0x02;
+- `func_8007EB88` records it under the next `D_8009B53C` sequence id.
+
+It publishes only once libds is initialized (`D_8009B554 = 1`, ring index
+0..7). `6AD40_complete_effect_allowlist` now accepts the sequence counter,
+the response buffer and the ring, as a retail read writes them.
+
+`credits_pad_code_mode` runs production's order:
+- `func_8006F044`'s two host reloads on Disc 1, after which `DsSync(0)` reads 2;
+- then `PE_Main_EnterCredits` in mode 0x12000:
+  - the second op table ran the whole scroll (13608 iterations);
+  - the press at iteration 2000 ran the channel switch, and its CdlSetfilter
+    reached the attached drive;
+  - bit 16 made state 4 leave;
+  - the device detached with the hooks restored.
 
 **What this does not establish.** The credits are native at unit level on a
 synthetic disc. Nothing has played the real Disc 2 CREDITS.XA, run the
@@ -1108,9 +1180,13 @@ substitutes silently in production.
   - m0034i/m0174i `gte_CompMatrix(&o->m, &m20, ...)` uses `m20.t`, so
     `o->m.t` follows the residue.
 
-  Native residue differs, so effect placement can differ. A fix needs recorded
-  retail stack contents (a runner `--recorded` snapshot), not zero-fill. This
-  is the same class as KNOWN_DIVERGENCES #17.
+  The lowered code reads exactly retail's frame offsets: all 8 bodies match
+  retail when both sides see the same stack bytes (`E21_STACK_COINCIDE=1`,
+  "e21 differential sweep"). What can differ in production is the content,
+  since the guest stack's history differs from retail's: hand ports keep host
+  frames and write nothing there. So effect placement can differ. A fix needs
+  recorded retail stack contents (a runner `--recorded` snapshot), not
+  zero-fill. This is the same class as KNOWN_DIVERGENCES #17.
 - **m0023i flash `[DAY1_SHIM]`** (`m0023i_effect_port.c`, KNOWN_DIVERGENCES
   #17) is the one shim that substitutes silently in production. Retail reads
   the stack residue of the previous mode-2 call.
@@ -1250,9 +1326,9 @@ Earlier gates:
 ## Open
 
 - The ending credits run natively in production through the attached
-  register-level device, at unit level only (see "The ending credits:
-  CD-XA"). Owed: a Disc 2 ending run on the runner. Still gated: the pad-code
-  mode (bit 16, `credits_pad_code_mode`).
+  register-level device, all three modes (0, 0x20000 and the pad-code
+  0x12000), at unit level only (see "The ending credits: CD-XA"). Owed: a
+  Disc 2 ending run on the runner.
 - The four Psy-Q libcard hooks are dormant (see the "Dangling callbacks"
   table): the only path to them, the MemCard_TimerCallback table
   `D_800A5AB4`, is never dispatched in production.

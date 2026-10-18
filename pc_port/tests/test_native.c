@@ -27482,7 +27482,14 @@ static void test_6AD40_complete_effect_allowlist(void)
             (a >= 0x8009E8B8u && a < 0x8009E928u) ||
             (a >= 0x8009E928u && a < 0x8009E960u) ||
             (a >= 0x8009E960u && a < 0x8009EC38u) ||
-            (a >= 0x8009EC38u && a < 0x8009EC70u))
+            (a >= 0x8009EC38u && a < 0x8009EC70u) ||
+            /* libds: each read's packet and closing CdlPause completions
+             * (sequence counter, completion ring and its write index), as a
+             * retail DsRead leaves them (pe_libcd.c PE_Cd_HostCompletion),
+             * and the command-lane response buffer they are copied from. */
+            (a >= 0x8009B53Cu && a < 0x8009B540u) ||
+            (a >= 0x800A3460u && a < 0x800A3468u) ||
+            (a >= 0x800A3610u && a < 0x800A3694u))
             continue;
         if (PE_LoadU8(a) != snapshot[a - PE_RAM_BASE]) {
             free(snapshot);

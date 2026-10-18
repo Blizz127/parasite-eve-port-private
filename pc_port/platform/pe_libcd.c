@@ -372,6 +372,28 @@ int func_80081414(pe_addr_t fp, const char *name)
     return 1;
 }
 
+/* One host-completed libds command, published to the completion ring
+ * through the IRQ chain's own path: the command-lane response buffer
+ * 0x800A3460 (what func_8007E964 hands func_8007EB88) gets the 8-byte answer,
+ * stat first, and func_8007EB88 records it under the next sequence id
+ * (newid(): ++D_8009B53C, zero skipped) as CdlComplete.  The same model as
+ * PE_Tray_HostStop. */
+static void PE_Cd_HostCompletion(uint8_t stat)
+{
+    uint32_t sequence;
+    /* The ring exists once DsInit/CdReset ran (D_8009B554 = 1, write index
+     * D_800A3690 cleared to 0..7 by PE_Cd_ClearState).  Production always
+     * boots that way; a fixture that reads with libds never initialized has
+     * no ring to publish to. */
+    if (PE_LoadU32(0x8009B554u) != 1u || PE_LoadU32(0x800A3690u) > 7u) return;
+    sequence = PE_LoadU32(0x8009B53Cu) + 1u;
+    PE_StoreU32(0x8009B53Cu, sequence);
+    if (!sequence) PE_StoreU32(0x8009B53Cu, ++sequence);
+    PE_Fill(0x800A3460u, 8u, 0u);
+    PE_StoreU8(0x800A3460u, stat);
+    func_8007EB88(sequence, 2u, 0x800A3460u);   /* CdlComplete */
+}
+
 /* func_8006E6D4 — read issue; synchronous on the host. */
 int func_8006E6D4(int lba_base, int lba_off, pe_addr_t dest, int sectors)
 {
@@ -433,6 +455,19 @@ int func_8006E6D4(int lba_base, int lba_off, pe_addr_t dest, int sectors)
     HostFB_GetState(&vs, &ds, &pr, &mk);
     PE_StoreU32(0x8009B6C4u, (uint32_t)vs);
     PE_StoreU32(0x8009B6CCu, 0u);
+    /* The two libds completions a retail read leaves in the ring, in order:
+     * - func_80080E34 queues one packet under one id (func_8007F0C8 push:
+     *   CdlPause, CdlSetmode, CdlSetloc, CdlReadN), finished when the ReadN
+     *   is acknowledged;
+     * - at read end func_80081268 sees D_8009B6CC == 1 and queues CdlPause
+     *   (func_8007EE84(9, 0, 0, -1)), finished at its INT2.
+     * The host read never queues them.  Without the records the ring stays
+     * as DsInit left it, so DsSync(0) reads 6 ("no command") where retail
+     * reads the Pause's CdlComplete: the pad-code credits' func_80125894
+     * waits for exactly that 2.  Stat 0x02 is motor on, as the register
+     * device reports both answers. */
+    PE_Cd_HostCompletion(0x02u);
+    PE_Cd_HostCompletion(0x02u);
     return 1;
 }
 

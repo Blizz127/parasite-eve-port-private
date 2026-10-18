@@ -74,15 +74,20 @@ static void PE_Port_ScratchpadCall(void (*overlay)(void))
  * so the entry attaches the register-level device around the loop
  * (PE_Cd_AttachDevice) and detaches it afterwards.
  *
- * Three cases stop on a named boundary instead of entering:
- *   - credits_pad_code_mode: bit 16 is set (the nine-step pad code in
- *     func_8003EB04 sets 0x12000).  There an edge on D_8009D1F4 bit 26 or
- *     27 runs func_80125894, which waits for func_8007F418(0, 0) == 2 with no
- *     XA setup, and nothing shows what retail's ring holds there.
- *   - credits_xa_file_absent: the active disc lacks the overlay's own file
- *     name (D_80125B48).  func_8012562C would retry CdSearchFile forever.
- *   - credits_cd_attach: the device cannot attach (libds busy, or already
- *     attached).
+ * With bit 16 set (the nine-step pad code in func_8003EB04 sets 0x12000)
+ * there is no XA setup.  An edge on D_8009D1F4 bit 26 or 27 runs
+ * func_80125894, which waits for func_8007F418(0, 0) == 2 and then sends
+ * CdlSetfilter through func_80080DC4, so that mode needs the attached drive
+ * too.  The 2 it waits for is the CdlComplete of the CdlPause that ends
+ * every read (func_80081268), which the host read now publishes
+ * (pe_libcd.c func_8006E6D4).
+ *
+ * Two cases stop on a named boundary instead of entering:
+ *   - credits_xa_file_absent: bit 16 is clear and the active disc lacks the
+ *     overlay's own file name (D_80125B48).  func_8012562C would retry
+ *     CdSearchFile forever.
+ *   - credits_cd_attach: the device cannot attach (no disc, libds busy, or
+ *     already attached).
  *
  * The generated ovl_0457 loops never test PE_Port_ShouldStop.  The entry arms
  * the stop escape (game_port.h) around the loop, so a stop inside it (a
@@ -100,9 +105,8 @@ static int credits_boundary(const char *name)
 int PE_Main_EnterCredits(void)
 {
     jmp_buf escape;
-    if (D_8009D1A0 & 0x10000u) return credits_boundary("credits_pad_code_mode");
     if (!PE_Cd_XaServiceAvailable()) return credits_boundary("credits_cd_xa_service");
-    if (!PE_Cd_FilePresent(PE_LoadU32(0x80125B48u)))
+    if (!(D_8009D1A0 & 0x10000u) && !PE_Cd_FilePresent(PE_LoadU32(0x80125B48u)))
         return credits_boundary("credits_xa_file_absent");
     if (!PE_Cd_AttachDevice(&g_credits_cd)) return credits_boundary("credits_cd_attach");
     if (setjmp(escape) == 0) {
