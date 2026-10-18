@@ -83,11 +83,21 @@ excluded 801982A4 was wrong; the census listed it as not-native.
 Batch 2 (after that census: m0318i 80192A7C/80193638, m0432i 801957CC) took it
 from 40 to 37.
 
-**EXE** (`gen_decomp_ports.py --e21 --check`): eligible 1130 verbatim, E21
-lowered 21, 112 matched leaves that a hand port defines. Five uncompilable
-verbatim TUs remain: 80072F64, 80073A44, 8007A244, 80080E34 and 80081A7C,
-all in the Psy-Q band, where the port's own `PE_` models are the
-implementation.
+**EXE** (`gen_decomp_ports.py --e21`): eligible 1130 verbatim, E21 lowered
+21, 112 matched leaves that a hand port defines. Five uncompilable verbatim
+TUs remain: 80072F64, 80073A44, 8007A244, 80080E34 and 80081A7C. All are in
+the Psy-Q band, where the port's own `PE_` models are the implementation.
+
+The 12 asm-only EXE effect functions (no C on any lineage, reached through
+effect descriptor tables in the EXE data) are NON_MATCHING C now:
+- 800C3324, 800C689C, 800D5A00, 800D8388, 800C83A0, 800C499C (249e76f38);
+- 800C9398, 800D6514, 800DC058, 800D5290, 800DE0A8, 800CAE0C (batch 3).
+
+All 12 came from workflow wf_b3938761: a decomp agent wrote each one, an
+independent verifier confirmed it, and the main session re-ran the proof.
+800C3324 is the 3D textured-quad packet builder that the weapon-effect
+callbacks 800CC644/800CC878 (the 0x800E0D08 table) reached through a STOP
+boundary. With batch 3, 1040 + 6 = 1046 EXE TUs.
 
 **Subsystem overlays**:
 
