@@ -72,21 +72,36 @@ Later on 2026-10-18 (all committed, none pushed):
   80197CBC/801944E8): census 28 -> 22 (59,452 bytes). regen14: suite
   1661/1661, ctests 6/6, psyq_port_guard PASS (1421).
 
+- Room batch 7 (f9ea749f3): census 22 -> 17. E22 (091cddad8): value-used
+  calls are cast back to the leaf's 32-bit return signedness where the host
+  prototype flipped it (48 EXE + 56 room verbatim TUs). The pointer-return
+  adapter no longer re-segments constant `&D_X` returns.
+- e21_verbatim.py (e0012374e, 40187e480) covers rooms, EXE and subsystem
+  overlays. First runs: rooms 1004 ok / 3 latent mismatches; EXE+ovl
+  902 ok / 17 latent mismatches (classes in NATIVE_COMPLETION.md: NULL
+  alias, 32-bit address wrap, narrow return, out-of-range local index).
+  None diverges for in-game values. The menu callback func_800428D4 with
+  D_800A1860 == 0 is the one plausible crash.
+- boundary_site_census.py counts generator `#define func_X(...)
+  PE_D_COMP_BOUNDARYn` bindings. --generated: 39 sites, including 21
+  generated EXE Psy-Q-band TUs that no hand code or pointer reaches.
+- Sweep 6 with the shipped flags: 1983 ok, 8 MISMATCH (stack residue), 36
+  skipped, 0 error. The first try crashed on the seed-extension name clash
+  (fixed 9f64651f3).
+- func_800D1384 colour args are 3-byte stack extents (55fe00601, from retail
+  lbu 0/1/2). That unblocked m0318i 80196E4C, which the workflow's verifier
+  refuted on the 16-byte window artifact.
+
+- Room batch 8 (m0432i 80193940/80195B40, m0318i 80195D20/80196E4C, m0273i
+  80194E6C): census 17 -> 12 (41,216 bytes). regen16: suite 1661/1661,
+  ctests 6/6, psyq PASS. The unclamped e21_verbatim run after E22: 1908 ok,
+  18 latent MISMATCH, 0 new; the two E22/segment cases now pass.
+
 In flight:
-- the room workflow wf_9660d38d on the remaining 22 bodies;
-- `tools/analysis/e21_verbatim.py` (new, pilot), the first retail
-  differential of verbatim room TUs, run over all 1016. A 20-TU pilot was
-  20/20 ok once callees whose host prototype flips the leaf's 32-bit return
-  signedness get bit-31-clear mock returns. Example: `func_800C6CE0` is
-  `unsigned int` in the leaves and `int` in pe_port_compat.h. It returns
-  0..5, so no live divergence; about 180 such leaf/host return-type
-  disagreements exist in verbatim TUs;
-- a sweep of the 40 sweep-5 skipped TUs with the opt-in seed extension
-  (`e21_diff.py --min-ok 4 --max-seeds 512`). One TU, ovl_0700
-  func_80191C94, has run since 06:08 and looks like a spinner;
-- next: sweep 6, every candidate with `E21_CFLAGS="-O3 -fno-strict-aliasing
-  -fwrapv" E21_GTE_CFLAGS=-O3`, on the regen14 tree. Then a pilot e21
-  harness for about 20 simple verbatim room TUs.
+- room batch 9 (m0432i 8019408C/80194F60, m0429i 80198914): yaml applied,
+  e21_leaf reruns running; next regen.
+- the room workflow wf_9660d38d on the last 12 bodies (the largest:
+  m0429i 80192F9C, 0x2500 bytes, no near twin).
 
 Integrate a confirmed leaf this way:
 1. Add its yaml line and specs.

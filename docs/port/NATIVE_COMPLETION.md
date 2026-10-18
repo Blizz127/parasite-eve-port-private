@@ -44,31 +44,30 @@ covers both discs.
 ## Census (2026-10-18)
 
 **Room code**: `PE_DISC1_BIN=<disc 1> python3 pc_port/tools/pe_all_rooms_native_census.py`.
-Registry `zz_dispatch.c`: 5754 thunks. 185 code rooms, 9103 (room x body)
+Registry `zz_dispatch.c`: 5759 thunks. 185 code rooms, 9103 (room x body)
 rows, 2952 unique (vma, size, FNV) bodies.
 
-| | session start | 2026-10-18 09:20 |
+| | session start | 2026-10-18 10:45 |
 |---|--:|--:|
-| native-generated bodies | 8855 | 9084 (87 via a data head) |
-| not-native bodies (all statically reachable) | 217 | 17 |
+| native-generated bodies | 8855 | 9089 (87 via a data head) |
+| not-native bodies (all statically reachable) | 217 | 12 |
 | direct-addr-guarded (hand port bound by address only) | 31 | 0 |
 | native-direct (hand port bound by fingerprint) | 0 | 2 |
-| unique not-native bodies | 136 (183,492 bytes) | 17 (50,844 bytes) |
+| unique not-native bodies | 136 (183,492 bytes) | 12 (41,216 bytes) |
 
 A body resolves only by fingerprint, as `PE_GuestCode_Resolve` does. Rooms are
 never declared resident in production, and closure-equal duplicates count once.
 
-The 17 bodies with no C anywhere are effect and particle callbacks in late
+The 12 bodies with no C anywhere are effect and particle callbacks in late
 rooms:
 
 | room | bodies |
 |---|--:|
-| m0318i | 3 |
-| m0432i | 7 |
+| m0318i | 1 |
+| m0432i | 5 |
 | m0429i | 4 |
 | m0404i | 1 |
 | m0256i | 1 |
-| m0273i | 1 |
 
 The vendor (khasinski) tree also has them as asm. The two native-direct bodies
 are m0005i 8018F614/8018FDC4: hand ports the effect dispatcher binds by
@@ -90,6 +89,8 @@ Batch 6 (m0432i 8019702C, m0429i 80196748/801972EC/80196CCC, m0318i
 80197CBC/801944E8) took it from 28 to 22.
 Batch 7 (m0429i 801960C4, m0318i 80198268/80197618/80194AAC, m0432i
 8019485C) took it from 22 to 17.
+Batch 8 (m0432i 80193940/80195B40, m0318i 80195D20/80196E4C, m0273i
+80194E6C) took it from 17 to 12.
 
 **EXE** (`gen_decomp_ports.py --e21`): eligible 1130 verbatim, E21 lowered
 21, 112 matched leaves that a hand port defines. Five uncompilable verbatim
@@ -269,6 +270,20 @@ tree: 1898 room, 81 subsystem-overlay and 33 EXE TUs):
 - Each of the 10 TUs then matched, 9 of them with every word covered. No
   subsystem-overlay or EXE TU showed a port difference.
 
+Sweep 6 (2026-10-18 08:44-09:37 UTC, regen14/15 tree): the native side built
+with the shipped flags (`E21_CFLAGS="-O3 -fno-strict-aliasing -fwrapv"
+E21_GTE_CFLAGS=-O3`) instead of -O1:
+
+    e21_diff: MISMATCH: 8
+    e21_diff: ok: 1983
+    e21_diff: skipped: 36
+
+No nocompile and no error. The 8 mismatches are the stack-residue set (the
+same TU names as sweep 5). The 36 skipped are from the 40 above; they run
+only with the seed extension or their directed specs. The first sweep-6
+attempt crashed after 62 minutes on the seed-extension name clash, fixed in
+9f64651f3.
+
 Subsystem overlays had never been swept before this. The sweep took only room TUs until
 495b7c1c4, which adds the 81 E21 TUs of ovl_03C5/03C9/03D2/0457/0700.
 `--only ovl_0457` gives 15 ok, 3 skipped, 0 MISMATCH. The three skipped
@@ -431,8 +446,12 @@ leaf's own callee declaration with the host prototype. Where the two 32-bit
 return types differ only in signedness, every value-used call is now cast
 back to the leaf's type (`((unsigned int)/* E22 leaf type */func_800C6CE0(o))`).
 A callee the leaf calls without a declaration counts as C89 implicit `int`.
-regen15 changed 48 EXE TUs and 56 room TUs this way, and nothing else beyond
-the 5 new batch-7 TUs and one segment-adapter fix. Cases:
+Counted from regen16's markers, regen15 put casts in 47 EXE TUs, 55 room TUs
+and 1 ovl_0457 TU. One more EXE TU, `func_80077294`, got only the note: its
+one call is a statement, so nothing was cast. The E22 commit says "48 EXE
+and 56 room, casts only"; these are the exact figures. The note is now
+written only when a cast is inserted. Beyond these, regen15 changed the 5
+new batch-7 TUs and one segment-adapter fix. Cases:
 - the rand `func_80071A54` (`int` in the leaves, `unsigned int` on the host);
 - `func_800C6CE0` (`unsigned int` / `int`);
 - `func_8003708C` (`int` / `uint32_t`);
@@ -441,6 +460,21 @@ the 5 new batch-7 TUs and one segment-adapter fix. Cases:
 The pointer-return adapter no longer moves a constant `&D_X` result into a
 root pointer's segment (m0432i 80199048). The inline `/* E22 leaf type */`
 marker was added after regen15, whose TUs carry the same casts without it.
+
+The check: all three verbatim sets on the regen15 tree, with the bit-31 clamp
+off (2026-10-18 09:16-10:16 UTC):
+
+    e21_verbatim.py --set rooms,exe,ovl --seeds 6 --jobs 3 --check-gte --verbose
+    e21_verbatim: MISMATCH: 18
+    e21_verbatim: ok: 1908
+    e21_verbatim: skipped: 87
+    e21_verbatim: unsupported: 57
+
+The clamped runs before E22 gave 1906 ok and 20 MISMATCH. m0418i
+80193480 (the rand compare) and m0432i 80199048 (the segment adapter) now
+pass. m0065i 8018F054 and the other func_800C6CE0 callers pass with
+unclamped returns. No new mismatch appeared; the 18 left are the latent
+classes listed above.
 
 **Generated-TU boundaries.** The verbatim path does not apply host
 replacements. 21 generated EXE TUs bind a callee with no host C to a loud
@@ -506,7 +540,7 @@ those are hand ports with one guarded error path.
 ## Gates on this branch
 
 - `pe-native-tests` (isolated HOME, Disc 1 configured, built in /dev/shm from
-  the regeneration with room batch 7 and E22, 2026-10-18 09:15 UTC): 1661/1661, 0
+  the regeneration with room batch 8, 2026-10-18 10:44 UTC): 1661/1661, 0
   skipped. The four `credits_*` tests and 8 more NAM9 retail cases are new
   since 4dba7922.
 - ctests `park-m0086-full`, `park-m0089-full`, `gte-native-fixed`,
@@ -517,7 +551,7 @@ those are hand ports with one guarded error path.
   - field VM 693/693
 - `retail_data_guard.py --strict` on every commit's files: OK.
 - `psyq_port_guard.py --binary parasite-eve-port --binary pe-native-tests`
-  (regenerations of f91561717, 249e76f38, bfdf402af and room batches 5-7): PASS relative to the
+  (regenerations of f91561717, 249e76f38, bfdf402af and room batches 5-8): PASS relative to the
   allowlist, 1421 entries, unchanged. This is not a public-binary clearance.
 - Not run on the devbox, by rule:
   - the Day-1 route regression;
@@ -527,8 +561,8 @@ those are hand ports with one guarded error path.
 
 ## Open
 
-- The 17 remaining no-C room bodies (m0432i 7, m0429i 4, m0318i 3, m0404i 1,
-  m0256i 1, m0273i 1). The room workflow (wf_9660d38d) is working through them.
+- The 12 remaining no-C room bodies (m0432i 5, m0429i 4, m0318i 1, m0404i 1,
+  m0256i 1). The room workflow (wf_9660d38d) is working through them.
 - Intra-overlay boundaries in generated subsystem-overlay TUs. These calls go
   to a non-emitted leaf of the same overlay that only a hand port implements:
   - ovl_03D2 `80191B64`, from 801924F8 and 80192934;
