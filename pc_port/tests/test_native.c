@@ -38786,6 +38786,40 @@ static void test_DRW1_chain_unknown_word_bounds(void)
     PASS();
 }
 
+/* A node's size is the tag's top byte (psx-spx), not the 15 words the walker
+ * used to cut at.  One 20-word node: four GP0(81h) VRAM copies (16 words)
+ * and four NOP mirrors.  Walked whole, no boundary, parser idle. */
+static void test_DRW1_chain_long_node_and_copy(void)
+{
+    const pe_addr_t node = 0x801F2000u;
+    static const uint32_t nops[4] = {0x04000000u, 0xE0000000u, 0xE7000000u, 0x1E000000u};
+    uint16_t src[2] = {0x1357u, 0x2468u}, pixel = 0u;
+    unsigned k, w = 0u;
+    PeGpuState gpu;
+    TEST("DRW1_chain_long_node_and_copy");
+    ResetTestState();
+    PE_GPU_Init();
+    ASSERT(B54KR_UploadPixels(900u, 0u, 2u, 1u, src), "seed pixels");
+    PE_StoreU32(node, (20u << 24) | 0x00FFFFFFu);
+    for (k = 0; k < 4u; k++) {
+        PE_StoreU32(node + 4u + 4u * w++, 0x81000000u);
+        PE_StoreU32(node + 4u + 4u * w++, 900u);
+        PE_StoreU32(node + 4u + 4u * w++, ((9u + k) << 16) | 900u);
+        PE_StoreU32(node + 4u + 4u * w++, (1u << 16) | 2u);
+    }
+    for (k = 0; k < 4u; k++) PE_StoreU32(node + 4u + 4u * w++, nops[k]);
+    (void)func_80076B98(node, 0u);
+    ASSERT(PE_Port_GetStopReason() == PE_PORT_STOP_NONE && g_bootstrap_arg4_call_count == 0,
+           "20-word node stopped or recorded a cut");
+    for (k = 0; k < 4u; k++) {
+        ASSERT(PE_GPU_ReadVRAM(900u, 9u + k, &pixel) && pixel == 0x1357u, "copy left pixel");
+        ASSERT(PE_GPU_ReadVRAM(901u, 9u + k, &pixel) && pixel == 0x2468u, "copy right pixel");
+    }
+    PE_GPU_GetState(&gpu);
+    ASSERT(gpu.gp0_state == PE_GPU_GP0_IDLE, "parser not idle at end");
+    PASS();
+}
+
 static void test_DRW1_fill_command_renders(void)
 {
     PeGpuState gpu;
@@ -41071,6 +41105,7 @@ int main(void)
     test_DRW1_drawotag_dispatch_boundary();
     test_DRW1_chain_two_env_nodes();
     test_DRW1_chain_unknown_word_bounds();
+    test_DRW1_chain_long_node_and_copy();
     test_DRW1_fill_command_renders();
     test_DRW1_fill_hardware_edges();
     test_DRW1_754e4_level2_prints();

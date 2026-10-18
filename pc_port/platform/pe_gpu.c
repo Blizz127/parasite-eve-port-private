@@ -78,6 +78,7 @@ typedef struct {
     uint32_t fill_position;
     uint32_t mono_rectangle_command;
     uint32_t mono_rectangle_position;
+    uint32_t copy_source, copy_destination;   /* GP0(80h..9Fh) parameters */
     uint32_t polygon_words[12];
     /* GP0 polyline (48h..5Fh with bit 27) stream state. */
     int polyline, polyline_expect_color;
@@ -826,14 +827,29 @@ static void DrawLine(void)
     }
 }
 
+/* psx-spx GPU: "GP0(04h..1Eh,E0h,E7h..EFh) - Mirrors of GP0(00h) - NOP".
+ * GP0(03h) ("Unknown? ... apparently not a NOP"), GP0(1Fh) (IRQ1) and
+ * F0h..FFh (not documented) stay unsized. */
+static int Gp0NopMirror(uint32_t opcode)
+{
+    return (opcode >= 0x04u && opcode <= 0x1Eu) || opcode == 0xE0u ||
+           (opcode >= 0xE7u && opcode <= 0xEFu);
+}
+
 uint32_t PE_GPU_GP0_PacketWords(uint32_t command)
 {
     uint32_t opcode = command >> 24;
 
     if (command == 0u)
         return 1u;
+    if (Gp0NopMirror(opcode))
+        return 1u;
     if (opcode >= 0xE1u && opcode <= 0xE6u)
         return 1u;
+    /* Command 4 (80h..9Fh): command, source, destination, width+height; for
+     * groups 4-6 "the remaining 29 bits are ignored" (psx-spx). */
+    if ((opcode & 0xE0u) == 0x80u)
+        return 4u;
     if (opcode == 0x02u)
         return 3u;
     if ((opcode & 0xE0u) == 0x20u) {
@@ -863,6 +879,17 @@ uint32_t PE_GPU_GP0_StreamPacketWords(const uint32_t *words, uint32_t avail)
 
     if (!avail) return 0u;
     command = words[0];
+    if ((command & 0xE0000000u) == 0xA0000000u) {
+        /* Command 5 (A0h..BFh): command, destination, width+height, then the
+         * halfword pixels two per word -- the same bounds GP0WriteInner's
+         * EXPECT_SIZE state accepts. */
+        uint32_t w, h, n;
+        if (avail < 3u) return 0u;
+        w = words[2] & 0xFFFFu; h = words[2] >> 16;
+        if (w == 0u || w > PE_GPU_VRAM_WIDTH || h == 0u || h > PE_GPU_VRAM_HEIGHT) return 0u;
+        n = 3u + (w * h + 1u) / 2u;
+        return n <= avail ? n : 0u;
+    }
     if ((command & 0xE8000000u) != 0x48000000u) {
         uint32_t n = PE_GPU_GP0_PacketWords(command);
         return n <= avail ? n : 0u;
@@ -879,6 +906,7 @@ uint32_t PE_GPU_GP0_StreamPacketWords(const uint32_t *words, uint32_t avail)
 }
 
 static int GP0WriteInner(uint32_t value);
+static int GpuVramCopy(uint32_t source, uint32_t destination, uint32_t size);
 
 /* PE_GPU_WATCH=x,y: debug aid, report each GP0 word that changes that VRAM pixel. */
 int PE_GPU_WriteGP0(uint32_t value)
@@ -977,9 +1005,20 @@ static int GP0WriteInner(uint32_t value)
             ResetParser();
             return 1;
         }
-        if (value == 0xA0000000u) {
+        if (Gp0NopMirror(value >> 24)) {
+            if (g_gpu.state.dma2_active) return 0;
+            g_gpu.state.nop_count++;
+            return 1;
+        }
+        if ((value & 0xE0000000u) == 0xA0000000u) {
+            /* A0h..BFh: the low 29 bits are ignored (psx-spx). */
             if (g_gpu.state.dma2_active) return 0;
             g_gpu.state.gp0_state = PE_GPU_GP0_EXPECT_POSITION;
+            return 1;
+        }
+        if ((value & 0xE0000000u) == 0x80000000u) {
+            if (g_gpu.state.dma2_active) return 0;
+            g_gpu.state.gp0_state = PE_GPU_GP0_COPY_EXPECT_SOURCE;
             return 1;
         }
         if ((value&0xE0000000u)==0xC0000000u) {
@@ -1049,6 +1088,21 @@ static int GP0WriteInner(uint32_t value)
         }
         if (PrimLogOn()) fprintf(g_prim_log, "X %08X rejected\n", value);
         return 0;
+
+    case PE_GPU_GP0_COPY_EXPECT_SOURCE:
+        g_gpu.copy_source = value;
+        g_gpu.state.gp0_state = PE_GPU_GP0_COPY_EXPECT_DESTINATION;
+        return 1;
+    case PE_GPU_GP0_COPY_EXPECT_DESTINATION:
+        g_gpu.copy_destination = value;
+        g_gpu.state.gp0_state = PE_GPU_GP0_COPY_EXPECT_SIZE;
+        return 1;
+    case PE_GPU_GP0_COPY_EXPECT_SIZE:
+        /* The same copy PE_GPU_MoveImage performs for the 80000000h
+         * MoveImage packet; the parser returns to idle either way. */
+        g_gpu.state.gp0_state = PE_GPU_GP0_IDLE;
+        XferLog("80", g_gpu.copy_source, g_gpu.copy_destination, value);
+        return GpuVramCopy(g_gpu.copy_source, g_gpu.copy_destination, value);
 
     case PE_GPU_GP0_READ_EXPECT_POSITION:
         g_gpu.state.image_x=value&(PE_GPU_VRAM_WIDTH-1u);
@@ -1271,6 +1325,22 @@ int PE_GPU_MoveImage(uint32_t source, uint32_t destination, uint32_t size)
         g_watch_y >= (long)((destination >> 16) & 0x1FFu) &&
         g_watch_y < (long)((destination >> 16) & 0x1FFu) + (long)(size >> 16))
         fprintf(stderr, "[GPU_WATCH] 80 move src=%08X dst=%08X size=%08X\n", source, destination, size);
+
+    if ((g_gpu.state.status & PE_GPU_STATUS_READY_GP0) == 0u ||
+        g_gpu.state.gp0_state != PE_GPU_GP0_IDLE ||
+        g_gpu.state.dma2_active ||
+        g_gpu.state.gp1_dma_direction != 2u) {
+        return 0;
+    }
+    return GpuVramCopy(source, destination, size);
+}
+
+/* The GP0(80h..9Fh) VRAM-to-VRAM copy itself (psx-spx "VRAM to VRAM
+ * blitting"): both MoveImage and a copy command written to the GP0 port end
+ * here.  Only the MoveImage entry needs the GP1(04h)=2 DMA setup its
+ * packet path programs. */
+static int GpuVramCopy(uint32_t source, uint32_t destination, uint32_t size)
+{
     uint32_t source_x;
     uint32_t source_y;
     uint32_t destination_x;
@@ -1280,13 +1350,6 @@ int PE_GPU_MoveImage(uint32_t source, uint32_t destination, uint32_t size)
     uint32_t rows_remaining;
     uint32_t current_source_y;
     uint32_t current_destination_y;
-
-    if ((g_gpu.state.status & PE_GPU_STATUS_READY_GP0) == 0u ||
-        g_gpu.state.gp0_state != PE_GPU_GP0_IDLE ||
-        g_gpu.state.dma2_active ||
-        g_gpu.state.gp1_dma_direction != 2u) {
-        return 0;
-    }
 
     source_x = source & (PE_GPU_VRAM_WIDTH - 1u);
     source_y = (source >> 16) & (PE_GPU_VRAM_HEIGHT - 1u);

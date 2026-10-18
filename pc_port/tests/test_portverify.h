@@ -463,6 +463,29 @@ static void test_PV_494AC_item_list_confirm_runs_native(void)
     PASS();
 }
 
+/* func_8004D5CC (card notice cleanup) calls the slot D_8009CFFC with no
+ * arguments (src/func_8004D5CC.c).  func_80042264 installs 0x80042228 there
+ * after a card CRC match.  It has native code (a generated TU), so the hand
+ * port's dispatch must run it through the registry, not the card-operation
+ * boundary its default arm used to raise. */
+static void test_PV_4D5CC_card_slot_runs_registry_callback(void)
+{
+    TEST("PV_4D5CC_card_slot_runs_registry_callback");
+    ResetTestState();
+    PE_Decomp_ResetBoundaries();
+    func_80062F9C();
+    PE_StoreU32(0x8009CFFCu, 0x80042228u);
+    PE_StoreU32(0x8009CF44u, 0xFFFFFFFFu);   /* index mismatch: stop after the slot */
+    PE_StoreU32(0x8009D010u, 0x55u);
+    func_8004D5CC(0u);
+    ASSERT(!PE_Port_ShouldStop() && !CountOrderLog("card operation unresolved call"),
+           "slot 0x80042228 stopped on the card-operation boundary");
+    ASSERT(PE_LoadU32(0x8009CFFCu) == 0u, "slot cleared after the call");
+    ASSERT(PE_LoadU32(0x8009D010u) == 2u,
+           "func_80042228 ran (its func_800512AC(12) sets D_8009D010 = 2)");
+    PASS();
+}
+
 /* func_80049354 (equip-slot list) opens the slot detail with func_8004A570,
  * which makes a task-9 window with update 0x8004A9A0 (src/func_8004A9A0.c)
  * and focuses it, so every following pad event goes there first. */
@@ -495,6 +518,7 @@ static void test_PV_all(void)
     test_PV_48918_item_window_constructor();
     test_PV_494AC_item_list_confirm_runs_native();
     test_PV_4A9A0_slot_detail_input_runs_native();
+    test_PV_4D5CC_card_slot_runs_registry_callback();
     test_PV_777C0_immediate_moveimage();
     test_PV_775E8_immediate_loadimage();
     test_PV_1F814_null_actor_latch();

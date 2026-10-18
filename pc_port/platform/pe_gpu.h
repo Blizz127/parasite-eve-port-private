@@ -52,7 +52,10 @@ typedef enum {
     PE_GPU_GP0_LINE_DATA,
     PE_GPU_GP0_READ_EXPECT_POSITION,
     PE_GPU_GP0_READ_EXPECT_SIZE,
-    PE_GPU_GP0_READ_DATA
+    PE_GPU_GP0_READ_DATA,
+    PE_GPU_GP0_COPY_EXPECT_SOURCE,      /* GP0(80h..9Fh) VRAM-to-VRAM copy */
+    PE_GPU_GP0_COPY_EXPECT_DESTINATION,
+    PE_GPU_GP0_COPY_EXPECT_SIZE
 } PeGpuGp0State;
 
 /* Read-only snapshot.  Every address is a 32-bit guest address; no native

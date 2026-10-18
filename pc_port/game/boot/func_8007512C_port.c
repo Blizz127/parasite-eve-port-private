@@ -42,7 +42,7 @@ static int IsGp0EnvironmentWord(uint32_t word)
 }
 
 /* Validate one chain node without submitting it: representable span,
- * word count within the authenticated bound, and a MoveImage shape or
+ * any 8-bit word count, and a MoveImage shape or
  * all-environment words.  Reports through the single-node boundary name
  * so earlier cuts keep their identity. */
 static int DRW1_ValidateNode(pe_addr_t node, uint32_t tag, uint32_t count,
@@ -57,7 +57,10 @@ static int DRW1_ValidateNode(pe_addr_t node, uint32_t tag, uint32_t count,
      * no test plants it, and hardware sends nothing either way.)
      * The record's a3 is the node whose link led here (0 for the head), so
      * a boundary report can name the writer of a corrupt link. */
-    if (count > 15u || !PE_RangeIsRam(node, node_bytes)) {
+    /* The node size is the tag's top byte (psx-spx: "size of 00h words
+     * (upper 8bit)"); its guess of a 16-word FIFO limit is a stall, not an
+     * error, so any 0..255 node is walked. */
+    if (!PE_RangeIsRam(node, node_bytes)) {
         (void)Bootstrap_ReturnInt4Indirect(
             "func_80076B98_packet_cut", "func_80076B98", 0, 0u,
             node, tag, count, previous_node, NULL, 0u);
@@ -78,7 +81,7 @@ static int DRW1_ValidateNode(pe_addr_t node, uint32_t tag, uint32_t count,
     i = 0u;
     while (i < count) {
         uint32_t word = PE_LoadU32(node + 4u + i * 4u);
-        uint32_t stream[15], k, words;
+        uint32_t stream[255], k, words;
 
         /* Polylines are variable length (to their 5xxx5xxx terminator). */
         for (k = 0u; k < count - i; k++) stream[k] = PE_LoadU32(node + 4u + (i + k) * 4u);

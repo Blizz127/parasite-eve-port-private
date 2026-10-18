@@ -641,18 +641,70 @@ The 41 unknown rows break down as follows:
   `func_8005C498` wrappers.
 - 6 remain unknown.
 
-Those 6, plus one dormant row whose verifier said unknown, are seven specific
-conditions that nobody could confirm or exclude:
-- `func_80028574_port.c:81`: a shot count (`wf & 15`) of 11 or more, past the
-  scales table;
-- `actor_contact_port.c:183`: an actor +0x194 contact callback that neither
-  resolves nor is 0x8001D268;
-- `absent_ovl_port.c:77`: libgte `func_80079178`, if `func_800C65E4` runs;
-- `func_80075358_port.c:40`: a GP0 word that `PE_GPU_WriteGP0` refuses;
-- `func_8007512C_port.c:61` and `:95`: a draw node over 15 words, or a GP0
-  opcode the packet tables cannot size;
-- `func_80041108_port.c:32`: the card-operation frontier, used only in the
-  test-only boundary mode and by the legacy frame functions.
+Those 6, plus one dormant row whose verifier said unknown, were seven
+specific conditions that nobody could confirm or exclude. Follow-up work
+settled them as follows.
+
+- **Fixed: `func_80041108_port.c:32`, the card-operation frontier.**
+  - Its one live caller is `func_8004D5CC`'s default arm, for the
+    card-notice slot `D_8009CFFC`. The only value written there outside the
+    four handled cases is 0x80042228. `func_80042264` installs it after a
+    card CRC match, and it is a generated TU.
+  - The arm now makes retail's argument-less call through the registry and
+    stops only on an unresolved target.
+  - `PV_4D5CC_card_slot_runs_registry_callback` shows that 0x80042228 runs:
+    `D_8009D010 = 2` from its `func_800512AC(12)`, the slot is cleared, and
+    there is no boundary.
+  - The other callers are test-only: `PE_Memcard_BoundaryMode`, and the
+    legacy frame functions called only from `test_card_operation_frame.h`.
+- **Fixed: `func_8007512C_port.c:61` and `:95`, the draw-chain walker cuts.**
+  - psx-spx gives a linked-list node's size as the tag's top byte. Its
+    16-word figure is a guess about the FIFO, which would stall, not fail.
+    The walker now takes any 0..255-word node.
+  - The GPU model now implements the opcodes psx-spx documents that it
+    used to refuse:
+    - GP0(04h..1Eh, E0h, E7h..EFh) as NOP mirrors;
+    - GP0(80h..9Fh) as the 4-word VRAM copy, through the copy
+      `PE_GPU_MoveImage` uses but without its DMA-direction precondition;
+    - A0h..BFh as A0h, since in groups 4-6 "the remaining 29 bits are
+      ignored".
+  - GP0(03h), GP0(1Fh) (IRQ1) and F0h..FFh stay cuts: their behaviour is
+    undocumented or non-trivial.
+  - Tests: `GFX1_gp0_mirrors_and_copy` and
+    `DRW1_chain_long_node_and_copy` (a 20-word node of four 81h copies plus
+    NOP mirrors).
+- **Narrowed: `func_80075358_port.c:40`, a GP0 word the GPU model refuses.**
+  The refusals that matter here were the opcodes just implemented. What
+  remains is 03h, 1Fh, F0h..FFh, the READ_DATA state, and A0 sizes outside
+  VRAM. The verifier could not establish the pause packets' (base+0x104 and
+  +0x114) command bytes, so this stays a guard.
+- **Dormant: `absent_ovl_port.c:77`.** libgte `func_80079178` is called only
+  from `func_800C65E4`, and nothing references `func_800C65E4`. There is no
+  C caller, no `jal 0x800C65E4` (`0x0C031979`) in the EXE or any of the
+  515 overlay blobs, no stored word, and no `lui 0x800C` + `0x65E4`
+  immediate pair.
+- **Error-defensive: `actor_contact_port.c:183`.** The verifier enumerated
+  the writers of actor +0x194:
+  - Aya's record takes `D_800915E0`, which is 0 in the EXE and has no
+    other writer;
+  - the constant 0x8001D268 is handled;
+  - `func_80035038` stores `D_800915DC[desc[0]][1]` from a 13-row table
+    whose column 1 is all zero.
+
+  So a stop needs a spawn descriptor with `desc[0]` of 13 or more, which
+  would make retail call table-adjacent data too. With the dangling census
+  and every room body native, every stored contact callback resolves. The
+  caveat: a body whose fingerprint matches in several rooms resolves to
+  NULL.
+- **Stack residue: `func_80028574_port.c:81`, a shot count of 11 or more.**
+  - The matched leaf indexes a local `unsigned char tbl[11]`. Retail keeps it
+    at sp+16..26, so indices 11..15 read sp+27..31, which `func_80028574`
+    never writes (the stores are `swl/swr` at 16-23 and `sb` at 24/25/26).
+  - Valid shot counts are 1, 2, 3, 5, 7 and 10. Whether any weapon record
+    reaches 11-15 is not established: a bounded search found no direct
+    retail store of the `D_8009D278` block's +0x68 weapon pointer.
+  - This is the RotMatrix residue class (KNOWN_DIVERGENCES #17). The port
+    stops rather than invent the bytes.
 
 Per-site conditions and evidence are in the workflow journal
 (`subagents/workflows/wf_8fa94741-8da/journal.jsonl` in the session
