@@ -213,12 +213,13 @@ void func_8003A088_mode0_walk_cut(pe_addr_t dest)
     }
 }
 
-/* func_8003A088 itself.  Despite its name, the walk cut above follows every
- * +0x28 mode of src/func_8003A088.c (1 source copy, 3 rigid attach, 4
+/* func_8003A088 itself.  Despite its name, the walk cut above transcribes
+ * every +0x28 mode of src/func_8003A088.c (1 source copy, 3 rigid attach, 4
  * parent-relative, then the bone walk); production's per-actor update
- * (func_80015240) calls it for every actor.  Room code that calls
- * func_8003A088 directly (room_m0017i func_8018F0F0) reaches it here instead
- * of a generated boundary. */
+ * (func_80015240) calls it for every actor.  Mode 0 is checked against retail
+ * (BTL6 oracle), modes 3/4 by the GFX2 unit tests, mode 1 by reading.  Room
+ * code that calls func_8003A088 directly (room_m0017i func_8018F0F0) reaches
+ * it here instead of a generated boundary. */
 void func_8003A088(pe_addr_t dest)
 {
     func_8003A088_mode0_walk_cut(dest);

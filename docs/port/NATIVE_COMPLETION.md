@@ -787,6 +787,16 @@ It reports each start with no fnv-0 registry row and no `case`/`==` arm. A
 literal inside a boundary call is reported as a boundary argument (the call is
 already a boundary site), and a literal after `!=` as a comparison.
 
+Scope: the census covers EXE function starts only.
+- Room-local starts are the room census's business: every room body is
+  native.
+- The six subsystem overlays have three leaves without a generated TU:
+  ovl_0700 8019234C, ovl_03D2 80191B64 and ovl_03C5 80121270. All three are
+  hand ports called by name, and 8019234C has a registry row.
+- No EXE or overlay word stores 0x8019234C or 0x80121270.
+- The three 0x80191B64 words are in room blobs (m0087i, m0419i, m0421i).
+  There that address is each room's own native body.
+
 Before today's fixes it found 7 stored callbacks with no native code, one
 loop sentinel, 9 boundary arguments, and one word in the EXE data:
 
@@ -801,9 +811,17 @@ loop sentinel, 9 boundary arguments, and one word in the EXE data:
 After f1a1b1c74 the census reported 4 stored, 9 boundary arguments and
 1 comparison. The ninth boundary argument was room_m0017i `func_8018F0F0`'s
 call of `func_8003A088`. The model-matrix walk has been native all along under
-the name `func_8003A088_mode0_walk_cut`: despite the name it follows every
-`+0x28` mode of the leaf, and production's per-actor update `func_80015240`
-calls it. It now has its own entry, `func_8003A088`
+the name `func_8003A088_mode0_walk_cut`. Despite the name it transcribes
+every `+0x28` mode of the leaf, and production's per-actor update
+`func_80015240` calls it for every actor. Verification is uneven:
+- mode 0 (the bone walk) is checked against retail by the BTL6 oracle
+  (`pc_port/tools/pe_btl6_3a088_walk_oracle.py`, a 2-bone PE.IMG object);
+- modes 3 and 4 have unit tests written from the matched C (GFX2);
+- mode 1 is verified by reading only.
+
+Retail has no `andi 0xFC` here either. The port returns early on
+`dest == 0` where retail does not check, but neither caller can pass 0. The
+walk now has its own entry, `func_8003A088`
 (`game/boot/func_8003A088_port.c`). After regen25 the room TU calls it
 directly and the registry has its row (5776 thunks). The room TU's e21 at the
 shipped flags gives 32 seeds and 45/45 words.
@@ -845,7 +863,43 @@ substitutes silently in production.
 
 ## Gates on this branch
 
-Final tree (regen20, HEAD 99fad1188 and later doc commits), 2026-10-18:
+Current tree: regen25, HEAD d9db7fcfb plus doc commits, 2026-10-18 18:26 UTC.
+- `pe-native-tests`: 1665/1665. Four tests are new since regen20:
+  `credits_entry_stops_without_xa_service`,
+  `credits_xa_commands_never_complete_without_device`,
+  `PV_494AC_item_list_confirm_runs_native` and
+  `PV_4A9A0_slot_detail_input_runs_native`.
+- ctests park/GTE/dev-menu 6/6.
+- `psyq_port_guard.py`: PASS (1421, unchanged).
+- `scripts/run_native_oracle_harnesses.sh` on this tree (18:35 UTC): font 54,
+  animation 117, field VM 693, all PASS with zero skipped.
+- Generator drift: 1050 EXE TUs, 0 drifted. The registry has 5776 thunks.
+- `boundary_site_census.py --generated`: 38 sites.
+- `dangling_callback_census.py`: 4 stored (the Psy-Q libcard hooks), 8
+  boundary arguments, 1 comparison.
+- Sweep 7 (below) predates five changes: the `LOWER_REASONS` addition, the
+  four new EXE TUs (800494AC, 8004A9A0, 800DD9E4, 800DB6BC), the
+  `func_800D1DEC` extents, the m0017i TU, and the host CdRead busy-word fix.
+  Only those TUs were swept again at the shipped flags. They pass:
+  - 800494AC: 446 seeds, 731/775 words;
+  - 8004A9A0: 557 seeds, 249/255;
+  - 800DD9E4: 216 seeds, 227/227;
+  - 800DB6BC: 265 seeds, 248/248;
+  - m0017i 8018F0F0: 32 seeds, 45/45.
+
+  No sweep 8 was run. The extents only narrow the compared window to the
+  bytes the callee reads, so they cannot turn an ok TU into a mismatch.
+- Not run, owed through the runner before anything ships:
+  - the Day-1 route regression;
+  - the movies-on Day-2 check;
+  - the owner device gate;
+  - any visual check.
+
+  Every production behaviour change today has function-level proof only.
+  Two of them sit in menus that normal play opens early: the item list
+  0x800494AC and the shop 0x8004A9A0.
+
+Earlier tree (regen20, HEAD 99fad1188 and later doc commits), 2026-10-18:
 
 - Generator drift: `gen_decomp_ports.py --e21 --verify` reports 1046 TUs up to
   date, 0 drifted. `gen_overlay_ports.py --verify` reports rooms 2951,

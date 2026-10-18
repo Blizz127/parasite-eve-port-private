@@ -3205,9 +3205,13 @@ def e21_lower_skipped(skipped: dict, matched: dict, defs: dict, known: set,
 
 
 # NON_MATCHING EXE leaves: behaviour C (proven by tools/analysis/e21_leaf.py
-# exe, not a byte match) for EXE functions that are asm in disc1.yaml.
+# exe, not a byte match), mostly for EXE functions that are asm in disc1.yaml.
 # configs/USA/overlays/nonmatching.yaml lists them under the overlay id `exe`
 # with their SLUS file offset and size; the C is src/nonmatching/exe/<name>.c.
+# An entry may also shadow a matched `c` leaf that neither the verbatim path
+# nor the E21 lowering takes (func_8004A9A0, func_800DD9E4, func_800DB6BC):
+# the matched leaf stays the byte-exact authority, and the NON_MATCHING TU is
+# the one emitted, because e21_lower_nonmatching's plans are applied last.
 NONMATCH_EXE_DIR = Path("src/nonmatching/exe")
 EXE_FILE_VRAM = 0x80010000 - 0x800          # SLUS file offset 0 -> this VMA
 

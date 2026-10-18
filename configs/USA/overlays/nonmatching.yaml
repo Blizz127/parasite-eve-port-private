@@ -85,7 +85,10 @@ leaves:
   - [room_m0256i, func_801940B0, 0x50C8, 0x1270]  # effect callback, modes 1/2, states 0-5 (m0256i)
   - [room_m0429i, func_80192F9C, 0x3FB4, 0x2500]  # effect state machine, modes 0/1/2, states 0-5 (m0429i)
 # EXE leaves: [exe, name, SLUS file offset, size] (src/nonmatching/exe/<name>.c,
-# lowered by gen_decomp_ports.py --e21, proven by tools/analysis/e21_leaf.py exe)
+# lowered by gen_decomp_ports.py --e21, proven by tools/analysis/e21_leaf.py exe).
+# Most are asm spans in disc1.yaml.  An entry may also shadow a matched `c` leaf
+# that no lowering takes; the matched leaf stays the byte-exact authority, and
+# the port uses the NON_MATCHING TU.
   - [exe, func_800C3324, 0xB3B24, 0x7E0]   # 3D textured-quad packet; called by the 0x800E0D08 weapon-effect callbacks
   - [exe, func_800C689C, 0xB709C, 0x284]   # point-in-triangle test against the D_8009D254 actor (GTE OP)
   - [exe, func_800D5A00, 0xC6200, 0x2E4]   # particle effect task, modes 0/1/2
