@@ -44,27 +44,26 @@ covers both discs.
 ## Census (2026-10-18)
 
 **Room code**: `PE_DISC1_BIN=<disc 1> python3 pc_port/tools/pe_all_rooms_native_census.py`.
-Registry `zz_dispatch.c`: 5768 thunks. 185 code rooms, 9103 (room x body)
+Registry `zz_dispatch.c`: 5769 thunks. 185 code rooms, 9103 (room x body)
 rows, 2952 unique (vma, size, FNV) bodies.
 
-| | session start | 2026-10-18 11:55 |
+| | session start | 2026-10-18 12:40 |
 |---|--:|--:|
-| native-generated bodies | 8855 | 9098 (87 via a data head) |
-| not-native bodies (all statically reachable) | 217 | 3 |
+| native-generated bodies | 8855 | 9099 (87 via a data head) |
+| not-native bodies (all statically reachable) | 217 | 2 |
 | direct-addr-guarded (hand port bound by address only) | 31 | 0 |
 | native-direct (hand port bound by fingerprint) | 0 | 2 |
-| unique not-native bodies | 136 (183,492 bytes) | 3 (17,816 bytes) |
+| unique not-native bodies | 136 (183,492 bytes) | 2 (14,192 bytes) |
 
 A body resolves only by fingerprint, as `PE_GuestCode_Resolve` does. Rooms are
 never declared resident in production, and closure-equal duplicates count once.
 
-The 3 bodies with no C anywhere are effect and particle callbacks in late
+The 2 bodies with no C anywhere are effect and particle callbacks in late
 rooms:
 
 | room | bodies |
 |---|--:|
 | m0429i | 1 |
-| m0404i | 1 |
 | m0256i | 1 |
 
 The vendor (khasinski) tree also has them as asm. The two native-direct bodies
@@ -92,6 +91,7 @@ Batch 8 (m0432i 80193940/80195B40, m0318i 80195D20/80196E4C, m0273i
 Batch 9 (m0432i 8019408C/80194F60/80196554, m0429i 80198914/801978EC,
 m0318i 801988F8) took it from 12 to 6.
 Batch 10 (m0432i 80198348/8019753C, m0429i 8019549C) took it from 6 to 3.
+Batch 11 (m0404i 80192540) took it from 3 to 2.
 
 **EXE** (`gen_decomp_ports.py --e21`): eligible 1130 verbatim, E21 lowered
 21, 112 matched leaves that a hand port defines. Five uncompilable verbatim
@@ -439,17 +439,51 @@ Every mismatch was read. None diverges for the values the game passes:
   indexes the 18-byte local tables beyond their end, so each side reads its
   own stack. In play a0 is 0..8.
 
-57 TUs are unsupported:
+57 TUs were unsupported:
 - 20 call a loud boundary (next item);
 - 10 call the host shims `HostFB_VSync` / `HostFB_SetDispMask`;
 - the rest declare callees with TU-local types (S64, RECT), which the
-  generated mocks do not see.
+  generated mocks did not see.
+
+The harness now handles the last two groups. The mock file includes the real
+headers plus the TU's own typedefs, and the headers' one-line inline
+wrappers (`func_80073A44(m) { return HostFB_VSync(m); }`) map a host call
+back to its retail address. Re-running the 57:
+
+    e21_verbatim: MISMATCH: 1     (ovl_0457 801247F4: the E23 bug above)
+    e21_verbatim: ok: 20
+    e21_verbatim: skipped: 1
+    e21_verbatim: unsupported: 35
+
+The 35 left are the 20 dormant boundary TUs and 15 whose callee or entry
+takes a struct by value (`S64`), which register mocks cannot express.
 
 The 78 skipped TUs need directed specs. Narrow returns, parameter-width
 drift (a K&R leaf passing a full `int` where the host prototype narrows to
 `short`; both harnesses mask narrow parameters to their width) and
 out-of-range indices are not closed by any generator change. They are
 recorded here as residuals.
+
+**E23: multi-dimensional array externs (live bug in the native credits).**
+ovl_0457 `func_801247F4` is the credits frame flip, entry 6 of op table 1
+at 0x80125B48 (`... 80124704, 801247F4, 80124034 ...`). The credits main loop
+dispatches it through the registry every frame of that table. Its leaf
+declares `extern unsigned char D_800BCE80[][20]` (DISPENV rows) and
+`D_800BCDC8[][92]` (DRAWENV rows). Retail passes the row addresses,
+0x800BCE80 + 20k and 0x800BCDC8 + 92k, to PutDispEnv (`func_800755F0`) and
+DrawOTagEnv (`func_800754E4`). The verbatim lowering flattened both to the
+one-dimensional `PE_DECOMP_ARRAY(addr, unsigned char)`, so `D_800BCDC8[k]`
+was the byte at offset k. The object code shows it
+(`movzbl (%rbx,%rax,1),%edi` before `call func_800755F0`): both env
+arguments were byte values, which are addresses in the low-RAM vector area.
+This was found by reading the one verbatim mismatch in ovl_0457 (a native
+SIGSEGV on a seeded frame index). Rule E23 now refuses verbatim lowering
+for a multi-dimensional array extern, and such a leaf takes the E21
+lowering, which computes guest addresses. No other verbatim TU declares
+one: a scan of every verbatim TU's leaf source finds only these two
+externs. ovl_0457 `func_80123CAC` (`D_80125B1C[][4]`) was already E21.
+`gen_overlay_ports.py --overlay ovl_0457 --verify` reports exactly this one
+TU drifting.
 
 **E22 call-site casts (generator fix, regen15).** The generator replaces a
 leaf's own callee declaration with the host prototype. Where the two 32-bit
@@ -550,7 +584,7 @@ those are hand ports with one guarded error path.
 ## Gates on this branch
 
 - `pe-native-tests` (isolated HOME, Disc 1 configured, built in /dev/shm from
-  the regeneration with room batch 10, 2026-10-18 11:50 UTC): 1661/1661, 0
+  the regeneration with room batch 11 and E23, 2026-10-18 12:36 UTC): 1661/1661, 0
   skipped. The four `credits_*` tests and 8 more NAM9 retail cases are new
   since 4dba7922.
 - ctests `park-m0086-full`, `park-m0089-full`, `gte-native-fixed`,
@@ -561,7 +595,7 @@ those are hand ports with one guarded error path.
   - field VM 693/693
 - `retail_data_guard.py --strict` on every commit's files: OK.
 - `psyq_port_guard.py --binary parasite-eve-port --binary pe-native-tests`
-  (regenerations of f91561717, 249e76f38, bfdf402af and room batches 5-10): PASS relative to the
+  (regenerations of f91561717, 249e76f38, bfdf402af and room batches 5-11): PASS relative to the
   allowlist, 1421 entries, unchanged. This is not a public-binary clearance.
 - Not run on the devbox, by rule:
   - the Day-1 route regression;
@@ -571,8 +605,9 @@ those are hand ports with one guarded error path.
 
 ## Open
 
-- The 3 remaining no-C room bodies: m0404i 80192540 (0xE28), m0256i
-  801940B0 (0x1270), m0429i 80192F9C (0x2500, no near twin). The room workflow (wf_9660d38d) is working through them.
+- The 2 remaining no-C room bodies, m0256i 801940B0 (0x1270) and m0429i
+  80192F9C (0x2500, no near twin): the workflow proved and confirmed both;
+  batch 12 integrates them. The room workflow (wf_9660d38d) is working through them.
 - Intra-overlay boundaries in generated subsystem-overlay TUs. These calls go
   to a non-emitted leaf of the same overlay that only a hand port implements:
   - ovl_03D2 `80191B64`, from 801924F8 and 80192934;
