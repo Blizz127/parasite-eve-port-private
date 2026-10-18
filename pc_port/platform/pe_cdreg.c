@@ -8,6 +8,7 @@
 #include "pe_gpu.h"
 #include "pe_irq.h"
 #include "pe_irq_delivery.h"
+#include <string.h>
 #include "game_port.h"
 #include "pe_bootstrap.h"
 #include "pe_mdec.h"
@@ -311,6 +312,20 @@ void PE_CdReg_Reset(void)
         g_cdreg_bus_control[i] = 0u;
     for (i = 0u; i < 12u; i++)
         g_cdreg_dma3[i] = 0u;
+}
+
+/* End a mid-game attachment (PE_Cd_DetachDevice).  Like PE_CdReg_Reset, but
+ * the CD audio mix latch (ATV0..3 pending and applied) survives: it is the
+ * game's own CdMix state (func_8007A88C / func_800870F0).  pe_cdreg keeps it
+ * with the device disabled too, and the host movie feed reads it there
+ * (pe_str_feed.c PE_CdReg_GetAudioVolumes).  Retail's mix after the credits
+ * is whatever the credits last applied, not zero. */
+void PE_CdReg_DetachDevice(void)
+{
+    uint8_t pending[4],active[4];
+    memcpy(pending,g_audio_pending,4);memcpy(active,g_audio_active,4);
+    PE_CdReg_Reset();
+    memcpy(g_audio_pending,pending,4);memcpy(g_audio_active,active,4);
 }
 
 static uint8_t *cdreg_byte(pe_addr_t address)

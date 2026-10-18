@@ -68,7 +68,13 @@ const char *PE_Port_StopReasonName(PEPortStopReason reason);
  * caller, and taking the escape disarms it.  The escape point sits at the very
  * entry of HostFB_VSync, PE_GuestCall and HostFB_DevicePoll, before any
  * device or audio servicing.  It is never taken from PE_Port_RequestStop,
- * which runs part-way through device updates. */
+ * which runs part-way through device updates.  It can be taken inside IRQ
+ * servicing: the CD data-ready dispatch (PE_GuestCall from
+ * HostFB_ServiceDeviceIrq) and a VSync(-1) inside the VBlank dispatch both
+ * reach a point.  The longjmp then abandons that dispatch's guard and mask
+ * state.  That is acceptable only because a stop ends the run: after main
+ * returns, port_main's shutdown is host-only (blit, screenshot, logs, stop
+ * report) and runs no guest code. */
 #include <setjmp.h>
 void PE_Port_EscapeArm(jmp_buf *escape);
 void PE_Port_EscapeDisarm(void);

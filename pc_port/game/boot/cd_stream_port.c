@@ -124,14 +124,15 @@ int func_8007F994(void)
  * retail sends those at boot, not at the credits.  It refuses unless libds is
  * host-booted and idle (lane 1, queue empty).  Detach puts both previous slot
  * values back; InterruptCallback also restores the I_MASK and
- * registered-source bits.  Detach then resets the device model. */
+ * registered-source bits.  Detach then resets the device model, keeping the
+ * CD audio mix the credits last applied (PE_CdReg_DetachDevice). */
 int PE_Cd_AttachDevice(PeCdAttach *saved)
 {
     memset(saved,0,sizeof *saved);
     if(PE_CdReg_DeviceEnabled() || PE_LoadU32(0x8009B554u)!=1u ||
        func_8007F72C()!=1 || func_8007F778()!=0) return 0;
     if(!PE_CdReg_EnableDevice(7u)) return 0;
-    if(PE_Callback_Bind(0x8007FE24u,func_8007FE24)!=0) {PE_CdReg_Reset();return 0;}
+    if(PE_Callback_Bind(0x8007FE24u,func_8007FE24)!=0) {PE_CdReg_DetachDevice();return 0;}
     saved->irq2=func_80073CC4(2u,0x8007C13Cu);
     saved->vsync0=func_80073D58(0u,0x8007FE24u);
     saved->attached=1;
@@ -143,7 +144,7 @@ void PE_Cd_DetachDevice(const PeCdAttach *saved)
     if(!saved->attached) return;
     (void)func_80073D58(0u,saved->vsync0);
     (void)func_80073CC4(2u,saved->irq2);
-    PE_CdReg_Reset();
+    PE_CdReg_DetachDevice();
 }
 
 /* 800F4..80164: timed-out command reset and asynchronous reissue. */

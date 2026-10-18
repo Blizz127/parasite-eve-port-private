@@ -948,9 +948,17 @@ credits in production. Its order:
      The injection test proved this: that case spun until its 60 s alarm
      before the point was added.
 
-   The escape is never taken from `PE_Port_RequestStop` itself. The attach
-   record is static, so it stays valid across the longjmp.
-5. Detach on both paths. The return is `!PE_Port_ShouldStop()`.
+   The escape is never taken from `PE_Port_RequestStop` itself. It can be
+   taken inside IRQ servicing, though: the CD data-ready dispatch and a
+   `VSync(-1)` in the VBlank dispatch both reach a point. The longjmp then
+   abandons that dispatch's guard and mask state. That is acceptable only
+   because a stop ends the run: `port_main`'s shutdown after main returns is
+   host-only and runs no guest code. The attach record is static, so it stays
+   valid across the longjmp.
+5. Detach on both paths, through `PE_CdReg_DetachDevice`. That is
+   `PE_CdReg_Reset` but keeps the CD audio mix latch (ATV pending and
+   applied), which the host movie feed reads with the device off
+   (`pe_str_feed.c`). The return is `!PE_Port_ShouldStop()`.
 
 **Tests** (forked children under `alarm()`, from the production entry state:
 host libds boot, pad records, the boot input config `func_8003E974`, no button
@@ -961,6 +969,14 @@ held, SPU active, an 80000-sector fixture; a test VBlank hook in VSync slot 7):
   - it left through `D_80172CE0 = D_80172CE4 = 1`;
   - after detach: IRQ 2, VSync 0 and both masks restored, lane 1, queue empty,
     bit 16 clear.
+- `credits_after_overlay_reload` follows production's order:
+  - main's arm first runs `func_8006F044` on Disc 1: stop all sound, then
+    reload ovl_039F and ovl_0457 through host reads from the mounted PE.IMG;
+  - only then does it run `PE_Main_EnterCredits`;
+  - the attach accepts what that leaves in libds, and the whole loop runs.
+- `credits_attach_from_host_boot` also applies the game's CdMix
+  (`func_800870F0(144)`) through the attached drive and checks that the latch
+  survives the detach.
 - `credits_mode_20000_waits_for_press`, mode 0x20000:
   - channel 1 via `func_80125894(1)`, and the fade states 1-3;
   - state 2 waited until the hook held the button the boot config maps to an
@@ -973,7 +989,8 @@ held, SPU active, an 80000-sector fixture; a test VBlank hook in VSync slot 7):
 - `credits_escape_from_cd_waits`: a stop in the `func_80125744` lane wait, in
   the `func_801255A4` Pause wait and in the `func_8012562C` search retry.
   Each comes back through the escape, detached and restored.
-- `credits_entry_stops_without_xa_service` now checks the two gate boundaries
+- `credits_entry_gates` (renamed from
+  `credits_entry_stops_without_xa_service`) checks the two gate boundaries
   (`credits_pad_code_mode` for 0x10000/0x12000, `credits_xa_file_absent` for
   0/0x20000 with no disc). In both, the device stays detached and nothing of
   the credits runs.
@@ -1107,11 +1124,12 @@ substitutes silently in production.
 
 ## Gates on this branch
 
-Current tree: HEAD after the credits production wiring, 2026-10-18 21:53-21:57
-UTC (incremental build in /dev/shm):
-- `pe-native-tests`: 1675/1675. New since regen25:
+Current tree: HEAD after the credits production wiring and its review
+fixes, 2026-10-18 22:19-22:23 UTC (incremental build in /dev/shm):
+- `pe-native-tests`: 1676/1676. New since regen25:
   `credits_xa_device_path`, `CDXA_device_commands`,
   `credits_attach_from_host_boot`, `credits_main_loop_runs_to_exit`,
+  `credits_after_overlay_reload`,
   `credits_mode_20000_waits_for_press`, `credits_escape_from_loop`,
   `credits_escape_from_cd_waits`, `GFX1_gp0_mirrors_and_copy`,
   `DRW1_chain_long_node_and_copy` and `PV_4D5CC_card_slot_runs_registry_callback`.

@@ -58,6 +58,8 @@ void PE_CdReg_Reset(void);
  * disc. Timing advances only via ServiceDevice; no SDK RAM is written here. */
 int PE_CdReg_DeviceEnabled(void);
 int PE_CdReg_EnableDevice(uint8_t interrupt_mask);
+/* Mid-game detach: PE_CdReg_Reset that keeps the CD audio mix latch. */
+void PE_CdReg_DetachDevice(void);
 void PE_CdReg_ServiceDevice(uint32_t elapsed_cycles);
 void PE_CdReg_ServiceDMA3(void);
 typedef struct {

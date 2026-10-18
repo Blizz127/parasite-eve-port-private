@@ -225,11 +225,11 @@ static void test_credits_vlc_bounded_resume_oracle(void)
  * forever.  Nothing of the credits runs: the op-table pointer the loop stores
  * first keeps its sentinel, the libcd queue is untouched and the device stays
  * detached. */
-static void test_credits_entry_stops_without_xa_service(void)
+static void test_credits_entry_gates(void)
 {
     static const uint32_t modes[] = { 0u, 0x10000u, 0x12000u, 0x20000u };
     unsigned m;
-    TEST("credits_entry_stops_without_xa_service");
+    TEST("credits_entry_gates");
     ASSERT(PE_Cd_XaServiceAvailable() == 1, "the attached device serves XA streaming");
     for (m = 0; m < 4u; m++) {
         const char *want = (modes[m] & 0x10000u) ? "credits_pad_code_mode"
@@ -314,6 +314,8 @@ int32_t ovl_0457__func_80125744(void);
 int32_t ovl_0457__func_80125894(uint8_t a_a0);
 int ovl_0457__func_801255A4(void);
 void ovl_0457__func_801235DC(void);
+void func_800870F0(unsigned int a0);
+void func_8006F044(void);
 
 /* total_sectors >= CXA_SECTORS: sectors past CXA_SECTORS are left untouched
  * (calloc'd zero pages, never written) so a long fixture costs no memory; the
@@ -475,7 +477,19 @@ static void test_credits_attach_from_host_boot(void)
     ASSERT(!PE_Port_ShouldStop() && PE_LoadU32(0x80172CE4u) == 1u &&
            dev.xa_sectors >= CXA_FILE_SECTORS / 4u, "XA stream played to its end");
     ASSERT(ovl_0457__func_801255A4() == 0 && !PE_Port_ShouldStop(), "teardown");
-    PE_Cd_DetachDevice(&at);
+    {
+        /* The game's CdMix (func_800870F0 -> func_8007A88C) through the
+         * attached drive; the latch must survive the detach, because the
+         * host movie feed reads it with the device off. */
+        uint8_t mix[4], kept[4];
+        func_800870F0(144u);
+        PE_CdReg_GetAudioVolumes(mix);
+        ASSERT(!PE_Port_ShouldStop() && (mix[0] | mix[1] | mix[2] | mix[3]),
+               "CdMix applied through the attached drive");
+        PE_Cd_DetachDevice(&at);
+        PE_CdReg_GetAudioVolumes(kept);
+        ASSERT(memcmp(mix, kept, 4) == 0, "detach keeps the CD audio mix");
+    }
     ASSERT(!PE_CdReg_DeviceEnabled(), "detach disables the device");
     ASSERT(PE_LoadU32(0x800945E8u + 8u) == irq2 && PE_Callback_GetSlot(0u) == vsync0 &&
            PE_IRQ_GetMask() == mask && PE_LoadU16(0x80094614u) == registered,
@@ -507,7 +521,7 @@ static void test_credits_attach_from_host_boot(void)
 #define CXA_LOOP_SECTORS 80000u
 #define CXA_HOOK_ADDR    0x8000FF00u
 enum { CXA_MODE0, CXA_MODE20000, CXA_STOP_IN_LOOP, CXA_QUIT_IN_LOOP,
-       CXA_STOP_LANE_WAIT, CXA_STOP_TEARDOWN, CXA_STOP_SEARCH };
+       CXA_STOP_LANE_WAIT, CXA_STOP_TEARDOWN, CXA_STOP_SEARCH, CXA_AFTER_F044 };
 typedef struct {
     uint32_t setup, ret, escaped, stopped, reason, attached_after, slots_ok;
     uint32_t ce0, ce4, iterations, presented, xa, lane, queue, d1a0;
@@ -574,7 +588,7 @@ static void CxaChild(int scenario, CxaRun *r)
     if (PE_GuestImage_LoadExe(d1, err, sizeof(err)) != 0 ||
         PE_Globals_AdoptRetailImage() != 0 || credits_load_overlays() != 0) return;
     if (!(cx = CxaBuildDiscSized(&img, CXA_LOOP_SECTORS, scenario != CXA_STOP_SEARCH))) return;
-    PE_Disc_SetActive(cx);
+    if (scenario != CXA_AFTER_F044) PE_Disc_SetActive(cx);
     HostFB_Init(); PE_GPU_Init(); PE_Callback_Init();
     PE_Spu_SetActive(1);                        /* the SPU decodes routed XA */
     func_80073C94();
@@ -582,6 +596,17 @@ static void CxaChild(int scenario, CxaRun *r)
     (void)func_8003E974();                      /* boot's input config */
     PE_StoreU16(0x800BE9A2u, 0xFFFFu);          /* no button held */
     if (func_8007EC14() != 1 || func_8007ED58() != 1 || func_8007F72C() != 1) return;
+    if (scenario == CXA_AFTER_F044) {
+        /* main's arm runs func_8006F044 first: the host-mode reload of
+         * ovl_039F and ovl_0457 from PE.IMG (Disc 1 here; the fixture has
+         * no PE.IMG), mounted as func_800698D4 mounts it. */
+        uint32_t lba, size;
+        if (!PE_Disc_FindFile(d1, "\\PE.IMG;1", &lba, &size, NULL, 0)) return;
+        PE_StoreU32(0x800B0DD8u, lba);
+        func_8006F044();
+        if (PE_Port_ShouldStop()) return;
+        PE_Disc_SetActive(cx);
+    }
     irq2 = PE_LoadU32(0x800945E8u + 8u);
     vsync0 = PE_Callback_GetSlot(0u);
     mask = PE_IRQ_GetMask();
@@ -607,6 +632,7 @@ static void CxaChild(int scenario, CxaRun *r)
         r->ret = (uint32_t)PE_Main_EnterCredits();
         break;
     case CXA_MODE0:
+    case CXA_AFTER_F044:
         r->ret = (uint32_t)PE_Main_EnterCredits();
         break;
     default:
@@ -702,6 +728,24 @@ static void test_credits_main_loop_runs_to_exit(void)
     PASS();
 }
 
+/* The production order: main's arm runs func_8006F044 (stop all sound, then
+ * reload ovl_039F and ovl_0457 through host reads) and then
+ * PE_Main_EnterCredits.  Whatever func_8006F044 leaves in libds must still
+ * let the attach accept (lane 1, queue empty, D_8009B554 = 1), or production
+ * would stop on credits_cd_attach and never run the credits. */
+static void test_credits_after_overlay_reload(void)
+{
+    CxaRun r;
+    TEST_RETAIL_DISC1("credits_after_overlay_reload");
+    ASSERT(CxaFork(CXA_AFTER_F044, &r, 240u), "func_8006F044 then the credits did not finish");
+    ASSERT(r.setup, "func_8006F044 ran on Disc 1 without a stop");
+    ASSERT(r.ret == 1u && !r.stopped && r.ce0 == 1u && r.iterations >= 13000u,
+           "PE_Main_EnterCredits attached and ran the whole loop");
+    ASSERT(!r.attached_after && r.slots_ok && r.lane == 1u && r.queue == 0u,
+           "detached, hooks restored, drive idle");
+    PASS();
+}
+
 /* Mode 0x20000 (bit 17): channel 1 (func_80125894(1)), the fade states 1-3 and
  * the state-2 wait for D_80172CE4 and a held exit button.  No button is held
  * until the hook presses the one the boot config maps to an exit bit, at
@@ -776,11 +820,12 @@ static void test_credits_native_all(void)
     test_credits_libpress_retail_oracle();
     test_credits_registry_dispatch();
     test_credits_vlc_bounded_resume_oracle();
-    test_credits_entry_stops_without_xa_service();
+    test_credits_entry_gates();
     test_credits_xa_commands_never_complete_without_device();
     test_credits_xa_device_path();
     test_credits_attach_from_host_boot();
     test_credits_main_loop_runs_to_exit();
+    test_credits_after_overlay_reload();
     test_credits_mode_20000_waits_for_press();
     test_credits_escape_from_loop();
     test_credits_escape_from_cd_waits();

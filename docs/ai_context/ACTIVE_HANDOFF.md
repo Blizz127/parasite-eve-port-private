@@ -14,7 +14,7 @@ Nothing pushed, nothing published, no game run.
     counter, as its header documents. It used to return the call count, which
     starved the credits' GetlocP.
   - `func_801235DC` runs to its exit from production state.
-- Production-wiring commit (after 4637916e3):
+- e9593b664 (production wiring):
   - `PE_Cd_XaServiceAvailable` = 1.
   - `PE_Main_EnterCredits` gates the pad-code mode and a missing CREDITS.XA,
     attaches, arms the new stop escape (`game_port.h`), runs, and detaches.
