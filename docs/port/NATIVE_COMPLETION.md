@@ -783,14 +783,25 @@ settled them as follows.
   - This is the RotMatrix residue class (KNOWN_DIVERGENCES #17). The port
     stops rather than invent the bytes.
 
-  - Writer trace (2026-10-19). The count is the low nibble of the equip
-    block's abilities word (`weapon+16`). The pause menu works on a copy at
-    `D_800A76D8` (`func_8005C498`, `func_800512AC` modes 2 and 3) and writes
-    it back through `func_800218D8`. The block is built from the weapon item,
-    and tool transfers (`func_8005A318`) copy attribute bytes without adding
-    to them. Whether any item carries 11-15 needs a census of the item
-    attribute data, which has not been done. So this stays an open,
-    reachable-in-principle stop, not a dormant one.
+  - **Settled: dormant (2026-10-19).** The count is the low nibble (`lo4`)
+    of the equip block's abilities word (`weapon+16`).
+    - Its only writer is `func_80051980` (`grep -rn lo4 src/` finds nothing
+      else). The word starts at `0x11`, so shots are 1 by default. An
+      attribute slot whose ability id `v` is 1-5 sets
+      `lo4 = D_800923D0[v]` (`src/func_80051980.c:86-89`).
+    - `D_800923D0` is a byte table in the retail EXE, `01 02 03 05 07 0a`.
+      So ids 1-5 give 2, 3, 5, 7 and 10, and no other value can be written.
+    - The port's `func_80051980_port.c:114-115` reads the same table.
+    - The pause menu recomputes the block on its copy at `D_800A76D8`
+      (`func_8005C498`, `func_800512AC` modes 2 and 3 -> `func_80051980`) and
+      copies it back with the 15 mask (`func_800218D8`).
+    - Tool transfers (`func_8005A318`) move attribute bytes and add only the
+      `+0xE`/`+0x10`/`+0x12` stats, never the abilities word. The cheats touch
+      `+0x0C` only.
+
+    So game logic produces only 1, 2, 3, 5, 7 or 10, the six counts the
+    damage table defines. 11-15 needs an externally edited or corrupt save.
+    The stop stays as the guard for that case.
 
 Per-site conditions and evidence are in the workflow journal
 (`subagents/workflows/wf_8fa94741-8da/journal.jsonl` in the session
@@ -1395,12 +1406,14 @@ Earlier gates:
   table): the only path to them, the MemCard_TimerCallback table
   `D_800A5AB4`, is never dispatched in production.
 - Of the seven boundary conditions (under "Boundary-site census"), two are
-  fixed and five are settled: three dormant (`func_80075358`'s GP0 refusals,
-  `absent_ovl_port.c:77`, and with them the libcard hooks), one
-  error-defensive (`actor_contact_port.c:183`), and one stack residue
-  (`func_80028574` shot counts 11-15). The stack-residue one stays a stop:
-  retail reads uninitialized stack there, and whether a weapon record can
-  carry 11-15 is not established.
+  fixed and five are settled:
+  - four dormant: `func_80075358`'s GP0 refusals, `absent_ovl_port.c:77`
+    (and with them the libcard hooks), and `func_80028574` shot counts
+    11-15, which game logic cannot produce (`func_80051980` and
+    `D_800923D0`);
+  - one error-defensive: `actor_contact_port.c:183`.
+
+  The shot-count stop stays only as the guard for an edited save.
 
 - No room body is without C any more (census 0). The NON_MATCHING bodies are
   behaviour C proven by the e21 differential, not byte matches. The room workflow (wf_9660d38d) is working through them.
@@ -1464,8 +1477,15 @@ Earlier gates:
   - The other callers pass 0 or `D_8009D02C`, which only holds 0
     (`func_800527C8`) or the current style (`func_80033A20`).
 
-  So it is dormant for every disc script. The caveat is world-map bytecode,
-  which is built from save data at run time and is not on the disc.
+  So it is dormant for every disc script. Op 0x55 is the only way into
+  `func_80029810`, and actor scripts come from the room package: the room
+  loader fills the per-type table at `D_800B0CD8 + 0x1C0` (`D_800B0E98`) with
+  pointers into the loaded package (`func_8006B4F8`, `func_8006BECC`), and
+  `func_80035038` takes each actor's script base from it. The census decodes
+  every module of every package. The one remaining caveat is
+  `pe_field_vm_opcode_coverage.py`'s note that world-map (type-0) slot
+  bytecode is save data. That note was not confirmed here: no code in `src/`
+  reads its `D_800A77F0 + 0x50`.
 - The retail stack-residue residuals and m0023i's `[DAY1_SHIM]` (above).
 - Done: the directed retail differential of the Items/Equipment paths
   (`func_80057834`, `func_800466C0`, `func_8005A318`). The two hand ports are
