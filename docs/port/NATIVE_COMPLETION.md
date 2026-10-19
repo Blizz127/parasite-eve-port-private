@@ -380,6 +380,30 @@ The mode is not the default yet. Two things are owed before switching:
 - A full sweep with the mode on. That is a heavy job, so it waits for the
   coordinator's heavy-job turn (PS4169 held it on 2026-10-19).
 
+Prepared since then for coordinator task c447185feb53 (not applied to the
+branch): `/dev/shm/pe-coincide-prep/RECIPE.md`. Findings:
+- The fixed `+16` is wrong for some TUs. Static evidence from room_m0430i
+  `func_8018F750`, a matched leaf with a 9-argument call: its locals start at
+  sp+40, not sp+36, and its four 4-byte `CVECTOR`s sit at sp+56/64/72/80.
+  cc1 2.7.2 therefore rounds the outgoing argument area to 8 and gives every
+  struct local an 8-aligned slot.
+- The proposal: guest_lower notes `retail sp+K` with
+  K = round8(max(16, 4 × the widest call's arguments)). There is no note for
+  a leaf, for `__builtin_memcpy`, or when a non-scalar sits off 8 in the
+  guest frame; coincide mode then falls back to the default placement.
+
+Focused pilot, coordinator task 77dc538195bd, 2026-10-19 04:36:51-04:38:44
+UTC. It ran in a scratch mirror at the proposal's post-pins, on 17 TUs: the 8
+residues, one noted EXE TU per K band (16-56) and three no-note fallbacks
+(m0430i included).
+- Default mode is identical to sweep 8: ok 9, and MISMATCH 8 on the
+  residues.
+- Coincide mode: ok 17. The residues pass at K=16 on 4 seeds with full
+  retail coverage, and the other nine keep their sweep-8 seeds and coverage.
+- The run used 3 min 30 s of CPU and a 169 M memory peak.
+- This covers those 17 TUs only, not a full sweep. The proposal stays
+  unapplied until the coordinator admits that step.
+
 ## Hand ports retired
 
 Each of these hand ports was replaced by the generated TU of its matched leaf,
@@ -937,6 +961,9 @@ Port changes:
     translation of a Psy-Q leaf, so it is disclosed here rather than renamed:
     a `PE_*` name would hide Psy-Q content from the guard. It is an allowlist
     edit, and allowlist edits go to the coordinator for approval.
+  - **Approved by the owner on 2026-10-19.** The owner answered directly in
+    the terminal at 04:31:05Z, and the coordinator verified the answer as
+    owner authority (message c4a74096b2831f39).
 - `PE_Cd_DispatchDataCallback`'s default arm runs a target the guest-code
   registry resolves (retail's `jalr (status, response)`), and only an
   unresolved target stops. This arm is reachable in production. It turns a

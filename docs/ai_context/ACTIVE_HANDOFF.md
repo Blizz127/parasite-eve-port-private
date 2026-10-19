@@ -1,3 +1,28 @@
+## UPDATE 2026-10-19 04:40 UTC: owner decisions; coincide recipe and pilot
+
+Lane: claude/native-complete-20261017. Nothing pushed or published; no game
+run on the devbox.
+
+- The owner answered in the terminal (04:31:05Z; the coordinator verified it,
+  message c4a74096b2831f39):
+  - Day-1 route run admitted. It stays separate, after the pilot, on the
+    coordinator's runner sequencing; no kit is built yet.
+  - The `0x8007BF44` (CdGetSector) Psy-Q allowlist row move is approved.
+- Coordinator task c447185feb53: the coincide full-sweep recipe is prepared,
+  not run (`/dev/shm/pe-coincide-prep/RECIPE.md`, copy in the session
+  scratchpad).
+  - The proposed rule is K = round8(max(16, 4 × the widest call's
+    arguments)), with no note for leaves, `__builtin_memcpy` or off-8
+    non-scalars.
+  - Evidence: room_m0430i `func_8018F750`'s retail frame.
+- Coordinator task 77dc538195bd: a focused pilot in the scratch mirror, PASS
+  on all 17 TUs.
+  - Coincide mode: ok 17, with the 8 residues ok at K=16.
+  - Default mode: identical to sweep 8.
+  - Units and temp were cleaned up; the branch and binaries are unchanged.
+- Next: the Day-1 route run once the coordinator gives a runner slot. It
+  covers this branch's normal-play changes and logs the flash shim's causes.
+
 ## UPDATE 2026-10-19 01:34 UTC: m0023i flash model records F710's write-back
 
 Lane: claude/native-complete-20261017. Nothing pushed, published or run as a
