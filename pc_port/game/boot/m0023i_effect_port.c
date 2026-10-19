@@ -105,6 +105,48 @@ __attribute__((constructor)) static void pe_strict_boundary_env(void)
     if (e && e[0] == '1') g_pe_strict_effect_stack = 1;
 }
 
+/* Day-1 shim diagnostics; nothing reads them back.  Each distinct effect-stack
+ * state that leaves F710's borrowed bytes unknown is logged once, and every
+ * hit is counted (summary at exit), so a run names the callback whose stack
+ * writes must be bound before the shim can go. */
+enum { FLASH_SHIM_CAUSES=16 };
+static struct { PeEffectStackCause cause; unsigned hits; } g_flash_shim[FLASH_SHIM_CAUSES];
+static unsigned g_flash_shim_causes,g_flash_shim_untracked,g_flash_shim_total;
+static PeEffectStackCause g_flash_shim_last;
+static int flash_shim_same(const PeEffectStackCause *a,const PeEffectStackCause *b)
+{
+    return a->active==b->active && a->context==b->context && a->known==b->known &&
+        a->reset_fn==b->reset_fn && a->reset_context==b->reset_context;
+}
+static void flash_shim_summary(void)
+{
+    char text[160];
+    for(unsigned i=0;i<g_flash_shim_causes;i++) {
+        PE_EffectStackDescribe(&g_flash_shim[i].cause,text,sizeof text);
+        fprintf(stderr,"[DAY1_SHIM] PE_M0023I_Flash: %u hit(s): %s\n",g_flash_shim[i].hits,text);
+    }
+    if(g_flash_shim_untracked)
+        fprintf(stderr,"[DAY1_SHIM] PE_M0023I_Flash: %u hit(s) with further causes\n",g_flash_shim_untracked);
+}
+static void flash_shim_note(void)
+{
+    PeEffectStackCause cause;char text[160];unsigned i;
+    PE_EffectStackCause(&cause);g_flash_shim_last=cause;g_flash_shim_total++;
+    for(i=0;i<g_flash_shim_causes;i++)
+        if(flash_shim_same(&g_flash_shim[i].cause,&cause)) {g_flash_shim[i].hits++;return;}
+    if(g_flash_shim_causes==FLASH_SHIM_CAUSES) {g_flash_shim_untracked++;return;}
+    if(!g_flash_shim_causes)atexit(flash_shim_summary);
+    g_flash_shim[g_flash_shim_causes].cause=cause;g_flash_shim[g_flash_shim_causes++].hits=1;
+    PE_EffectStackDescribe(&cause,text,sizeof text);
+    fprintf(stderr,"[DAY1_SHIM] PE_M0023I_Flash: F710 caller-stack ring position unresolved (%s); "
+        "using owner joint position\n",text);
+}
+unsigned PE_M0023I_FlashShimLast(PeEffectStackCause *cause)
+{
+    if(cause)*cause=g_flash_shim_last;
+    return g_flash_shim_total;
+}
+
 int PE_M0023I_Flash(int32_t mode,pe_addr_t data,int16_t retained_position[3])
 {
     int16_t local[3];uint8_t ring_color[3],fan_color[3];
@@ -137,8 +179,8 @@ int PE_M0023I_Flash(int32_t mode,pe_addr_t data,int16_t retained_position[3])
                  * leaves F710's own last write there (the joint position
                  * stored at the end of every mode-2 call below), so use the
                  * current joint position instead of stopping the game. */
-                static int16_t fallback[3];static int warned;
-                if(!warned){warned=1;fprintf(stderr,"[DAY1_SHIM] PE_M0023I_Flash: F710 caller-stack ring position unresolved; using owner joint position\n");}
+                static int16_t fallback[3];
+                flash_shim_note();
                 PE_ActorJointPositionCE8F0(owner(),(uint32_t)(int32_t)lh(data),local,fallback);
                 retained_position=fallback;
             }

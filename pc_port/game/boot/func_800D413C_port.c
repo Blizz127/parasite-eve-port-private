@@ -6,6 +6,7 @@
 #include "pe_sdk.h"
 #include "game_port.h"
 #include <stdio.h>
+#include <string.h>
 
 /* Retail passes a fourth register (a3) to descriptor command callbacks;
  * D4698 publishes it here before dispatching (SEW12). */
@@ -26,15 +27,58 @@ void PE_EffectCallback_SlotAbi(uint32_t a1) { g_pe_effect_slot_abi = 1; g_pe_eff
 enum { EFFECT_STACK_NONE,EFFECT_STACK_INIT,EFFECT_STACK_UPDATE,EFFECT_STACK_DRAW,
        EFFECT_STACK_PARTICLE_UPDATE,EFFECT_STACK_PARTICLE_DRAW,EFFECT_STACK_WEAPON_DRAW,
        EFFECT_STACK_WEAPON_UPDATE };
-static struct { uint64_t generation;unsigned active,context,known;int16_t position[3]; } effect_stack;
-void PE_EffectStackInvalidate(void) { effect_stack.known=0; }
+static struct { uint64_t generation;unsigned active,context,known;int16_t position[3];
+                pe_addr_t reset_fn;unsigned reset_context; } effect_stack;
+/* Forget the borrowed bytes and remember who did it: a callback whose stack
+ * writes are not bound, or a PE_EFFECT_STACK_RESET_* marker.  Diagnostics for
+ * the m0023i flash shim only (PE_EffectStackCause); nothing reads them back. */
+static void effect_stack_forget(pe_addr_t fn)
+{
+    effect_stack.known=0;effect_stack.reset_fn=fn;effect_stack.reset_context=effect_stack.context;
+}
+void PE_EffectStackCause(PeEffectStackCause *out)
+{
+    out->active=effect_stack.active;out->context=effect_stack.context;out->known=effect_stack.known;
+    out->reset_fn=effect_stack.reset_fn;out->reset_context=effect_stack.reset_context;
+}
+static const char *effect_stack_context_name(unsigned context)
+{
+    static const char *const names[]={"none","init","update","draw","particle-update",
+        "particle-draw","weapon-draw","weapon-update"};
+    return context<sizeof(names)/sizeof(names[0])?names[context]:"?";
+}
+void PE_EffectStackDescribe(const PeEffectStackCause *cause,char *out,unsigned size)
+{
+    char who[32];
+    switch(cause->reset_fn) {
+    case 0:snprintf(who,sizeof who,"nothing");break;
+    case PE_EFFECT_STACK_RESET_INVALIDATE:snprintf(who,sizeof who,"invalidate");break;
+    case PE_EFFECT_STACK_RESET_RAM:snprintf(who,sizeof who,"new RAM generation");break;
+    case PE_EFFECT_STACK_RESET_WEAPON_UPDATE:snprintf(who,sizeof who,"weapon-update call");break;
+    case PE_EFFECT_STACK_RESET_BEGIN:snprintf(who,sizeof who,"new draw depth");break;
+    default:snprintf(who,sizeof who,"callback %08X",(unsigned)cause->reset_fn);break;
+    }
+    /* known: 1 = X, 2 = Y (particle prologue), 4 = Z (CE934 update store). */
+    char missing[8]="";
+    for(unsigned i=0;i<3;i++)if(!(cause->known&(1u<<i))) {
+        size_t n=strlen(missing);missing[n]="XYZ"[i];missing[n+1]=0;
+    }
+    if(!cause->active)snprintf(out,size,"outside the effect pump");
+    else snprintf(out,size,"context %s, unknown %s, last cleared by %s in context %s",
+        effect_stack_context_name(cause->context),missing[0]?missing:"none",who,
+        effect_stack_context_name(cause->reset_context));
+}
+void PE_EffectStackInvalidate(void) { effect_stack_forget(PE_EFFECT_STACK_RESET_INVALIDATE); }
 void PE_EffectStackBegin(void)
 {
     if(effect_stack.generation!=PE_RamGeneration()) {
-        effect_stack.generation=PE_RamGeneration();effect_stack.known=0;
+        effect_stack.generation=PE_RamGeneration();effect_stack_forget(PE_EFFECT_STACK_RESET_RAM);
     }
     effect_stack.active=1;effect_stack.context=EFFECT_STACK_NONE;
     /* The next particle prologue establishes X/Y at this draw depth. */
+    if(effect_stack.known&3u) {
+        effect_stack.reset_fn=PE_EFFECT_STACK_RESET_BEGIN;effect_stack.reset_context=EFFECT_STACK_NONE;
+    }
     effect_stack.known&=4u;
 }
 void PE_EffectStackEnd(void) { effect_stack.active=0;effect_stack.context=EFFECT_STACK_NONE; }
@@ -59,7 +103,7 @@ int PE_EffectStackWeaponUpdate(pe_addr_t fn,pe_addr_t slot)
 void PE_EffectStackWeaponUpdateCall(void)
 {
     if(effect_stack.active && effect_stack.context==EFFECT_STACK_WEAPON_UPDATE)
-        effect_stack.known=0;
+        effect_stack_forget(PE_EFFECT_STACK_RESET_WEAPON_UPDATE);
 }
 void PE_EffectStackWeaponCallback(pe_addr_t fn,pe_addr_t data)
 {
@@ -76,7 +120,7 @@ void PE_EffectStackWeaponCallback(pe_addr_t fn,pe_addr_t data)
          * into sp+78/+7C, at this same 69594 draw depth. */
         for(unsigned i=0;i<3;i++)effect_stack.position[i]=(int16_t)PE_LoadU16(0x800C21BCu+i*2u);
         break;
-    default:effect_stack.known=0;return;
+    default:effect_stack_forget(fn);return;
     }
     effect_stack.known=7u;
 }
@@ -100,9 +144,9 @@ int PE_EffectCallback(pe_addr_t fn, int32_t mode, pe_addr_t data, pe_addr_t extr
     PE_M34StackCallback(fn);
     int rehearsal=m0023i_code();
     if(effect_stack.active && (!rehearsal || effect_stack.context==EFFECT_STACK_INIT ||
-       effect_stack.context==EFFECT_STACK_NONE))effect_stack.known=0;
+       effect_stack.context==EFFECT_STACK_NONE))effect_stack_forget(fn);
     if (PE_MirrorOverlay()) {
-        if(effect_stack.active)effect_stack.known=0;
+        if(effect_stack.active)effect_stack_forget(fn);
         if (fn==0x8018F0F0u) return PE_MirrorDraw(data);
         if (fn==0x8018EFF4u || fn==0x8018F1A4u || fn==0x8018F1BCu) return 0;
         if (fn==0x8018F1ACu) {PE_StoreU8(data,4u);return 0;}
@@ -174,7 +218,7 @@ int PE_EffectCallback(pe_addr_t fn, int32_t mode, pe_addr_t data, pe_addr_t extr
             return PE_M0023I_Particle(mode,data);
         }
         if (fn==0x8018FC14u) {
-            if(effect_stack.active)effect_stack.known=0;
+            if(effect_stack.active)effect_stack_forget(fn);
             return PE_M0023I_Beam(mode,data);
         }
         if (fn==0x8018F710u) {
@@ -191,7 +235,7 @@ int PE_EffectCallback(pe_addr_t fn, int32_t mode, pe_addr_t data, pe_addr_t extr
             return (int32_t)0x80190758u;
         }
     }
-    if(effect_stack.active)effect_stack.known=0;
+    if(effect_stack.active)effect_stack_forget(fn);
     /* M0005I (Eve's charge effect) hand ports are that room's code only:
      * other rooms put different bodies at these addresses (m0113i 8018F018,
      * the m0412i 8018F614, m0205i/m0243i/m0406i/m0410i 8018FB84, m0256i

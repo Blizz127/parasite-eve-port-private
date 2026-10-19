@@ -1169,6 +1169,19 @@ int PE_Decomp_BoundaryStopEnabled(void); /* pe_guest_decomp.c: native-only stop 
 void PE_EffectStackBegin(void);
 void PE_EffectStackEnd(void);
 void PE_EffectStackInvalidate(void);
+/* Why the m0023i flash's borrowed stack bytes are unknown (diagnostics only):
+ * the effect-stack model's state and the callback, or marker, that last
+ * cleared them (func_800D413C_port.c). */
+typedef struct { unsigned active, context, known; pe_addr_t reset_fn; unsigned reset_context; } PeEffectStackCause;
+#define PE_EFFECT_STACK_RESET_INVALIDATE    0xFFFFFFFFu  /* PE_EffectStackInvalidate */
+#define PE_EFFECT_STACK_RESET_RAM           0xFFFFFFFEu  /* guest RAM generation changed */
+#define PE_EFFECT_STACK_RESET_WEAPON_UPDATE 0xFFFFFFFDu  /* unbound call at the weapon-update depth */
+#define PE_EFFECT_STACK_RESET_BEGIN         0xFFFFFFFCu  /* new draw depth; X/Y not re-established */
+void PE_EffectStackCause(PeEffectStackCause *out);
+void PE_EffectStackDescribe(const PeEffectStackCause *cause, char *out, unsigned size);
+/* Day-1 flash shim hits: total, and the effect-stack cause of the latest one
+ * (m0023i_effect_port.c; diagnostics only). */
+unsigned PE_M0023I_FlashShimLast(PeEffectStackCause *cause);
 int PE_EffectStackWeaponDraw(pe_addr_t fn,pe_addr_t slot);
 int PE_EffectStackWeaponUpdate(pe_addr_t fn,pe_addr_t slot);
 void PE_EffectStackWeaponUpdateCall(void);

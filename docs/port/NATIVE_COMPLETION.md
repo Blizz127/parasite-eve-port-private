@@ -373,9 +373,12 @@ the same uninitialized frame offsets as retail. What remains is the
 production question in "Known residuals": what the guest stack holds there,
 which depends on what ran before.
 
-The mode is not the default yet. A full sweep with it is owed before
-switching, and that is a heavy job, so it waits for a free turn. `+16` assumes
-a frame with the home area, which every one of the 8 has.
+The mode is not the default yet. Two things are owed before switching:
+- `guest_lower.py` should record each lowered TU's retail stack-pointer
+  offset. Today `e21_diff.py` infers `+16`, which holds only for frames with
+  the 16-byte home area (every one of the 8 has it).
+- A full sweep with the mode on. That is a heavy job, so it waits for the
+  coordinator's heavy-job turn (PS4169 held it on 2026-10-19).
 
 ## Hand ports retired
 
@@ -798,6 +801,21 @@ settled them as follows.
     - Tool transfers (`func_8005A318`) move attribute bytes and add only the
       `+0xE`/`+0x10`/`+0x12` stats, never the abilities word. The cheats touch
       `+0x0C` only.
+    - An offset search finds no other store into the word. Through the weapon
+      pointer (`+0x68`) there is one store, `func_800512AC.c:101`, and it
+      writes the item id (`lo`, bits 0-9 of `+0x0C`):
+
+          grep -rnE "f68->[a-zA-Z0-9_]+ *(=[^=]|\|=|&=|\+=)|f68\)->" src/
+
+      Every `+0x10` store in the `src/` files that use the weapon pointer
+      targets the player record's `f10`, an actor record, field-VM state
+      (`D_8009D300`) or effect data:
+
+          for f in $(grep -rlE "f68|\+ 0x68\)" src/ | xargs grep -lE "D_8009D278|D_8009D254"); do
+            grep -nE "(\+ 0x10\)|\[4\]|->f10\b|->ab|lo4|abil).*=[^=]" $f | grep -vE "==|!=|<=|>="; done
+
+      In `pc_port/`, the stores through `record+104` write `weapon+10` (the
+      item id), not `+16`. A save load restores a block the game wrote.
 
     So game logic produces only 1, 2, 3, 5, 7 or 10, the six counts the
     damage table defines. 11-15 needs an externally edited or corrupt save.
@@ -1249,6 +1267,20 @@ substitutes silently in production.
 - **m0023i flash `[DAY1_SHIM]`** (`m0023i_effect_port.c`, KNOWN_DIVERGENCES
   #17) is the one shim that substitutes silently in production. Retail reads
   the stack residue of the previous mode-2 call.
+  - Since 2026-10-19 the shim names its cause; what it substitutes is
+    unchanged. The effect-stack model records the callback, or marker, that
+    last cleared the borrowed bytes (`PE_EffectStackCause`). The first hit of
+    each distinct cause is logged, every hit is counted, and a summary prints
+    at exit:
+
+        [DAY1_SHIM] PE_M0023I_Flash: F710 caller-stack ring position unresolved (context draw, unknown Z, last cleared by new RAM generation in context none); using owner joint position
+
+  - That is the cause on the retail pump history (`test_m0023i_pump.h`
+    asserts it). In a fresh RAM generation, F004's prologue writes X/Y, but
+    no CE934 update has stored Z at the borrowed depth before the first
+    flash draw.
+  - Which causes normal play hits, and so which stack writers to bind next,
+    needs the log of a Day-1 route run.
 - **m0005i hand ports versus generated TUs.** 8018F018, 8018F330 and 8018FB84
   now have matched C (harvested), but the effect dispatcher still sends
   m0005i's own bytes to the hand ports. Those hand ports are checked against
@@ -1482,10 +1514,35 @@ Earlier gates:
   loader fills the per-type table at `D_800B0CD8 + 0x1C0` (`D_800B0E98`) with
   pointers into the loaded package (`func_8006B4F8`, `func_8006BECC`), and
   `func_80035038` takes each actor's script base from it. The census decodes
-  every module of every package. The one remaining caveat is
-  `pe_field_vm_opcode_coverage.py`'s note that world-map (type-0) slot
-  bytecode is save data. That note was not confirmed here: no code in `src/`
-  reads its `D_800A77F0 + 0x50`.
+  every module of every package.
+
+  The old note in `pe_field_vm_opcode_coverage.py`, that world-map (type-0)
+  slot bytecode is save data, does not hold (checked 2026-10-19):
+  - An actor's script base is `(*D_800B161C)[desc[0] + 2]`
+    (`func_80035038`; `func_800125E0` reads the same table). `D_800B161C` is
+    `D_800B0CD8 + 0x944`, the `Tbl.p` word after the ten 0xC0-byte class
+    rows, not a row entry.
+  - Only `func_8006B4F8` stores a nonzero value there: the room package's
+    slot-0x14 script, the one the census decodes. `func_8006B35C` clears it.
+    No other code stores to it:
+
+        python3 -I tools/analysis/store_imm_scan.py 0x944 0x161C
+        EXE 8006B3D8 sw $0,0x944($2)        (func_8006B35C)
+        EXE 8006B8C4 sw $2,0x944($22)       (func_8006B4F8)
+        room_m0085i_c1.bin +3AB34 swr $7,0x161C($2)
+        room_m0162i_c1.bin +3FBC sb $16,0x944($24)
+        store_imm_scan: 4 hit(s) in the EXE text and 517 PE.IMG blobs
+
+    The two blob hits are data words, not code (their neighbours do not
+    decode as code).
+  - `func_8006BECC` refills class-0 rows from PE.IMG area blocks at
+    `D_800B0DD8 + D_800930D8[area + 8]` (`D_800B0DD8` is PE.IMG's start,
+    `func_800698D4`). Those are animation-handler rows (`func_8001A680`,
+    `func_8001A784`), not script bases. They are disc data, not save data.
+
+  So every actor script base points into a room package script that the
+  census decodes. Not audited: other stores to the actor's script-base field
+  (`+0x9C`) after the spawn sets it.
 - The retail stack-residue residuals and m0023i's `[DAY1_SHIM]` (above).
 - Done: the directed retail differential of the Items/Equipment paths
   (`func_80057834`, `func_800466C0`, `func_8005A318`). The two hand ports are

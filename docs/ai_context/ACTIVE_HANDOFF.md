@@ -1,3 +1,37 @@
+## UPDATE 2026-10-19 01:08 UTC: m0023i shim names its cause; style-census caveat closed
+
+Lane: claude/native-complete-20261017. Nothing pushed, published or run as a
+game.
+
+- The m0023i flash `[DAY1_SHIM]` now names why the borrowed stack bytes are
+  unknown; what it substitutes is unchanged.
+  - The effect-stack model records the callback, or marker, that last
+    cleared them (`PE_EffectStackCause`, `PE_EffectStackDescribe`).
+  - Each distinct cause is logged once and every hit is counted, with a
+    summary at exit.
+  - On the retail pump history the cause is "context draw, unknown Z, last
+    cleared by new RAM generation": no CE934 update stored Z before the
+    first flash draw. `test_m0023i_pump.h` and `test_m0023i_flash.h` assert
+    the cause.
+- Style census: the "world-map bytecode is save data" note does not hold.
+  - Actor script bases come from `D_800B161C`. Only `func_8006B4F8` writes it
+    a nonzero value, the room package's slot-0x14 script that the census
+    decodes.
+  - New `tools/analysis/store_imm_scan.py` finds no other store to it in the
+    EXE or the 517 PE.IMG blobs.
+  - `func_8006BECC`'s class-0 area rows are animation handlers, loaded from
+    PE.IMG.
+- Shot counts: the offset-search commands and their results are recorded in
+  NATIVE_COMPLETION.
+- Coincide mode: making it the default needs `guest_lower.py` to record each
+  TU's retail stack-pointer offset, then a full sweep, which is a heavy job.
+- Gate: pe-native-tests 1677/1677, ctests 6/6 (GATE_DETAILS).
+- Next:
+  - the Day-1 route regression on the runner, with an admission. It covers
+    this branch's normal-play changes, and its log lists the shim's causes;
+  - the Disc 2 ending and Day-2 movie runs;
+  - the owner device gate and the `0x8007BF44` allowlist approval.
+
 ## UPDATE 2026-10-19 00:10 UTC: pad-code credits, e21 residue, Items/Equipment
 
 Lane: claude/native-complete-20261017. Nothing pushed, published or run as a

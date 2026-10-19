@@ -100,7 +100,19 @@ static void test_DAY1_retail_m0023i_pump(void)
     for(unsigned i=0;i<sizeof(DAY1_pump_common)/sizeof(DAY1_pump_common[0]);i++)
         PE_StoreU32(DAY1_pump_address(DAY1_pump_common[i][0]),DAY1_pump_common[i][1]);
     D_8009D1A0=0x84u;(void)func_800D401C(1);
+    unsigned hits=PE_M0023I_FlashShimLast(NULL);
     (void)func_80069594();
     ASSERT(!PE_Port_ShouldStop(),"Day-1 shim: a fresh effect pump keeps the port running");
+    {   /* The shim names the resetter: inside the pump's draw, F004's prologue
+         * set X/Y, but no CE934 update stored Z after the fresh RAM generation
+         * cleared the bytes when the pump began. */
+        PeEffectStackCause cause;char text[160];
+        ASSERT(PE_M0023I_FlashShimLast(&cause)==hits+1u,"Day-1 shim: one substitution in the fresh pump");
+        PE_EffectStackDescribe(&cause,text,sizeof text);
+        if(!strstr(text,"unknown Z"))fprintf(stderr,"M0023I pump shim cause: %s\n",text);
+        ASSERT(cause.active && cause.known==3u && cause.reset_fn==PE_EFFECT_STACK_RESET_RAM &&
+               strstr(text,"context draw, unknown Z, last cleared by new RAM generation"),
+               "Day-1 shim: the log names the resetter");
+    }
     ResetTestState();PASS();
 }
