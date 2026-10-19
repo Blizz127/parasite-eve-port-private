@@ -1,3 +1,33 @@
+## UPDATE 2026-10-19 00:10 UTC: pad-code credits, e21 residue, Items/Equipment
+
+Lane: claude/native-complete-20261017. Nothing pushed, published or run as a
+game.
+
+- 8b8b92c83: the pad-code credits (bit 16) run native.
+  - The host read now publishes the two libds completions a retail read
+    leaves: the read packet, then the closing CdlPause, through 0x800A3460
+    and `func_8007EB88`. So `DsSync(0)` reads 2 as on hardware.
+  - New `E21_STACK_COINCIDE=1` mode: the 8 stack-residue TUs all match retail
+    when both sides see the same stack bytes. The lowered frame equals
+    retail's at sp+16.
+- 80f3f0128: the `func_80057834` and `func_800466C0` hand ports are retired for
+  generated TUs proven by directed e21. `func_8005A318` is now at 591/825
+  words.
+  - New `battle_style_census.py`: across 414 scripts, 402 battle entries all
+    use style 0-3. So the `func_800339A0` style >= 4 guard is dormant on the
+    disc.
+- Gate: pe-native-tests 1677/1677, ctests 6/6, Psy-Q guard 1421, generator
+  0 drifted (1051 EXE TUs).
+- Coordinator task 2aec7ce1795e (space recovery): reported "no step
+  space-blocked" at 22:40Z.
+- Still open:
+  - production stack-residue content: needs a runner `--recorded` snapshot;
+  - the m0023i flash shim;
+  - `func_80028574` shot counts 11-15 (no item-database census yet);
+  - a full sweep in coincide mode before it becomes the default (a heavy
+    job);
+  - the runner runs and the owner device gate.
+
 ## UPDATE 2026-10-18 22:00 UTC: the ending credits run native (unit level)
 
 Lane: claude/native-complete-20261017 (worktree build/wt-native-20261017).
