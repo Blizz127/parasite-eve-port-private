@@ -377,6 +377,32 @@ The mode is not the default yet. A full sweep with it is owed before
 switching, and that is a heavy job, so it waits for a free turn. `+16` assumes
 a frame with the home area, which every one of the 8 has.
 
+## Hand ports retired
+
+Each of these hand ports was replaced by the generated TU of its matched leaf,
+proven by the e21 differential at the shipped flags with directed inputs
+(`configs/USA/overlays/nonmatching.yaml` `inputs:`). The generated TU now takes
+the hand port's symbol, and the registry row binds it by that symbol. The
+hand ports matched the leaves on reading, but no differential had covered
+them.
+
+| function | what | e21 (directed) | notes |
+|---|---|---|---|
+| `func_80057834` | Items -> Use (record kind switch, `D_8009D028` history arm) | 15 seeds, 103/104 words | retail calls `func_800512AC(0, &local)` where the hand port called `PE_MenuCommitResult(v + 3)`; same effect |
+| `func_800466C0` | Equipment list window (confirm, cancel) | 11 seeds, 206/255 words | canonical prototype's `event` is `int32_t` now (the leaf's `int key`); the registry thunk's cast followed |
+
+`func_8005A318` (Equipment tool transfer) was already generated. Sweep 8
+covered it at 352/825 words. With three directed specs it covers 591/825 in
+18 seeds, all matching retail. The specs cover:
+- the attribute-slot move;
+- the `slot < 0` stat merge and HP spill;
+- the `cnt < 999` tail.
+
+The first run with those specs mismatched on `func_80054E4C`'s argument,
+which was a harness artefact. The mocked `func_80059A40(&tmp)` did not write
+its out-parameter, so each side passed its own stack residue. The fix is the
+`out=80059A40:0:4` term.
+
 ## Host compile semantics (verbatim TUs)
 
 1016 of the 2923 room TUs, and most generated EXE TUs, are verbatim lowerings,
@@ -1391,11 +1417,23 @@ Earlier gates:
     (`r(0x8006E6A8)=0;r(0x8006E7E8)=0`). ovl_03D2's three are title-loop
     code, which the port runs as hand ports (see the intra-overlay
     boundaries above).
-- `func_800339A0` with style >= 4 stays a loud boundary. Retail reads the
-  stack above a 16-byte local there.
+- `func_800339A0` with style >= 4 stays a loud boundary, because retail reads
+  the stack above a 16-byte local there. No disc data reaches it:
+  - `tools/analysis/battle_style_census.py` reads all 414 room scripts.
+  - The style comes from field-VM op 0x55 (battle entry,
+    `func_800144FC` -> `func_80029810(**a0)`). Those 402 commands all take
+    immediate styles: 0 (37), 1 (26), 2 (273) and 3 (66).
+  - Op 0xED key 0xAF1 (`func_80016910`) appears in none of the 1411 op-0xED
+    commands.
+  - The other callers pass 0 or `D_8009D02C`, which only holds 0
+    (`func_800527C8`) or the current style (`func_80033A20`).
+
+  So it is dormant for every disc script. The caveat is world-map bytecode,
+  which is built from save data at run time and is not on the disc.
 - The retail stack-residue residuals and m0023i's `[DAY1_SHIM]` (above).
-- A directed retail differential of the Items/Equipment paths
-  (`func_80057834`, `func_800466C0`, `func_8005A318`).
+- Done: the directed retail differential of the Items/Equipment paths
+  (`func_80057834`, `func_800466C0`, `func_8005A318`). The two hand ports are
+  retired for their generated TUs; see "Hand ports retired".
 - m0005i: hand ports or generated TUs. The hand ports that the effect
   dispatcher binds for m0005i's own bytes (8018F018, 8018F330, 8018FB84)
   have retail-case tests generated from the original Disc 1 code:

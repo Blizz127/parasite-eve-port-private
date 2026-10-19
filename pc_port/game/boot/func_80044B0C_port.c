@@ -23,35 +23,7 @@ void func_800516B4(int32_t item)
     func_80052E30(bank);
 }
 
-void func_80057834(int32_t index)
-{
-    pe_addr_t record=func_8005332C(index);
-    if (PE_LoadU32(0x8009D028u)) {
-        pe_addr_t history=func_80051098(),slot=D_8009D048+(uint32_t)index*2u;
-        PE_StoreU32(use_ram(history),0u);
-        PE_StoreU32(use_ram(history+8u),(uint32_t)index);
-        PE_StoreU32(use_ram(history+4u),(uint32_t)(int32_t)(int16_t)PE_LoadU16(use_ram(slot)));
-        PE_MenuCommitResult((uint32_t)(int32_t)(int16_t)PE_LoadU16(use_ram(slot))+3u);
-        func_80057D30(index);
-    } else {
-        /* src/func_80057834.c: switch (p[0xE]) */
-        switch (PE_LoadU8(use_ram(record+14u))) {
-        case 1u:
-            func_800516B4((int16_t)PE_LoadU16(use_ram(D_8009D048+(uint32_t)index*2u)));
-            func_80057D30(index);func_80055760();
-            break;
-        case 2u:
-            func_8004F23C();
-            break;
-        case 4u: case 5u: case 6u:
-            func_80048918(0xFE,index,-1);
-            break;
-        case 12u: case 13u: case 14u:
-            func_80048918(0x200,index,-1);
-            break;
-        }
-    }
-}
+/* func_80057834: ported from the matching decomp -- generated TU pc_port/game/decomp/func_80057834_port.c (src/func_80057834.c); hand port retired after differential verification (docs/port/NATIVE_COMPLETION.md, "Hand ports retired"). */
 
 int func_80044B0C(pe_addr_t window,uint32_t event)
 {

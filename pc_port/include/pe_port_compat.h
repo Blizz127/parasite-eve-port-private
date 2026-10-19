@@ -376,7 +376,7 @@ void func_80045A98(pe_addr_t window);
 unsigned int func_800631C0(pe_addr_t pe_arg0);
 int func_80045D0C(pe_addr_t window,uint32_t event);
 int func_8004620C(pe_addr_t window,uint32_t event);
-int func_800466C0(pe_addr_t window,uint32_t event);
+int func_800466C0(pe_addr_t window,int32_t event);   /* src: int key */
 void func_80046574(pe_addr_t window,uint32_t confirmed);
 void func_80059534(int32_t selected);
 int32_t func_8005968C(int32_t selected);
