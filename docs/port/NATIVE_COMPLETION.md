@@ -783,6 +783,15 @@ settled them as follows.
   - This is the RotMatrix residue class (KNOWN_DIVERGENCES #17). The port
     stops rather than invent the bytes.
 
+  - Writer trace (2026-10-19). The count is the low nibble of the equip
+    block's abilities word (`weapon+16`). The pause menu works on a copy at
+    `D_800A76D8` (`func_8005C498`, `func_800512AC` modes 2 and 3) and writes
+    it back through `func_800218D8`. The block is built from the weapon item,
+    and tool transfers (`func_8005A318`) copy attribute bytes without adding
+    to them. Whether any item carries 11-15 needs a census of the item
+    attribute data, which has not been done. So this stays an open,
+    reachable-in-principle stop, not a dormant one.
+
 Per-site conditions and evidence are in the workflow journal
 (`subagents/workflows/wf_8fa94741-8da/journal.jsonl` in the session
 directory).
@@ -1084,6 +1093,19 @@ It publishes only once libds is initialized (`D_8009B554 = 1`, ring index
 0..7). `6AD40_complete_effect_allowlist` now accepts the sequence counter,
 the response buffer and the ring, as a retail read writes them.
 
+**Scope of the ring model.** Only `func_8006E6D4` (and the tray's
+`PE_Tray_HostStop`) publish completions. The other host CD operations that
+retail sends through the libds queue publish nothing:
+- the PVD verify `func_80082314`;
+- the host CdSearchFile `func_80081414`.
+
+So `DsSync(0)` is faithful only after a `func_8006E6D4` read. The pad-code
+credits rely on exactly that: `func_8006F044` reads right before them. This is
+a normal-play change too: every room load now writes the libds sequence
+counter `D_8009B53C`, the ring `0x800A3610..0x800A3693` and the response
+buffer `0x800A3460`. It has function-level proof only (the suite and 6AD40);
+the Day-1 route regression is owed.
+
 `credits_pad_code_mode` runs production's order:
 - `func_8006F044`'s two host reloads on Disc 1, after which `DsSync(0)` reads 2;
 - then `PE_Main_EnterCredits` in mode 0x12000:
@@ -1226,7 +1248,21 @@ substitutes silently in production.
 
 ## Gates on this branch
 
-Current tree: HEAD after the credits production wiring and its review
+Current tree: HEAD e6785a20d (2026-10-19 00:15 UTC):
+- `pe-native-tests` 1677/1677 (0 skipped), ctests 6/6.
+- `psyq_port_guard.py` on both binaries: PASS (1421).
+- Generator drift: 1051 EXE TUs, 0 drifted; overlay TUs 0 drifted; the
+  registry is up to date.
+- No overlay registry entry at fingerprint 0 (2169 fnv-0 rows, all EXE).
+- `scripts/run_native_oracle_harnesses.sh`: font 54, animation 117, field
+  VM 693, all PASS with zero skipped.
+- `boundary_site_census.py --generated`: 38 sites. `dangling_callback_census.py`:
+  4 stored, 8 boundary arguments, 1 comparison. Both unchanged.
+- The two normal-play changes (host reads publish libds completions;
+  Items -> Use and the Equipment list run generated TUs) have function-level
+  proof only, so the Day-1 route regression is the most important owed run.
+
+Earlier tree: HEAD after the credits production wiring and its review
 fixes, 2026-10-18 22:19-22:23 UTC (incremental build in /dev/shm):
 - `pe-native-tests`: 1676/1676. New since regen25:
   `credits_xa_device_path`, `CDXA_device_commands`,
