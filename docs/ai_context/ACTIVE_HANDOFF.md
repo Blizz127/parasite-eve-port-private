@@ -24,6 +24,17 @@ game.
 - Candidate, not done: substitute the model's last tracked values instead of
   the joint position. That assumes unbound callbacks leave the bytes alone,
   so it needs evidence first, for example the causes from a Day-1 route run.
+- Erratum to the 01:08 entry: its gate line reads "(GATE_DETAILS)", a
+  placeholder. The 03ba62003 gate: pe-native-tests 1677/1677, ctests 6/6,
+  Psy-Q guard PASS (1421), generators 0 drifted (1051 EXE TUs, overlay
+  registry up to date), boundary census 38, dangling census 4/8/1, oracle
+  harnesses PASS.
+- Gate on 6b2956262 (01:34-01:54 UTC): pe-native-tests 1677/1677, ctests 6/6,
+  Psy-Q guard PASS (1421), 1051 EXE and 2951 room TUs 0 drifted, boundary
+  census 38, dangling census 4/8/1, oracle harnesses PASS.
+- Next: the Day-1 route run on the runner (coordinator admission). It covers
+  this branch's normal-play changes, and DAY1_FIDELITY_GAPS records the shim
+  path in the first Eve fight, so its log will list the shim's causes.
 
 ## UPDATE 2026-10-19 01:08 UTC: m0023i shim names its cause; style-census caveat closed
 

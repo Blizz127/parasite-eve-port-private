@@ -1545,9 +1545,10 @@ Earlier gates:
     rows, not a row entry.
   - Only `func_8006B4F8` stores a nonzero value there: the room package's
     slot-0x14 script, the one the census decodes. `func_8006B35C` clears it.
-    No other code stores to it:
+    No other code stores to it, through `D_800B0CD8` (+0x944), `%lo` (0x161C)
+    or the `Tbl` base `&D_800B0E98` (+0x784):
 
-        python3 -I tools/analysis/store_imm_scan.py 0x944 0x161C
+        python3 -I tools/analysis/store_imm_scan.py 0x944 0x161C 0x784
         EXE 8006B3D8 sw $0,0x944($2)        (func_8006B35C)
         EXE 8006B8C4 sw $2,0x944($22)       (func_8006B4F8)
         room_m0085i_c1.bin +3AB34 swr $7,0x161C($2)
