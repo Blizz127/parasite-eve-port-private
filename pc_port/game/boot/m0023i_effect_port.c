@@ -147,7 +147,12 @@ unsigned PE_M0023I_FlashShimLast(PeEffectStackCause *cause)
     return g_flash_shim_total;
 }
 
-int PE_M0023I_Flash(int32_t mode,pe_addr_t data,int16_t retained_position[3])
+/* borrowed: F710's six caller-stack bytes (NULL: not tracked on this path).
+ * known: which of X(1)/Y(2)/Z(4) hold the original bytes.  State 0 reads them
+ * as the ring position.  Every mode-2 call ends by writing the joint position
+ * over all six (pe_m0023i_flash_oracle.py hashes 0x801FEFB8 after the
+ * original call), so a tracked caller knows all six afterwards. */
+static int flash(int32_t mode,pe_addr_t data,int16_t borrowed[3],unsigned known)
 {
     int16_t local[3];uint8_t ring_color[3],fan_color[3];
     for(unsigned i=0;i<3;i++) {
@@ -168,23 +173,24 @@ int PE_M0023I_Flash(int32_t mode,pe_addr_t data,int16_t retained_position[3])
     } else if(mode==2) {
         int state=lh(data+4u),timer=lh(data+2u);int32_t scale=0,brightness=0;
         if(state==0) {
-            if(!retained_position && g_pe_strict_effect_stack) {
+            const int16_t *ring=borrowed;int16_t fallback[3];
+            if((!borrowed || known!=7u) && g_pe_strict_effect_stack) {
                 Bootstrap_ReturnVoid("PE_M0023I_Flash","original F710 caller stack position is unresolved");
                 PE_Port_RequestStop(PE_PORT_STOP_UNRESOLVED_BOUNDARY);return 0;
             }
-            if(!retained_position) {
+            if(!borrowed || known!=7u) {
                 /* DAY1 SHIM (docs/ai_context/DAY1_FIDELITY_GAPS.md,
-                 * "M0023I F710 flash ring position"): the borrowed caller
-                 * stack bytes are not modelled on this call path.  Retail
-                 * leaves F710's own last write there (the joint position
-                 * stored at the end of every mode-2 call below), so use the
-                 * current joint position instead of stopping the game. */
-                static int16_t fallback[3];
+                 * "M0023I F710 flash ring position"): the model has lost the
+                 * borrowed bytes (an unbound callback ran at this depth, the
+                 * RAM generation changed, or this path is not tracked).
+                 * Retail reads whatever their last writer left.  Substitute
+                 * the current joint position instead of stopping the game.
+                 * That is not the original value; the log names the cause. */
                 flash_shim_note();
                 PE_ActorJointPositionCE8F0(owner(),(uint32_t)(int32_t)lh(data),local,fallback);
-                retained_position=fallback;
+                ring=fallback;
             }
-            PE_EffectRingD0728(retained_position,600,800,32,0,timer,timer,ring_color,0,
+            PE_EffectRingD0728(ring,600,800,32,0,timer,timer,ring_color,0,
                 func_80077CF4(timer*128)/32,1);
             scale=timer*256;brightness=80;
             if(timer>=8) {PE_StoreU16(data+4u,1);PE_StoreU16(data+2u,0);}
@@ -203,7 +209,7 @@ int PE_M0023I_Flash(int32_t mode,pe_addr_t data,int16_t retained_position[3])
         if(time&1u)scale=(int32_t)((uint32_t)scale*5u)/4;
         int16_t position[3],angles[4]={0,0,(int16_t)((0u-time)<<6u),0};
         PE_ActorJointPositionCE8F0(owner(),(uint32_t)(int32_t)lh(data),local,position);
-        if(retained_position)for(unsigned i=0;i<3;i++)retained_position[i]=position[i];
+        if(borrowed)for(unsigned i=0;i<3;i++)borrowed[i]=position[i];
         int32_t sprite_scale=(int32_t)((uint32_t)scale*3u)/2;
         PE_EffectSpriteValuesCEE20(position,angles,sprite_scale,sprite_scale,128,clut(48),1,
             brightness/(int32_t)(1u+(time&1u)),0);
@@ -211,6 +217,14 @@ int PE_M0023I_Flash(int32_t mode,pe_addr_t data,int16_t retained_position[3])
         PE_EffectFanD004C(position,600,600,12,0,scale,scale,fan_color,0,64,1);
     }
     return 0;
+}
+int PE_M0023I_Flash(int32_t mode,pe_addr_t data,int16_t retained_position[3])
+{
+    return flash(mode,data,retained_position,retained_position?7u:0u);
+}
+int PE_M0023I_FlashTracked(pe_addr_t data,int16_t borrowed[3],unsigned known)
+{
+    return flash(2,data,borrowed,known);
 }
 
 /* SDK 785D4: left rotation becomes the GTE rotation; each right column

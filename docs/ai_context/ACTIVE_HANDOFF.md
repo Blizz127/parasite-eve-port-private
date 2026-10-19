@@ -1,3 +1,30 @@
+## UPDATE 2026-10-19 01:34 UTC: m0023i flash model records F710's write-back
+
+Lane: claude/native-complete-20261017. Nothing pushed, published or run as a
+game.
+
+- Bug fixed: after a substituted (`[DAY1_SHIM]`) state-0 draw, the effect-stack
+  model did not record F710's own end-of-call write of its joint position
+  over the six borrowed bytes. So the shim fired again on later state-0
+  draws.
+  - The write is retail behaviour: `pe_m0023i_flash_oracle.py` runs the
+    original code and hashes 0x801FEFB8 after the call.
+  - The model now records it (`PE_M0023I_FlashTracked`), so the shim fires
+    once per loss of the bytes.
+  - `test_m0023i_pump.h` runs a second pump in strict mode and asserts no
+    stop and no new substitute. With the old behaviour that pump stops.
+- The substitute value (owner joint position) is unchanged.
+- Provenance check: the flash fixture's borrowed bytes are generator inputs
+  (`pe_m0023i_flash_oracle.py:47` defaults them to (-6120, -32756, 0)), not
+  captured retail stack. So they say nothing about what retail holds when the
+  model loses the bytes.
+- Correction to the 01:08 entry: the "context draw, unknown Z" cause comes
+  from the pump test's fresh-generation scenario, which the test builds; it
+  is not a recorded retail history.
+- Candidate, not done: substitute the model's last tracked values instead of
+  the joint position. That assumes unbound callbacks leave the bytes alone,
+  so it needs evidence first, for example the causes from a Day-1 route run.
+
 ## UPDATE 2026-10-19 01:08 UTC: m0023i shim names its cause; style-census caveat closed
 
 Lane: claude/native-complete-20261017. Nothing pushed, published or run as a

@@ -222,12 +222,14 @@ int PE_EffectCallback(pe_addr_t fn, int32_t mode, pe_addr_t data, pe_addr_t extr
             return PE_M0023I_Beam(mode,data);
         }
         if (fn==0x8018F710u) {
-            int16_t *retained=0;
-            if(effect_stack.active && effect_stack.context==EFFECT_STACK_DRAW && mode==2 &&
-               (effect_stack.known==7u || (int16_t)PE_LoadU16(data+4u)!=0))retained=effect_stack.position;
-            int result=PE_M0023I_Flash(mode,data,retained);
-            if(retained && !PE_Port_ShouldStop())effect_stack.known=7u;
-            return result;
+            if(effect_stack.active && effect_stack.context==EFFECT_STACK_DRAW && mode==2) {
+                /* F710 ends every mode-2 call by writing its joint position
+                 * over all six bytes, including after a shim substitution. */
+                int result=PE_M0023I_FlashTracked(data,effect_stack.position,effect_stack.known);
+                if(!PE_Port_ShouldStop())effect_stack.known=7u;
+                return result;
+            }
+            return PE_M0023I_Flash(mode,data,NULL);
         }
         /* Eleven-word descriptor command; +0x34 is bytecode, not a callback. */
         if (fn==0x80190644u) {

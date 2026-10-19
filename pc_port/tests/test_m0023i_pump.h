@@ -114,5 +114,14 @@ static void test_DAY1_retail_m0023i_pump(void)
                strstr(text,"context draw, unknown Z, last cleared by new RAM generation"),
                "Day-1 shim: the log names the resetter");
     }
+    /* F710 ended that draw by writing its joint position over all six bytes,
+     * so the next pump's state-0 draw reads tracked bytes: strict mode runs
+     * on and nothing is substituted. */
+    hits=PE_M0023I_FlashShimLast(NULL);
+    g_pe_strict_effect_stack=1;
+    (void)func_80069594();
+    g_pe_strict_effect_stack=0;
+    ASSERT(!PE_Port_ShouldStop(),"after F710's write-back a strict second pump must not stop");
+    ASSERT(PE_M0023I_FlashShimLast(NULL)==hits,"after F710's write-back the next draw needs no substitute");
     ResetTestState();PASS();
 }

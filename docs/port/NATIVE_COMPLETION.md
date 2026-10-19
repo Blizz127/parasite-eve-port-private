@@ -1245,7 +1245,7 @@ comparison is `port6_port.c`'s `0x8007E3B4` loop sentinel.
 `PE_EffectCallback` has a `[DAY1_SHIM]` arm that skips an unresolved effect
 callback instead of stopping. It runs only under `PE_BOUNDARY_POLICY=record`,
 the diagnostic policy, so production stops. m0023i stays the one shim that
-substitutes silently in production.
+substitutes in production instead of stopping (it logs each cause).
 
 ## Known residuals (documented, not hidden)
 
@@ -1265,20 +1265,30 @@ substitutes silently in production.
   recorded retail stack contents (a runner `--recorded` snapshot), not
   zero-fill. This is the same class as KNOWN_DIVERGENCES #17.
 - **m0023i flash `[DAY1_SHIM]`** (`m0023i_effect_port.c`, KNOWN_DIVERGENCES
-  #17) is the one shim that substitutes silently in production. Retail reads
-  the stack residue of the previous mode-2 call.
-  - Since 2026-10-19 the shim names its cause; what it substitutes is
-    unchanged. The effect-stack model records the callback, or marker, that
-    last cleared the borrowed bytes (`PE_EffectStackCause`). The first hit of
-    each distinct cause is logged, every hit is counted, and a summary prints
-    at exit:
+  #17) is the one shim that substitutes in production instead of stopping.
+  Retail reads whatever the six borrowed bytes' last writer left.
+  - Fixed 2026-10-19: F710 ends every mode-2 call by writing its joint
+    position over all six bytes, and the original-code oracle
+    (`pe_m0023i_flash_oracle.py`, which hashes 0x801FEFB8 after the call)
+    confirms it. The model used to skip that write after a substituted draw,
+    so the shim fired again on later state-0 draws. It now records the
+    write, so the shim fires only on the first state-0 draw after the model
+    loses the bytes. `test_m0023i_pump.h` runs a second pump, in strict
+    mode, and asserts it needs no substitute; without the fix that pump
+    stops.
+  - The substitute itself (the owner joint position) is unchanged and is not
+    the original value.
+  - Since 2026-10-19 the shim also names its cause. The effect-stack model
+    records the callback, or marker, that last cleared the borrowed bytes
+    (`PE_EffectStackCause`). The first hit of each distinct cause is logged,
+    every hit is counted, and a summary prints at exit:
 
         [DAY1_SHIM] PE_M0023I_Flash: F710 caller-stack ring position unresolved (context draw, unknown Z, last cleared by new RAM generation in context none); using owner joint position
 
-  - That is the cause on the retail pump history (`test_m0023i_pump.h`
-    asserts it). In a fresh RAM generation, F004's prologue writes X/Y, but
-    no CE934 update has stored Z at the borrowed depth before the first
-    flash draw.
+  - That is the cause in the pump test's fresh-generation scenario, which
+    the test builds on the recorded pump state (`test_m0023i_pump.h`
+    asserts it). F004's prologue writes X/Y, but no CE934 update has stored
+    Z at the borrowed depth before the first flash draw.
   - Which causes normal play hits, and so which stack writers to bind next,
     needs the log of a Day-1 route run.
 - **m0005i hand ports versus generated TUs.** 8018F018, 8018F330 and 8018FB84
