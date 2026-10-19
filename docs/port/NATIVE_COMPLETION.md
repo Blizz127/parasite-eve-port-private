@@ -1301,7 +1301,18 @@ substitutes in production instead of stopping (it logs each cause).
 
 ## Gates on this branch
 
-Current tree: HEAD e6785a20d (2026-10-19 00:15 UTC):
+Current tree: HEAD 6b2956262 (gate run on its code, 2026-10-19 01:34-01:54 UTC):
+- `pe-native-tests` 1677/1677 (0 skipped), ctests 6/6.
+- `psyq_port_guard.py` on both binaries: PASS (1421).
+- Generator drift: 1051 EXE TUs, 0 drifted; 2951 room TUs, 0 drifted.
+- `boundary_site_census.py --generated`: 38 sites. `dangling_callback_census.py`:
+  4 stored, 8 boundary arguments, 1 comparison. Both unchanged.
+- `scripts/run_native_oracle_harnesses.sh`: PASS.
+- Changes since e6785a20d: the m0023i flash shim names its cause (03ba62003)
+  and the effect-stack model records F710's write-back (6b2956262). Both are
+  checked at function level only.
+
+Earlier tree: HEAD e6785a20d (2026-10-19 00:15 UTC):
 - `pe-native-tests` 1677/1677 (0 skipped), ctests 6/6.
 - `psyq_port_guard.py` on both binaries: PASS (1421).
 - Generator drift: 1051 EXE TUs, 0 drifted; overlay TUs 0 drifted; the
