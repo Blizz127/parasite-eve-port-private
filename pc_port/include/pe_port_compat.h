@@ -1188,6 +1188,10 @@ unsigned PE_M0023I_FlashShimLast(PeEffectStackCause *cause);
 int PE_EffectStackWeaponDraw(pe_addr_t fn,pe_addr_t slot);
 int PE_EffectStackWeaponUpdate(pe_addr_t fn,pe_addr_t slot);
 void PE_EffectStackWeaponUpdateCall(void);
+/* Native C2758, right after its C2B90 call (retail jal at 800C2850). */
+void PE_EffectStackWeaponSpawnReturn(void);
+/* The modeled six bytes (diagnostics and tests only). */
+void PE_EffectStackPosition(int16_t out[3]);
 int func_800CE084(pe_addr_t slot);
 int func_800CE144(int slot);
 int func_800CE16C(int a0);

@@ -35775,6 +35775,7 @@ static void test_ATK3_retail_attack_initialization(void)
 #include "test_m0023i_beam.h"
 #include "test_m0023i_flash.h"
 #include "test_m0023i_pump.h"
+#include "test_flash_vector_writers.h"
 #include "test_eve_flare.h"
 #include "test_effect_fan.h"
 #include "test_m0013i_effect.h"
@@ -40822,6 +40823,7 @@ int main(void)
     test_DAY1_retail_m0023i_beam();
     test_DAY1_retail_m0023i_flash();
     test_DAY1_retail_m0023i_pump();
+    test_FLASHVEC_borrowed_vector_writers();
     test_ATK26_retail_eve_flare();
     test_DAY1_retail_effect_fan();
     test_ATK27_retail_beam_geometry();

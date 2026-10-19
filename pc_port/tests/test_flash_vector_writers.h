@@ -1,0 +1,140 @@
+/* The m0023i flash's borrowed six bytes (F710 sp+48, S-112..S-107 below the
+ * 69594 dispatch sp S): writers bound from retail frames.  Each case drives
+ * the real weapon update/draw ports (CD8F0 -> C251C/C2758, CD8C8 -> C2414)
+ * on a zeroed slot and checks the modeled bytes the F710 arm later reads.
+ *   - CDE90 at the weapon-draw depth writes none of the bytes;
+ *   - C2758's C2B90 call leaves the return address low half 0x2858 in Z
+ *     and C2758's s4 (unknown here) in X/Y;
+ *   - other callbacks and direct C2B90 calls keep forgetting. */
+#define FVW_SLOT 0x801F0000u
+#define FVW_PROG (FVW_SLOT+0xE00u)
+/* Each case runs on a snapshot: the native callees also write packets,
+ * the packet cursor and scratch, and later tests must not see them. */
+static uint8_t *fvw_ram,fvw_scratch[0x400];
+
+static int fvw_save(int restore)
+{
+    if (!fvw_ram && !(fvw_ram=malloc(PE_RAM_SIZE))) return 0;
+    if (restore) {
+        memcpy(PE_Translate(PE_RAM_BASE,PE_RAM_SIZE),fvw_ram,PE_RAM_SIZE);
+        memcpy(PE_Translate(0x1F800000u,sizeof fvw_scratch),fvw_scratch,sizeof fvw_scratch);
+    } else {
+        memcpy(fvw_ram,PE_TranslateConst(PE_RAM_BASE,PE_RAM_SIZE),PE_RAM_SIZE);
+        memcpy(fvw_scratch,PE_TranslateConst(0x1F800000u,sizeof fvw_scratch),sizeof fvw_scratch);
+    }
+    return 1;
+}
+
+/* Zeroed slot (owner 0, so C6CE0 returns 0 and C2B90 creates nothing),
+ * one bytecode op then stop, record 0 with code 0 bound to the given
+ * draw/update callbacks (0 = inactive). */
+static void fvw_slot(uint32_t op,pe_addr_t draw_fn,pe_addr_t update_fn)
+{
+    for (pe_addr_t a=FVW_SLOT;a<FVW_SLOT+0x1000u;a+=4u) PE_StoreU32(a,0u);
+    PE_StoreU32(FVW_SLOT+120u,FVW_PROG);
+    PE_StoreU32(FVW_PROG,op);PE_StoreU32(FVW_PROG+4u,0xFFFFFFFFu);
+    PE_StoreU32(0x800E0F28u,draw_fn);PE_StoreU32(0x800E0F38u,update_fn);
+    if (draw_fn || update_fn) PE_StoreU8(FVW_SLOT+129u,1u);
+}
+
+static const char *fvw_cause(unsigned known,pe_addr_t reset_fn,const char *text)
+{
+    static char buf[256];
+    PeEffectStackCause cause;char describe[160];
+    PE_EffectStackCause(&cause);PE_EffectStackDescribe(&cause,describe,sizeof describe);
+    if (PE_Port_ShouldStop()) return "weapon ports stopped at a boundary";
+    if (cause.known!=known || cause.reset_fn!=reset_fn || !strstr(describe,text)) {
+        snprintf(buf,sizeof buf,"known %u reset %08X \"%s\"",cause.known,(unsigned)cause.reset_fn,describe);
+        return buf;
+    }
+    return NULL;
+}
+
+/* Update pass: C2758 runs op 0x00010000 (create code 0) through C2B90. */
+static const char *fvw_spawn_update(void)
+{
+    int16_t position[3];
+    const char *error;
+    fvw_slot(0x00010000u,0,0);
+    PE_EffectStackBegin();
+    (void)PE_EffectStackWeaponUpdate(0x800CD8F0u,FVW_SLOT);
+    if ((error=fvw_cause(4u,0x800C2B90u,"unknown XY, last cleared by callback 800C2B90 in context weapon-update")))
+        return error;
+    PE_EffectStackPosition(position);
+    return position[2]==0x2858?NULL:"Z is not the C2B90 return-address low half";
+}
+
+static const char *fvw_case_spawn_binds_z(void)
+{
+    const char *error=fvw_spawn_update();
+    PE_EffectStackEnd();return error;
+}
+
+static const char *fvw_case_cde90_preserves_known_z(void)
+{
+    int16_t position[3];
+    const char *error=fvw_spawn_update();
+    if (!error) {
+        PE_StoreU32(0x800E0F28u,0x800CDE90u);PE_StoreU8(FVW_SLOT+129u,1u);
+        (void)PE_EffectStackWeaponDraw(0x800CD8C8u,FVW_SLOT);
+        error=fvw_cause(4u,0x800C2B90u,"last cleared by callback 800C2B90 in context weapon-update");
+        PE_EffectStackPosition(position);
+        if (!error && position[2]!=0x2858) error="CDE90 changed the retained Z";
+    }
+    PE_EffectStackEnd();return error;
+}
+
+static const char *fvw_case_cde90_keeps_unknown_z(void)
+{
+    const char *error;
+    fvw_slot(0xFFFFFFFFu,0x800CDE90u,0);
+    PE_EffectStackBegin();PE_EffectStackInvalidate();
+    (void)PE_EffectStackWeaponDraw(0x800CD8C8u,FVW_SLOT);
+    error=fvw_cause(0u,PE_EFFECT_STACK_RESET_INVALIDATE,"unknown XYZ, last cleared by invalidate");
+    PE_EffectStackEnd();return error;
+}
+
+static const char *fvw_case_other_callback_forgets(void)
+{
+    const char *error=fvw_spawn_update();
+    if (!error) {
+        PE_StoreU32(0x800E0F28u,0x800CDC24u);PE_StoreU8(FVW_SLOT+129u,1u);
+        (void)PE_EffectStackWeaponDraw(0x800CD8C8u,FVW_SLOT);
+        error=fvw_cause(0u,0x800CDC24u,"unknown XYZ, last cleared by callback 800CDC24 in context weapon-draw");
+    }
+    PE_EffectStackEnd();return error;
+}
+
+/* C2B90 reached directly (here as C251C's record callback through the
+ * guest-call table, as overlay code reaches it) is not C2758's frame. */
+static const char *fvw_case_direct_c2b90_does_not_bind(void)
+{
+    const char *error;
+    if (!PE_GuestCode_Resolve(0x800C2B90u)) return "C2B90 is not reachable through the guest-call table";
+    fvw_slot(0xFFFFFFFFu,0,0x800C2B90u);
+    PE_EffectStackBegin();PE_EffectStackInvalidate();
+    (void)PE_EffectStackWeaponUpdate(0x800CD8F0u,FVW_SLOT);
+    error=fvw_cause(0u,PE_EFFECT_STACK_RESET_WEAPON_UPDATE,
+        "unknown XYZ, last cleared by weapon-update call in context weapon-update");
+    PE_EffectStackEnd();return error;
+}
+
+static void fvw_run(const char *name,const char *(*body)(void))
+{
+    const char *error;
+    TEST(name);
+    ASSERT(fvw_save(0),"cannot allocate the RAM snapshot");
+    error=body();fvw_save(1);
+    PE_EffectStackInvalidate();
+    ASSERT(!error,error);
+    PASS();
+}
+
+static void test_FLASHVEC_borrowed_vector_writers(void)
+{
+    fvw_run("FLASHVEC_c2758_spawn_binds_z_2858",fvw_case_spawn_binds_z);
+    fvw_run("FLASHVEC_cde90_preserves_known_z",fvw_case_cde90_preserves_known_z);
+    fvw_run("FLASHVEC_cde90_keeps_unknown_z_unknown",fvw_case_cde90_keeps_unknown_z);
+    fvw_run("FLASHVEC_other_weapon_callback_forgets",fvw_case_other_callback_forgets);
+    fvw_run("FLASHVEC_direct_c2b90_call_does_not_bind",fvw_case_direct_c2b90_does_not_bind);
+}

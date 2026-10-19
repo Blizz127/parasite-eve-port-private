@@ -105,11 +105,31 @@ void PE_EffectStackWeaponUpdateCall(void)
     if(effect_stack.active && effect_stack.context==EFFECT_STACK_WEAPON_UPDATE)
         effect_stack_forget(PE_EFFECT_STACK_RESET_WEAPON_UPDATE);
 }
+/* C2758 (sp S-104) calls C2B90 at 800C2850. C2B90's straight-line prologue
+ * (frame 40, sp S-144) stores C2758's s4 at sp+32 over borrowed X/Y and the
+ * return address 800C2858 at sp+36, whose low half lands on borrowed Z.
+ * C2B90's callees run below S-144 and cannot reach those bytes. Other C2B90
+ * callers run at other depths and keep the entry marker's forget. */
+void PE_EffectStackWeaponSpawnReturn(void)
+{
+    if(!effect_stack.active || effect_stack.context!=EFFECT_STACK_WEAPON_UPDATE)return;
+    effect_stack_forget(0x800C2B90u);
+    effect_stack.position[2]=0x2858;effect_stack.known=4u;
+}
+void PE_EffectStackPosition(int16_t out[3])
+{
+    for(unsigned i=0;i<3;i++)out[i]=effect_stack.position[i];
+}
 void PE_EffectStackWeaponCallback(pe_addr_t fn,pe_addr_t data)
 {
     if(!effect_stack.active || effect_stack.context!=EFFECT_STACK_WEAPON_DRAW)return;
     switch(fn) {
     case 0x800C9EA0u:case 0x800CDD04u:case 0x800CE3ACu:return; /* Original empty leaves. */
+    case 0x800CDE90u:
+        /* Runs at S-80. The only frame of its call tree that covers the
+         * bytes is C3B04's (sp S-112), which never stores its sp+0..5
+         * argument area, and C3B04's callees use no stack. */
+        return;
     case 0x800C9EA8u:
         /* C9ED8/DC/F8: casing angles at sp+30 overlap the borrowed vector. */
         effect_stack.position[0]=0;effect_stack.position[1]=0;

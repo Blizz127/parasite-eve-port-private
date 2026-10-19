@@ -242,7 +242,10 @@ int func_800C2758(pe_addr_t slot,pe_addr_t callbacks,pe_addr_t sizes)
         high=op>>16u;value=(int16_t)op;
         if (op==0xFFFFFFFFu) { stop=1;PE_StoreU8(weapon_body()+7u,1u); }
         else {
-            if (high==1u) (void)func_800C2B90(slot,op&255u,sizes,callbacks);
+            if (high==1u) {
+                (void)func_800C2B90(slot,op&255u,sizes,callbacks);
+                PE_EffectStackWeaponSpawnReturn();
+            }
             if (high==2u) { PE_StoreU16(weapon_body(),(uint16_t)op);stop=1; }
             body=weapon_body();
             if (high>=0x10u && high<0x20u) PE_StoreU32(body+8u+(high-0x10u)*4u,(uint32_t)value);
