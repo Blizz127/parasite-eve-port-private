@@ -180,8 +180,8 @@ static const char *fvw_ca540_high(uint16_t offset,unsigned known,pe_addr_t reset
 static const char *fvw_case_ca540_stack_record_forgets(void)
 {
     /* data = 0x801FC200 + 0x1DF4 = 0x801FDFF4; the sh lands on 0x801FDFF8. */
-    const char *error=fvw_ca540_high(0x1DF4u,0u,PE_EFFECT_STACK_RESET_WEAPON_UPDATE,
-        "unknown XYZ, last cleared by weapon-update call in context weapon-update");
+    const char *error=fvw_ca540_high(0x1DF4u,0u,0x800CA540u,
+        "unknown XYZ, last cleared by callback 800CA540 in context weapon-update");
     PE_EffectStackEnd();return error;
 }
 
@@ -201,8 +201,8 @@ static const char *fvw_case_other_update_callback_forgets(void)
         PE_StoreU32(0x800E0F38u,0x800CA4B4u);
         PE_StoreU8(FVW_SLOT+128u,0u);PE_StoreU8(FVW_SLOT+129u,1u);PE_StoreU8(FVW_SLOT+512u+2u,5u);
         (void)PE_EffectStackWeaponUpdate(0x800CD8F0u,FVW_SLOT);
-        error=fvw_cause(0u,PE_EFFECT_STACK_RESET_WEAPON_UPDATE,
-            "unknown XYZ, last cleared by weapon-update call in context weapon-update");
+        error=fvw_cause(0u,0x800CA4B4u,
+            "unknown XYZ, last cleared by callback 800CA4B4 in context weapon-update");
     }
     PE_EffectStackEnd();return error;
 }

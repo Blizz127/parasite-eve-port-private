@@ -1348,6 +1348,27 @@ substitutes in production instead of stopping (it logs each cause).
       these two causes. Whether the shim still fires depends on the bytes'
       state before those calls, so this does not say the shim is removable
       or that Day-1 is fixed.
+    - **Result (2026-10-20, Day-1 route on this devbox, binary 56c8eb73 from
+      be90460eb, zig-cc build, pads only, aids off, bwrap sandbox).** Packet
+      `/home/blizz/scratch/pe-modern-route-be90460eb/`, RESULTS.md
+      69bd17cd…, SHA256SUMS 6bf3a88e…
+      - The route outcome is unchanged: the same first Eve fight at frame
+        42707 and the same game over at 44602, FAIL at eve1_victory, as all
+        four references.
+      - With the shim lines excluded, the log has no textual difference from
+        any reference, and the final screenshot is byte-identical.
+      - CPU_BOUNDARY 0, STOP 0, stubs 0. No `enhancements.conf` was created.
+      - **CDD0C is gone.** No shim hit of any cause occurs before BATTLE_EDGE
+        43659.
+      - **One cause remains, there:** "last cleared by weapon-update call in
+        context weapon-update", at the point where the e2r reference named
+        CA540.
+      - CA540 is now preserved; its port-domain stores were outside the
+        window in the e2w observation. The likely reading is that another,
+        unbound update callback cleared the bytes earlier in the same pass,
+        and CA540's later clear had masked it.
+      - Unbound update callbacks are therefore recorded by address since the
+        commit after be90460eb, so the next run names that writer.
 - **m0005i hand ports versus generated TUs.** 8018F018, 8018F330 and 8018FB84
   now have matched C (harvested), but the effect dispatcher still sends
   m0005i's own bytes to the hand ports. Those hand ports are checked against

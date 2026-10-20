@@ -113,7 +113,8 @@ static int effect_stack_retail_stack(pe_addr_t ea,unsigned n)
     return 0;
 }
 /* A record callback that PE_WeaponCallback dispatches at the weapon-update
- * depth. Unbound callbacks forget the bytes, as the generic call does. */
+ * depth. Unbound callbacks forget the bytes and are recorded by address, so
+ * the flash shim's cause line names the writer to bind next. */
 void PE_EffectStackWeaponUpdateCallback(pe_addr_t fn,pe_addr_t rec,pe_addr_t data)
 {
     if(!effect_stack.active || effect_stack.context!=EFFECT_STACK_WEAPON_UPDATE)return;
@@ -127,7 +128,9 @@ void PE_EffectStackWeaponUpdateCallback(pe_addr_t fn,pe_addr_t rec,pe_addr_t dat
         if(!effect_stack_retail_stack(data+4u,2u) && !effect_stack_retail_stack(rec+1u,1u))return;
         break;
     }
-    effect_stack_forget(PE_EFFECT_STACK_RESET_WEAPON_UPDATE);
+    /* fn 0 (a zeroed callbacks table) or a reserved marker value is not an
+     * address to name; record the generic marker for it. */
+    effect_stack_forget(fn && fn < PE_EFFECT_STACK_RESET_BEGIN ? fn : PE_EFFECT_STACK_RESET_WEAPON_UPDATE);
 }
 /* C2758 (sp S-104) calls C2B90 at 800C2850. C2B90's straight-line prologue
  * (frame 40, sp S-144) stores C2758's s4 at sp+32 over borrowed X/Y and the
