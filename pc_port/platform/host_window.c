@@ -10,6 +10,7 @@
 #include "host_window_scale.h"
 #include "host_upscale.h"
 #include "host_pad.h"
+#include "host_pad_remap.h"
 #include "host_dev_menu.h"
 #include "host_audio.h"
 #include "pe_audio_driver.h"
@@ -27,15 +28,8 @@
 typedef unsigned long KeySym;
 #define XK_Escape 0xFF1B
 #define XK_Return 0xFF0D
-#define XK_space  0x0020
-#define XK_Left   0xFF51
 #define XK_Up     0xFF52
-#define XK_Right  0xFF53
 #define XK_Down   0xFF54
-#define XK_z      0x007A
-#define XK_x      0x0078
-#define XK_Z      0x005A
-#define XK_X      0x0058
 #define XK_F6     0xFFC3
 #define XK_F1     0xFFBE
 #define XK_F8     0xFFC5
@@ -506,6 +500,9 @@ int HostWindow_Open(const char *display, int width, int height,
     fprintf(stderr, "[WINDOW] %dx%d (fb %dx%d) on %s title='%s'%s scaler=%s%s\n",
             g_win_w, g_win_h, g_fb_w, g_fb_h, display, title,
             g_fullscreen ? " fullscreen" : "", g_xr_on ? "xrender" : "cpu", g_xr_why);
+    /* Opt-in controls.conf (pad.* / key.* remaps), read once per window; no
+     * file leaves the pad word and the key table exactly as before. */
+    (void)HostPadRemap_Init();
     return 0;
 }
 
@@ -751,35 +748,12 @@ int HostWindow_Poll(void)
                 continue;
             }
             if (ks == XK_Escape) { g_close_requested = 1; return 1; }
-            if (ks == XK_Return || ks == XK_space || ks == XK_z ||
-                ks == XK_x || ks == XK_Z || ks == XK_X)
-                bit = 0x4000u;
-            else if (ks == XK_Up)
-                bit = 0x0010u;
-            else if (ks == XK_Right)
-                bit = 0x0020u;
-            else if (ks == XK_Down)
-                bit = 0x0040u;
-            else if (ks == XK_Left)
-                bit = 0x0080u;
-            else if (ks == 'c' || ks == 'C')
-                bit = 0x2000u; /* Circle */
-            else if (ks == 'v' || ks == 'V')
-                bit = 0x1000u; /* Triangle */
-            else if (ks == 's' || ks == 'S')
-                bit = 0x8000u; /* Square */
-            else if (ks == 'q' || ks == 'Q')
-                bit = 0x0400u; /* L1 */
-            else if (ks == 'e' || ks == 'E')
-                bit = 0x0800u; /* R1 */
-            else if (ks == '1')
-                bit = 0x0100u; /* L2 */
-            else if (ks == '3')
-                bit = 0x0200u; /* R2 */
-            else if (ks == 0xFF09u)
-                bit = 0x0001u; /* Tab: Select */
-            else if (ks == 'p' || ks == 'P')
-                bit = 0x0008u; /* Start */
+            /* Keyboard table (host_pad_remap.c).  Its built-in entries are the
+             * former if-chain (Return/space/z/x = Cross, c/v/s = Circle/Triangle/
+             * Square, q/e = L1/R1, 1/3 = L2/R2, Tab = Select, p = Start, arrows);
+             * controls.conf may replace a button's keys.  Esc and F1-F8 never
+             * bind, so the lookup refuses them even if they reach this point. */
+            bit = HostPadRemap_Key(HostPadRemap_Global(), (unsigned long)ks);
             if (bit != 0u) {
                 if (ev.type == KeyPress)
                     g_sony_held |= bit;
@@ -797,9 +771,13 @@ uint16_t HostWindow_PadRaw(void)
 {
     /* Keyboard and controller both drive the pad at once.  The controller
      * word goes through the dev-menu combo filter (a lone Select/Start is
-     * withheld only while it could still become Select+Start). */
+     * withheld only while it could still become Select+Start), which reads the
+     * physical bits; the optional controls.conf pad.* remap applies to the
+     * filter's output only, so the combo stays reachable whatever the remap and
+     * the keyboard (already mapped by its own table) is never remapped twice. */
     if (pe_plat_cheats_menu_open() || HostDevMenu_CapturesInput()) return 0xFFFFu;
-    return (uint16_t)(~(g_sony_held | HostDevMenu_FilterPad(HostPad_Held())));
+    return HostPadRemap_PadWord(HostPadRemap_Global(), g_sony_held,
+                                HostDevMenu_FilterPad(HostPad_Held()));
 }
 
 static int monotonic_ns(uint64_t *out)
@@ -912,6 +890,7 @@ void HostWindow_Close(void)
     if (g_xlib) { dlclose(g_xlib); g_xlib = NULL; }
     g_host_window_open = 0;
     g_sony_held = 0;
+    HostPadRemap_Reset();
     HostDevMenu_Close();
     HostPad_Close();
 }

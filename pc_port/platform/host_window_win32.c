@@ -13,12 +13,16 @@
  *   Circle/Triangle/Square = C/V/S; L1/R1 = Q/E; L2/R2 = 1/3
  *   Select/Start = Tab/P
  *   Escape or window-close           (close requested)
+ * An optional controls.conf (host_pad_remap.h) rebinds the keys through the
+ * same keysym table as the X11 backend; key names are X11 keysym names, and
+ * modifier keys are not bindable here.
  */
 
 #include "host_window.h"
 #include "host_frame_pacer.h"
 #include "host_window_scale.h"
 #include "host_upscale.h"
+#include "host_pad_remap.h"
 #include "pe_plat/cheats.h"
 
 /* GetTickCount64 needs Vista+ declarations on older MinGW defaults. */
@@ -53,30 +57,14 @@ static LARGE_INTEGER g_clock_frequency;
 static int g_fast_forward;
 static char g_title[512];
 
-/* Translate a virtual-key code to a Sony pad bit (0 = unmapped). */
+/* Translate a virtual-key code to a Sony pad bit (0 = unmapped).  The shared
+ * keysym-keyed table (host_pad_remap.c) holds the defaults listed at the top of
+ * this file; an optional controls.conf (key.<button>=<keysym>,...) replaces a
+ * button's keys.  Esc and F1-F8 are never bindable. */
 static uint16_t vk_to_pad_bit(UINT vk)
 {
-    switch (vk) {
-    case VK_RETURN:
-    case VK_SPACE:
-    case 'Z':
-    case 'X':
-        return 0x4000u;
-    case VK_UP:    return 0x0010u;
-    case VK_RIGHT: return 0x0020u;
-    case VK_DOWN:  return 0x0040u;
-    case VK_LEFT:  return 0x0080u;
-    case 'C':      return 0x2000u;
-    case 'V':      return 0x1000u;
-    case 'S':      return 0x8000u;
-    case 'Q':      return 0x0400u;
-    case 'E':      return 0x0800u;
-    case '1':      return 0x0100u;
-    case '3':      return 0x0200u;
-    case VK_TAB:   return 0x0001u;
-    case 'P':      return 0x0008u;
-    default:       return 0u;
-    }
+    return HostPadRemap_Key(HostPadRemap_Global(),
+                            HostPadRemap_KeysymFromWin32Vk((unsigned)vk));
 }
 
 static void paint_window(HDC hdc)
@@ -243,6 +231,9 @@ int HostWindow_Open(const char *display, int width, int height,
     HostWindow_SetTitle(title);
     fprintf(stderr, "[WINDOW] %dx%d (fb %dx%d) title='%s'\n",
             g_win_w, g_win_h, g_fb_w, g_fb_h, title ? title : "PE");
+    /* Opt-in controls.conf (key.* remaps; this backend has no controller, so
+     * pad.* lines have nothing to act on), read once per window. */
+    (void)HostPadRemap_Init();
     return 0;
 }
 
@@ -359,6 +350,7 @@ void HostWindow_Close(void)
 {
     if (g_frame_timer) {CloseHandle(g_frame_timer);g_frame_timer=NULL;}
     g_sony_held = 0;
+    HostPadRemap_Reset();
     if (g_hwnd) {
         DestroyWindow(g_hwnd);
         g_hwnd = NULL;
