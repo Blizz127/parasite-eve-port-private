@@ -105,6 +105,30 @@ void PE_EffectStackWeaponUpdateCall(void)
     if(effect_stack.active && effect_stack.context==EFFECT_STACK_WEAPON_UPDATE)
         effect_stack_forget(PE_EFFECT_STACK_RESET_WEAPON_UPDATE);
 }
+/* crt0 starts sp at 0x801FFFF8 with an 8 KB stack (heap [0x800C20CC,
+ * 0x801FDFFC)). Any RAM mirror of that range may hold the borrowed bytes. */
+static int effect_stack_retail_stack(pe_addr_t ea,unsigned n)
+{
+    for(unsigned i=0;i<n;i++)if(((ea+i)&0x1FFFFFu)>=0x1FDFF8u)return 1;
+    return 0;
+}
+/* A record callback that PE_WeaponCallback dispatches at the weapon-update
+ * depth. Unbound callbacks forget the bytes, as the generic call does. */
+void PE_EffectStackWeaponUpdateCallback(pe_addr_t fn,pe_addr_t rec,pe_addr_t data)
+{
+    if(!effect_stack.active || effect_stack.context!=EFFECT_STACK_WEAPON_UPDATE)return;
+    switch(fn) {
+    case 0x800CA540u:
+        /* Retail 800CA540..800CA570 is a frameless leaf: no sp access and
+         * no calls, so it writes no stack at any depth. Its only stores are
+         * sh 4(a2) (data+4) and sb 1(a1) (rec+1), which C251C points into
+         * the slot's record table and command arena. Keep the bytes while
+         * neither store can land in the retail stack reservation. */
+        if(!effect_stack_retail_stack(data+4u,2u) && !effect_stack_retail_stack(rec+1u,1u))return;
+        break;
+    }
+    effect_stack_forget(PE_EFFECT_STACK_RESET_WEAPON_UPDATE);
+}
 /* C2758 (sp S-104) calls C2B90 at 800C2850. C2B90's straight-line prologue
  * (frame 40, sp S-144) stores C2758's s4 at sp+32 over borrowed X/Y and the
  * return address 800C2858 at sp+36, whose low half lands on borrowed Z.
@@ -129,6 +153,17 @@ void PE_EffectStackWeaponCallback(pe_addr_t fn,pe_addr_t data)
         /* Runs at S-80. The only frame of its call tree that covers the
          * bytes is C3B04's (sp S-112), which never stores its sp+0..5
          * argument area, and C3B04's callees use no stack. */
+        return;
+    case 0x800CDD0Cu:
+        /* Enters at S-56 like CDE90 (C9B68/CE144/CD8C8 and C2414 frames
+         * 24 + 32) and runs at S-88. The frames that cover the bytes are
+         * the outgoing-argument areas of C2EAC, C3098 and C3238 (sp S-112)
+         * and C3B04 (sp S-120). Those four store only at their own sp+16..28,
+         * C3B04 gets global records (D_800E27B0, D_800E2770), and their
+         * callees are frameless leaves without stack stores. C3098 reaches
+         * the BIOS printf stub 80071A74 (which spills a1-a3 into sp+4..12,
+         * over Z) only for a mode other than 16 or 256, and CDD0C passes
+         * 0x100 and 0x10. */
         return;
     case 0x800C9EA8u:
         /* C9ED8/DC/F8: casing angles at sp+30 overlap the borrowed vector. */

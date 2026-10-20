@@ -1318,6 +1318,36 @@ substitutes in production instead of stopping (it logs each cause).
     Z at the borrowed depth before the first flash draw.
   - Which causes normal play hits, and so which stack writers to bind next,
     needs the log of a Day-1 route run.
+  - The 2026-10-19 Day-1 diagnostic run (binary d396976e) logged two shim
+    causes: the hit-draw callback `800CDD0C` and the update callback
+    `800CA540`. Both are bound since 2026-10-20 (`func_800D413C_port.c`),
+    each from retail bytes:
+    - **CDD0C** keeps the bytes at the weapon-draw depth.
+      - Every draw entry (C9B68, CE144, CD8C8: frame 24) calls C2414
+        (frame 32), so the callback enters at S-56 and runs at S-88.
+      - The frames that cover [S-112, S-106) are outgoing-argument areas:
+        C2EAC, C3098 and C3238 at sp S-112, and C3B04 at sp S-120. Those
+        four store only at their own sp+16..28. Their callees are frameless
+        leaves without stack stores, and no stack address escapes.
+      - One path could write the bytes: C3098 calls the BIOS printf stub
+        `80071A74`, which spills a1-a3 over sp+4..12. It does so only for a
+        mode other than 16 or 256, and CDD0C passes the constants 0x100 and
+        0x10 (`800cdd30`, `800cde00`).
+      - The call tree was walked with a disassembly script over the retail
+        EXE.
+    - **CA540** (`800ca540..800ca570`) is a frameless leaf: no sp access
+      and no calls.
+      - Its two stores go through a1 (rec+1) and a2 (data+4), which C251C
+        points into the slot's record table and command arena.
+      - The binding keeps the bytes only while neither address can fall in
+        crt0's stack reservation (`>= 0x801FDFF8`, any RAM mirror).
+        Otherwise it forgets, as before.
+    - Tests: `FLASHVEC_cdd0c_*`, `FLASHVEC_ca540_*` (including both sides
+      of the reservation boundary) and `FLASHVEC_other_update_callback_forgets`.
+    - **Falsifiable prediction.** The next Day-1 run should log neither of
+      these two causes. Whether the shim still fires depends on the bytes'
+      state before those calls, so this does not say the shim is removable
+      or that Day-1 is fixed.
 - **m0005i hand ports versus generated TUs.** 8018F018, 8018F330 and 8018FB84
   now have matched C (harvested), but the effect dispatcher still sends
   m0005i's own bytes to the hand ports. Those hand ports are checked against

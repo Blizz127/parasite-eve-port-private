@@ -1188,6 +1188,9 @@ unsigned PE_M0023I_FlashShimLast(PeEffectStackCause *cause);
 int PE_EffectStackWeaponDraw(pe_addr_t fn,pe_addr_t slot);
 int PE_EffectStackWeaponUpdate(pe_addr_t fn,pe_addr_t slot);
 void PE_EffectStackWeaponUpdateCall(void);
+/* PE_WeaponCallback, before dispatching record callback `fn` (a1 = rec,
+ * a2 = data); bound frameless leaves keep the borrowed bytes. */
+void PE_EffectStackWeaponUpdateCallback(pe_addr_t fn,pe_addr_t rec,pe_addr_t data);
 /* Native C2758, right after its C2B90 call (retail jal at 800C2850). */
 void PE_EffectStackWeaponSpawnReturn(void);
 /* The modeled six bytes (diagnostics and tests only). */

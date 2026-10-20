@@ -2,9 +2,11 @@
  * 69594 dispatch sp S): writers bound from retail frames.  Each case drives
  * the real weapon update/draw ports (CD8F0 -> C251C/C2758, CD8C8 -> C2414)
  * on a zeroed slot and checks the modeled bytes the F710 arm later reads.
- *   - CDE90 at the weapon-draw depth writes none of the bytes;
+ *   - CDE90 and CDD0C at the weapon-draw depth write none of the bytes;
  *   - C2758's C2B90 call leaves the return address low half 0x2858 in Z
  *     and C2758's s4 (unknown here) in X/Y;
+ *   - the update leaf CA540 is frameless, so it keeps them unless its
+ *     record store could reach crt0's stack reservation;
  *   - other callbacks and direct C2B90 calls keep forgetting. */
 #define FVW_SLOT 0x801F0000u
 #define FVW_PROG (FVW_SLOT+0xE00u)
@@ -105,6 +107,106 @@ static const char *fvw_case_other_callback_forgets(void)
     PE_EffectStackEnd();return error;
 }
 
+static const char *fvw_case_cdd0c_preserves_known_z(void)
+{
+    int16_t position[3];
+    const char *error=fvw_spawn_update();
+    if (!error) {
+        PE_StoreU32(0x800E0F28u,0x800CDD0Cu);PE_StoreU8(FVW_SLOT+129u,1u);
+        (void)PE_EffectStackWeaponDraw(0x800CD8C8u,FVW_SLOT);
+        error=fvw_cause(4u,0x800C2B90u,"last cleared by callback 800C2B90 in context weapon-update");
+        PE_EffectStackPosition(position);
+        if (!error && position[2]!=0x2858) error="CDD0C changed the retained Z";
+    }
+    PE_EffectStackEnd();return error;
+}
+
+static const char *fvw_case_cdd0c_keeps_unknown_z(void)
+{
+    const char *error;
+    fvw_slot(0xFFFFFFFFu,0x800CDD0Cu,0);
+    PE_EffectStackBegin();PE_EffectStackInvalidate();
+    (void)PE_EffectStackWeaponDraw(0x800CD8C8u,FVW_SLOT);
+    error=fvw_cause(0u,PE_EFFECT_STACK_RESET_INVALIDATE,"unknown XYZ, last cleared by invalidate");
+    PE_EffectStackEnd();return error;
+}
+
+/* CA540 as record 0's update callback after the spawn pass bound Z: C251C
+ * dispatches it (the bytecode cursor stays on its stop op, so C2758 does
+ * not bind again). `offset` is rec[4], the record's data offset from the
+ * slot's arena base slot+512. Returns the cause check, NULL on success. */
+static const char *fvw_ca540_update(pe_addr_t slot,uint16_t offset,unsigned known,pe_addr_t reset_fn,
+                                    const char *text)
+{
+    pe_addr_t data=slot+512u+(pe_addr_t)(int32_t)(int16_t)offset;
+    PE_StoreU32(0x800E0F38u,0x800CA540u);
+    PE_StoreU8(slot+128u,0u);PE_StoreU8(slot+129u,1u);PE_StoreU16(slot+132u,offset);
+    PE_StoreU16(data+4u,100u);
+    (void)PE_EffectStackWeaponUpdate(0x800CD8F0u,slot);
+    /* Retail CA540: data+4 -= 20; below 20 it zeroes it and retires rec. */
+    if (PE_LoadU16(data+4u)!=80u || PE_LoadU8(slot+129u)!=1u) return "CA540 did not run its retail update";
+    return fvw_cause(known,reset_fn,text);
+}
+
+static const char *fvw_case_ca540_preserves_known_z(void)
+{
+    int16_t position[3];
+    const char *error=fvw_spawn_update();
+    if (!error) error=fvw_ca540_update(FVW_SLOT,0u,4u,0x800C2B90u,
+        "unknown XY, last cleared by callback 800C2B90 in context weapon-update");
+    PE_EffectStackPosition(position);
+    if (!error && position[2]!=0x2858) error="CA540 changed the retained Z";
+    PE_EffectStackEnd();return error;
+}
+
+/* The same two passes on a slot whose arena record reaches crt0's stack
+ * reservation (>= 0x801FDFF8): there the leaf's sh could land on the
+ * borrowed bytes, so the bytes are forgotten. Just below it they are kept. */
+#define FVW_HIGH_SLOT 0x801FC000u
+static const char *fvw_ca540_high(uint16_t offset,unsigned known,pe_addr_t reset_fn,const char *text)
+{
+    const char *error;
+    for (pe_addr_t a=FVW_HIGH_SLOT;a<FVW_HIGH_SLOT+0x200u;a+=4u) PE_StoreU32(a,0u);
+    PE_StoreU32(FVW_HIGH_SLOT+120u,FVW_PROG);
+    PE_StoreU32(FVW_PROG,0x00010000u);PE_StoreU32(FVW_PROG+4u,0xFFFFFFFFu);
+    PE_StoreU32(0x800E0F28u,0u);PE_StoreU32(0x800E0F38u,0u);
+    PE_EffectStackBegin();
+    (void)PE_EffectStackWeaponUpdate(0x800CD8F0u,FVW_HIGH_SLOT);
+    if ((error=fvw_cause(4u,0x800C2B90u,"last cleared by callback 800C2B90 in context weapon-update")))
+        return error;
+    return fvw_ca540_update(FVW_HIGH_SLOT,offset,known,reset_fn,text);
+}
+
+static const char *fvw_case_ca540_stack_record_forgets(void)
+{
+    /* data = 0x801FC200 + 0x1DF4 = 0x801FDFF4; the sh lands on 0x801FDFF8. */
+    const char *error=fvw_ca540_high(0x1DF4u,0u,PE_EFFECT_STACK_RESET_WEAPON_UPDATE,
+        "unknown XYZ, last cleared by weapon-update call in context weapon-update");
+    PE_EffectStackEnd();return error;
+}
+
+static const char *fvw_case_ca540_below_stack_preserves(void)
+{
+    /* data+4 = 0x801FDFF6..F7, the last halfword below the reservation. */
+    const char *error=fvw_ca540_high(0x1DF2u,4u,0x800C2B90u,
+        "last cleared by callback 800C2B90 in context weapon-update");
+    PE_EffectStackEnd();return error;
+}
+
+static const char *fvw_case_other_update_callback_forgets(void)
+{
+    const char *error=fvw_spawn_update();
+    if (!error) {
+        /* CA4B4, another update leaf of the same table family, is unbound. */
+        PE_StoreU32(0x800E0F38u,0x800CA4B4u);
+        PE_StoreU8(FVW_SLOT+128u,0u);PE_StoreU8(FVW_SLOT+129u,1u);PE_StoreU8(FVW_SLOT+512u+2u,5u);
+        (void)PE_EffectStackWeaponUpdate(0x800CD8F0u,FVW_SLOT);
+        error=fvw_cause(0u,PE_EFFECT_STACK_RESET_WEAPON_UPDATE,
+            "unknown XYZ, last cleared by weapon-update call in context weapon-update");
+    }
+    PE_EffectStackEnd();return error;
+}
+
 /* C2B90 reached directly (here as C251C's record callback through the
  * guest-call table, as overlay code reaches it) is not C2758's frame. */
 static const char *fvw_case_direct_c2b90_does_not_bind(void)
@@ -136,5 +238,11 @@ static void test_FLASHVEC_borrowed_vector_writers(void)
     fvw_run("FLASHVEC_cde90_preserves_known_z",fvw_case_cde90_preserves_known_z);
     fvw_run("FLASHVEC_cde90_keeps_unknown_z_unknown",fvw_case_cde90_keeps_unknown_z);
     fvw_run("FLASHVEC_other_weapon_callback_forgets",fvw_case_other_callback_forgets);
+    fvw_run("FLASHVEC_cdd0c_preserves_known_z",fvw_case_cdd0c_preserves_known_z);
+    fvw_run("FLASHVEC_cdd0c_keeps_unknown_z_unknown",fvw_case_cdd0c_keeps_unknown_z);
+    fvw_run("FLASHVEC_ca540_update_preserves_known_z",fvw_case_ca540_preserves_known_z);
+    fvw_run("FLASHVEC_ca540_stack_record_forgets",fvw_case_ca540_stack_record_forgets);
+    fvw_run("FLASHVEC_ca540_below_stack_preserves",fvw_case_ca540_below_stack_preserves);
+    fvw_run("FLASHVEC_other_update_callback_forgets",fvw_case_other_update_callback_forgets);
     fvw_run("FLASHVEC_direct_c2b90_call_does_not_bind",fvw_case_direct_c2b90_does_not_bind);
 }

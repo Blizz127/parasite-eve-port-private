@@ -45,7 +45,7 @@ static void weapon_hit_child(pe_addr_t data,int particles)
 void PE_WeaponCallback(pe_addr_t fn,pe_addr_t slot,pe_addr_t rec,pe_addr_t data)
 {
     unsigned i;
-    PE_EffectStackWeaponUpdateCall();
+    PE_EffectStackWeaponUpdateCallback(fn,rec,data);
     PE_M34StackCallback(fn);
     (void)slot;
     if(PE_M34BossEffectOverlay() && PE_M34BossEffectChild(fn,slot,rec,data))return;
