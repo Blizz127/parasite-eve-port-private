@@ -70,13 +70,16 @@ native screenshots were identical to the default run.
 Higher internal resolutions and FSR 1 cost CPU time. They act differently
 when the CPU cannot keep up:
 
-- **FSR 1** in a large window shows fewer frames per second, but the game
-  keeps its speed.
+- **FSR 1** runs on its own threads. In a large window it is designed to
+  show fewer frames per second rather than slow the game, but that was not
+  measured with the game running, and on CPUs with few cores it may slow
+  the game too.
 - **Internal Resolution** set too high slows the game itself.
 
-On the development server, FSR 1 kept up in a 1280x800 window and 4x was
-too slow; your device's CPU may do better or worse. If the game slows down,
-step Internal Resolution back.
+On the development server the FSR 1 filter, timed on its own, was fast
+enough for a 1280x800 window but not for 1080p, and 4x was too slow. Your
+device's CPU may do better or worse. If the game slows down, step Internal
+Resolution back, or the Display Scaler.
 
 - **Controls** (these change how you play):
   - **Analog Stick**: play with the left stick as on a DualShock with the
@@ -107,7 +110,7 @@ Steam Input setup.
 | Controller works out of the box through SDL gamepad / Steam Input, in menus and gameplay, with no manual remap or keyboard workaround | NOT RUN |
 | Window is borderless/fullscreen with no white border | NOT RUN |
 | Focusing a text field opens the on-screen keyboard | NOT RUN. The only text entry is the game's own name entry at New Game: the original letter grid, driven by the controller. The port has no system text field (no SDL or X11 text-input call in `pc_port/`), so nothing asks for the on-screen keyboard; the device run should confirm the name entry works with the controller alone |
-| Display Scaler: Sharp Bilinear and FSR 1 change the picture in the window | NOT RUN |
+| Display Scaler: Sharp Bilinear and FSR 1 change the picture in the window, and the game keeps its speed with FSR 1 at the device's screen resolution | NOT RUN |
 | Master Volume changes the level at the audio device | NOT RUN |
 | Analog Stick: half tilt walks, full tilt runs, and the d-pad does not move Aya while it is on | NOT RUN |
 | controls.conf: a swapped button pair takes effect, and Esc, F1-F8 and Back+Start still work | NOT RUN |

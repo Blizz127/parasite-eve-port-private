@@ -202,10 +202,15 @@ byte-identical whatever the setting; only window pixels differ.
   On one thread FSR 1 took 134-151 ms at 1280x800 and 902-1052 ms at
   3840x2160.
   The game shows a new frame every 33 ms, because it draws at 30 Hz: 39,998
-  VBlanks for 20,000 presents in the runs below. FSR 1 keeps up at
-  1280x800 here. At 1080p and above the presenter shows fewer filtered
-  frames, while the game itself keeps its speed. The owner's devices have
-  other CPUs, so these figures hold for this host only.
+  VBlanks for 20,000 presents in the runs below. Timed on its own, the
+  filter fits that budget at 1280x800 here but not at 1080p and above,
+  where the presenter shows fewer filtered frames. The presenter is
+  designed not to slow the game: the filter runs on its own threads, with
+  one present of latency. That was not measured with the game running,
+  though. On a CPU with 8 or fewer logical cores the filter's workers
+  (`min(cores, 8)`) compete with the game thread and may slow it. The
+  owner's devices have other CPUs, so these figures hold for this host
+  only.
 
 **Internal Resolution** renders into a separate 2x/3x/4x shadow surface. The
 original 1024x512 VRAM stays the authority for game readbacks, texture
