@@ -35970,6 +35970,7 @@ static void test_ATK3_retail_attack_initialization(void)
 #include "test_transition_ot.h"
 #include "test_controller_sdk.h"
 #include "test_game_input.h"
+#include "test_analog_stick.h"
 #include "test_vsync.h"
 #include "test_vblank.h"
 #include "test_timer1.h"
@@ -41163,6 +41164,7 @@ int main(void)
     test_PADCOMBO_all(); /* Select+Start dev-menu combo (test_pad_combo.h) */
     test_ENH_all();    /* opt-in movement speed / always run (test_enhance.h) */
     test_ASSIST_all(); /* opt-in assists: 1-hit kills, god mode, EXP/BP mult (test_assists.h) */
+    test_ANALOG_all(); /* opt-in ANALOG STICK: pad reply, retail analog branch (test_analog_stick.h) */
     test_SPLIT_all();  /* one guest authority per retail scalar (test_split_brain.h) */
     test_GLOW1_func_800E051C_packet();  /* matched-C packet check (test_glow_sprite.h) */
     test_VPASS_all();  /* batch O: retail $v0 of func_80062A7C via func_80044E14 (test_v0_passthrough.h) */

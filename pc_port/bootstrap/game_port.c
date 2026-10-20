@@ -10,6 +10,8 @@
 
 #include "pe_str_feed.h"
 #include "game_port.h"
+#include "pe_plat/enhance.h"
+#include "pe_guest_ram.h"
 #include "pe_gpu.h"
 #include "pe_irq.h"
 #include "pe_irq_delivery.h"
@@ -45,6 +47,7 @@ static int g_port_card_testevent_host_return = 0;
 static int g_port_movie_continue_budget = -1;
 static int g_port_title_loop_budget = -1;
 static PEPortPadSource g_port_pad_source = NULL;
+static PEPortPadAnalogSource g_port_pad_analog_source = NULL;
 
 void PE_Port_SetSkipMovie(int enabled)
 {
@@ -114,6 +117,7 @@ int PE_Port_CardTestEventHostReturn(void)
 void PE_Port_SetPadSource(PEPortPadSource source)
 {
     g_port_pad_source = source;
+    g_port_pad_analog_source = NULL;
 }
 
 int PE_Port_HasPadSource(void)
@@ -128,6 +132,35 @@ uint16_t PE_Port_ReadPadRaw(void)
     return g_port_pad_source();
 }
 
+void PE_Port_SetPadAnalogSource(PEPortPadAnalogSource source)
+{
+    g_port_pad_analog_source = source;
+}
+
+int PE_Port_StorePadId(void)
+{
+    uint8_t sticks[4];
+
+    if (g_port_pad_analog_source != NULL && pe_enh_analog_stick()
+        && g_port_pad_analog_source(sticks)) {
+        /* DualShock analog reply: ID 73h, then RX, RY, LX, LY. */
+        PE_StoreU16(0x800BE9A0u, 0x7300u);
+        for (uint32_t i = 0; i < 4u; i++)
+            PE_StoreU8(0x800BE9A4u + i, sticks[i]);
+        return 1;
+    }
+    PE_StoreU16(0x800BE9A0u, 0x4100u);
+    return 0;
+}
+
+void PE_Port_FillPadBuffer(void)
+{
+    if (!PE_Port_HasPadSource())
+        return;
+    (void)PE_Port_StorePadId();
+    PE_StoreU16(0x800BE9A2u, PE_Port_ReadPadRaw());
+}
+
 void PE_Port_RunControlReset(void)
 {
     g_port_stop_epoch = 0;
@@ -138,6 +171,7 @@ void PE_Port_RunControlReset(void)
     g_port_title_loop_budget = -1;
     PE_StrFeed_Reset();
     g_port_pad_source = NULL;
+    g_port_pad_analog_source = NULL;
     g_port_stop_requested = 0;
     g_port_main_iterations = 0;
     g_port_frame_limit = 0;

@@ -227,11 +227,78 @@ Resolution is Native; an explicit 2x/3x/4x choice is kept.
 The build was a local `zig cc` (clang) build: the current devbox has no
 system GCC. See `docs/ai_context/ACTIVE_HANDOFF.md`.
 
+## Controls (dev menu ▸ Options ▸ Controls)
+
+**Analog Stick** (`analog_stick=<0|1>`, `PE_ANALOG_STICK=<0|1>`, default
+OFF). This is retail's DualShock analog mode.
+
+**OFF (retail default).** Behaviour is unchanged:
+- every pad fill stores ID word `0x4100` (status 0, ID 41h digital);
+- the left stick maps to the d-pad.
+
+**ON, with an SDL GameController connected:**
+- the fills store `0x7300` (ID 73h, DualShock analog);
+- they write the stick bytes at `0x800BE9A4..A7` (RX, RY, LX, LY; 0x80 = centre; up/left 0x00);
+- the left stick no longer sets d-pad bits in the game's button word.
+
+With no GameController (raw joystick or `/dev/input/js*` only), on Win32, or
+with a route-pad / `PE_PAD_SCRIPT` source, the reply stays digital. Installing
+a pad source drops the analog source. The SDL axis converts to a byte as
+`(v + 32768) >> 8`. The retail game then runs its own analog code, unchanged.
+
+What retail does in analog mode (each item checked against the matching C
+in `src/`):
+
+| Retail fact | Where |
+| --- | --- |
+| Analog branch taken when `(D_800BE9A0 & 0xF000) == 0x7000`. It reads `D_800BE9A6` (LX) and `D_800BE9A7` (LY): `< 0x5A` / `>= 0xA1` set Up 8 / Down 0x20 / Left 0x40 / Right 0x10 in `D_8009D26C`; `< 0x14` / `>= 0xE7` also set bit 0 (value 1, run) | `src/func_8003EB04.c:138-178` |
+| **Before the stick, `D_8009D26C &= ~0x79`.** In analog mode the d-pad direction bits and the Circle run bit are cleared, so the d-pad does not move Aya or menu cursors; direction and run come from the stick only | `src/func_8003EB04.c:139`; table `D_800A76F0` slots 0, 3-6 (`func_8003E974`, `test_3E974_array_final_table`) |
+| While window id 0 is open (`func_80062A34(1,0)`: a node keyed (1,0) in the `D_8009D154` window list, created by `func_80062D2C(0,…)` in `func_800438EC` / `func_8004E97C`), only full deflection counts and run is never set | `src/func_8003EB04.c:140-152`, `src/func_80062A34.c`, `src/func_80062D2C.c` (`s[8] = 1`, `s[9] = a0`) |
+| The field walk steers by `atan2(LY-0x80, LX-0x80) - 0x400` plus the analog camera yaw `D_800BD022` | `src/func_800710A4.c:45-57` |
+| The run walk, battle facing and camera yaw take the same analog paths | `src/func_8007136C.c`, `src/func_80071754.c`, `src/func_80066CE8.c:1374` |
+| These are the only readers of the pad ID / stick bytes in retail: a load/store scan of `SLUS_006.62` and all 518 `PE.IMG` entries (`lui 0x800C` plus offsets 0xE9A0..0xE9A7) finds 3E944 (init), 3EB04, 66CE8, 710A4, 7136C and 71754, and nothing in any overlay | binary scan, 2026-10-20 |
+| libpad: the game asks for analog mode itself (`func_8008292C(0,1,0)` = PadSetMainMode analog, unlocked) once `func_800825C0` (PadGetState) reports Stable and `func_80082680(0,2,0)` reports an extended ID. The port has no SIO0 device and no pad interrupt, so the record at `0x800A5B70` stays PadStateDiscon. The handshake does not run, for the digital or the analog reply; the analog branch depends only on the ID. | `src/func_8003EB04.c:56-74`, `pe_controller_sdk_port.c`, `pe_save.c` |
+
+Port change needed for analog mode: `func_800710A4`'s hand port had only the
+d-pad half. With ID 73h it wrote no walk velocity, so Aya could not walk. The
+analog block of `src/func_800710A4.c` is now ported
+(`pe_walk_analog_apply`, `game/boot/func_80035558_port.c`). The other four
+consumers were already line-for-line.
+
+Tests (`pc_port/tests/test_analog_stick.h`, `ANALOG_*`):
+- **`ANALOG_axis_to_byte`**: axis-to-byte conversion.
+- **`ANALOG_fill_off_is_today`**: with the option off, or without an analog source or controller, the 8 pad bytes equal the old fill's.
+- **`ANALOG_fill_on`**: ID 73h and the stick bytes.
+- **`ANALOG_retail_branch`**: the generated `func_8003EB04` with the real libpad init. Checks:
+  - half deflection gives a direction;
+  - full deflection gives a direction plus run;
+  - the d-pad and Circle-run are cleared in analog mode;
+  - the menu-window case;
+  - no handshake call.
+- **`ANALOG_field_walk`**: the stick up/right walk equals the d-pad walk, and `D_800BD022` turns the heading.
+- **`ANALOG_dev_menu`**: the dev menu row.
+- **Host-pad ctests**: `MapControllerEx`, `HostPadSDL_AnalogSticks`, and the no-stick masks.
+
+**Results (2026-10-20, local `zig cc` build, `-j 3`):**
+
+| Check | Result |
+| --- | --- |
+| Native suite | `Results: 1696 run, 1696 passed, 0 failed, 0 skipped`. This includes `DAY1_game_input`, the retail-hashed `func_8003EB04` cases with ID 0x7300 and edge stick bytes. |
+| CTest `-R host-pad` | `100% tests passed out of 3` (`host-pad-input`, `host-pad-sdl`, `host-pad-hotplug`) |
+
+**Not done:**
+- no live controller or device check;
+- no route run, neither with the option on nor the default-off Day-1 identity run. The default path changed shape (the fill sites call a helper, and `func_800710A4` has a new ID check), and these unit tests cover it only;
+- no Win32 path: that backend has no GameController, so only a stub was added.
+
+In analog mode the keyboard's arrow keys feed the same d-pad bits, so like
+the d-pad they do not move Aya or menu cursors.
+
 ## The option registry (how options are added)
 
 Every player-facing option is registered once, in `k_options` in
 `pc_port/platform/plat_enhance.c` (`pe_plat/enhance.h`): an id that is also
-its config key, a category (Graphics, Gameplay/QoL, Assists), a menu label,
+its config key, a category (Graphics, Gameplay/QoL, Assists, Audio, Controls), a menu label,
 its values in cycle order with the retail value first, an env override and a
 "suggested by" credit. The registry drives the config file, the env overrides,
 the two dev-menu pages (which list a category each) and the identity rule:

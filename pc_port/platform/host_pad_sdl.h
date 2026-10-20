@@ -66,6 +66,17 @@ typedef struct { int cross, circle, square, triangle, l1, r1, l2, r2, select, st
 /* Pure mappings (exposed for tests). */
 uint16_t HostPadSDL_MapController(const uint8_t btn[HPS_BTN_COUNT], const int16_t axis[HPS_AXIS_COUNT],
                                   int swap_xy, uint8_t *hotkeys);
+/* stick_dpad = 0 drops the left-stick -> d-pad bits (opt-in ANALOG STICK:
+ * the stick then reaches the game as analog bytes, as on a DualShock). */
+uint16_t HostPadSDL_MapControllerEx(const uint8_t btn[HPS_BTN_COUNT], const int16_t axis[HPS_AXIS_COUNT],
+                                    int swap_xy, int stick_dpad, uint8_t *hotkeys);
+/* SDL axis (-32768..32767, 0 = centre; up/left negative) to a DualShock
+ * stick byte (0x00..0xFF, 0x80 = centre; up/left 0x00): linear, exact at
+ * both ends and at the centre. */
+static inline uint8_t HostPadSDL_AxisToByte(int16_t v)
+{
+    return (uint8_t)(((int32_t)v + 32768) >> 8);
+}
 void     HostPadSDL_RawMapDefaults(HostPadRawMap *m);
 /* Parse "c,o,s,t,l1,r1,l2,r2,select,start"; returns 0 on success (m unchanged on error). */
 int      HostPadSDL_RawMapParse(HostPadRawMap *m, const char *spec);
@@ -78,6 +89,12 @@ void     HostPadSDL_Poll(void);
 int      HostPadSDL_Count(void);      /* open SDL devices */
 uint16_t HostPadSDL_Held(void);
 uint8_t  HostPadSDL_Hotkeys(void);
+/* Opt-in ANALOG STICK.  HostPadSDL_HeldAnalog: HostPadSDL_Held without the
+ * GameControllers' left-stick -> d-pad bits.  HostPadSDL_AnalogSticks: 1 when
+ * at least one GameController is open, with out[] = RX, RY, LX, LY bytes
+ * (per axis the most-deflected open GameController); 0 otherwise. */
+uint16_t HostPadSDL_HeldAnalog(void);
+int      HostPadSDL_AnalogSticks(uint8_t out[4]);
 /* Open SDL devices as HostPadOrigin (key 0x40000000 | SDL instance id; SDL
  * never reuses an instance id, so a reconnect is a new key). */
 int      HostPadSDL_Origins(HostPadOrigin *out, int max);

@@ -310,9 +310,11 @@ static void pe_3f3c4_host_pad(void)
     uint16_t raw;
 
     if (PE_Port_HasPadSource()) {
-        /* BIOS pad buffer: successful reply, ID 41h (digital, one word).
-         * The window supplies buttons only; never retain an analog ID. */
-        PE_StoreU16(0x800BE9A0u,0x4100u);
+        /* BIOS pad buffer: successful reply, ID 41h (digital, one word),
+         * rewritten every tick so no stale ID survives.  The opt-in ANALOG
+         * STICK (pe_plat/enhance.h) replies ID 73h with the window's stick
+         * bytes instead; off, the store is exactly 0x4100. */
+        (void)PE_Port_StorePadId();
         raw = PE_Port_ReadPadRaw();
     }
     else if (pe_3f3c4_message_state2())

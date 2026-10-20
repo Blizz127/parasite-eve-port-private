@@ -1377,6 +1377,9 @@ int main(int argc, char **argv) {
             PE_Port_SetPresentHook(PresentHook_BlitWindow);
             HostFB_SetScanoutHook(ScanoutHook_BlitWindow);
             PE_Port_SetPadSource(HostWindow_PadRaw);
+            /* Opt-in ANALOG STICK; route-pad / PE_PAD_SCRIPT sources below
+             * replace the pad source and drop this, so they stay digital. */
+            PE_Port_SetPadAnalogSource(HostWindow_PadAnalog);
         }
     }
 

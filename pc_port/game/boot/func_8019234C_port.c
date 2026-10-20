@@ -84,10 +84,7 @@ void func_8019234C(void)
          * VSync interrupt; like the field (func_8003F3C4) and title loops,
          * fill it from the host pad source right before 8003EB04 reads it.
          * Without this the world map never saw input. */
-        if (PE_Port_HasPadSource()) {
-            PE_StoreU16(0x800BE9A0u, 0x4100u);
-            PE_StoreU16(0x800BE9A2u, PE_Port_ReadPadRaw());
-        }
+        PE_Port_FillPadBuffer();   /* ID 41h (73h + sticks: opt-in ANALOG STICK) */
         align_calls = PE_ControllerAlignCalls;
         func_8003EB04();
         if (PE_Port_ShouldStop()) return;

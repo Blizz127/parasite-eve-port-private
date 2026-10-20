@@ -112,17 +112,19 @@ void HostPad_DeviceEvent(HostPadDevice *dev, uint8_t type, uint8_t number, int16
     }
 }
 
-uint16_t HostPad_DeviceHeld(const HostPadDevice *dev)
+static uint16_t device_held(const HostPadDevice *dev, int stick_dpad)
 {
     uint16_t held = dev->buttons;
     for (unsigned i = 0; i < 64; i++) {
         int v = dev->axis[i];
         switch (dev->axis_code[i]) {
         case EV_ABS_X:
+            if (!stick_dpad) break;
             if (v <= -HOST_PAD_STICK_DEADZONE) held |= HOST_PAD_LEFT;
             if (v >=  HOST_PAD_STICK_DEADZONE) held |= HOST_PAD_RIGHT;
             break;
         case EV_ABS_Y:
+            if (!stick_dpad) break;
             if (v <= -HOST_PAD_STICK_DEADZONE) held |= HOST_PAD_UP;
             if (v >=  HOST_PAD_STICK_DEADZONE) held |= HOST_PAD_DOWN;
             break;
@@ -147,6 +149,9 @@ uint16_t HostPad_DeviceHeld(const HostPadDevice *dev)
     }
     return held;
 }
+
+uint16_t HostPad_DeviceHeld(const HostPadDevice *dev) { return device_held(dev, 1); }
+uint16_t HostPad_DeviceHeldAnalog(const HostPadDevice *dev) { return device_held(dev, 0); }
 
 uint8_t HostPad_DeviceHotkeys(const HostPadDevice *dev)
 {
@@ -319,6 +324,14 @@ uint16_t HostPad_Held(void)
     uint16_t held = HostPadSDL_Held();
     for (int i = 0; i < HOST_PAD_MAX_DEVICES; i++)
         if (g_slots[i].fd >= 0) held |= HostPad_DeviceHeld(&g_slots[i].dev);
+    return held;
+}
+
+uint16_t HostPad_HeldAnalog(void)
+{
+    uint16_t held = HostPadSDL_HeldAnalog();
+    for (int i = 0; i < HOST_PAD_MAX_DEVICES; i++)
+        if (g_slots[i].fd >= 0) held |= HostPad_DeviceHeldAnalog(&g_slots[i].dev);
     return held;
 }
 

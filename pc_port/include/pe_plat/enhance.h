@@ -18,6 +18,9 @@
  *   god_mode=<0|1>       PE_GOD_MODE=<0|1>        Aya's HP never goes down
  *   exp_mult=<1|2|3>     PE_EXP_MULT=<1|2|3>      battle EXP and BP times N
  * At the defaults every assist hook returns its input and writes nothing.
+ *
+ * Controls (dev menu: OPTIONS > CONTROLS), same file, default off:
+ *   analog_stick=<0|1>   PE_ANALOG_STICK=<0|1>    DualShock analog mode
  */
 #ifndef PE_PLAT_ENHANCE_H
 #define PE_PLAT_ENHANCE_H
@@ -42,6 +45,7 @@ typedef enum {
     PE_ENH_CAT_GAMEPLAY,         /* quality-of-life gameplay options */
     PE_ENH_CAT_ASSIST,           /* cheat-style assists (god mode, EXP, 1-hit) */
     PE_ENH_CAT_AUDIO,            /* output levels (master, movie/CD audio) */
+    PE_ENH_CAT_CONTROLS,         /* controller options (DualShock analog mode) */
     PE_ENH_CAT_COUNT
 } PeEnhCategory;
 
@@ -114,6 +118,23 @@ int  pe_enh_master_volume(void);
 int  pe_enh_movie_volume(void);
 void pe_enh_set_master_volume(int percent);
 void pe_enh_set_movie_volume(int percent);
+
+/* ── Controls ────────────────────────────────────────────────────────── */
+/* ANALOG STICK.  OFF (retail default): the pad replies as today's digital
+ * pad, ID 41h, and the left stick maps to the d-pad.  ON with an SDL
+ * GameController connected: the pad replies as a DualShock in analog mode,
+ * ID 73h, with the stick bytes at 0x800BE9A4..A7 (RX, RY, LX, LY; 0x80 =
+ * centre), and the left stick no longer maps to the d-pad.  Retail's own
+ * analog code then runs (func_8003EB04, func_800710A4, func_8007136C,
+ * func_80071754, func_80066CE8).  Like retail on a real DualShock, analog
+ * mode takes direction and run from the left stick only: func_8003EB04
+ * clears the d-pad direction bits and the Circle run bit (D_8009D26C &=
+ * ~0x79), so the d-pad does not move Aya or menu cursors.  Without a
+ * GameController (or with the raw/js backends only) the reply stays
+ * digital.  Only the windowed host installs the analog source; route-pad
+ * and PE_PAD_SCRIPT runs stay digital whatever the setting. */
+int  pe_enh_analog_stick(void);          /* 0 (default) or 1 */
+void pe_enh_set_analog_stick(int on);
 
 /* ── Assists ─────────────────────────────────────────────────────────── */
 #define PE_ENH_EXP_MULT_MAX 3
