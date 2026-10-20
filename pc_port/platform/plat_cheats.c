@@ -329,6 +329,7 @@ static const struct { int page; PeEnhCategory category; const char *label; } k_o
     {5, PE_ENH_CAT_GAMEPLAY, "ENHANCEMENTS"},
     {7, PE_ENH_CAT_GRAPHICS, "GRAPHICS"},
     {8, PE_ENH_CAT_AUDIO,    "AUDIO"},
+    {9, PE_ENH_CAT_CONTROLS, "CONTROLS"},
 };
 #define N_OPTION_PAGES ((int)(sizeof k_option_pages / sizeof k_option_pages[0]))
 static int option_row(int page)

@@ -9,7 +9,6 @@
 
 static char enh_conf[256];
 
-/* A config path nobody else uses; the file is removed before each test. */
 /* The suite's own enhancements.conf and no option overrides: main() calls
  * this first, and suites end with it instead of unsetting PE_ENH_CONFIG, so
  * no enhancement hook ever loads the user's ~/.config file. */
@@ -25,6 +24,7 @@ static void enh_hermetic(void)
     pe_enh_reset();
 }
 
+/* A config path nobody else uses; the file is removed before each test. */
 static void enh_isolate(void)
 {
     snprintf(enh_conf, sizeof enh_conf, "%s/pe_enh_test_%d.conf",
@@ -40,6 +40,7 @@ static void enh_isolate(void)
     unsetenv("PE_DITHERING");
     unsetenv("PE_MASTER_VOLUME");
     unsetenv("PE_MOVIE_VOLUME");
+    unsetenv("PE_ANALOG_STICK");
     pe_enh_reset();
 }
 

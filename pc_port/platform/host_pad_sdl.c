@@ -22,6 +22,12 @@
 uint16_t HostPadSDL_MapController(const uint8_t btn[HPS_BTN_COUNT], const int16_t axis[HPS_AXIS_COUNT],
                                   int swap_xy, uint8_t *hotkeys)
 {
+    return HostPadSDL_MapControllerEx(btn, axis, swap_xy, 1, hotkeys);
+}
+
+uint16_t HostPadSDL_MapControllerEx(const uint8_t btn[HPS_BTN_COUNT], const int16_t axis[HPS_AXIS_COUNT],
+                                    int swap_xy, int stick_dpad, uint8_t *hotkeys)
+{
     uint16_t h = 0;
     uint8_t hk = 0;
     if (btn[HPS_BTN_A]) h |= HOST_PAD_CROSS;
@@ -40,10 +46,12 @@ uint16_t HostPadSDL_MapController(const uint8_t btn[HPS_BTN_COUNT], const int16_
     if (btn[HPS_BTN_LSTICK]) hk |= HOST_PAD_HOTKEY_FF_TOGGLE;
     if (axis[HPS_AXIS_TL] >= HOST_PAD_SDL_TRIGGER_THRESHOLD) h |= HOST_PAD_L2;
     if (axis[HPS_AXIS_TR] >= HOST_PAD_SDL_TRIGGER_THRESHOLD) h |= HOST_PAD_R2;
-    if (axis[HPS_AXIS_LX] <= -HOST_PAD_STICK_DEADZONE) h |= HOST_PAD_LEFT;
-    if (axis[HPS_AXIS_LX] >=  HOST_PAD_STICK_DEADZONE) h |= HOST_PAD_RIGHT;
-    if (axis[HPS_AXIS_LY] <= -HOST_PAD_STICK_DEADZONE) h |= HOST_PAD_UP;
-    if (axis[HPS_AXIS_LY] >=  HOST_PAD_STICK_DEADZONE) h |= HOST_PAD_DOWN;
+    if (stick_dpad) {
+        if (axis[HPS_AXIS_LX] <= -HOST_PAD_STICK_DEADZONE) h |= HOST_PAD_LEFT;
+        if (axis[HPS_AXIS_LX] >=  HOST_PAD_STICK_DEADZONE) h |= HOST_PAD_RIGHT;
+        if (axis[HPS_AXIS_LY] <= -HOST_PAD_STICK_DEADZONE) h |= HOST_PAD_UP;
+        if (axis[HPS_AXIS_LY] >=  HOST_PAD_STICK_DEADZONE) h |= HOST_PAD_DOWN;
+    }
     if (hotkeys) *hotkeys = hk;
     return h;
 }
@@ -110,7 +118,10 @@ uint16_t HostPadSDL_MapJoystick(const HostPadRawMap *m, const uint8_t *btn, int 
 
 /* ── runtime (dlopen SDL2) ─────────────────────────────────────────── */
 
-typedef struct { void *gc, *js; int32_t id; uint16_t held; uint8_t hk, input_seen; char name[96]; } HpsDev;
+typedef struct {
+    void *gc, *js; int32_t id; uint16_t held, held_analog; uint8_t hk, input_seen; char name[96];
+    int16_t axis[HPS_AXIS_COUNT];   /* GameController axes from the last poll */
+} HpsDev;
 
 static struct {
     int state;             /* 0 untried, 1 ready, -1 unavailable/disabled */
@@ -314,6 +325,8 @@ void HostPadSDL_Poll(void)
             for (int i = 0; i < HPS_BTN_COUNT; i++) b[i] = S.GCButton(d->gc, i);
             for (int i = 0; i < HPS_AXIS_COUNT; i++) a[i] = S.GCAxis(d->gc, i);
             d->held = HostPadSDL_MapController(b, a, S.swap_xy, &d->hk);
+            d->held_analog = HostPadSDL_MapControllerEx(b, a, S.swap_xy, 0, NULL);
+            memcpy(d->axis, a, sizeof d->axis);
         } else {
             uint8_t b[32] = {0};
             int16_t a[2] = {0, 0};
@@ -326,6 +339,7 @@ void HostPadSDL_Poll(void)
             for (int i = 0; i < na; i++) a[i] = S.JSAxis(d->js, i);
             if (S.JSNumHats(d->js) > 0) hat = S.JSHat(d->js, 0);
             d->held = HostPadSDL_MapJoystick(&S.raw, b, nb, a, na, hat, S.swap_xy, &d->hk);
+            d->held_analog = d->held;   /* no analog reply from a raw joystick */
         }
         if (d->held && !d->input_seen) {
             /* One line per device: which pad and backend actually fed input. */
@@ -354,6 +368,35 @@ uint16_t HostPadSDL_Held(void)
     if (S.state != 1) return 0;
     for (int k = 0; k < HPS_MAX_DEVICES; k++) if (S.dev[k].id >= 0) h |= S.dev[k].held;
     return h;
+}
+
+uint16_t HostPadSDL_HeldAnalog(void)
+{
+    uint16_t h = 0;
+    if (S.state != 1) return 0;
+    for (int k = 0; k < HPS_MAX_DEVICES; k++) if (S.dev[k].id >= 0) h |= S.dev[k].held_analog;
+    return h;
+}
+
+int HostPadSDL_AnalogSticks(uint8_t out[4])
+{
+    /* SDL axis order LX, LY, RX, RY; DualShock reply order RX, RY, LX, LY. */
+    static const int order[4] = {HPS_AXIS_RX, HPS_AXIS_RY, HPS_AXIS_LX, HPS_AXIS_LY};
+    int16_t best[4] = {0, 0, 0, 0};
+    int any = 0;
+    if (S.state != 1) return 0;
+    for (int k = 0; k < HPS_MAX_DEVICES; k++) {
+        const HpsDev *d = &S.dev[k];
+        if (d->id < 0 || !d->gc) continue;
+        any = 1;
+        for (int i = 0; i < 4; i++) {
+            int v = d->axis[order[i]], b = best[i];
+            if ((v < 0 ? -v : v) > (b < 0 ? -b : b)) best[i] = (int16_t)v;
+        }
+    }
+    if (!any) return 0;
+    for (int i = 0; i < 4; i++) out[i] = HostPadSDL_AxisToByte(best[i]);
+    return 1;
 }
 
 int HostPadSDL_Origins(HostPadOrigin *out, int max)

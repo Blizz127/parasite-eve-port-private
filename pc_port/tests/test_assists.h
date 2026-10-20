@@ -377,10 +377,21 @@ static void test_ASSIST_option_registry(void)
     int n = pe_enh_option_count();
     TEST("ASSIST_option_registry");
     enh_isolate();
-    ASSERT(n == 12, "twelve registered options");
+    ASSERT(n == 13, "thirteen registered options");
     ASSERT(pe_enh_category_count(PE_ENH_CAT_GAMEPLAY) == 2 && pe_enh_category_count(PE_ENH_CAT_ASSIST) == 3 &&
-           pe_enh_category_count(PE_ENH_CAT_GRAPHICS) == 5 && pe_enh_category_count(PE_ENH_CAT_AUDIO) == 2,
-           "categories: 2 gameplay, 3 assists, 5 graphics, 2 audio");
+           pe_enh_category_count(PE_ENH_CAT_GRAPHICS) == 5 && pe_enh_category_count(PE_ENH_CAT_AUDIO) == 2 &&
+           pe_enh_category_count(PE_ENH_CAT_CONTROLS) == 1,
+           "categories: 2 gameplay, 3 assists, 5 graphics, 2 audio, 1 controls");
+    {   /* the controls row: ANALOG STICK, a retail-OFF toggle, last in the registry */
+        int a = pe_enh_option_index("analog_stick");
+        const PeEnhOption *o = pe_enh_option(a);
+        ASSERT(a == n - 1 && pe_enh_category_option(PE_ENH_CAT_CONTROLS, 0) == a &&
+               pe_enh_category_option(PE_ENH_CAT_CONTROLS, 1) == -1, "analog_stick is the one controls row, last");
+        ASSERT(o && o->format == PE_ENH_FMT_TOGGLE && o->values[0] == 0 && o->nvalues == 2 &&
+               strcmp(o->env, "PE_ANALOG_STICK") == 0 && strcmp(o->label, "ANALOG STICK") == 0 &&
+               o->credit && strcmp(o->credit, "the owner") == 0, "analog_stick row as registered");
+        ASSERT(pe_enh_analog_stick() == 0, "ANALOG STICK defaults OFF (retail digital pad)");
+    }
     for (int i = 0; i < n; i++) {
         const PeEnhOption *o = pe_enh_option(i);
         ASSERT(o && o->id && o->label && o->env && o->values && o->nvalues >= 2, "option is fully described");

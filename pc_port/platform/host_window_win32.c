@@ -295,6 +295,13 @@ uint16_t HostWindow_PadRaw(void)
     return (uint16_t)(~g_sony_held);
 }
 
+/* No GameController backend here: the pad always replies digital. */
+int HostWindow_PadAnalog(uint8_t sticks[4])
+{
+    (void)sticks;
+    return 0;
+}
+
 static uint64_t monotonic_ns(void)
 {
     LARGE_INTEGER counter;

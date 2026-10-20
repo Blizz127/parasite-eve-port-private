@@ -31,7 +31,7 @@ static const int k_volume[] = {100, 90, 80, 70, 60, 50, 40, 30, 20, 10, 0};
 
 /* The registry.  Order within a category is the menu order. */
 enum { OPT_DISPLAY_SCALER, OPT_INTERNAL_SCALE, OPT_TEXTURE_FILTER, OPT_SSAA, OPT_DITHER, OPT_MOVE_SPEED, OPT_ALWAYS_RUN, OPT_ONE_HIT, OPT_GOD, OPT_EXP_MULT,
-       OPT_MASTER_VOLUME, OPT_MOVIE_VOLUME, OPT_COUNT };
+       OPT_MASTER_VOLUME, OPT_MOVIE_VOLUME, OPT_ANALOG_STICK, OPT_COUNT };
 static const PeEnhOption k_options[OPT_COUNT] = {
     {"display_scaler", PE_ENH_CAT_GRAPHICS, "DISPLAY SCALER",      PE_ENH_FMT_NAMED,
         k_scaler, sizeof k_scaler / sizeof k_scaler[0], "PE_DISPLAY_SCALER", "the owner", k_scaler_names},
@@ -57,6 +57,8 @@ static const PeEnhOption k_options[OPT_COUNT] = {
         k_volume, 11, "PE_MASTER_VOLUME", "the owner"},
     {"movie_volume",  PE_ENH_CAT_AUDIO,   "MOVIE AUDIO VOLUME",   PE_ENH_FMT_PERCENT,
         k_volume, 11, "PE_MOVIE_VOLUME",  "the owner"},
+    {"analog_stick",  PE_ENH_CAT_CONTROLS, "ANALOG STICK",        PE_ENH_FMT_TOGGLE,
+        k_toggle, 2, "PE_ANALOG_STICK",  "the owner"},
 };
 
 #define GA_AYA_ACTOR  0x8009D254u   /* *(u32 *) = Aya's field actor */
@@ -302,6 +304,8 @@ void pe_enh_set_one_hit_kills(int on)     { pe_enh_option_set(OPT_ONE_HIT, on); 
 void pe_enh_set_god_mode(int on)          { pe_enh_option_set(OPT_GOD, on); }
 void pe_enh_set_exp_mult(int mult)        { pe_enh_option_set(OPT_EXP_MULT, mult); }
 void pe_enh_cycle_exp_mult(void)          { pe_enh_option_cycle(OPT_EXP_MULT); }
+int  pe_enh_analog_stick(void)            { return pe_enh_option_value(OPT_ANALOG_STICK); }
+void pe_enh_set_analog_stick(int on)      { pe_enh_option_set(OPT_ANALOG_STICK, on); }
 
 static int aya_in_field(uint32_t actor)
 {

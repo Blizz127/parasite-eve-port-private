@@ -345,8 +345,44 @@ void func_8007136C(pe_addr_t actor, pe_addr_t codep)
 }
 
 /*
- * PE-BTL68 — func_800710A4 d-pad walk (no Circle).
- * 178 words 0x800710A4..0x8007136C. D1A0&2 jals 7136C.
+ * src/func_800710A4.c:45-57 + 109-120: the analog-pad field walk (pad ID 73h,
+ * D_800BE9A0 & 0xF000 == 0x7000).  Heading = atan2(LY - 0x80, LX - 0x80)
+ * - 0x400, wrapped to 0..0xFFF, plus the analog camera yaw D_800BD022;
+ * velocity = (-speed * sin, 0, -speed * cos) of that heading; then the
+ * shared D_8009D2E8 bit-4 heading adjust, func_80078934 into actor+0x68 and
+ * the mirror.  Retail always takes this branch when the ID is 73h, so before
+ * it was ported an analog reply left Aya's walk velocity unwritten.  Same
+ * order as the func_8007136C analog block above.
+ */
+static void pe_walk_analog_apply(pe_addr_t actor, uint32_t speed)
+{
+    int32_t ang, d, sp, r;
+
+    ang = func_80079FB4((int32_t)PE_LoadU8(0x800BE9A7u) - 0x80, (int32_t)PE_LoadU8(0x800BE9A6u) - 0x80) - 0x400;
+    if (ang < 0) ang += 0x1000;
+    PE_StoreU16(actor + 0x3Au, (uint16_t)(PE_LoadU16(0x800BD022u) + (uint32_t)ang));
+    d = func_80077CF4(ang);
+    sp = -(int32_t)speed;
+    PE_StoreU32(GA_WALK_VEL + 0u, func_8003708C((uint32_t)sp, (uint32_t)d << 4));
+    PE_StoreU32(GA_WALK_VEL + 4u, 0u);
+    PE_StoreU32(GA_WALK_VEL + 8u, func_8003708C((uint32_t)sp, (uint32_t)func_80077DC4(ang) << 4));
+    r = (int16_t)PE_LoadU16(actor + 0x3Au);
+    if (PE_LoadU32(GA_D_8009D254) != 0u && (PE_LoadU32(GA_D_8009D2E8) & 0x10u)) {
+        r += 0x800;
+        r += (int32_t)((PE_LoadU32(PE_LoadU32(PE_LoadU32(GA_D_8009D254)) + 0x4Cu) >> 7) & 0xC00u);
+    }
+    r &= 0xFFF;
+    PE_StoreU16(actor + 0x3Au, (uint16_t)r);
+    func_80078934(GA_D_800BD000, GA_WALK_VEL, actor + 0x68u);
+    if (PE_LoadU32(GA_D_8009D2E8) & 0x10u) {
+        PE_StoreU16(actor + 0x3Au, (uint16_t)((0x1000u - PE_LoadU16(actor + 0x3Au)) & 0xFFFu));
+        PE_StoreU32(actor + 0x68u, (uint32_t)-(int32_t)PE_LoadU32(actor + 0x68u));
+    }
+}
+
+/*
+ * PE-BTL68 — func_800710A4 field walk (no Circle): d-pad, or the stick with
+ * the analog pad ID.  178 words 0x800710A4..0x8007136C. D1A0&2 jals 7136C.
  */
 void func_800710A4(pe_addr_t actor, pe_addr_t codep)
 {
@@ -370,6 +406,10 @@ void func_800710A4(pe_addr_t actor, pe_addr_t codep)
     scaled = func_8003708C(scaled,
                            (uint32_t)PE_LoadU16(actor + 0x26u) << 4);
     scaled = (uint32_t)pe_enh_field_speed(actor, (int32_t)scaled);  /* opt-in; 100 % = retail */
+    if ((PE_LoadU16(GA_D_800BE9A0) & 0xF000u) == 0x7000u) {
+        pe_walk_analog_apply(actor, scaled);
+        return;
+    }
     pe_walk_digital_apply(actor, scaled);
 }
 

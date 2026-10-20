@@ -11,11 +11,13 @@
 #include "host_upscale.h"
 #include "host_pad.h"
 #include "host_pad_remap.h"
+#include "host_pad_sdl.h"
 #include "host_dev_menu.h"
 #include "host_audio.h"
 #include "pe_audio_driver.h"
 #include "game_port.h"
 #include "pe_plat/cheats.h"
+#include "pe_plat/enhance.h"
 #include "pe_gpu.h"
 #include "pe_str_feed.h"
 #include <stdio.h>
@@ -767,17 +769,34 @@ int HostWindow_Poll(void)
     return g_close_requested ? 1 : 0;
 }
 
+/* Opt-in ANALOG STICK on and a GameController open: the pad replies analog. */
+static int window_pad_analog(uint8_t sticks[4])
+{
+    return pe_enh_analog_stick() && HostPadSDL_AnalogSticks(sticks);
+}
+
 uint16_t HostWindow_PadRaw(void)
 {
+    uint8_t sticks[4];
     /* Keyboard and controller both drive the pad at once.  The controller
      * word goes through the dev-menu combo filter (a lone Select/Start is
      * withheld only while it could still become Select+Start), which reads the
      * physical bits; the optional controls.conf pad.* remap applies to the
      * filter's output only, so the combo stays reachable whatever the remap and
-     * the keyboard (already mapped by its own table) is never remapped twice. */
+     * the keyboard (already mapped by its own table) is never remapped twice.
+     * In an analog reply the left stick is the analog bytes, not the d-pad. */
     if (pe_plat_cheats_menu_open() || HostDevMenu_CapturesInput()) return 0xFFFFu;
     return HostPadRemap_PadWord(HostPadRemap_Global(), g_sony_held,
-                                HostDevMenu_FilterPad(HostPad_Held()));
+                                HostDevMenu_FilterPad(window_pad_analog(sticks) ? HostPad_HeldAnalog()
+                                                                                 : HostPad_Held()));
+}
+
+int HostWindow_PadAnalog(uint8_t sticks[4])
+{
+    if (!window_pad_analog(sticks)) return 0;
+    if (pe_plat_cheats_menu_open() || HostDevMenu_CapturesInput())
+        memset(sticks, 0x80, 4);   /* the menu holds the pad: centred */
+    return 1;
 }
 
 static int monotonic_ns(uint64_t *out)

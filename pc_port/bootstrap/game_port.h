@@ -135,9 +135,27 @@ int  PE_Port_CardTestEventHostReturn(void);
  * scripted source.  NULL source leaves guest RAM unchanged except the
  * existing idle-zero → 0xFFFF normalize. */
 typedef uint16_t (*PEPortPadSource)(void);
+/* Installing a pad source drops the analog source (below), so route-pad and
+ * PE_PAD_SCRIPT sources always reply as the digital pad. */
 void PE_Port_SetPadSource(PEPortPadSource source);
 int  PE_Port_HasPadSource(void);
 uint16_t PE_Port_ReadPadRaw(void);
+
+/* Opt-in ANALOG STICK (pe_plat/enhance.h).  An analog source fills the four
+ * DualShock stick bytes RX, RY, LX, LY (0x80 = centre) and returns 1 while an
+ * analog controller is connected, else 0.  Only the windowed host installs
+ * one (port_main.c, after PE_Port_SetPadSource(HostWindow_PadRaw)). */
+typedef int (*PEPortPadAnalogSource)(uint8_t sticks[4]);
+void PE_Port_SetPadAnalogSource(PEPortPadAnalogSource source);
+/* Pad-buffer header at the fill sites (D_800BE9A0: status byte 0, ID byte).
+ * Default: stores 0x4100 (ID 41h, digital), exactly the fill before this
+ * option existed.  With ANALOG STICK on and the analog source reporting:
+ * 0x7300 (ID 73h, DualShock analog) and the stick bytes at 0x800BE9A4..A7.
+ * Returns 1 when it stored the analog reply. */
+int  PE_Port_StorePadId(void);
+/* The overlay fill sites (title, world map, movie loops): when a pad source
+ * is installed, PE_Port_StorePadId() then the raw buttons at 0x800BE9A2. */
+void PE_Port_FillPadBuffer(void);
 
 /* Trace helper available to game code */
 void Trace_Direct(const char *event);

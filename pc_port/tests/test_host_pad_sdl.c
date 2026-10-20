@@ -52,6 +52,25 @@ static void test_controller_map(void)
     CHECK(HostPadSDL_MapController(b, a, 0, NULL) == 0);                  /* inside the deadzone */
     a[HPS_AXIS_RX] = 32767;                                               /* right stick unused */
     CHECK(HostPadSDL_MapController(b, a, 0, NULL) == 0);
+
+    /* Opt-in ANALOG STICK: stick_dpad = 0 drops only the left-stick bits. */
+    memset(a, 0, sizeof(a));
+    a[HPS_AXIS_LX] = -32768; a[HPS_AXIS_LY] = 32767;
+    CHECK(HostPadSDL_MapControllerEx(b, a, 0, 1, NULL) == (HOST_PAD_LEFT | HOST_PAD_DOWN));
+    CHECK(HostPadSDL_MapControllerEx(b, a, 0, 0, NULL) == 0);
+    b[HPS_BTN_DPAD_UP] = 1; b[HPS_BTN_A] = 1;
+    CHECK(HostPadSDL_MapControllerEx(b, a, 0, 0, NULL) == (HOST_PAD_UP | HOST_PAD_CROSS));
+    CHECK(HostPadSDL_MapController(b, a, 0, NULL) == HostPadSDL_MapControllerEx(b, a, 0, 1, NULL));
+    memset(b, 0, sizeof(b));
+
+    /* SDL axis -> DualShock stick byte: 0x80 centre, up/left 0x00, down/right 0xFF. */
+    CHECK(HostPadSDL_AxisToByte(-32768) == 0x00 && HostPadSDL_AxisToByte(0) == 0x80 &&
+          HostPadSDL_AxisToByte(32767) == 0xFF);
+    CHECK(HostPadSDL_AxisToByte(-16384) == 0x40 && HostPadSDL_AxisToByte(16384) == 0xC0);
+    CHECK(HostPadSDL_AxisToByte(-1) == 0x7F && HostPadSDL_AxisToByte(255) == 0x80 &&
+          HostPadSDL_AxisToByte(256) == 0x81);
+    for (int v = -32768; v < 32767; v++)
+        if (HostPadSDL_AxisToByte((int16_t)(v + 1)) < HostPadSDL_AxisToByte((int16_t)v)) { CHECK(!"monotonic"); break; }
 }
 
 static void test_raw_map(void)
@@ -123,6 +142,26 @@ static void test_runtime(const char *stub)
     CHECK(HostPad_Held() == 0 && HostPad_Hotkeys() == HOST_PAD_HOTKEY_FF_HOLD);
     button(0, HPS_BTN_RSTICK, 0);
 
+    /* Opt-in ANALOG STICK: a GameController reports RX, RY, LX, LY bytes and
+     * the analog held mask leaves its left stick out of the d-pad bits. */
+    {
+        uint8_t st[4] = {0, 0, 0, 0};
+        axis(0, HPS_AXIS_LX, -32768); axis(0, HPS_AXIS_LY, 16384);
+        axis(0, HPS_AXIS_RX, 32767);  axis(0, HPS_AXIS_RY, 0);
+        button(0, HPS_BTN_DPAD_RIGHT, 1);
+        HostPad_Poll();
+        CHECK(HostPadSDL_AnalogSticks(st) == 1);
+        CHECK(st[0] == 0xFF && st[1] == 0x80 && st[2] == 0x00 && st[3] == 0xC0);
+        CHECK(HostPad_Held() == (HOST_PAD_LEFT | HOST_PAD_DOWN | HOST_PAD_RIGHT));
+        CHECK(HostPad_HeldAnalog() == HOST_PAD_RIGHT);
+        CHECK(HostPadSDL_HeldAnalog() == HOST_PAD_RIGHT);
+        axis(0, HPS_AXIS_LX, 0); axis(0, HPS_AXIS_LY, 0); axis(0, HPS_AXIS_RX, 0);
+        button(0, HPS_BTN_DPAD_RIGHT, 0);
+        HostPad_Poll();
+        CHECK(HostPadSDL_AnalogSticks(st) == 1 && st[0] == 0x80 && st[1] == 0x80 &&
+              st[2] == 0x80 && st[3] == 0x80);
+    }
+
     /* hot-plug a raw (unmapped) joystick: hat + button 1 = Circle */
     plug(1, 9, 0, 12, 2, 1);
     sleep_scan();
@@ -138,6 +177,11 @@ static void test_runtime(const char *stub)
     HostPad_Poll();
     CHECK(HostPadSDL_Count() == 1);
     CHECK(HostPad_Held() == (HOST_PAD_LEFT | HOST_PAD_CIRCLE));
+    {   /* a raw joystick alone is no analog source; its mask is unchanged */
+        uint8_t st[4] = {1, 2, 3, 4};
+        CHECK(HostPadSDL_AnalogSticks(st) == 0 && st[0] == 1 && st[3] == 4);
+        CHECK(HostPad_HeldAnalog() == (HOST_PAD_LEFT | HOST_PAD_CIRCLE));
+    }
     unplug(1);
     HostPad_Poll();
     CHECK(HostPadSDL_Count() == 0 && HostPad_Held() == 0);
