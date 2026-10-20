@@ -39495,6 +39495,7 @@ int main(void)
 
     /* DEBUG: test filter via PE_TEST_FILTER env var */
     test_filter = getenv("PE_TEST_FILTER");
+    enh_hermetic();   /* never the user's enhancements.conf (test_enhance.h) */
 
     PE_RamInit();
     Test_ResetMemcard();

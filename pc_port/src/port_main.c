@@ -475,15 +475,22 @@ static uint16_t RoutePadSource(void)
     return mask;
 }
 
-/* Keep capture and menu composition at native resolution. The graphics
- * surface is used only when the overlay leaves the frame untouched. */
+/* Menus, help and toasts are laid out for the 320x240 frame, so the native
+ * frame is shown while one is up.  Otherwise the overlay (at most the CHEATS
+ * badge) is drawn on the presentation frame, so a used cheat or warp never
+ * turns the graphics options off.  At the defaults the presentation frame
+ * is the native one and this is the old blit. */
 static void BlitPresentationFrame(int with_overlay)
 {
     const uint8_t *native = HostFB_GetPixels();
-    const uint8_t *pixels = with_overlay ?
-        pe_plat_cheats_overlay(native, PE_PORT_FB_WIDTH, PE_PORT_FB_HEIGHT) : native;
     int width = PE_PORT_FB_WIDTH, height = PE_PORT_FB_HEIGHT;
-    if (pixels == native) pixels = HostFB_GetPresentationPixels(&width, &height);
+    const uint8_t *pixels = HostFB_GetPresentationPixels(&width, &height);
+    if (with_overlay) {
+        if (pixels != native && pe_plat_cheats_overlay_ui()) {
+            pixels = native; width = PE_PORT_FB_WIDTH; height = PE_PORT_FB_HEIGHT;
+        }
+        pixels = pe_plat_cheats_overlay(pixels, width, height);
+    }
     HostWindow_Blit(pixels, width, height);
 }
 

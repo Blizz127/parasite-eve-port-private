@@ -516,7 +516,10 @@ static int g_scaler_mode_last;
 static int display_scaler_mode(void)
 {
     int mode = pe_enh_display_scaler ? pe_enh_display_scaler() : 0;
-    if (mode != g_scaler_mode_last) { g_scaler_mode_last = mode; g_blit_dirty = 1; } /* redraw even if the frame is unchanged */
+    if (mode != g_scaler_mode_last) {
+        g_scaler_mode_last = mode; g_blit_dirty = 1; /* redraw even if the frame is unchanged */
+        HostUpscale_DropReady();
+    }
     return mode;
 }
 

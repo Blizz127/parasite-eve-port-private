@@ -55,6 +55,9 @@ void pe_plat_cheats_frame(void);
 /* Pixels to present: `rgb` unchanged, or a copy with the overlay drawn when
  * any overlay text is visible.  RGB888, width*height*3. */
 const uint8_t *pe_plat_cheats_overlay(const uint8_t *rgb, int width, int height);
+/* 1 while the overlay shows a menu, the help text or a toast: text laid out
+ * for the 320x240 frame.  The CHEATS badge alone does not count. */
+int pe_plat_cheats_overlay_ui(void);
 /* Fast-forward speed while FF is on: 0 = uncapped, else N emulated frames
  * per wall frame. */
 int  pe_plat_cheats_ff_multiplier(void);

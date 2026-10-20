@@ -699,6 +699,16 @@ static int HostUpscale_TakeReadyFor(uint8_t *dst, int mode, int ww, int wh)
     return got;
 }
 
+/* The scaler changed: a finished image belongs to an older frame. */
+static void HostUpscale_DropReady(void)
+{
+    HuAsync *a = &hu_async;
+    if (!a->started) return;
+    pthread_mutex_lock(&a->mu);
+    a->ready_new = 0;
+    pthread_mutex_unlock(&a->mu);
+}
+
 /* Compatibility for callers that do not select a filter. */
 static int HostUpscale_TakeReady(uint8_t *dst, int ww, int wh)
 {
@@ -745,6 +755,7 @@ static void HostUpscale_Shutdown(void)
 #else
 static int HostUpscale_AsyncAvailable(void) { return 0; }
 static int HostUpscale_TakeFailure(void) { return 0; }
+static void HostUpscale_DropReady(void) { }
 static void HostUpscale_Shutdown(void) { }
 #endif
 #endif

@@ -361,6 +361,7 @@ static int day_warp_index(int day, int row)
 }
 
 int pe_plat_cheats_menu_open(void) { return C.enabled && C.menu; }
+int pe_plat_cheats_overlay_ui(void) { return C.enabled && (C.menu || C.help || C.toast_frames); }
 int pe_plat_cheats_ff_multiplier(void) { return k_ff_mult[C.ff_index & 3]; }
 int pe_plat_cheats_warp_count(void) { return N_WARPS; }
 const char *pe_plat_cheats_warp_name(int i) { return (i >= 0 && i < N_WARPS) ? k_warps[i].name : ""; }

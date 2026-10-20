@@ -239,9 +239,10 @@ static void test_AUDIO_cd_gain(void)
     TEST("AUDIO_cd_gain");
     ResetTestState();
     ASSERT(PE_Spu_CdGain() == 100, "default CD gain is retail (100)");
+    PE_Spu_SetCdGain(100);
     audio_cd_render(100, retail, 400);
     audio_cd_render(100, again, 400);
-    ASSERT(memcmp(retail, again, sizeof retail) == 0, "gain 100 renders identically");
+    ASSERT(memcmp(retail, again, sizeof retail) == 0, "gain 100 takes the unscaled path repeatably");
     audio_cd_render(50, half, 400);
     audio_cd_render(0, none, 400);
     int nonzero = 0, within = 1, silent = 1;

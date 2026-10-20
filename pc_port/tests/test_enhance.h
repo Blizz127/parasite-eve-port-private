@@ -10,6 +10,21 @@
 static char enh_conf[256];
 
 /* A config path nobody else uses; the file is removed before each test. */
+/* The suite's own enhancements.conf and no option overrides: main() calls
+ * this first, and suites end with it instead of unsetting PE_ENH_CONFIG, so
+ * no enhancement hook ever loads the user's ~/.config file. */
+static char g_test_enh_conf[256];
+static void enh_hermetic(void)
+{
+    if (!g_test_enh_conf[0])
+        snprintf(g_test_enh_conf, sizeof g_test_enh_conf, "%s/pe_native_tests_%d.conf",
+                 getenv("TMPDIR") && *getenv("TMPDIR") ? getenv("TMPDIR") : "/tmp", (int)getpid());
+    unlink(g_test_enh_conf);
+    setenv("PE_ENH_CONFIG", g_test_enh_conf, 1);
+    for (int i = 0; i < pe_enh_option_count(); i++) unsetenv(pe_enh_option(i)->env);
+    pe_enh_reset();
+}
+
 static void enh_isolate(void)
 {
     snprintf(enh_conf, sizeof enh_conf, "%s/pe_enh_test_%d.conf",
@@ -222,5 +237,5 @@ static void test_ENH_all(void)
     test_ENH_config_persists();
     test_ENH_dev_menu_rows();
     enh_isolate();                                  /* leave defaults for later tests */
-    unsetenv("PE_ENH_CONFIG");
+    enh_hermetic();
 }

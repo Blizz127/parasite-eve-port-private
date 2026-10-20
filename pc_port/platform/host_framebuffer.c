@@ -32,6 +32,7 @@ static int fb_presentation_scale = 1;
 static uint64_t fb_presentation_generation;
 static int fb_ssaa;
 static int fb_presentation_ssaa;
+static int fb_presentation_movie;   /* last scan-out was a 24-bit movie frame */
 static uint8_t fb_antialias[PE_PORT_FB_WIDTH * PE_PORT_FB_HEIGHT * 3];
 
 void HostFB_SetSSAA(int enabled) { fb_ssaa = enabled == 1; }
@@ -61,6 +62,7 @@ void HostFB_Init(void)
 {
     memset(fb, 0, sizeof(fb));
     free(fb_presentation); fb_presentation = NULL; fb_presentation_scale = 1;
+    fb_presentation_movie = 0;
     fb_presented = 0;
     fb_mask      = 0;
     fb_vsync_count = 0;
@@ -184,7 +186,11 @@ static void ScanPresentation(uint32_t dx, uint32_t dy, uint32_t dw,
 {
     int scale = PE_GPU_GetRenderScale();
     size_t bytes = (size_t)PE_PORT_FB_WIDTH * PE_PORT_FB_HEIGHT * scale * scale * 3u;
+    fb_presentation_movie = rgb24;
     if (scale == 1) { fb_presentation_scale = 1; return; }
+    /* A movie frame is decoded at 320x240: a larger copy adds nothing and
+     * would cost the window's XRender path. */
+    if (rgb24) return;
     if (fb_presentation_scale != scale || !fb_presentation) {
         uint8_t *next = realloc(fb_presentation, bytes);
         if (!next) { fb_presentation_scale = 1; return; }
@@ -245,6 +251,11 @@ int HostFB_WritePresentationPPM(const char *path)
 
 const uint8_t *HostFB_GetPresentationPixels(int *width, int *height)
 {
+    if (fb_presentation_movie) {
+        if (width) *width = PE_PORT_FB_WIDTH;
+        if (height) *height = PE_PORT_FB_HEIGHT;
+        return fb;
+    }
     int scale = fb_presentation && fb_presentation_scale == PE_GPU_GetRenderScale() &&
                 fb_presentation_generation == PE_GPU_GetRenderGeneration() &&
                 fb_presentation_ssaa == fb_ssaa ?

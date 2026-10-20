@@ -198,8 +198,13 @@ fetches and captures.
   with window scaling.
 - Integer projection and affine texture mapping remain; there is no
   sub-pixel geometry yet.
-- Movies expand the original decoded pixels.
-- The developer overlay uses the native frame.
+- Movies present the native 320x240 decoded frame: a larger copy adds
+  nothing, and the native frame keeps the X11 XRender fast path. The
+  Display Scaler still applies.
+- While the dev menu, the help text or a toast is up, the window shows the
+  native frame, because that text is laid out for 320x240. The CHEATS badge
+  alone is drawn on the presentation frame, so a used cheat or warp does not
+  turn these options off.
 - An allocation failure falls back to native.
 - `PE_ROUTE_PRESENTATION_SHOTS=1` with `PE_ROUTE_SHOT_RANGE` also writes the
   presentation frame (`f<N>-presentation.ppm`); ordinary captures stay native.
@@ -257,6 +262,10 @@ emulated register stay retail.
 - The SPU mix, the `PE_AUDIO_WAV` dump and every test capture stay at the
   retail level.
 - At 100 % the samples pass through untouched.
+- Otherwise they are scaled in fixed stack chunks, so there is no allocation
+  that could fail and play at full level.
+- A level change ramps linearly across one submit (`HostAudio_GainRamp`), so
+  it does not click.
 - Windows has no audio device backend yet, so the row has no effect there.
 
 **Movie Audio Volume** scales the SPU's CD-input contribution: FMV
@@ -272,6 +281,15 @@ The volume lists fall from the retail value, which is the largest. So
 `snap()` now picks the largest listed value at or below the input, or else
 the smallest listed one. That is unchanged for every list that rises from
 retail.
+
+Config handling (all options):
+
+- Config and env values must be whole decimal numbers. Anything else, such
+  as `loud` or an empty value, keeps the retail value.
+- The config file is written to a temp file and renamed into place, so an
+  interrupted save never leaves a truncated value.
+- An env override is never written back, even when another option is saved
+  from the menu.
 
 **Tests** (native suite):
 

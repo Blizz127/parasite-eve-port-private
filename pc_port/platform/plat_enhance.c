@@ -64,7 +64,8 @@ static const PeEnhOption k_options[OPT_COUNT] = {
 
 static struct {
     int inited;
-    int value[OPT_COUNT];
+    int value[OPT_COUNT];   /* in effect: config, then env override */
+    int file[OPT_COUNT];    /* what the config holds; save_config writes this */
 } E;
 
 static void sync_graphics(void)
@@ -98,6 +99,20 @@ static int snap(int i, int v)
     return found ? best : lowest;
 }
 
+/* A config or env value must be a whole decimal number.  Anything else
+ * (empty, "loud", "50%") keeps the retail value instead of snapping. */
+static int parse_value(int i, const char *s)
+{
+    char *end;
+    long v;
+    errno = 0;
+    v = strtol(s, &end, 10);
+    if (end == s) return k_options[i].values[0];   /* no digits (strtol leaves end at s) */
+    while (*end == ' ' || *end == '\t' || *end == '\r' || *end == '\n') end++;
+    if (*end || errno || v < -1000000 || v > 1000000) return k_options[i].values[0];
+    return snap(i, (int)v);
+}
+
 static int config_path(char *out, size_t n)
 {
     const char *p = getenv("PE_ENH_CONFIG");
@@ -122,7 +137,7 @@ static void load_config(void)
         if (!eq || line[0] == '#') continue;
         *eq = 0;
         for (int i = 0; i < OPT_COUNT; i++)
-            if (strcmp(line, k_options[i].id) == 0) { E.value[i] = snap(i, atoi(eq + 1)); break; }
+            if (strcmp(line, k_options[i].id) == 0) { E.value[i] = E.file[i] = parse_value(i, eq + 1); break; }
     }
     fclose(f);
 }
@@ -142,22 +157,31 @@ static void mkdir_parent(const char *path)
     (void)mkdir(dir, 0700);
 }
 
+/* Written to a sibling temp file and renamed over the config, so an
+ * interrupted save never leaves a truncated value behind. */
 static void save_config(void)
 {
-    char path[1024];
+    char path[1024], tmp[1100];
     FILE *f;
+    int failed;
     if (!config_path(path, sizeof path)) return;
     mkdir_parent(path);
-    f = fopen(path, "w");
+    snprintf(tmp, sizeof tmp, "%s.tmp", path);
+    f = fopen(tmp, "w");
     if (!f) {
-        fprintf(stderr, "[ENH] cannot write %s: %s\n", path, strerror(errno));
+        fprintf(stderr, "[ENH] cannot write %s: %s\n", tmp, strerror(errno));
         return;
     }
     fprintf(f, "# Parasite Eve port enhancements and assists (dev menu > Options / Assists)\n");
     fprintf(f, "# Every value's default is the retail behaviour; delete this file to reset.\n");
     for (int i = 0; i < OPT_COUNT; i++)
-        fprintf(f, "%s=%d\n", k_options[i].id, E.value[i]);
-    fclose(f);
+        fprintf(f, "%s=%d\n", k_options[i].id, E.file[i]);
+    failed = ferror(f) != 0;
+    if (fclose(f) != 0) failed = 1;
+    if (failed || rename(tmp, path) != 0) {
+        fprintf(stderr, "[ENH] cannot write %s: %s\n", path, strerror(errno));
+        (void)remove(tmp);
+    }
 }
 
 void pe_enh_init(void)
@@ -165,11 +189,11 @@ void pe_enh_init(void)
     int any = 0;
     if (E.inited) return;
     E.inited = 1;
-    for (int i = 0; i < OPT_COUNT; i++) E.value[i] = k_options[i].values[0];
+    for (int i = 0; i < OPT_COUNT; i++) E.value[i] = E.file[i] = k_options[i].values[0];
     load_config();
     for (int i = 0; i < OPT_COUNT; i++) {
         const char *e = getenv(k_options[i].env);
-        if (e && *e) E.value[i] = snap(i, atoi(e));
+        if (e && *e) E.value[i] = parse_value(i, e);
         if (E.value[i] != k_options[i].values[0]) any = 1;
     }
     sync_graphics();
@@ -223,7 +247,7 @@ void pe_enh_option_set(int i, int value)
 {
     if (i < 0 || i >= OPT_COUNT) return;
     pe_enh_init();
-    E.value[i] = snap(i, value);
+    E.value[i] = E.file[i] = snap(i, value);   /* a menu choice is the player's: it persists */
     if (k_options[i].category == PE_ENH_CAT_GRAPHICS) sync_graphics();
     if (k_options[i].category == PE_ENH_CAT_AUDIO) sync_audio();
     save_config();

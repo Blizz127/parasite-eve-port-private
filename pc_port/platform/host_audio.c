@@ -423,19 +423,20 @@ void HostAudio_Submit(const int16_t *stereo, int frames)
     }
 #ifndef _WIN32
     if (g_device) {
+        static int last = 100;     /* the level the previous submit ended at */
         int percent = pe_enh_master_volume ? pe_enh_master_volume() : 100;
-        static int16_t *scaled;
-        static int scaled_frames;
-        if (percent != 100 && frames > scaled_frames) {
-            int16_t *p = realloc(scaled, (size_t)frames * 4u);
-            if (p) { scaled = p; scaled_frames = frames; }
-        }
-        if (percent != 100 && frames <= scaled_frames) {
-            for (int i = 0; i < frames * 2; i++) scaled[i] = HostAudio_GainSample(stereo[i], percent);
-            pulse_submit(scaled, frames);
-        } else {
+        if (percent == 100 && last == 100) {
             pulse_submit(stereo, frames);
+        } else {
+            /* Fixed chunks on the stack: no allocation that could fail open. */
+            int16_t chunk[2 * 256];
+            for (int done = 0; done < frames; done += 256) {
+                int n = frames - done < 256 ? frames - done : 256;
+                HostAudio_GainRamp(chunk, stereo, done, n, frames, last, percent);
+                pulse_submit(chunk, n);
+            }
         }
+        last = percent;
     }
 #endif
 }

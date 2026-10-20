@@ -47,7 +47,8 @@ int main(void)
         /* 24-bit bytes straddle VRAM words and wrap x, retain exact RGB. */
         gp(0xA0000000);gp(1023);gp((1u<<16)|2u);gp(0x00332211u);
         scan(1023,0,1,0,1,1);hi=HostFB_GetPresentationPixels(&w,&h);pixel(HostFB_GetPixels(),320,0,0,0x11,0x22,0x33);
-        for(unsigned sy=0;sy<scale;sy++)for(unsigned sx=0;sx<scale;sx++)pixel(hi,w,sx,sy,0x11,0x22,0x33);
+        /* A movie frame presents the native 320x240 frame itself. */
+        CHECK(hi==HostFB_GetPixels() && w==320 && h==240);pixel(hi,w,0,0,0x11,0x22,0x33);
         /* Export is presentation-sized and leaves native fb/counters intact. */
         CHECK(HostFB_WritePresentationPPM(path)==0);
         FILE *f=fopen(path,"rb");CHECK(f);int fw,fh;CHECK(fscanf(f,"P6\n%d %d\n255\n",&fw,&fh)==2);CHECK(fw==w && fh==h);CHECK(fclose(f)==0);

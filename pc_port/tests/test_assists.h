@@ -367,7 +367,7 @@ static void test_ASSIST_all(void)
     test_ASSIST_config_and_env();
     test_ASSIST_dev_menu_rows();
     enh_isolate();                                  /* leave defaults for later tests */
-    unsetenv("PE_ENH_CONFIG");
+    enh_hermetic();
 }
 
 /* The option registry: one entry per player-facing option, retail first. */
@@ -496,6 +496,33 @@ static void test_ASSIST_option_registry(void)
         ASSERT(PE_Spu_CdGain() == 100, "100 restores the unity CD gain");
         ASSERT(HostAudio_GainSample(12345, 100) == 12345 && HostAudio_GainSample(-32768, 50) == -16384 &&
                HostAudio_GainSample(32767, 0) == 0, "device-sink gain helper");
+        {   /* the ramp: from == to is the constant gain; a change ramps across the submit */
+            int16_t src[2 * 4] = {1000, -1000, 1000, -1000, 1000, -1000, 1000, -1000}, out[2 * 4];
+            HostAudio_GainRamp(out, src, 0, 4, 4, 50, 50);
+            ASSERT(out[0] == 500 && out[7] == -500, "a constant ramp is the plain gain");
+            HostAudio_GainRamp(out, src, 0, 4, 4, 100, 0);
+            ASSERT(out[0] == 1000 && out[2] == 750 && out[4] == 500 && out[6] == 250, "100 -> 0 ramps down");
+        }
+        {   /* strict parsing: garbage keeps retail instead of muting */
+            FILE *f = fopen(enh_conf, "w");
+            ASSERT(f != NULL, "write a hand-edited config");
+            fprintf(f, "master_volume=loud\nmovie_volume=\nmove_speed=150\n");
+            fclose(f);
+            pe_enh_reset();
+            ASSERT(pe_enh_master_volume() == 100 && pe_enh_movie_volume() == 100 && pe_enh_move_speed_pct() == 150,
+                   "unparsable config values keep retail; valid ones load");
+            setenv("PE_MASTER_VOLUME", "50%", 1); pe_enh_reset();
+            ASSERT(pe_enh_master_volume() == 100, "an unparsable env override keeps retail");
+            unsetenv("PE_MASTER_VOLUME");
+            /* an env override is never persisted by a later menu save */
+            setenv("PE_MOVE_SPEED", "200", 1); pe_enh_reset();
+            ASSERT(pe_enh_move_speed_pct() == 200, "env override in effect");
+            pe_enh_set_master_volume(80);
+            unsetenv("PE_MOVE_SPEED"); pe_enh_reset();
+            ASSERT(pe_enh_move_speed_pct() == 150 && pe_enh_master_volume() == 80,
+                   "saving another option writes the config's own value, not the env override");
+            pe_enh_set_move_speed_pct(100); pe_enh_set_master_volume(100);
+        }
     }
     ASSERT(pe_enh_option(pe_enh_option_index("move_speed"))->credit != NULL &&
            pe_enh_option(pe_enh_option_index("god_mode"))->credit != NULL, "credits recorded");

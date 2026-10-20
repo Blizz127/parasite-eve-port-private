@@ -70,7 +70,7 @@ typedef struct {
 } PePlatPrimitive;
 
 typedef struct {
-    int internal_scale;         /* 1 = native 1024x512 VRAM */
+    int internal_scale;         /* render scale of the presentation shadow (1 = native VRAM only) */
     int widescreen;             /* 0 = 4:3 */
     const char *backend_name;
 } PePlatRendererCaps;
