@@ -22,6 +22,7 @@ static void enh_isolate(void)
     unsetenv("PE_INTERNAL_SCALE");
     unsetenv("PE_TEXTURE_FILTER");
     unsetenv("PE_SSAA");
+    unsetenv("PE_DITHERING");
     unsetenv("PE_MASTER_VOLUME");
     unsetenv("PE_MOVIE_VOLUME");
     pe_enh_reset();

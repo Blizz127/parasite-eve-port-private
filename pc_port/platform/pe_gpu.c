@@ -134,6 +134,12 @@ void PE_GPU_SetRenderScale(int scale)
 
 void PE_GPU_SetTextureFilter(int filter) { g_texture_filter = filter == 1; }
 int PE_GPU_GetTextureFilter(void) { return g_texture_filter; }
+/* Shadow-surface dithering: 0 retail (the native 4x4 pattern, magnified),
+ * 1 fine (the same pattern at shadow-pixel resolution), 2 off.  Native VRAM
+ * always dithers as retail. */
+static int g_shadow_dither;
+void PE_GPU_SetShadowDither(int mode) { g_shadow_dither = mode >= 0 && mode <= 2 ? mode : 0; }
+int PE_GPU_GetShadowDither(void) { return g_shadow_dither; }
 int PE_GPU_GetRenderScale(void) { return g_render_scale; }
 uint64_t PE_GPU_GetRenderGeneration(void) { return g_render_generation; }
 
@@ -1024,7 +1030,8 @@ static void ShadowPolygonTriangle(PePolygonVertex a, PePolygonVertex b, PePolygo
                 for (channel = 0u; channel < 3u; channel++) {
                     int value = (int)((w0*a.color[channel] + w1*b.color[channel] + w2*c.color[channel] + half) / area);
                     if (textured) value = (int)(((texture >> (channel*5u)) & 31u) * (unsigned int)value) >> 4;
-                    if (dithering) value += dither[(y / scale) & 3][(x / scale) & 3];
+                    if (dithering && g_shadow_dither != 2)
+                        value += g_shadow_dither ? dither[y & 3][x & 3] : dither[(y / scale) & 3][(x / scale) & 3];
                     if (value < 0) value = 0;
                     if (value > 255) value = 255;
                     color |= (uint16_t)((unsigned int)(value >> 3) << (channel*5u));
@@ -1139,7 +1146,8 @@ static void ShadowLine(void)
             if (!(g_gpu.state.mask_setting&2u) || !(*pixel&0x8000u)) {
                 for (ch=0;ch<3;ch++) {
                     int32_t value=rgb[ch]>>12;
-                    if (g_gpu.state.draw_mode&0x200u) value+=dither[y&3][x&3];
+                    if ((g_gpu.state.draw_mode&0x200u) && g_shadow_dither!=2)
+                        value+=g_shadow_dither?dither[(y*g_render_scale+sy)&3][(x*g_render_scale+sx)&3]:dither[y&3][x&3];
                     if (value<0) value=0;
                     if (value>255) value=255;
                     color|=(uint16_t)((uint32_t)(value>>3)<<(ch*5));

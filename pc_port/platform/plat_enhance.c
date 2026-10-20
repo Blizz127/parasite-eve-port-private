@@ -25,10 +25,12 @@ static const char *const k_scaler_names[] = {"NEAREST", "SHARP BILINEAR", "FSR 1
 static const int k_internal_scale[] = {1, 2, 3, 4};
 static const char *const k_internal_scale_names[] = {"NATIVE", "2X", "3X", "4X"};
 static const char *const k_texture_filter_names[] = {"NEAREST", "BILINEAR (POLYGONS)"};
+static const int k_dither[] = {0, 1, 2};
+static const char *const k_dither_names[] = {"RETAIL", "FINE (SCALED)", "OFF"};
 static const int k_volume[] = {100, 90, 80, 70, 60, 50, 40, 30, 20, 10, 0};
 
 /* The registry.  Order within a category is the menu order. */
-enum { OPT_DISPLAY_SCALER, OPT_INTERNAL_SCALE, OPT_TEXTURE_FILTER, OPT_SSAA, OPT_MOVE_SPEED, OPT_ALWAYS_RUN, OPT_ONE_HIT, OPT_GOD, OPT_EXP_MULT,
+enum { OPT_DISPLAY_SCALER, OPT_INTERNAL_SCALE, OPT_TEXTURE_FILTER, OPT_SSAA, OPT_DITHER, OPT_MOVE_SPEED, OPT_ALWAYS_RUN, OPT_ONE_HIT, OPT_GOD, OPT_EXP_MULT,
        OPT_MASTER_VOLUME, OPT_MOVIE_VOLUME, OPT_COUNT };
 static const PeEnhOption k_options[OPT_COUNT] = {
     {"display_scaler", PE_ENH_CAT_GRAPHICS, "DISPLAY SCALER",      PE_ENH_FMT_NAMED,
@@ -39,6 +41,8 @@ static const PeEnhOption k_options[OPT_COUNT] = {
         k_toggle, 2, "PE_TEXTURE_FILTER", "the owner", k_texture_filter_names},
     {"ssaa", PE_ENH_CAT_GRAPHICS, "SUPERSAMPLE AA", PE_ENH_FMT_TOGGLE,
         k_toggle, 2, "PE_SSAA", "the owner", NULL},
+    {"dithering", PE_ENH_CAT_GRAPHICS, "DITHERING", PE_ENH_FMT_NAMED,
+        k_dither, 3, "PE_DITHERING", "the owner", k_dither_names},
     {"move_speed",    PE_ENH_CAT_GAMEPLAY, "MOVEMENT SPEED",       PE_ENH_FMT_PERCENT,
         pe_enh_move_speed_steps, PE_ENH_MOVE_SPEED_COUNT, "PE_MOVE_SPEED",    "u/stellarola"},
     {"always_run",    PE_ENH_CAT_GAMEPLAY, "ALWAYS RUN",           PE_ENH_FMT_TOGGLE,
@@ -66,9 +70,10 @@ static struct {
 static void sync_graphics(void)
 {
     int scale = E.value[OPT_INTERNAL_SCALE];
-    if ((E.value[OPT_SSAA] || E.value[OPT_TEXTURE_FILTER]) && scale == 1) scale = 2;
+    if ((E.value[OPT_SSAA] || E.value[OPT_TEXTURE_FILTER] || E.value[OPT_DITHER]) && scale == 1) scale = 2;
     PE_GPU_SetRenderScale(scale);
     PE_GPU_SetTextureFilter(E.value[OPT_TEXTURE_FILTER]);
+    PE_GPU_SetShadowDither(E.value[OPT_DITHER]);
     HostFB_SetSSAA(E.value[OPT_SSAA]);
 }
 
@@ -181,6 +186,7 @@ void pe_enh_reset(void) {
     memset(&E, 0, sizeof E);
     PE_GPU_SetRenderScale(1);
     PE_GPU_SetTextureFilter(0);
+    PE_GPU_SetShadowDither(0);
     HostFB_SetSSAA(0);
     pe_plat_audio_set_cd_gain(100);
 }

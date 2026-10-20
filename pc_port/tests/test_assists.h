@@ -323,6 +323,13 @@ static void test_ASSIST_dev_menu_graphics_page(void)
     ASSERT(HostFB_GetSSAA() == 1 && PE_GPU_GetRenderScale() == 2, "row 4 turns on supersample AA at 2x");
     (void)pe_plat_cheats_key(PE_CHEAT_KEY_ENTER, 1);
     ASSERT(!HostFB_GetSSAA() && PE_GPU_GetRenderScale() == 1, "AA off restores native rendering");
+    (void)pe_plat_cheats_key(PE_CHEAT_KEY_DOWN, 1);
+    (void)pe_plat_cheats_key(PE_CHEAT_KEY_ENTER, 1);
+    ASSERT(PE_GPU_GetShadowDither() == 1 && PE_GPU_GetRenderScale() == 2, "row 5 selects fine dithering at 2x");
+    (void)pe_plat_cheats_key(PE_CHEAT_KEY_ENTER, 1);
+    ASSERT(PE_GPU_GetShadowDither() == 2 && PE_GPU_GetRenderScale() == 2, "then dithering off");
+    (void)pe_plat_cheats_key(PE_CHEAT_KEY_ENTER, 1);
+    ASSERT(PE_GPU_GetShadowDither() == 0 && PE_GPU_GetRenderScale() == 1, "retail dithering restores native rendering");
     (void)pe_plat_cheats_key(PE_CHEAT_KEY_BACK, 1);                              /* -> OPTIONS row 2 */
     (void)pe_plat_cheats_key(PE_CHEAT_KEY_DOWN, 1);
     (void)pe_plat_cheats_key(PE_CHEAT_KEY_ENTER, 1);                             /* -> AUDIO (row 3) */
@@ -370,10 +377,10 @@ static void test_ASSIST_option_registry(void)
     int n = pe_enh_option_count();
     TEST("ASSIST_option_registry");
     enh_isolate();
-    ASSERT(n == 11, "eleven registered options");
+    ASSERT(n == 12, "twelve registered options");
     ASSERT(pe_enh_category_count(PE_ENH_CAT_GAMEPLAY) == 2 && pe_enh_category_count(PE_ENH_CAT_ASSIST) == 3 &&
-           pe_enh_category_count(PE_ENH_CAT_GRAPHICS) == 4 && pe_enh_category_count(PE_ENH_CAT_AUDIO) == 2,
-           "categories: 2 gameplay, 3 assists, 4 graphics, 2 audio");
+           pe_enh_category_count(PE_ENH_CAT_GRAPHICS) == 5 && pe_enh_category_count(PE_ENH_CAT_AUDIO) == 2,
+           "categories: 2 gameplay, 3 assists, 5 graphics, 2 audio");
     for (int i = 0; i < n; i++) {
         const PeEnhOption *o = pe_enh_option(i);
         ASSERT(o && o->id && o->label && o->env && o->values && o->nvalues >= 2, "option is fully described");
@@ -454,6 +461,13 @@ static void test_ASSIST_option_registry(void)
                "polygon filtering alone selects a 2x shadow");
         pe_enh_option_set(filter, 0);
         ASSERT(PE_GPU_GetRenderScale() == 1, "filter off restores native scale");
+        int dither = pe_enh_option_index("dithering");
+        pe_enh_option_label(dither, label, sizeof label);
+        ASSERT(strcmp(label, "DITHERING: RETAIL (RETAIL)") == 0 && PE_GPU_GetShadowDither() == 0, "dithering defaults retail");
+        pe_enh_option_set(dither, 1);
+        ASSERT(PE_GPU_GetShadowDither() == 1 && PE_GPU_GetRenderScale() == 2, "fine dithering alone selects a 2x shadow");
+        pe_enh_option_set(dither, 0);
+        ASSERT(PE_GPU_GetShadowDither() == 0 && PE_GPU_GetRenderScale() == 1, "retail dithering restores native scale");
     }
     {   /* audio rows: percent levels falling from the retail 100 */
         int m = pe_enh_option_index("master_volume"), v = pe_enh_option_index("movie_volume");

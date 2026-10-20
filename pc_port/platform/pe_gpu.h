@@ -167,6 +167,10 @@ int PE_GPU_GetRenderScale(void);
  * Rectangles and native VRAM always retain nearest sampling. */
 void PE_GPU_SetTextureFilter(int filter);
 int PE_GPU_GetTextureFilter(void);
+/* Shadow dithering: 0 retail (native pattern magnified, default), 1 fine
+ * (pattern at shadow resolution), 2 off.  Native VRAM is never affected. */
+void PE_GPU_SetShadowDither(int mode);
+int PE_GPU_GetShadowDither(void);
 /* Invalidates cached host scan-out when Init or a scale change reseeds VRAM. */
 uint64_t PE_GPU_GetRenderGeneration(void);
 /* Coordinates are in scaled VRAM units; never wraps. */

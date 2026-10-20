@@ -147,6 +147,7 @@ one defaults to the retail presentation.
 | Internal Resolution | Native (retail), 2x, 3x, 4x; A cycles | Native | `internal_scale=<1\|2\|3\|4>` / `PE_INTERNAL_SCALE` | the owner |
 | Texture Filter | Nearest (retail), Bilinear (polygons) | Nearest | `texture_filter=<0\|1>` / `PE_TEXTURE_FILTER` | the owner |
 | Supersample AA | Off, On | Off | `ssaa=<0\|1>` / `PE_SSAA` | the owner |
+| Dithering | Retail, Fine (scaled), Off | Retail | `dithering=<0\|1\|2>` / `PE_DITHERING` | the owner |
 
 **Where it came from.** These four rows were built and gated on the
 2026-09-30 lineage, branch `claude/gfx-options` (8ea0d39e3), and ported to the
@@ -212,15 +213,27 @@ excludes incompatible neighbours. Background sprites and UI stay nearest.
 **Supersample AA** box-filters the shadow into a separate native-sized
 presentation frame.
 
-Either of these last two selects a 2x surface by itself when Internal
-Resolution is Native; an explicit 2x/3x/4x choice is kept.
+**Dithering** sets how the shadow surface dithers gouraud shading and
+modulated textures. Retail dithers them with a 4x4 pattern, and native VRAM
+always does.
+
+- **Retail** draws that pattern at native-pixel size, magnified.
+- **Fine** draws the same pattern at the shadow's own resolution: a finer
+  grain, the "scaled dithering" look of modern PS1 renderers.
+- **Off** skips it. Gradients are smooth, but 15-bit banding shows in dark
+  ramps.
+
+Texture Filter, Supersample AA and Dithering each select a 2x surface by
+themselves when Internal Resolution is Native; an explicit 2x/3x/4x choice is
+kept.
 
 **Tests on the native lineage (2026-10-20):**
 
 | Check | Result |
 | --- | --- |
-| Native suite | `Results: 1689 run, 1689 passed, 0 failed, 0 skipped`, which includes `test_ASSIST_option_registry` (9 options, 4 graphics, labels, env overrides, the scale/filter/SSAA coupling) and `test_ASSIST_dev_menu_graphics_page` (Options ▸ Graphics rows, BACK to Options row 2, Enhancements still row 1) |
-| CTest | 10/10: `upscale-filters`, `upscale-filters-single-thread`, `upscale-no-threads`, `window-scaler-failures`, `scaler-windows-policy`, `gpu-shadow-parity`, `framebuffer-shadow-parity`, `gpu-filter-parity`, `framebuffer-ssaa-parity`, `window-scale-math` |
+| Native suite | `Results: 1690 run, 1690 passed, 0 failed, 0 skipped` (with Dithering and Audio), which includes `test_ASSIST_option_registry` (9 options, 4 graphics, labels, env overrides, the scale/filter/SSAA coupling) and `test_ASSIST_dev_menu_graphics_page` (Options ▸ Graphics rows, BACK to Options row 2, Enhancements still row 1) |
+| CTest | 11/11: `upscale-filters`, `upscale-filters-single-thread`, `upscale-no-threads`, `window-scaler-failures`, `scaler-windows-policy`, `gpu-shadow-parity`, `framebuffer-shadow-parity`, `gpu-filter-parity`, `gpu-dither-parity`, `framebuffer-ssaa-parity`, `window-scale-math` |
+| Dithering | `gpu-dither-parity` covers scales 2-4. Native VRAM is identical in all three modes. Retail is the magnified native pattern, Fine follows the 4x4 pattern at shadow resolution, and Off is flat. The suite checks the row's label, its default and the automatic 2x |
 | Identity of 1x VRAM and the 320x240 frame with the shadow on | `gpu-shadow-parity`, `framebuffer-shadow-parity`, `gpu-filter-parity` and `framebuffer-ssaa-parity` (shadow on and off over the same primitives) |
 | NOT RUN | a default-build Day-1 route identity run, a route run with each row forced on (`PE_ENH_AT`), live window and device checks, and a cost re-measurement on the current host |
 
