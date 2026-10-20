@@ -189,17 +189,17 @@ byte-identical whatever the setting; only window pixels differ.
 - Cost on this devbox, measured 2026-10-20: an Intel Xeon Gold 6338N at
   2.2 GHz, shared with other work at load 16-25. Each figure is the best of
   5 from this branch's `pe-upscale-tests --demo` on a 320x240 route
-  screenshot, with the default pool (8 threads here). Two runs (10:12Z and
-  10:50Z) gave the ranges shown.
+  screenshot, with the default pool (8 threads here). Three runs (10:12Z,
+  10:50Z, 11:08Z) gave the ranges shown. Evidence: `/home/blizz/scratch/pe-modern-subpixel-evidence-20261020/fsr/`.
 
   | Window | Sharp Bilinear | FSR 1 |
   | --- | --- | --- |
-  | 1280x800 | 3.1-3.2 ms | 23.7-25.7 ms |
-  | 1920x1080 | 5.2-5.8 ms | 42.0-43.6 ms |
-  | 2560x1600 | 12.3-12.7 ms | 97.7-102.9 ms |
-  | 3840x2160 | 22.9-25.4 ms | 170.5-177.5 ms |
+  | 1280x800 | 2.9-3.2 ms | 22.8-25.7 ms |
+  | 1920x1080 | 5.2-5.8 ms | 42.0-45.8 ms |
+  | 2560x1600 | 12.3-13.5 ms | 97.7-103.8 ms |
+  | 3840x2160 | 21.1-25.4 ms | 170.5-183.5 ms |
 
-  On one thread FSR 1 took 135-151 ms at 1280x800 and 902-1052 ms at
+  On one thread FSR 1 took 134-151 ms at 1280x800 and 902-1052 ms at
   3840x2160.
   The game shows a new frame every 33 ms, because it draws at 30 Hz: 39,998
   VBlanks for 20,000 presents in the runs below. FSR 1 keeps up at
@@ -248,6 +248,7 @@ fetches and captures.
   result: each 2x/3x/4x log matched the native one line for line (the
   `[ENH]` line aside), and every run ended on the same native screenshot
   (sha256 17461834…). So 2x-4x did not change the game over that segment.
+  Evidence: `/home/blizz/scratch/pe-modern-subpixel-evidence-20261020/scale/`.
 
 **Texture Filter** filters polygon texels on the shadow surface only, after
 the CLUT lookup. It keeps the nearest texel's transparency and STP class and
@@ -296,7 +297,9 @@ its 16.16 screen result drops.
   22,386,108 had every vertex recorded (99.87 %), 4,763 some (0.02 %) and
   25,081 none. Of the untextured ones, 836,682 had all, 863 some and
   23,824 none. The shipped table is larger (8,192 slots) and also records
-  saturated coordinates; it was not re-counted.
+  saturated coordinates; it was not re-counted. The counter log, the
+  prototype binary (sha256 d172edec…) and a reconstructed patch are in
+  `/home/blizz/scratch/pe-modern-subpixel-evidence-20261020/probe/`. The original prototype source was not kept.
 - It does not change texture mapping: textures stay affine, so large floor
   polygons still warp as on the original hardware.
 - Like the Texture Filter, it selects a 2x surface when Internal Resolution
@@ -318,16 +321,16 @@ kept.
 
 | Check | Result |
 | --- | --- |
-| Native suite | `Results: 1690 run, 1690 passed, 0 failed, 0 skipped` (with Dithering and Audio), which includes `test_ASSIST_option_registry` (9 options, 4 graphics, labels, env overrides, the scale/filter/SSAA coupling) and `test_ASSIST_dev_menu_graphics_page` (Options ▸ Graphics rows, BACK to Options row 2, Enhancements still row 1) |
+| Native suite | `Results: 1690 run, 1690 passed, 0 failed, 0 skipped` (with Dithering and Audio), which includes `test_ASSIST_option_registry` (9 options, 4 graphics, labels, env overrides, the scale/filter/SSAA coupling) and `test_ASSIST_dev_menu_graphics_page` (Options ▸ Graphics rows, BACK to Options row 2, Enhancements still row 1). At 304457606 (Sub-pixel Geometry): `Results: 1700 run, 1700 passed, 0 failed, 0 skipped` |
 | CTest | 12/12: `upscale-filters`, `upscale-filters-single-thread`, `upscale-no-threads`, `window-scaler-failures`, `scaler-windows-policy`, `gpu-shadow-parity`, `framebuffer-shadow-parity`, `gpu-filter-parity`, `gpu-dither-parity`, `gpu-subpixel-parity`, `framebuffer-ssaa-parity`, `window-scale-math` |
 | Sub-pixel Geometry, unit level | `gpu-subpixel-parity` (scales 2-4): native VRAM is identical with the lookup on and off. A polygon whose vertex words are all known moves by its fraction on the shadow; one with an unknown vertex keeps the integer shadow; scale 1 never consults the table. `gte-native-fixed` and `gte-native-hardware`: every fixed case and all 1,100 real-console cases pass again with recording on (463,492 checks, 0 failures), plus record/lookup cases for the fraction, a saturated axis, an unknown word and the clear on switch-off. The suite checks the sixth graphics row, its default, env override and the automatic 2x |
-| Sub-pixel Geometry, captures (binary c0c298fc) | Day-1 route with `PE_ROUTE_PRESENTATION_SHOTS`: field rooms at 4x (frames 2200-4800 every 650) and the Eve fight at 2x (frames 43000-44200 every 300), row off and on. Logs match line for line apart from the `[ENH]` line (4,810 and 44,210 presents), and every native frame is identical. The presentation frames differ only on the 3D characters and their shadows (3.7-5.6 % of pixels; frame 2200 not at all). Backgrounds, the battle HUD and dialogue text are pixel-identical, and a zoomed crop shows no gaps |
+| Sub-pixel Geometry, captures (binary c0c298fc) | Day-1 route with `PE_ROUTE_PRESENTATION_SHOTS`: field rooms at 4x (frames 2200-4800 every 650) and the Eve fight at 2x (frames 43000-44200 every 300), row off and on. Logs match line for line apart from the `[ENH]` line (4,810 and 44,210 presents), and every native frame is identical. The presentation frames differ only on the 3D characters and their shadows (3.7-5.6 % of pixels; frame 2200 not at all). Backgrounds, the battle HUD and dialogue text are pixel-identical, and a zoomed crop shows no gaps. Packet `/home/blizz/scratch/pe-modern-subpixel-evidence-20261020/captures/` |
 | Dithering | `gpu-dither-parity` covers scales 2-4. Native VRAM is identical in all three modes. Retail is the magnified native pattern, Fine follows the 4x4 pattern at shadow resolution, and Off is flat. The suite checks the row's label, its default and the automatic 2x |
 | Identity of 1x VRAM and the 320x240 frame with the shadow on | `gpu-shadow-parity`, `framebuffer-shadow-parity`, `gpu-filter-parity` and `framebuffer-ssaa-parity` (shadow on and off over the same primitives) |
 | Day-1 route, defaults (2026-10-20, binary 2fd26b8c from 049784820) | No textual or behavioural difference against seven earlier route logs, with flash-shim lines excluded. Route packet `/home/blizz/scratch/pe-modern-route-049784820` |
 | Day-1 route, rows forced on (same binary) | Internal Resolution 2x, Texture Filter, Fine dithering, SSAA, and Movie/Music/SFX Volume 50 %, set by env in the sandbox. Packet `/home/blizz/scratch/pe-modern-route-049784820-forced`. Results below |
 | Day-1 route, rows and Sub-pixel Geometry forced on (binary c0c298fc from 304457606) | The same rows plus Sub-pixel Geometry. Packet `/home/blizz/scratch/pe-modern-route-304457606-subpixel`, compared with nine references: the eight used for the forced-on run above, plus that run. The only log difference is the `[ENH]` line: +1/−0 against the eight default-option runs, +1/−1 against the forced-on one. Same checkpoints (field_start 963, eve1_room 42707), same frame-44602 game over, same final native screenshot (sha256 12c810bd…). CPU_BOUNDARY, STOP, stubs and DAY1_SHIM 0; no `enhancements.conf`. 12 min 8 s wall, sampled port peak RSS 14.0 MB |
-| NOT RUN | live window and device checks. Display Scaler and Master Volume act only in a window or audio device, so headless runs do not cover them. Analog Stick and controls.conf are window-only too. The costs above are headless and for this devbox only |
+| NOT RUN | Live window and device checks. Display Scaler and Master Volume act only in a window or audio device, so headless runs do not cover them; Analog Stick and controls.conf are window-only too. Movies: the route pad skips them (skip-movie stubs), so no identity run with the options on reached the MDEC/rgb24 presentation path. `day1_end_80` is unreachable (frame-44602 game over), and movies into Day 2 were not run. The costs above are headless and for this devbox only |
 
 Results of the forced-on route:
 

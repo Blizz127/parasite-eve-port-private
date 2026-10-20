@@ -29,13 +29,21 @@ Nothing is pushed or published. The Decomp Bot integrates.
 - **Costs on this devbox** (headless; ENHANCEMENTS.md):
   - CPU per present, against a 33 ms budget: native 4.8 ms, 2x 15.6, 3x 26.5,
     4x 41.3. Every scale gave identical logs and screenshots.
-  - FSR 1 with 8 threads: 23.7-25.7 ms at 1280x800, 42-44 ms at 1080p.
+  - FSR 1 with 8 threads: 22.8-25.7 ms at 1280x800, 42.0-45.8 ms at 1080p
+    (three runs).
+- **Evidence packet:** `/home/blizz/scratch/pe-modern-subpixel-evidence-20261020`. It holds the scale runs, captures, prototype
+  counters and binary, FSR runs and gate logs, with `SHA256SUMS`.
+  Integration handoff: `/home/blizz/scratch/pe-modern-integration-handoff-20261020`.
 - **RELEASE_NOTES_NEXT.md:**
   - device-check table: controller, window, keyboard, and the new rows, all
     NOT RUN;
   - the build ID, source commit and package SHA256 are left for the
     integrator.
 - **Not run:**
+  - movies with the options on: the route pad skips them, so the
+    MDEC/rgb24 presentation path is unverified with the options on;
+  - `day1_end_80`, unreachable because of the frame-44602 game over;
+    movies into Day 2 were not run either;
   - `route-boot-day2-control-flow`, excluded by standing instruction. One
     accidental run stopped at frame 2 on an unbound `0x8003E91C`; not
     investigated.
