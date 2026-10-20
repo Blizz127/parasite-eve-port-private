@@ -56,8 +56,13 @@ and choices are saved in `~/.config/parasite-eve-port/enhancements.conf`.
   - **Music Volume** and **SFX Volume**, set separately.
 
 The Graphics and Audio rows are designed to change only what you see and
-hear. The game itself, its timing and saves are untouched. Higher internal
-resolutions and FSR 1 cost CPU time; if the game slows down, step them back.
+hear: the game itself, its timing and saves are untouched. This was checked
+on the automated Day-1 route with internal resolution 2x, the texture filter,
+fine dithering, SSAA and the movie/music/SFX levels all switched on. Game
+behaviour and the native screenshots were identical to the default run.
+
+Higher internal resolutions and FSR 1 cost CPU time. If the game slows down,
+step them back.
 
 - **Controls** (these change how you play):
   - **Analog Stick**: play with the left stick as on a DualShock with the

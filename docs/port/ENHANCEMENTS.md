@@ -240,7 +240,17 @@ kept.
 | CTest | 11/11: `upscale-filters`, `upscale-filters-single-thread`, `upscale-no-threads`, `window-scaler-failures`, `scaler-windows-policy`, `gpu-shadow-parity`, `framebuffer-shadow-parity`, `gpu-filter-parity`, `gpu-dither-parity`, `framebuffer-ssaa-parity`, `window-scale-math` |
 | Dithering | `gpu-dither-parity` covers scales 2-4. Native VRAM is identical in all three modes. Retail is the magnified native pattern, Fine follows the 4x4 pattern at shadow resolution, and Off is flat. The suite checks the row's label, its default and the automatic 2x |
 | Identity of 1x VRAM and the 320x240 frame with the shadow on | `gpu-shadow-parity`, `framebuffer-shadow-parity`, `gpu-filter-parity` and `framebuffer-ssaa-parity` (shadow on and off over the same primitives) |
-| NOT RUN | a default-build Day-1 route identity run, a route run with each row forced on (`PE_ENH_AT`), live window and device checks, and a cost re-measurement on the current host |
+| Day-1 route, defaults (2026-10-20, binary 2fd26b8c from 049784820) | No textual or behavioural difference against seven earlier route logs, with flash-shim lines excluded. Route packet `/home/blizz/scratch/pe-modern-route-049784820` |
+| Day-1 route, rows forced on (same binary) | Internal Resolution 2x, Texture Filter, Fine dithering, SSAA, and Movie/Music/SFX Volume 50 %, set by env in the sandbox. Packet `/home/blizz/scratch/pe-modern-route-049784820-forced`. Results below |
+| NOT RUN | live window and device checks, and a cost re-measurement on the current host. Display Scaler and Master Volume act only in a window or audio device, so headless runs do not cover them. Analog Stick and controls.conf are window-only too |
+
+Results of the forced-on route:
+
+- The only log difference against all eight references is the `[ENH]` startup line (+1/−0 lines).
+- There is no behavioural difference: same route checkpoints, same frame-44602 game over, and the same final native screenshot (sha256 12c810bd…).
+- CPU_BOUNDARY, STOP, stubs and DAY1_SHIM are all 0, and no `enhancements.conf` was created.
+- The headless route runs the native SPU and AKAO driver, so the volume gains were executed in the mixer.
+- Cost: 16 min 18 s wall time against about 3.5 min for the defaults (CPU capped at 2 cores), with a peak port RSS of 13.7 MB against 8.6 MB.
 
 The build was a local `zig cc` (clang) build: the current devbox has no
 system GCC. See `docs/ai_context/ACTIVE_HANDOFF.md`.
