@@ -75,6 +75,22 @@ void PE_Spu_CdInputStop(void);
  * Kept across PE_Spu_Reset. */
 void PE_Spu_SetCdGain(int percent);
 int  PE_Spu_CdGain(void);
+/* Host options (MUSIC VOLUME / SFX VOLUME): voice gains by class, percent,
+ * 100 = retail, scaling each voice's contribution (dry and reverb send).
+ * A class whose gain is 100 skips the multiply, so 100/100 renders exactly
+ * as before.  Every key-on write (0x188/0x18A) asks the SFX-mask source
+ * which voices the sound driver's sound effects own at that moment
+ * (bit n = voice n; pe_audio_driver.c installs the AKAO source); each keyed
+ * voice latches that class until its own next key-on, so a release tail
+ * keeps its class.  With no source every voice is music.  The gains and
+ * the source are host state kept across PE_Spu_Reset; the latched classes
+ * are voice state and clear with it. */
+typedef uint32_t (*PeSpuSfxMaskFn)(void);
+void PE_Spu_SetSfxMaskSource(PeSpuSfxMaskFn source);   /* NULL = all music */
+void PE_Spu_SetVoiceGains(int music_percent, int sfx_percent);
+int  PE_Spu_MusicGain(void);
+int  PE_Spu_SfxGain(void);
+uint32_t PE_Spu_SfxVoices(void);   /* latched classes: bit n = voice n is SFX */
 uint64_t PE_Spu_XaSectors(void);
 /* Print key SPU registers (FILE *) — diagnostics. */
 void PE_Spu_DebugSummary(void *file);

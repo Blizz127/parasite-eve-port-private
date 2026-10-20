@@ -44,7 +44,7 @@ typedef enum {
     PE_ENH_CAT_GRAPHICS = 0,     /* rendering/presentation options */
     PE_ENH_CAT_GAMEPLAY,         /* quality-of-life gameplay options */
     PE_ENH_CAT_ASSIST,           /* cheat-style assists (god mode, EXP, 1-hit) */
-    PE_ENH_CAT_AUDIO,            /* output levels (master, movie/CD audio) */
+    PE_ENH_CAT_AUDIO,            /* output levels (master, movie/CD audio, music, SFX) */
     PE_ENH_CAT_CONTROLS,         /* controller options (DualShock analog mode) */
     PE_ENH_CAT_COUNT
 } PeEnhCategory;
@@ -118,6 +118,14 @@ int  pe_enh_master_volume(void);
 int  pe_enh_movie_volume(void);
 void pe_enh_set_master_volume(int percent);
 void pe_enh_set_movie_volume(int percent);
+/* MUSIC VOLUME and SFX VOLUME scale the SPU voices by class (pe_spu.c): a
+ * voice keyed on while the AKAO driver's sound-effect channels own it
+ * (D_800BCD50 | D_800BCD60) is SFX, every other voice is music; the class
+ * holds until the voice's next key-on.  A class at 100 skips the multiply. */
+int  pe_enh_music_volume(void);
+int  pe_enh_sfx_volume(void);
+void pe_enh_set_music_volume(int percent);
+void pe_enh_set_sfx_volume(int percent);
 
 /* ── Controls ────────────────────────────────────────────────────────── */
 /* ANALOG STICK.  OFF (retail default): the pad replies as today's digital

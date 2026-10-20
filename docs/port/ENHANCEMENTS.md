@@ -372,6 +372,79 @@ Tests (`pc_port/tests/test_analog_stick.h`, `ANALOG_*`):
 In analog mode the keyboard's arrow keys feed the same d-pad bits, so like
 the d-pad they do not move Aya or menu cursors.
 
+## Music and SFX volume (dev menu ▸ Options ▸ Audio)
+
+Two more rows on the Audio page, after Master Volume and Movie Audio Volume.
+They scale SPU voices by class inside the mixer (`pc_port/platform/pe_spu.c`),
+both the dry signal and the reverb send.
+
+| Row | Values | Default | Config line / env override | Suggested by |
+| --- | --- | --- | --- | --- |
+| Music Volume | 100 % (retail), 90 %, ..., 0 %; A steps down 10, 0 % wraps to 100 % | 100 % | `music_volume=<0..100>` / `PE_MUSIC_VOLUME` | the owner |
+| SFX Volume | 100 % (retail), 90 %, ..., 0 % | 100 % | `sfx_volume=<0..100>` / `PE_SFX_VOLUME` | the owner |
+
+**Which voices are SFX.** The AKAO driver's 12 sound-effect channels own
+SPU voices 12..23. A voice is SFX while its bit is set in
+`D_800BCD50 | D_800BCD60`. `D_800BCD50` is the active SFX mask
+(`func_8008A750` sets bits, `func_8008F1B0` clears them).
+`D_800BCD60` holds SFX parked by `func_8008C8B8`. Music can use any voice.
+
+At every key-on register write, pe_spu reads that mask through
+`PE_AudioDriver_SfxVoiceMask` (`pc_port/platform/pe_audio_driver.c`). Each
+keyed voice keeps its class until its own next key-on, so a release tail
+keeps the class it started with. The read happens at the write because all
+AKAO key-ons are issued in one `func_8008770C` store at the end of
+`func_80089328`, the tick's first call, and that store reaches pe_spu
+synchronously. At that point:
+
+- music cannot have keyed a voice in the mask;
+- the SFX key-on mask `D_800BCD54` has already been zeroed;
+- an SFX that ends later in the same tick has not yet cleared its
+  `D_800BCD50` bit. Reading after the tick would class a one-tick SFX as
+  music.
+
+The comment above `PE_AudioDriver_SfxVoiceMask` gives the file:line chain.
+
+**Identity.** A class at 100 % skips the multiply, so at 100/100 the mix is
+bit-identical to a mixer without classes (`test_AUDIO_voice_class_gains`).
+Classes are latched even at 100 %, so changing a level mid-note takes effect
+on the voices already sounding.
+
+**Known limits.**
+
+- On unpause, `func_8008C9DC` replaces `D_800BCD50` with the parked mask
+  (`src/func_8008C9DC.c:27`). That drops the bits of pause-menu SFX that were
+  still playing. A key-on that one of those voices still had pending is
+  classed music.
+- A key-on from outside AKAO is classed by AKAO's mask at that moment: SFX
+  if an AKAO sound effect owns the voice, otherwise music. There is no such
+  key-on in `src/`. `pe_plat_audio_voice_key_on` could produce one. With no
+  mask source installed, every voice is music.
+- A key-on written through a pe_mmio host pointer would be classed at
+  `PE_MMIO_Commit`, not at the store, and so would hit the one-tick case.
+  None were found: the only AKAO key-on writer, `func_8008770C`
+  (`spu_voice_port.c`), stores through `PE_SpuRegister_StoreU16`.
+
+**Tests** (native suite):
+
+- `test_AUDIO_voice_class_gains`: classes from the mask, 100/100
+  bit-identity, music 50 halves only music voices and SFX 50 only SFX voices
+  (dry and reverb send), gains kept across `PE_Spu_Reset`.
+- `test_AUDIO_one_tick_sfx_class`: the real native `func_80089328` key-on
+  followed by `func_8008F1B0` before the commit.
+- `test_ASSIST_option_registry` and `test_ASSIST_dev_menu_graphics_page`:
+  the rows, labels, env overrides and the Audio page.
+
+Results on 2026-10-20 (local `zig cc` build of this branch):
+
+- Native suite: `Results: 1692 run, 1692 passed, 0 failed, 0 skipped`.
+- `akao-tick-oracle`, with its image built by
+  `build_leaf_oracle.py --range 0x80085000 0x80092000 func_8008DB7C`:
+  `300 cases, 219 judged, 0 mismatched, 81 oracle faults (skipped) -> PASS`.
+  The oracle runs with the synthesizer inactive. It shows that the tick's
+  guest RAM and SPU registers are unchanged. It does not exercise the
+  classifier, which `test_AUDIO_one_tick_sfx_class` covers.
+
 ## The option registry (how options are added)
 
 Every player-facing option is registered once, in `k_options` in

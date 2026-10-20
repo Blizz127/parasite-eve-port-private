@@ -339,6 +339,13 @@ static void test_ASSIST_dev_menu_graphics_page(void)
     (void)pe_plat_cheats_key(PE_CHEAT_KEY_DOWN, 1);
     (void)pe_plat_cheats_key(PE_CHEAT_KEY_ENTER, 1);
     ASSERT(pe_enh_movie_volume() == 90 && PE_Spu_CdGain() == 90, "audio row 2 steps the movie volume");
+    (void)pe_plat_cheats_key(PE_CHEAT_KEY_DOWN, 1);
+    (void)pe_plat_cheats_key(PE_CHEAT_KEY_ENTER, 1);
+    ASSERT(pe_enh_music_volume() == 90 && PE_Spu_MusicGain() == 90 && PE_Spu_SfxGain() == 100,
+           "audio row 3 steps the music volume");
+    (void)pe_plat_cheats_key(PE_CHEAT_KEY_DOWN, 1);
+    (void)pe_plat_cheats_key(PE_CHEAT_KEY_ENTER, 1);
+    ASSERT(pe_enh_sfx_volume() == 90 && PE_Spu_SfxGain() == 90, "audio row 4 steps the SFX volume");
     (void)pe_plat_cheats_key(PE_CHEAT_KEY_BACK, 1);                              /* -> OPTIONS row 3 */
     (void)pe_plat_cheats_key(PE_CHEAT_KEY_UP, 1);
     (void)pe_plat_cheats_key(PE_CHEAT_KEY_UP, 1);
@@ -347,6 +354,8 @@ static void test_ASSIST_dev_menu_graphics_page(void)
     ASSERT(pe_enh_move_speed_pct() == 125, "BACK returns to OPTIONS, whose row 1 is still ENHANCEMENTS");
     pe_enh_set_master_volume(100);
     pe_enh_set_movie_volume(100);
+    pe_enh_set_music_volume(100);
+    pe_enh_set_sfx_volume(100);
     (void)pe_plat_cheats_key(PE_CHEAT_KEY_DEV_MENU, 1);
     pe_enh_set_display_scaler(PE_ENH_SCALER_NEAREST);
     unsetenv("PE_DEV_MENU");
@@ -377,11 +386,11 @@ static void test_ASSIST_option_registry(void)
     int n = pe_enh_option_count();
     TEST("ASSIST_option_registry");
     enh_isolate();
-    ASSERT(n == 13, "thirteen registered options");
+    ASSERT(n == 15, "fifteen registered options");
     ASSERT(pe_enh_category_count(PE_ENH_CAT_GAMEPLAY) == 2 && pe_enh_category_count(PE_ENH_CAT_ASSIST) == 3 &&
-           pe_enh_category_count(PE_ENH_CAT_GRAPHICS) == 5 && pe_enh_category_count(PE_ENH_CAT_AUDIO) == 2 &&
+           pe_enh_category_count(PE_ENH_CAT_GRAPHICS) == 5 && pe_enh_category_count(PE_ENH_CAT_AUDIO) == 4 &&
            pe_enh_category_count(PE_ENH_CAT_CONTROLS) == 1,
-           "categories: 2 gameplay, 3 assists, 5 graphics, 2 audio, 1 controls");
+           "categories: 2 gameplay, 3 assists, 5 graphics, 4 audio, 1 controls");
     {   /* the controls row: ANALOG STICK, a retail-OFF toggle, last in the registry */
         int a = pe_enh_option_index("analog_stick");
         const PeEnhOption *o = pe_enh_option(a);
@@ -534,6 +543,42 @@ static void test_ASSIST_option_registry(void)
                    "saving another option writes the config's own value, not the env override");
             pe_enh_set_move_speed_pct(100); pe_enh_set_master_volume(100);
         }
+    }
+    {   /* MUSIC / SFX VOLUME: the last two rows, SPU voice gains by class */
+        int mu = pe_enh_option_index("music_volume"), sf = pe_enh_option_index("sfx_volume");
+        ASSERT(mu == n - 2 && sf == n - 1, "music and SFX rows close the registry");
+        ASSERT(pe_enh_option(mu)->category == PE_ENH_CAT_AUDIO && pe_enh_option(sf)->category == PE_ENH_CAT_AUDIO &&
+               pe_enh_option(mu)->format == PE_ENH_FMT_PERCENT && pe_enh_option(sf)->format == PE_ENH_FMT_PERCENT &&
+               pe_enh_option(mu)->nvalues == 11 && pe_enh_option(sf)->nvalues == 11 &&
+               strcmp(pe_enh_option(mu)->env, "PE_MUSIC_VOLUME") == 0 && strcmp(pe_enh_option(sf)->env, "PE_SFX_VOLUME") == 0 &&
+               strcmp(pe_enh_option(mu)->credit, "the owner") == 0 && strcmp(pe_enh_option(sf)->credit, "the owner") == 0,
+               "music/SFX rows: audio, percent 100..0, env, credit");
+        ASSERT(pe_enh_category_option(PE_ENH_CAT_AUDIO, 2) == mu && pe_enh_category_option(PE_ENH_CAT_AUDIO, 3) == sf,
+               "AUDIO page rows 3 and 4");
+        ASSERT(pe_enh_music_volume() == 100 && pe_enh_sfx_volume() == 100 &&
+               PE_Spu_MusicGain() == 100 && PE_Spu_SfxGain() == 100, "music/SFX default retail, unity voice gains");
+        pe_enh_option_label(mu, label, sizeof label);
+        ASSERT(strcmp(label, "MUSIC VOLUME: 100% (RETAIL)") == 0, "music volume label");
+        pe_enh_option_label(sf, label, sizeof label);
+        ASSERT(strcmp(label, "SFX VOLUME: 100% (RETAIL)") == 0, "SFX volume label");
+        pe_enh_set_music_volume(50);
+        ASSERT(pe_enh_music_volume() == 50 && PE_Spu_MusicGain() == 50 && PE_Spu_SfxGain() == 100,
+               "music volume drives only the music gain");
+        pe_enh_set_sfx_volume(35);
+        ASSERT(pe_enh_sfx_volume() == 30 && PE_Spu_SfxGain() == 30 && PE_Spu_MusicGain() == 50,
+               "SFX volume snaps (35 -> 30) and drives only the SFX gain");
+        pe_enh_reset();
+        ASSERT(PE_Spu_MusicGain() == 100 && PE_Spu_SfxGain() == 100, "reset restores unity gains");
+        ASSERT(pe_enh_music_volume() == 50 && PE_Spu_MusicGain() == 50 && PE_Spu_SfxGain() == 30,
+               "music/SFX volume persist and re-apply");
+        setenv("PE_SFX_VOLUME", "80", 1); setenv("PE_MUSIC_VOLUME", "0", 1); pe_enh_reset();
+        ASSERT(pe_enh_sfx_volume() == 80 && pe_enh_music_volume() == 0 && PE_Spu_SfxGain() == 80 &&
+               PE_Spu_MusicGain() == 0, "env overrides apply");
+        unsetenv("PE_SFX_VOLUME"); unsetenv("PE_MUSIC_VOLUME"); pe_enh_reset();
+        ASSERT(pe_enh_sfx_volume() == 30 && pe_enh_music_volume() == 50, "env overrides are not written back");
+        pe_enh_set_music_volume(100);
+        pe_enh_set_sfx_volume(100);
+        ASSERT(PE_Spu_MusicGain() == 100 && PE_Spu_SfxGain() == 100, "100 restores the unity voice gains");
     }
     ASSERT(pe_enh_option(pe_enh_option_index("move_speed"))->credit != NULL &&
            pe_enh_option(pe_enh_option_index("god_mode"))->credit != NULL, "credits recorded");
