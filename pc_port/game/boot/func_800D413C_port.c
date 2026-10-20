@@ -117,8 +117,9 @@ static int effect_stack_retail_stack(pe_addr_t ea,unsigned n)
  * calls, so they write no stack at any depth.  Their only stores go through
  * a1 (rec+1) and a2 (data+[lo, hi)); the bounds were read from the retail
  * bytes.  The fourth entry of D_800E0F38, 800CDFE0, has a frame and calls the
- * RNG, so it is not listed. */
-static const struct { pe_addr_t fn; uint8_t lo, hi; } k_frameless_update[] = {
+ * RNG; it is in k_framed_update below. */
+typedef struct { pe_addr_t fn; uint8_t lo, hi; } effect_stack_update_leaf;
+static const effect_stack_update_leaf k_frameless_update[] = {
     {0x800CA4A8u, 0, 0},    /* li v0,2; sb v0,1(a1): retire */
     {0x800CA4B4u, 1, 20},   /* data+1,+2,+8..+13,+18..+19 */
     {0x800CA540u, 4, 6},    /* sh 4(a2) */
@@ -127,6 +128,31 @@ static const struct { pe_addr_t fn; uint8_t lo, hi; } k_frameless_update[] = {
     {0x800CE464u, 0, 0},    /* retire */
     {0x800CE470u, 3, 4},    /* sb 3(a2) */
 };
+/* Update callbacks with a frame that stays above the borrowed bytes.  The
+ * update entries C9B90/CD8F0/CE16C (frame 32) call C251C at S-32, and C251C
+ * (frame 40) dispatches record callbacks by jalr at 800C2638, so a callback
+ * enters at S-72.  800CDFE0 (frame 32, sp S-104) saves s0, s1 and ra at
+ * sp+16/20/24 = S-88..S-77, above the borrowed [S-112, S-106).  Its one call
+ * is the BIOS rand stub 80071A54 (li t2,0xA0; jr t2; li t1,0x2F), which
+ * touches no stack in the EXE.  The BIOS A(2Fh) body is not modelled, as for
+ * every BIOS call (docs/ai_context/M34_FRAME_STACK_PRESERVATION.md).  Its
+ * stores go through a1 (sb 1(a1)) and a2 (sb 1, sh 4, sh 6). */
+static const effect_stack_update_leaf k_framed_update[] = {
+    {0x800CDFE0u, 1, 8},
+};
+/* 1 when fn is a listed update callback whose stores all miss the retail
+ * stack reservation for this record and data block. */
+static int effect_stack_update_keeps(const effect_stack_update_leaf *list,unsigned n,
+                                     pe_addr_t fn,pe_addr_t rec,pe_addr_t data)
+{
+    for(unsigned k=0;k<n;k++) {
+        if(list[k].fn!=fn)continue;
+        unsigned lo=list[k].lo,hi=list[k].hi;
+        return !effect_stack_retail_stack(rec+1u,1u) &&
+               (lo==hi || !effect_stack_retail_stack(data+lo,hi-lo));
+    }
+    return 0;
+}
 /* A record callback that PE_WeaponCallback dispatches at the weapon-update
  * depth.  The frameless leaves above keep the bytes while none of their
  * stores can land in the retail stack reservation.  Every other callback
@@ -135,13 +161,9 @@ static const struct { pe_addr_t fn; uint8_t lo, hi; } k_frameless_update[] = {
 void PE_EffectStackWeaponUpdateCallback(pe_addr_t fn,pe_addr_t rec,pe_addr_t data)
 {
     if(!effect_stack.active || effect_stack.context!=EFFECT_STACK_WEAPON_UPDATE)return;
-    for(unsigned k=0;k<sizeof k_frameless_update/sizeof k_frameless_update[0];k++) {
-        if(k_frameless_update[k].fn!=fn)continue;
-        unsigned lo=k_frameless_update[k].lo,hi=k_frameless_update[k].hi;
-        if(!effect_stack_retail_stack(rec+1u,1u) &&
-           (lo==hi || !effect_stack_retail_stack(data+lo,hi-lo)))return;
-        break;
-    }
+    if(effect_stack_update_keeps(k_frameless_update,sizeof k_frameless_update/sizeof k_frameless_update[0],fn,rec,data) ||
+       effect_stack_update_keeps(k_framed_update,sizeof k_framed_update/sizeof k_framed_update[0],fn,rec,data))
+        return;
     /* fn 0 (a zeroed callbacks table) or a reserved marker value is not an
      * address to name; record the generic marker for it. */
     effect_stack_forget(fn && fn < PE_EFFECT_STACK_RESET_BEGIN ? fn : PE_EFFECT_STACK_RESET_WEAPON_UPDATE);

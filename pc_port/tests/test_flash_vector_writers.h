@@ -8,6 +8,8 @@
  *   - the frameless update leaves of the three weapon tables (CA4A8,
  *     CA4B4, CA540, CDF40, CDF4C, CE464, CE470) keep them unless a record
  *     store could reach crt0's stack reservation;
+ *   - CDFE0, whose frame at the C251C dispatch depth stays above them,
+ *     keeps them too;
  *   - other callbacks and direct C2B90 calls keep forgetting. */
 #define FVW_SLOT 0x801F0000u
 #define FVW_PROG (FVW_SLOT+0xE00u)
@@ -218,6 +220,35 @@ static const char *fvw_case_ca4b4_update_preserves_known_z(void)
     PE_EffectStackEnd();return error;
 }
 
+/* CDFE0 (hit table entry 4) dispatched by C251C after the spawn pass: its
+ * frame (S-104..S-72) stays above the borrowed bytes, so the bound Z and the
+ * cause survive, and the retail update runs: life -= 3, data+6 -= 4,
+ * data+4 += rand() % 11 - 5.  Seed 1 gives rand() = 0x41C6 = 16838, and
+ * 16838 % 11 = 8.  The rand seed is restored for later tests. */
+static const char *fvw_case_cdfe0_update_preserves_known_z(void)
+{
+    int16_t position[3];
+    pe_addr_t data=FVW_SLOT+512u;
+    uint32_t seed=PE_BiosRandSeed();
+    const char *error=fvw_spawn_update();
+    if (!error) {
+        PE_StoreU32(0x800E0F38u,0x800CDFE0u);
+        PE_StoreU8(FVW_SLOT+128u,0u);PE_StoreU8(FVW_SLOT+129u,1u);PE_StoreU16(FVW_SLOT+132u,0u);
+        PE_StoreU8(data+1u,100u);PE_StoreU16(data+4u,100u);PE_StoreU16(data+6u,100u);
+        func_80071A64(1u);
+        (void)PE_EffectStackWeaponUpdate(0x800CD8F0u,FVW_SLOT);
+        if (PE_LoadU8(data+1u)!=97u || PE_LoadU16(data+6u)!=96u || PE_LoadU16(data+4u)!=103u ||
+            PE_LoadU8(FVW_SLOT+129u)!=1u)
+            error="CDFE0 did not run its retail update";
+        else error=fvw_cause(4u,0x800C2B90u,
+            "unknown XY, last cleared by callback 800C2B90 in context weapon-update");
+        PE_EffectStackPosition(position);
+        if (!error && position[2]!=0x2858) error="CDFE0 changed the retained Z";
+    }
+    func_80071A64(seed);
+    PE_EffectStackEnd();return error;
+}
+
 static const char *fvw_case_other_update_callback_forgets(void)
 {
     const char *error=fvw_spawn_update();
@@ -302,6 +333,7 @@ static void test_FLASHVEC_borrowed_vector_writers(void)
     fvw_run("FLASHVEC_ca540_below_stack_preserves",fvw_case_ca540_below_stack_preserves);
     fvw_run("FLASHVEC_ca4b4_update_preserves_known_z",fvw_case_ca4b4_update_preserves_known_z);
     fvw_run("FLASHVEC_frameless_update_table_preserves",fvw_case_frameless_update_table);
+    fvw_run("FLASHVEC_cdfe0_update_preserves_known_z",fvw_case_cdfe0_update_preserves_known_z);
     fvw_run("FLASHVEC_other_update_callback_forgets",fvw_case_other_update_callback_forgets);
     fvw_run("FLASHVEC_direct_c2b90_call_does_not_bind",fvw_case_direct_c2b90_does_not_bind);
 }

@@ -34,6 +34,13 @@ unsigned int func_80071A54(void)
     return (s_bios_rand_seed >> 16) & 0x7FFFu;
 }
 
+/* The current seed, so a test can restore it with func_80071A64 after
+ * running an RNG-calling callback. */
+uint32_t PE_BiosRandSeed(void)
+{
+    return s_bios_rand_seed;
+}
+
 /* func_800305C8: ported from the matching decomp -- generated TU pc_port/game/decomp/func_800305C8_port.c (src/func_800305C8.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md). */
 
 /* func_8001F814: ported from the matching decomp -- generated TU pc_port/game/decomp/func_8001F814_port.c (src/func_8001F814.c); hand port retired after differential verification (docs/evidence/portverify/REPORT.md, round 7). */

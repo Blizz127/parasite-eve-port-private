@@ -171,6 +171,7 @@ extern void func_80029388(void);
 extern void func_8002F658(void);
 extern void func_80020EFC(void);
 extern void func_80071A64(uint32_t seed);
+extern uint32_t PE_BiosRandSeed(void);   /* current A(2Fh) rand seed (tests) */
 extern void func_8005BCA8(void);
 extern int func_80068D28(void);
 extern void func_800124F8(void);
