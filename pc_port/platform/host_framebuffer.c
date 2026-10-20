@@ -27,6 +27,15 @@
 /* ── framebuffer state ───────────────────────────────────────────────── */
 
 static uint8_t fb[PE_PORT_FB_WIDTH * PE_PORT_FB_HEIGHT * 3];  /* RGB */
+static uint8_t *fb_presentation;
+static int fb_presentation_scale = 1;
+static uint64_t fb_presentation_generation;
+static int fb_ssaa;
+static int fb_presentation_ssaa;
+static uint8_t fb_antialias[PE_PORT_FB_WIDTH * PE_PORT_FB_HEIGHT * 3];
+
+void HostFB_SetSSAA(int enabled) { fb_ssaa = enabled == 1; }
+int HostFB_GetSSAA(void) { return fb_ssaa; }
 static int     fb_presented = 0;
 static int     fb_mask      = 0;   /* 0 = blanked, 1 = visible (SetDispMask) */
 static uint32_t fb_device_cycles = 0;
@@ -51,6 +60,7 @@ static uint32_t fb_scanouts;   /* idle-VBlank rescans (PE_FRAME_TRACE) */
 void HostFB_Init(void)
 {
     memset(fb, 0, sizeof(fb));
+    free(fb_presentation); fb_presentation = NULL; fb_presentation_scale = 1;
     fb_presented = 0;
     fb_mask      = 0;
     fb_vsync_count = 0;
@@ -167,6 +177,88 @@ void HostFB_PresentDispEnv(pe_addr_t env)
     PE_Port_InvokePresentHook();
 }
 
+/* Separate scan-out keeps native screenshot/capture pixels unchanged. 24-bit
+ * movie frames are nearest-expanded from their native packed-byte scan-out. */
+static void ScanPresentation(uint32_t dx, uint32_t dy, uint32_t dw,
+                             uint32_t top, uint32_t dh, int rgb24)
+{
+    int scale = PE_GPU_GetRenderScale();
+    size_t bytes = (size_t)PE_PORT_FB_WIDTH * PE_PORT_FB_HEIGHT * scale * scale * 3u;
+    if (scale == 1) { fb_presentation_scale = 1; return; }
+    if (fb_presentation_scale != scale || !fb_presentation) {
+        uint8_t *next = realloc(fb_presentation, bytes);
+        if (!next) { fb_presentation_scale = 1; return; }
+        fb_presentation = next; fb_presentation_scale = scale;
+    }
+    fb_presentation_generation = PE_GPU_GetRenderGeneration();
+    fb_presentation_ssaa = fb_ssaa;
+    memset(fb_presentation, 0, bytes);
+    if (!fb_mask) {
+        if (fb_ssaa) memset(fb_antialias, 0, sizeof(fb_antialias));
+        return;
+    }
+    if (dw > PE_PORT_FB_WIDTH) dw = PE_PORT_FB_WIDTH;
+    for (uint32_t y = 0; y < PE_PORT_FB_HEIGHT * (uint32_t)scale; y++) {
+        for (uint32_t x = 0; x < PE_PORT_FB_WIDTH * (uint32_t)scale; x++) {
+            uint8_t *dst = fb_presentation + ((size_t)y * PE_PORT_FB_WIDTH * scale + x) * 3u;
+            if (rgb24) {
+                const uint8_t *src = fb + ((size_t)(y / scale) * PE_PORT_FB_WIDTH + x / scale) * 3u;
+                memcpy(dst, src, 3u);
+            } else if (y >= top * scale && y / scale - top < dh && x / scale < dw) {
+                uint16_t pixel;
+                if (PE_GPU_ReadRenderPixel(dx * scale + x, dy * scale + y - top * scale, &pixel))
+                    HostVRAM_DecodePixel(pixel, dst);
+            }
+        }
+    }
+
+    if (fb_ssaa) {
+        if (rgb24) memcpy(fb_antialias, fb, sizeof(fb_antialias));
+        else for (unsigned int y = 0; y < PE_PORT_FB_HEIGHT; y++)
+            for (unsigned int x = 0; x < PE_PORT_FB_WIDTH; x++) {
+                unsigned int sum[3] = {0,0,0};
+                for (int sy = 0; sy < scale; sy++)
+                    for (int sx = 0; sx < scale; sx++) {
+                        const uint8_t *src = fb_presentation +
+                            (((size_t)y * scale + sy) * PE_PORT_FB_WIDTH * scale + x * scale + sx) * 3u;
+                        for (unsigned int ch = 0; ch < 3; ch++) sum[ch] += src[ch];
+                    }
+                for (unsigned int ch = 0; ch < 3; ch++)
+                    fb_antialias[((size_t)y * PE_PORT_FB_WIDTH + x) * 3u + ch] =
+                        (uint8_t)((sum[ch] + scale * scale / 2) / (scale * scale));
+            }
+    }
+}
+
+int HostFB_WritePresentationPPM(const char *path)
+{
+    int width, height;
+    const uint8_t *pixels = HostFB_GetPresentationPixels(&width, &height);
+    FILE *file = fopen(path, "wb");
+    if (!file) return -1;
+    int failed = fprintf(file, "P6\n%d %d\n255\n", width, height) < 0;
+    size_t bytes = (size_t)width * height * 3u;
+    if (fwrite(pixels, 1, bytes, file) != bytes) failed = 1;
+    if (fclose(file)) failed = 1;
+    return failed ? -1 : 0;
+}
+
+const uint8_t *HostFB_GetPresentationPixels(int *width, int *height)
+{
+    int scale = fb_presentation && fb_presentation_scale == PE_GPU_GetRenderScale() &&
+                fb_presentation_generation == PE_GPU_GetRenderGeneration() &&
+                fb_presentation_ssaa == fb_ssaa ?
+                fb_presentation_scale : 1;
+    if (scale > 1 && fb_ssaa) {
+        if (width) *width = PE_PORT_FB_WIDTH;
+        if (height) *height = PE_PORT_FB_HEIGHT;
+        return fb_antialias;
+    }
+    if (width) *width = PE_PORT_FB_WIDTH * scale;
+    if (height) *height = PE_PORT_FB_HEIGHT * scale;
+    return scale > 1 ? fb_presentation : fb;
+}
+
 static void ScanDisplay(uint32_t dx, uint32_t dy, uint32_t dw, uint32_t top, uint32_t dh, int rgb24)
 {
     uint32_t row, col;
@@ -205,6 +297,7 @@ static void ScanDisplay(uint32_t dx, uint32_t dy, uint32_t dw, uint32_t top, uin
             }
         }
     }
+    ScanPresentation(dx, dy, dw, top, dh, rgb24);
 }
 
 void HostFB_SetDispMask(int mask)

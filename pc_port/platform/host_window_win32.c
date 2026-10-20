@@ -18,6 +18,7 @@
 #include "host_window.h"
 #include "host_frame_pacer.h"
 #include "host_window_scale.h"
+#include "host_upscale.h"
 #include "pe_plat/cheats.h"
 
 /* GetTickCount64 needs Vista+ declarations on older MinGW defaults. */
@@ -245,6 +246,8 @@ int HostWindow_Open(const char *display, int width, int height,
     return 0;
 }
 
+extern int pe_enh_display_scaler(void) __attribute__((weak));
+
 void HostWindow_Blit(const uint8_t *rgb, int fb_w, int fb_h)
 {
     HDC hdc;
@@ -261,7 +264,11 @@ void HostWindow_Blit(const uint8_t *rgb, int fb_w, int fb_h)
         g_bmi.bmiHeader.biWidth = width;
         g_bmi.bmiHeader.biHeight = -height;
     }
-    HostWindow_ScaleBGRA(g_imgbuf, g_win_w, g_win_h, rgb, fb_w, fb_h);
+    /* DISPLAY SCALER graphics option; NEAREST (the default) is
+     * HostWindow_ScaleBGRA unchanged.  Weak: a consumer without the
+     * enhancement registry keeps the nearest path. */
+    HostUpscale_Run(pe_enh_display_scaler ? pe_enh_display_scaler() : 0,
+                    g_imgbuf, g_win_w, g_win_h, rgb, fb_w, fb_h);
     hdc = GetDC(g_hwnd);
     if (hdc) {
         paint_window(hdc);

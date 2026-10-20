@@ -8,6 +8,7 @@
 #include "host_framebuffer.h"
 #include "host_frame_pacer.h"
 #include "host_window_scale.h"
+#include "host_upscale.h"
 #include "host_pad.h"
 #include "host_dev_menu.h"
 #include "host_audio.h"
@@ -142,6 +143,7 @@ static Window g_win = 0;
 static GC g_gc = 0;
 static XImage *g_ximg = NULL;
 static uint8_t *g_imgbuf = NULL;
+static int g_img_w, g_img_h;   /* size of g_ximg */
 static int g_win_w = 0, g_win_h = 0;
 static int g_fb_w = 0, g_fb_h = 0;
 static Atom g_wm_delete = 0;
@@ -415,7 +417,7 @@ static int resize_image(int width, int height)
                                  width, height, 32, 0);
     if (!image) { free(buffer); return -1; }
     if (g_ximg) XDestroyImage(g_ximg); /* owns its pixel buffer */
-    g_ximg = image; g_imgbuf = buffer;
+    g_ximg = image; g_imgbuf = buffer; g_img_w = width; g_img_h = height;
     g_win_w = width; g_win_h = height;
     return 0;
 }
@@ -507,35 +509,126 @@ int HostWindow_Open(const char *display, int width, int height,
     return 0;
 }
 
-void HostWindow_Blit(const uint8_t *rgb, int fb_w, int fb_h)
+/* The DISPLAY SCALER graphics option (plat_enhance.c).  Weak so a
+ * consumer without the enhancement registry keeps the nearest path. */
+extern int pe_enh_display_scaler(void) __attribute__((weak));
+static int g_scaler_mode_last;
+static int display_scaler_mode(void)
 {
-    uint64_t t0 = 0, t1;
-    size_t size = (size_t)fb_w * (size_t)fb_h * 3u;
-    if (!g_dpy || !rgb || fb_w <= 0 || fb_h <= 0) return;
-    if (!g_xr_on && (!g_ximg || !g_imgbuf)) return;
-    /* A present or scan-out that shows exactly the pixels already on
-     * screen (a movie's catch-up presents, the static pause frame
-     * rescanned every VBlank) changes nothing visible: skip it unless the
-     * window itself needs a redraw. */
-    if (!g_blit_dirty && g_last_rgb && g_last_size == size && memcmp(g_last_rgb, rgb, size) == 0) {
-        if (g_ft.on) g_ft.skipped++;
-        return;
-    }
-    if (g_ft.on) (void)monotonic_ns(&t0);
-    if (g_xr_on) {
-        if (fb_w != g_xr_fb_w || fb_h != g_xr_fb_h) return; /* fb is fixed 320x240 */
-        xr_blit(rgb);
-    } else {
-        HostWindow_ScaleBGRA(g_imgbuf, g_win_w, g_win_h, rgb, fb_w, fb_h);
-        XPutImage(g_dpy, g_win, g_gc, g_ximg, 0, 0, 0, 0, g_win_w, g_win_h);
-    }
-    XFlush(g_dpy);
-    g_blit_dirty = 0;
+    int mode = pe_enh_display_scaler ? pe_enh_display_scaler() : 0;
+    if (mode != g_scaler_mode_last) { g_scaler_mode_last = mode; g_blit_dirty = 1; } /* redraw even if the frame is unchanged */
+    return mode;
+}
+
+/* A window-sized client XImage for the CPU/filtered paths.  The XRender
+ * path normally has none (the server scales), so the filtered scalers
+ * create one on demand. */
+static int ensure_client_image(void)
+{
+    uint8_t *buffer; XImage *image;
+    if (g_ximg && g_imgbuf && g_img_w == g_win_w && g_img_h == g_win_h) return 1;
+    buffer = calloc((size_t)g_win_w * (size_t)g_win_h, 4u);
+    if (!buffer) return 0;
+    image = XCreateImage(g_dpy, NULL, 24, 2, 0, (char *)buffer, g_win_w, g_win_h, 32, 0);
+    if (!image) { free(buffer); return 0; }
+    if (g_ximg) XDestroyImage(g_ximg);
+    g_ximg = image; g_imgbuf = buffer; g_img_w = g_win_w; g_img_h = g_win_h;
+    g_blit_dirty = 1;
+    return 1;
+}
+
+static void remember_frame(const uint8_t *rgb, size_t size)
+{
     if (g_last_size != size) {
         uint8_t *p = realloc(g_last_rgb, size);
         if (p) { g_last_rgb = p; g_last_size = size; }
     }
     if (g_last_size == size) memcpy(g_last_rgb, rgb, size);
+}
+
+void HostWindow_Blit(const uint8_t *rgb, int fb_w, int fb_h)
+{
+    uint64_t t0 = 0, t1;
+    size_t size = (size_t)fb_w * (size_t)fb_h * 3u;
+    int scaler, unchanged, retry_filtered = 0;
+#ifdef PE_UPSCALE_THREADS
+    int async_available;
+#endif
+    if (!g_dpy || !rgb || fb_w <= 0 || fb_h <= 0) return;
+    scaler = display_scaler_mode();
+#ifdef PE_UPSCALE_THREADS
+    if (HostUpscale_TakeFailure()) g_blit_dirty = 1;
+    async_available = scaler != HOST_UPSCALE_NEAREST && HostUpscale_AsyncAvailable();
+    /* Runtime thread startup can fail even in a pthread-enabled build.
+     * Never execute CPU FSR on the game thread in that case. */
+    if (!async_available && scaler == HOST_UPSCALE_FSR1) {
+        static int fallback_said;
+        if (!fallback_said) {
+            fprintf(stderr, "[WINDOW] FSR 1 presenter unavailable; using SHARP BILINEAR\n");
+            fallback_said = 1;
+        }
+        scaler = HOST_UPSCALE_SHARP_BILINEAR;
+    }
+#endif
+    unchanged = !g_blit_dirty && g_last_rgb && g_last_size == size && memcmp(g_last_rgb, rgb, size) == 0;
+#ifdef PE_UPSCALE_THREADS
+    if (scaler != HOST_UPSCALE_NEAREST && async_available) {
+        /* Filtered scalers run on the presenter thread (one present of
+         * latency; a slow filter drops frames, never slows the game).  Put
+         * whatever finished since the last call, then queue this frame. */
+        if (ensure_client_image()) {
+            if (HostUpscale_TakeReadyFor(g_imgbuf, scaler, g_win_w, g_win_h)) {
+                if (g_ft.on) (void)monotonic_ns(&t0);
+                XPutImage(g_dpy, g_win, g_gc, g_ximg, 0, 0, 0, 0, g_win_w, g_win_h);
+                XFlush(g_dpy);
+                if (g_ft.on && monotonic_ns(&t1)) {
+                    g_ft.blits++; g_ft.blit_ns += t1 - t0;
+                    if (t1 - t0 > g_ft.blit_max) g_ft.blit_max = t1 - t0;
+                }
+            }
+            if (unchanged) { if (g_ft.on) g_ft.skipped++; return; }
+            if (HostUpscale_SubmitAsync(scaler, rgb, fb_w, fb_h, g_win_w, g_win_h)) {
+                g_blit_dirty = 0;
+                remember_frame(rgb, size);
+                return;
+            }
+        }
+        /* A failed allocation must remain retryable even for an unchanged
+         * scene. Nearest is safe while the worker owns its filter tables. */
+        retry_filtered = 1;
+        g_blit_dirty = 1;
+        unchanged = 0;
+        scaler = HOST_UPSCALE_NEAREST;
+    }
+#endif
+    if (!g_xr_on && (!g_ximg || !g_imgbuf)) return;
+    /* A present or scan-out that shows exactly the pixels already on
+     * screen (a movie's catch-up presents, the static pause frame
+     * rescanned every VBlank) changes nothing visible: skip it unless the
+     * window itself needs a redraw. */
+    if (unchanged) {
+        if (g_ft.on) g_ft.skipped++;
+        return;
+    }
+    if (g_ft.on) (void)monotonic_ns(&t0);
+    if (g_xr_on && scaler == HOST_UPSCALE_NEAREST &&
+        fb_w == g_xr_fb_w && fb_h == g_xr_fb_h) {
+        xr_blit(rgb);
+    } else if (ensure_client_image()) {
+        /* Retail default (NEAREST) is HostWindow_ScaleBGRA unchanged; a
+         * filtered mode lands here only without a presenter thread. */
+        int actual_mode = HostUpscale_Run(scaler, g_imgbuf, g_win_w, g_win_h, rgb, fb_w, fb_h);
+        if (scaler != HOST_UPSCALE_NEAREST && actual_mode != scaler) {
+            retry_filtered = 1;
+            g_blit_dirty = 1;
+        }
+        XPutImage(g_dpy, g_win, g_gc, g_ximg, 0, 0, 0, 0, g_win_w, g_win_h);
+    } else return;
+    XFlush(g_dpy);
+    if (!retry_filtered) {
+        g_blit_dirty = 0;
+        remember_frame(rgb, size);
+    }
     if (g_ft.on && monotonic_ns(&t1)) {
         g_ft.blits++; g_ft.blit_ns += t1 - t0;
         if (t1 - t0 > g_ft.blit_max) g_ft.blit_max = t1 - t0;
@@ -802,6 +895,7 @@ int HostWindow_Run(int milliseconds)
 
 void HostWindow_Close(void)
 {
+    HostUpscale_Shutdown();
     PE_AudioDriver_SetVBlankPacer(NULL);
     xr_release();
     free(g_last_rgb); g_last_rgb = NULL; g_last_size = 0;

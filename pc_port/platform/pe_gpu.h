@@ -158,6 +158,19 @@ typedef struct {
  * between platform initialization and a GP1/control reset. */
 void PE_GPU_Init(void);
 void PE_GPU_Reset(void);
+/* Host presentation only. Scale 1 uses native VRAM; 2..4 own a separate
+ * render surface. Changes seed it from native VRAM; allocation failure falls
+ * back to 1. Init clears both surfaces, Reset preserves both. */
+void PE_GPU_SetRenderScale(int scale);
+int PE_GPU_GetRenderScale(void);
+/* 0 nearest (default), 1 conservative bilinear on shadow polygons only.
+ * Rectangles and native VRAM always retain nearest sampling. */
+void PE_GPU_SetTextureFilter(int filter);
+int PE_GPU_GetTextureFilter(void);
+/* Invalidates cached host scan-out when Init or a scale change reseeds VRAM. */
+uint64_t PE_GPU_GetRenderGeneration(void);
+/* Coordinates are in scaled VRAM units; never wraps. */
+int PE_GPU_ReadRenderPixel(uint32_t x, uint32_t y, uint16_t *pixel);
 
 uint32_t PE_GPU_ReadStatus(void);
 void PE_GPU_SetReady(int ready);

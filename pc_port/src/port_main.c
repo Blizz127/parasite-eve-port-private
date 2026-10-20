@@ -475,6 +475,18 @@ static uint16_t RoutePadSource(void)
     return mask;
 }
 
+/* Keep capture and menu composition at native resolution. The graphics
+ * surface is used only when the overlay leaves the frame untouched. */
+static void BlitPresentationFrame(int with_overlay)
+{
+    const uint8_t *native = HostFB_GetPixels();
+    const uint8_t *pixels = with_overlay ?
+        pe_plat_cheats_overlay(native, PE_PORT_FB_WIDTH, PE_PORT_FB_HEIGHT) : native;
+    int width = PE_PORT_FB_WIDTH, height = PE_PORT_FB_HEIGHT;
+    if (pixels == native) pixels = HostFB_GetPresentationPixels(&width, &height);
+    HostWindow_Blit(pixels, width, height);
+}
+
 /* Phase 6E-PRS1 live-window present hook: blit the newest host pixels and
  * poll for close/Escape.  Host data only; never touches guest state.
  * Headless --route-pad also uses this hook so g_frame advances; without it
@@ -618,6 +630,10 @@ static void PresentHook_BlitWindow(void)
                 char path[512];
                 snprintf(path, sizeof path, "%s/f%06d.ppm", rdir, g_frame);
                 (void)HostFB_WritePPM(path);
+                if (getenv("PE_ROUTE_PRESENTATION_SHOTS")) {
+                    snprintf(path, sizeof path, "%s/f%06d-presentation.ppm", rdir, g_frame);
+                    (void)HostFB_WritePresentationPPM(path);
+                }
             }
             PE_GPU_PrimLogFrame(g_frame);
         }
@@ -655,8 +671,7 @@ static void PresentHook_BlitWindow(void)
     if (g_opts.headless)
         return;
     if (HostWindow_Pace()) {PE_Port_RequestStop(PE_PORT_STOP_HOST_QUIT);return;}
-    HostWindow_Blit(pe_plat_cheats_overlay(HostFB_GetPixels(), PE_PORT_FB_WIDTH, PE_PORT_FB_HEIGHT),
-                    PE_PORT_FB_WIDTH, PE_PORT_FB_HEIGHT);
+    BlitPresentationFrame(1);
     (void)HostWindow_Poll();
 }
 
@@ -665,8 +680,7 @@ static void PresentHook_BlitWindow(void)
  * per-VBlank pacer, and nothing here counts as a present. */
 static void ScanoutHook_BlitWindow(void)
 {
-    HostWindow_Blit(pe_plat_cheats_overlay(HostFB_GetPixels(), PE_PORT_FB_WIDTH, PE_PORT_FB_HEIGHT),
-                    PE_PORT_FB_WIDTH, PE_PORT_FB_HEIGHT);
+    BlitPresentationFrame(1);
 }
 
 static int ParsePositiveLimit(const char *option, const char *value) {
@@ -1205,6 +1219,7 @@ int main(int argc, char **argv) {
     PE_Callback_Init();
     Bootstrap_Init();
     HostFB_Init();
+    pe_enh_init();
     PE_Port_RunControlReset();
     PE_Port_SetFrameLimit(g_opts.max_frames);
     PE_Port_SetMainIterationLimit(g_opts.max_main_iterations);
@@ -1465,7 +1480,7 @@ int main(int argc, char **argv) {
 
     if (use_window) {
         TraceEvent("window_blit");
-        HostWindow_Blit(HostFB_GetPixels(), PE_PORT_FB_WIDTH, PE_PORT_FB_HEIGHT);
+        BlitPresentationFrame(0);
         UpdateTitle("Black frame", "waiting");
         if (PE_Port_GetStopReason() != PE_PORT_STOP_NONE) {
             /* A quit request or explicit budget already ended execution. */

@@ -2,6 +2,8 @@
  * See pe_plat/enhance.h.  At the defaults the hooks are pure pass-throughs. */
 #include "pe_plat/enhance.h"
 #include "pe_guest_ram.h"
+#include "pe_gpu.h"
+#include "host_framebuffer.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,10 +13,29 @@
 const int pe_enh_move_speed_steps[PE_ENH_MOVE_SPEED_COUNT] = {100, 125, 150, 175, 200};
 static const int k_toggle[] = {0, 1};
 static const int k_mult[]   = {1, 2, 3};
+#ifdef _WIN32
+/* This backend has no asynchronous FSR presenter. Expose only modes it runs. */
+static const int k_scaler[] = {PE_ENH_SCALER_NEAREST, PE_ENH_SCALER_SHARP_BILINEAR};
+static const char *const k_scaler_names[] = {"NEAREST", "SHARP BILINEAR"};
+#else
+static const int k_scaler[] = {PE_ENH_SCALER_NEAREST, PE_ENH_SCALER_SHARP_BILINEAR, PE_ENH_SCALER_FSR1};
+static const char *const k_scaler_names[] = {"NEAREST", "SHARP BILINEAR", "FSR 1 (CPU)"};
+#endif
+static const int k_internal_scale[] = {1, 2, 3, 4};
+static const char *const k_internal_scale_names[] = {"NATIVE", "2X", "3X", "4X"};
+static const char *const k_texture_filter_names[] = {"NEAREST", "BILINEAR (POLYGONS)"};
 
 /* The registry.  Order within a category is the menu order. */
-enum { OPT_MOVE_SPEED, OPT_ALWAYS_RUN, OPT_ONE_HIT, OPT_GOD, OPT_EXP_MULT, OPT_COUNT };
+enum { OPT_DISPLAY_SCALER, OPT_INTERNAL_SCALE, OPT_TEXTURE_FILTER, OPT_SSAA, OPT_MOVE_SPEED, OPT_ALWAYS_RUN, OPT_ONE_HIT, OPT_GOD, OPT_EXP_MULT, OPT_COUNT };
 static const PeEnhOption k_options[OPT_COUNT] = {
+    {"display_scaler", PE_ENH_CAT_GRAPHICS, "DISPLAY SCALER",      PE_ENH_FMT_NAMED,
+        k_scaler, sizeof k_scaler / sizeof k_scaler[0], "PE_DISPLAY_SCALER", "the owner", k_scaler_names},
+    {"internal_scale", PE_ENH_CAT_GRAPHICS, "INTERNAL RESOLUTION", PE_ENH_FMT_NAMED,
+        k_internal_scale, 4, "PE_INTERNAL_SCALE", "the owner", k_internal_scale_names},
+    {"texture_filter", PE_ENH_CAT_GRAPHICS, "TEXTURE FILTER", PE_ENH_FMT_NAMED,
+        k_toggle, 2, "PE_TEXTURE_FILTER", "the owner", k_texture_filter_names},
+    {"ssaa", PE_ENH_CAT_GRAPHICS, "SUPERSAMPLE AA", PE_ENH_FMT_TOGGLE,
+        k_toggle, 2, "PE_SSAA", "the owner", NULL},
     {"move_speed",    PE_ENH_CAT_GAMEPLAY, "MOVEMENT SPEED",       PE_ENH_FMT_PERCENT,
         pe_enh_move_speed_steps, PE_ENH_MOVE_SPEED_COUNT, "PE_MOVE_SPEED",    "u/stellarola"},
     {"always_run",    PE_ENH_CAT_GAMEPLAY, "ALWAYS RUN",           PE_ENH_FMT_TOGGLE,
@@ -34,6 +55,15 @@ static struct {
     int inited;
     int value[OPT_COUNT];
 } E;
+
+static void sync_graphics(void)
+{
+    int scale = E.value[OPT_INTERNAL_SCALE];
+    if ((E.value[OPT_SSAA] || E.value[OPT_TEXTURE_FILTER]) && scale == 1) scale = 2;
+    PE_GPU_SetRenderScale(scale);
+    PE_GPU_SetTextureFilter(E.value[OPT_TEXTURE_FILTER]);
+    HostFB_SetSSAA(E.value[OPT_SSAA]);
+}
 
 /* Snap to a listed value: the largest listed value <= v, else the retail one. */
 static int snap(int i, int v)
@@ -120,6 +150,7 @@ void pe_enh_init(void)
         if (e && *e) E.value[i] = snap(i, atoi(e));
         if (E.value[i] != k_options[i].values[0]) any = 1;
     }
+    sync_graphics();
     if (any) {
         fprintf(stderr, "[ENH]");
         for (int i = 0; i < OPT_COUNT; i++)
@@ -128,7 +159,12 @@ void pe_enh_init(void)
     }
 }
 
-void pe_enh_reset(void) { memset(&E, 0, sizeof E); }
+void pe_enh_reset(void) {
+    memset(&E, 0, sizeof E);
+    PE_GPU_SetRenderScale(1);
+    PE_GPU_SetTextureFilter(0);
+    HostFB_SetSSAA(0);
+}
 
 /* ── registry access ─────────────────────────────────────────────────── */
 int pe_enh_option_count(void) { return OPT_COUNT; }
@@ -163,6 +199,7 @@ void pe_enh_option_set(int i, int value)
     if (i < 0 || i >= OPT_COUNT) return;
     pe_enh_init();
     E.value[i] = snap(i, value);
+    if (k_options[i].category == PE_ENH_CAT_GRAPHICS) sync_graphics();
     save_config();
 }
 void pe_enh_option_cycle(int i)
@@ -183,11 +220,22 @@ void pe_enh_option_label(int i, char *buf, size_t n)
     switch (o->format) {
     case PE_ENH_FMT_TOGGLE:  snprintf(buf, n, "%s: %s", o->label, v ? "ON" : "OFF"); break;
     case PE_ENH_FMT_PERCENT: snprintf(buf, n, "%s: %d%%%s", o->label, v, pe_enh_option_is_retail(i) ? " (RETAIL)" : ""); break;
+    case PE_ENH_FMT_NAMED: {
+        int k;
+        for (k = 0; k < o->nvalues && o->values[k] != v; k++) ;
+        snprintf(buf, n, "%s: %s%s", o->label, (o->names && k < o->nvalues) ? o->names[k] : "?",
+                 pe_enh_option_is_retail(i) ? " (RETAIL)" : "");
+        break;
+    }
     default:                 snprintf(buf, n, "%s: %dX%s", o->label, v, pe_enh_option_is_retail(i) ? " (RETAIL)" : ""); break;
     }
 }
 
 /* ── named accessors (thin wrappers over the registry) ───────────────── */
+int  pe_enh_display_scaler(void)          { return pe_enh_option_value(OPT_DISPLAY_SCALER); }
+void pe_enh_set_display_scaler(int mode)  { pe_enh_option_set(OPT_DISPLAY_SCALER, mode); }
+int  pe_enh_internal_scale(void)          { return pe_enh_option_value(OPT_INTERNAL_SCALE); }
+void pe_enh_set_internal_scale(int scale) { pe_enh_option_set(OPT_INTERNAL_SCALE, scale); }
 int  pe_enh_move_speed_pct(void)          { return pe_enh_option_value(OPT_MOVE_SPEED); }
 int  pe_enh_always_run(void)              { return pe_enh_option_value(OPT_ALWAYS_RUN); }
 void pe_enh_set_move_speed_pct(int pct)   { pe_enh_option_set(OPT_MOVE_SPEED, pct); }

@@ -38,7 +38,7 @@ extern const int pe_enh_move_speed_steps[PE_ENH_MOVE_SPEED_COUNT]; /* 100..200 *
  * override, credit).  The dev menu lists the registry per category today; a
  * future standalone Options/Enhancements menu lists the same registry. */
 typedef enum {
-    PE_ENH_CAT_GRAPHICS = 0,     /* rendering options (none yet) */
+    PE_ENH_CAT_GRAPHICS = 0,     /* rendering/presentation options */
     PE_ENH_CAT_GAMEPLAY,         /* quality-of-life gameplay options */
     PE_ENH_CAT_ASSIST,           /* cheat-style assists (god mode, EXP, 1-hit) */
     PE_ENH_CAT_COUNT
@@ -47,7 +47,8 @@ typedef enum {
 typedef enum {
     PE_ENH_FMT_TOGGLE = 0,       /* OFF / ON */
     PE_ENH_FMT_PERCENT,          /* 150% */
-    PE_ENH_FMT_MULT              /* 2X */
+    PE_ENH_FMT_MULT,             /* 2X */
+    PE_ENH_FMT_NAMED             /* names[k] for values[k], e.g. "FSR 1" */
 } PeEnhFormat;
 
 typedef struct {
@@ -59,6 +60,7 @@ typedef struct {
     int           nvalues;
     const char   *env;           /* env override, e.g. "PE_MOVE_SPEED" (not written back) */
     const char   *credit;        /* "suggested by", e.g. "u/stellarola", or NULL */
+    const char *const *names;    /* PE_ENH_FMT_NAMED only: one name per value; else NULL */
 } PeEnhOption;
 
 int  pe_enh_option_count(void);
@@ -90,6 +92,16 @@ void pe_enh_set_always_run(int on);
  * the game is not in battle (D_8009D1A0 & 2 clear). */
 int32_t pe_enh_field_speed(uint32_t actor, int32_t speed);  /* speed * pct/100 */
 int  pe_enh_field_always_run(uint32_t actor);
+
+/* ── Graphics ────────────────────────────────────────────────────────── */
+/* Display scaler: how the finished 320x240 frame is fitted into the window.
+ * It runs after HostFB_GetPixels, so VRAM, the present buffer, screenshots,
+ * frame counters and guest RAM are identical whatever the setting. */
+enum { PE_ENH_SCALER_NEAREST = 0, PE_ENH_SCALER_SHARP_BILINEAR = 1, PE_ENH_SCALER_FSR1 = 2 };
+int  pe_enh_display_scaler(void);       /* PE_ENH_SCALER_NEAREST (default) .. FSR1 */
+void pe_enh_set_display_scaler(int mode);
+int  pe_enh_internal_scale(void);        /* 1 (native default), 2, 3, 4 */
+void pe_enh_set_internal_scale(int scale);
 
 /* ── Assists ─────────────────────────────────────────────────────────── */
 #define PE_ENH_EXP_MULT_MAX 3

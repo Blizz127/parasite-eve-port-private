@@ -96,6 +96,56 @@ static PeGpuAuthority g_gpu = {
     }
 };
 
+/* Presentation-only surface. Native VRAM and hardware telemetry remain the
+ * authority for guest reads and texture sampling, at every render scale. */
+static uint16_t *g_shadow;
+static int g_render_scale = 1;
+static uint64_t g_render_generation;
+static int g_texture_filter;
+
+static void ShadowSeedPixel(uint32_t x, uint32_t y, uint16_t pixel)
+{
+    if (!g_shadow) return;
+    unsigned int sy, sx, scale = (unsigned int)g_render_scale;
+    for (sy = 0; sy < scale; sy++) {
+        uint16_t *dst = g_shadow + ((size_t)y * scale + sy) *
+                        PE_GPU_VRAM_WIDTH * scale + x * scale;
+        for (sx = 0; sx < scale; sx++) dst[sx] = pixel;
+    }
+}
+
+void PE_GPU_SetRenderScale(int scale)
+{
+    uint16_t *next;
+    uint32_t x, y;
+    if (scale < 1 || scale > 4) scale = 1;
+    if (scale == g_render_scale) return;
+    next = scale > 1 ? malloc((size_t)PE_GPU_VRAM_PIXELS * scale * scale * sizeof(*next)) : NULL;
+    if (scale > 1 && !next) scale = 1;
+    free(g_shadow);
+    g_shadow = next;
+    g_render_scale = scale;
+    g_render_generation++;
+    if (g_shadow)
+        for (y = 0; y < PE_GPU_VRAM_HEIGHT; y++)
+            for (x = 0; x < PE_GPU_VRAM_WIDTH; x++)
+                ShadowSeedPixel(x, y, g_gpu.vram[y * PE_GPU_VRAM_WIDTH + x]);
+}
+
+void PE_GPU_SetTextureFilter(int filter) { g_texture_filter = filter == 1; }
+int PE_GPU_GetTextureFilter(void) { return g_texture_filter; }
+int PE_GPU_GetRenderScale(void) { return g_render_scale; }
+uint64_t PE_GPU_GetRenderGeneration(void) { return g_render_generation; }
+
+int PE_GPU_ReadRenderPixel(uint32_t x, uint32_t y, uint16_t *pixel)
+{
+    unsigned int scale = (unsigned int)g_render_scale;
+    if (!pixel || x >= PE_GPU_VRAM_WIDTH * scale || y >= PE_GPU_VRAM_HEIGHT * scale) return 0;
+    *pixel = g_shadow ? g_shadow[(size_t)y * PE_GPU_VRAM_WIDTH * scale + x] :
+                       g_gpu.vram[y * PE_GPU_VRAM_WIDTH + x];
+    return 1;
+}
+
 static int DICRMasterFlag(uint32_t stored)
 {
     return (stored & PE_GPU_DICR_FORCE) != 0u ||
@@ -166,7 +216,9 @@ static void ResetHardwareState(void)
 
 void PE_GPU_Init(void)
 {
+    g_render_generation++;
     memset(g_gpu.vram, 0, sizeof(g_gpu.vram));
+    if (g_shadow) memset(g_shadow, 0, (size_t)PE_GPU_VRAM_PIXELS * g_render_scale * g_render_scale * sizeof(*g_shadow));
     ResetHardwareState();
 }
 
@@ -241,6 +293,7 @@ static void WriteImagePixel(uint16_t pixel)
         if (getenv("PE_GPU_WATCH_BT")) { void *bt[24]; int n = backtrace(bt, 24); backtrace_symbols_fd(bt, n, 2); }
     }
     g_gpu.vram[y * PE_GPU_VRAM_WIDTH + x] = pixel;
+    ShadowSeedPixel(x, y, pixel);
     g_gpu.state.image_current_pixel++;
     g_gpu.state.image_remaining_pixels--;
     if (g_gpu.state.image_remaining_pixels == 0) {
@@ -325,8 +378,130 @@ static uint32_t MonoRectangleFixedSize(uint32_t command);
  * The E2h..E6h
  * environment is applied only after the corresponding command has actually
  * been observed; this preserves the pre-PutDrawEnv physical-clip behavior. */
+static void ShadowTexturedRectangle(uint32_t size)
+{
+    uint32_t draw_mode = g_gpu.state.draw_mode;
+    uint32_t width = size & 0x3FFu;
+    uint32_t height = (size >> 16) & 0x1FFu;
+    int32_t origin_x = SignExtend11(g_gpu.rectangle_position);
+    int32_t origin_y = SignExtend11(g_gpu.rectangle_position >> 16);
+    uint32_t origin_u = g_gpu.rectangle_uv_clut & 0xFFu;
+    uint32_t origin_v = (g_gpu.rectangle_uv_clut >> 8) & 0xFFu;
+    uint32_t clut = g_gpu.rectangle_uv_clut >> 16;
+    uint32_t clut_x = (clut & 0x3Fu) * 16u;
+    uint32_t clut_y = (clut >> 6) & (PE_GPU_VRAM_HEIGHT - 1u);
+    uint32_t texture_x = (draw_mode & 0xFu) * 64u;
+    uint32_t texture_y = ((draw_mode >> 4) & 1u) * 256u;
+    int flip_x = (draw_mode & 0x1000u) != 0u;
+    int flip_y = (draw_mode & 0x2000u) != 0u;
+    uint32_t row;
+
+    if (g_gpu.state.drawing_offset_count != 0u) {
+        origin_x += SignExtend11(g_gpu.state.drawing_offset);
+        origin_y += SignExtend11(g_gpu.state.drawing_offset >> 11);
+    }
+
+    for (row = 0u; row < height; row++) {
+        int32_t destination_y = origin_y + (int32_t)row;
+        uint32_t texture_v = (origin_v +
+            (flip_y ? (0u - row) : row)) & 0xFFu;
+        uint32_t column;
+
+        if (g_gpu.state.texture_window_count != 0u)
+            texture_v = ApplyTextureWindow(texture_v, 0);
+        if (destination_y < 0 || destination_y >=
+            (int32_t)PE_GPU_VRAM_HEIGHT) {
+            continue;
+        }
+        if (g_gpu.state.drawing_area_top_left_count != 0u &&
+            g_gpu.state.drawing_area_bottom_right_count != 0u &&
+            ((uint32_t)destination_y <
+                 ((g_gpu.state.drawing_area_top_left >> 10) & 0x1FFu) ||
+             (uint32_t)destination_y >
+                 ((g_gpu.state.drawing_area_bottom_right >> 10) & 0x1FFu)))
+            continue;
+        for (column = 0u; column < width; column++) {
+            int32_t destination_x = origin_x + (int32_t)column;
+            uint32_t texture_u;
+            uint16_t packed;
+            uint32_t palette_index;
+            uint16_t texture_color;
+
+            if (destination_x < 0 || destination_x >=
+                (int32_t)PE_GPU_VRAM_WIDTH) {
+                continue;
+            }
+            if (g_gpu.state.drawing_area_top_left_count != 0u &&
+                g_gpu.state.drawing_area_bottom_right_count != 0u &&
+                ((uint32_t)destination_x <
+                     (g_gpu.state.drawing_area_top_left & 0x3FFu) ||
+                 (uint32_t)destination_x >
+                     (g_gpu.state.drawing_area_bottom_right & 0x3FFu)))
+                continue;
+            texture_u = (origin_u +
+                (flip_x ? (0u - column) : column)) & 0xFFu;
+            if (g_gpu.state.texture_window_count != 0u)
+                texture_u = ApplyTextureWindow(texture_u, 1);
+            if (((draw_mode >> 7) & 3u) >= 2u) {
+                /* 15bpp direct (depth 3 "reserved" behaves as 15bpp). */
+                texture_color = g_gpu.vram[
+                    ((texture_y + texture_v) &
+                     (PE_GPU_VRAM_HEIGHT - 1u)) * PE_GPU_VRAM_WIDTH +
+                    ((texture_x + texture_u) &
+                     (PE_GPU_VRAM_WIDTH - 1u))];
+                goto have_texel;
+            } else if (((draw_mode >> 7) & 3u) == 1u) {
+                packed = g_gpu.vram[
+                    ((texture_y + texture_v) &
+                     (PE_GPU_VRAM_HEIGHT - 1u)) * PE_GPU_VRAM_WIDTH +
+                    ((texture_x + texture_u / 2u) &
+                     (PE_GPU_VRAM_WIDTH - 1u))];
+                palette_index =
+                    (packed >> ((texture_u & 1u) * 8u)) & 0xFFu;
+            } else {
+                packed = g_gpu.vram[
+                    ((texture_y + texture_v) &
+                     (PE_GPU_VRAM_HEIGHT - 1u)) * PE_GPU_VRAM_WIDTH +
+                    ((texture_x + texture_u / 4u) &
+                     (PE_GPU_VRAM_WIDTH - 1u))];
+                palette_index =
+                    (packed >> ((texture_u & 3u) * 4u)) & 0xFu;
+            }
+            texture_color = g_gpu.vram[
+                clut_y * PE_GPU_VRAM_WIDTH +
+                ((clut_x + palette_index) &
+                 (PE_GPU_VRAM_WIDTH - 1u))];
+        have_texel:
+            if (texture_color == 0u)
+                continue;
+            for (int sy = 0; sy < g_render_scale; sy++)
+            for (int sx = 0; sx < g_render_scale; sx++) {
+                uint16_t *destination = &g_shadow[
+                    ((size_t)destination_y * g_render_scale + sy) * PE_GPU_VRAM_WIDTH * g_render_scale +
+                    (uint32_t)destination_x * g_render_scale + sx];
+                uint16_t result;
+
+                if (g_gpu.state.mask_setting_count != 0u &&
+                    (g_gpu.state.mask_setting & 2u) != 0u &&
+                    (*destination & 0x8000u) != 0u)
+                    continue;
+                uint16_t sample = texture_color;
+                result = (g_gpu.rectangle_command & 0x01000000u) ?
+                    sample : ModulateTextureColor(sample, g_gpu.rectangle_command);
+                if ((g_gpu.rectangle_command & 0x02000000u) && (texture_color & 0x8000u))
+                    result = BlendSemiTransparent(*destination, result) | (texture_color & 0x8000u);
+                if (g_gpu.state.mask_setting_count != 0u &&
+                    (g_gpu.state.mask_setting & 1u) != 0u)
+                    result |= 0x8000u;
+                *destination = result;
+            }
+        }
+    }
+}
+
 static void DrawTexturedRectangle(uint32_t size)
 {
+    if (g_shadow) ShadowTexturedRectangle(size);
     uint32_t draw_mode = g_gpu.state.draw_mode;
     uint32_t width = size & 0x3FFu;
     uint32_t height = (size >> 16) & 0x1FFu;
@@ -491,6 +666,7 @@ static void DrawFillRectangle(uint32_t size)
 
             g_gpu.vram[destination_y * PE_GPU_VRAM_WIDTH +
                        destination_x] = pixel;
+            ShadowSeedPixel(destination_x, destination_y, pixel);
         }
     }
 }
@@ -565,8 +741,56 @@ static uint32_t MonoRectangleFixedSize(uint32_t command)
     }
 }
 
+static void ShadowMonoRectangle(uint32_t size)
+{
+    uint32_t command = g_gpu.mono_rectangle_command;
+    uint16_t color = Color24To15(command);
+    int semi_transparent = (command & 0x02000000u) != 0u;
+    uint32_t width = size & 0x3FFu;
+    uint32_t height = (size >> 16) & 0x1FFu;
+    int32_t origin_x = SignExtend11(g_gpu.mono_rectangle_position);
+    int32_t origin_y = SignExtend11(g_gpu.mono_rectangle_position >> 16);
+    int check_mask = g_gpu.state.mask_setting_count != 0u &&
+                     (g_gpu.state.mask_setting & 2u) != 0u;
+    int set_mask = g_gpu.state.mask_setting_count != 0u &&
+                   (g_gpu.state.mask_setting & 1u) != 0u;
+    uint32_t row;
+
+    if (g_gpu.state.drawing_offset_count != 0u) {
+        origin_x += SignExtend11(g_gpu.state.drawing_offset);
+        origin_y += SignExtend11(g_gpu.state.drawing_offset >> 11);
+    }
+
+    for (row = 0u; row < height; row++) {
+        int32_t y = origin_y + (int32_t)row;
+        uint32_t column;
+
+        for (column = 0u; column < width; column++) {
+            int32_t x = origin_x + (int32_t)column;
+            uint16_t *destination;
+            uint16_t result;
+
+            if (!PixelInDrawingArea(x, y))
+                continue;
+            for (int sy = 0; sy < g_render_scale; sy++)
+            for (int sx = 0; sx < g_render_scale; sx++) {
+            destination = &g_shadow[((size_t)y * g_render_scale + sy) * PE_GPU_VRAM_WIDTH * g_render_scale +
+                                    (uint32_t)x * g_render_scale + sx];
+            if (check_mask && (*destination & 0x8000u) != 0u)
+                continue;
+            result = semi_transparent ?
+                BlendSemiTransparent(*destination, color) : color;
+            if (set_mask)
+                result |= 0x8000u;
+            *destination = result;
+            }
+        }
+    }
+}
+
 static void DrawMonoRectangle(uint32_t size)
 {
+    if (g_shadow) ShadowMonoRectangle(size);
     uint32_t command = g_gpu.mono_rectangle_command;
     uint16_t color = Color24To15(command);
     int semi_transparent = (command & 0x02000000u) != 0u;
@@ -716,6 +940,106 @@ static void DrawPolygonTriangle(PePolygonVertex a, PePolygonVertex b, PePolygonV
     }
 }
 
+/* Conservative post-CLUT bilinear sampling. Nearest determines coverage
+ * and STP; transparent or opposite-STP taps cannot color the chosen class.
+ * Fractional UV is 8-bit fixed point, drawn only into the shadow surface. */
+static uint16_t ShadowFilteredTexel(int64_t un, int64_t vn, int64_t area, uint32_t clut)
+{
+    uint32_t nearest_u = (uint32_t)((un + area / 2) / area);
+    uint32_t nearest_v = (uint32_t)((vn + area / 2) / area);
+    uint16_t anchor = PolygonTexel(nearest_u, nearest_v, clut);
+    if (!anchor) return 0;
+    uint32_t uf = (uint32_t)(un * 256 / area), vf = (uint32_t)(vn * 256 / area);
+    uint32_t u = uf >> 8, v = vf >> 8, fu = uf & 255u, fv = vf & 255u;
+    uint32_t weights[4] = {(256u-fu)*(256u-fv), fu*(256u-fv), (256u-fu)*fv, fu*fv};
+    uint16_t taps[4] = {PolygonTexel(u,v,clut), PolygonTexel(u+1u,v,clut),
+                        PolygonTexel(u,v+1u,clut), PolygonTexel(u+1u,v+1u,clut)};
+    uint32_t total = 0, sums[3] = {0,0,0};
+    for (unsigned int i = 0; i < 4; i++) {
+        if (!taps[i] || ((taps[i] ^ anchor) & 0x8000u)) continue;
+        total += weights[i];
+        for (unsigned int ch = 0; ch < 3; ch++)
+            sums[ch] += ((taps[i] >> (5u*ch)) & 31u) * weights[i];
+    }
+    if (!total) return anchor;
+    uint16_t result = anchor & 0x8000u;
+    for (unsigned int ch = 0; ch < 3; ch++)
+        result |= (uint16_t)(((sums[ch] + total / 2u) / total) << (5u*ch));
+    /* A nonzero opaque texel must not become transparent through rounding. */
+    return result ? result : anchor;
+}
+
+static void ShadowPolygonTriangle(PePolygonVertex a, PePolygonVertex b, PePolygonVertex c,
+                                uint32_t command, uint32_t clut)
+{
+    static const int8_t dither[4][4] = {{-4,0,-3,1},{2,-2,3,-1},{-3,1,-4,0},{3,-1,2,-2}};
+    const int scale = g_render_scale;
+    a.x *= scale; a.y *= scale; b.x *= scale; b.y *= scale; c.x *= scale; c.y *= scale;
+    int64_t area = PolygonEdge(&a,&b,c.x,c.y), half;
+    int32_t minx, maxx, miny, maxy, x, y;
+    int textured = (command & 0x04000000u) != 0u;
+    int raw = textured && (command & 0x01000000u);
+    int dithering = (g_gpu.state.draw_mode & 0x200u) && !raw &&
+                    (textured || (command & 0x10000000u));
+    if (!area) return;
+    if (area < 0) { PePolygonVertex temp = b; b = c; c = temp; area = -area; }
+    /* Interpolated UV and RGB round to nearest (half-unit bias on the planar
+     * value), not truncate: the hardware-researched rasterizers add
+     * 1 << (frac-1) to the attribute base (Mednafen/DuckStation convention),
+     * and the emulator oracle's first room agrees (gfx2 lane: 95.87% ->
+     * 98.90% identical pixels vs oracle VSync 9713, with the model packets
+     * and GTE colour tables already bit-identical).  Inside the triangle every
+     * edge weight is >= 0, so the numerators are non-negative. */
+    half = area / 2;
+    minx = a.x < b.x ? a.x : b.x; if (c.x < minx) minx = c.x;
+    maxx = a.x > b.x ? a.x : b.x; if (c.x > maxx) maxx = c.x;
+    miny = a.y < b.y ? a.y : b.y; if (c.y < miny) miny = c.y;
+    maxy = a.y > b.y ? a.y : b.y; if (c.y > maxy) maxy = c.y;
+    if (maxx-minx >= 1024 * scale || maxy-miny >= 512 * scale) return;
+    if (minx < 0) minx = 0;
+    if (maxx >= 1024 * scale) maxx = 1024 * scale - 1;
+    if (miny < 0) miny = 0;
+    if (maxy >= 512 * scale) maxy = 512 * scale - 1;
+    for (y = miny; y <= maxy; y++) {
+        for (x = minx; x <= maxx; x++) {
+            int64_t w0 = PolygonEdge(&b,&c,x,y), w1 = PolygonEdge(&c,&a,x,y), w2 = PolygonEdge(&a,&b,x,y);
+            uint16_t texture = 0u, color = 0u, *pixel;
+            unsigned int channel;
+            if (w0 < 0 || (w0 == 0 && !PolygonTopLeft(&b,&c)) ||
+                w1 < 0 || (w1 == 0 && !PolygonTopLeft(&c,&a)) ||
+                w2 < 0 || (w2 == 0 && !PolygonTopLeft(&a,&b)) || !PixelInDrawingArea(x / scale,y / scale)) continue;
+            pixel = &g_shadow[(size_t)y * 1024u * scale + (uint32_t)x];
+            if ((g_gpu.state.mask_setting & 2u) && (*pixel & 0x8000u)) continue;
+            if (textured) {
+                uint32_t u = (uint32_t)((w0*a.u + w1*b.u + w2*c.u + half) / area);
+                uint32_t v = (uint32_t)((w0*a.v + w1*b.v + w2*c.v + half) / area);
+                texture = g_texture_filter ?
+                    ShadowFilteredTexel(w0*a.u + w1*b.u + w2*c.u,
+                                        w0*a.v + w1*b.v + w2*c.v, area, clut) :
+                    PolygonTexel(u,v,clut);
+                if (texture == 0u) continue;
+            }
+            if (raw) color = texture;
+            else {
+                for (channel = 0u; channel < 3u; channel++) {
+                    int value = (int)((w0*a.color[channel] + w1*b.color[channel] + w2*c.color[channel] + half) / area);
+                    if (textured) value = (int)(((texture >> (channel*5u)) & 31u) * (unsigned int)value) >> 4;
+                    if (dithering) value += dither[(y / scale) & 3][(x / scale) & 3];
+                    if (value < 0) value = 0;
+                    if (value > 255) value = 255;
+                    color |= (uint16_t)((unsigned int)(value >> 3) << (channel*5u));
+                }
+                color |= texture & 0x8000u;
+            }
+            if ((command & 0x02000000u) && (!textured || (texture & 0x8000u)))
+                color = BlendSemiTransparent(*pixel,color) | (texture & 0x8000u);
+            if (g_gpu.state.mask_setting & 1u) color |= 0x8000u;
+            *pixel = color;
+
+        }
+    }
+}
+
 static void DrawPolygon(void)
 {
     PePolygonVertex vertices[4];
@@ -749,6 +1073,10 @@ static void DrawPolygon(void)
                     (unsigned)vertices[i].color[1], (unsigned)vertices[i].color[2]);
         fputc('\n', g_prim_log);
     }
+    if (g_shadow) {
+        ShadowPolygonTriangle(vertices[0],vertices[1],vertices[2],command,clut);
+        if (count == 4u) ShadowPolygonTriangle(vertices[1],vertices[2],vertices[3],command,clut);
+    }
     DrawPolygonTriangle(vertices[0],vertices[1],vertices[2],command,clut);
     if (count == 4u) DrawPolygonTriangle(vertices[1],vertices[2],vertices[3],command,clut);
     g_gpu.state.polygon_count++;
@@ -760,8 +1088,76 @@ static void DrawPolygon(void)
  * Fixed-point coverage conventions (32 fractional coordinate bits, 12
  * color bits, directional tie bias) cross-checked against DuckStation's
  * gpu_sw_rasterizer.inl. This native DDA uses no host graphics API. */
+static void ShadowLine(void)
+{
+    static const int8_t dither[4][4]={{-4,0,-3,1},{2,-2,3,-1},{-3,1,-4,0},{3,-1,2,-2}};
+    const int64_t unit=INT64_C(4294967296);
+    uint32_t command=g_gpu.polygon_words[0];
+    uint32_t colors[2]={command,command};
+    uint32_t xy[2]={g_gpu.polygon_words[1],g_gpu.polygon_words[2]};
+    int32_t ends[2][2], delta[2], span, axis, step, ch;
+    int64_t origin[2], increment[2];
+    int32_t rgb[3], rgb_step[3];
+    if (command&0x10000000u) {
+        colors[1]=g_gpu.polygon_words[2]; xy[1]=g_gpu.polygon_words[3];
+    }
+    for (axis=0;axis<2;axis++) {
+        int32_t offset=SignExtend11(g_gpu.state.drawing_offset>>(axis*11));
+        ends[0][axis]=SignExtend11(xy[0]>>(axis*16))+offset;
+        ends[1][axis]=SignExtend11(xy[1]>>(axis*16))+offset;
+        delta[axis]=ends[1][axis]-ends[0][axis];
+        if (delta[axis]<0) delta[axis]=-delta[axis];
+    }
+
+    if (delta[0]>=1024 || delta[1]>=512) return;
+    span=delta[0]>delta[1]?delta[0]:delta[1];
+    if (span && ends[0][0]>=ends[1][0]) {
+        uint32_t color=colors[0]; colors[0]=colors[1]; colors[1]=color;
+        for (axis=0;axis<2;axis++) {
+            int32_t coord=ends[0][axis]; ends[0][axis]=ends[1][axis]; ends[1][axis]=coord;
+        }
+    }
+    for (axis=0;axis<2;axis++) {
+        int32_t distance=ends[1][axis]-ends[0][axis];
+        int64_t numerator=(int64_t)distance*unit;
+        if (span && distance) numerator+=distance>0?span-1:1-span;
+        increment[axis]=span?numerator/span:0;
+        origin[axis]=(int64_t)ends[0][axis]*unit+unit/2;
+        if (axis==0 || increment[axis]<0) origin[axis]-=1024;
+    }
+    for (ch=0;ch<3;ch++) {
+        int32_t first=(colors[0]>>(ch*8))&255u, last=(colors[1]>>(ch*8))&255u;
+        rgb[ch]=first*4096+2048; rgb_step[ch]=span?(last-first)*4096/span:0;
+    }
+    for (step=0;step<=span;step++) {
+        int32_t x=SignExtend11((uint32_t)(origin[0]>>32));
+        int32_t y=SignExtend11((uint32_t)(origin[1]>>32));
+        if (PixelInDrawingArea(x,y)) {
+            for (int sy = 0; sy < g_render_scale; sy++)
+            for (int sx = 0; sx < g_render_scale; sx++) {
+            uint16_t *pixel=&g_shadow[((size_t)y*g_render_scale+sy)*1024u*g_render_scale+(uint32_t)x*g_render_scale+sx], color=0;
+            if (!(g_gpu.state.mask_setting&2u) || !(*pixel&0x8000u)) {
+                for (ch=0;ch<3;ch++) {
+                    int32_t value=rgb[ch]>>12;
+                    if (g_gpu.state.draw_mode&0x200u) value+=dither[y&3][x&3];
+                    if (value<0) value=0;
+                    if (value>255) value=255;
+                    color|=(uint16_t)((uint32_t)(value>>3)<<(ch*5));
+                }
+                if (command&0x02000000u) color=BlendSemiTransparent(*pixel,color);
+                if (g_gpu.state.mask_setting&1u) color|=0x8000u;
+                *pixel=color;
+            }
+        }
+        }
+        for (axis=0;axis<2;axis++) origin[axis]+=increment[axis];
+        for (ch=0;ch<3;ch++) rgb[ch]+=rgb_step[ch];
+    }
+}
+
 static void DrawLine(void)
 {
+    if (g_shadow) ShadowLine();
     static const int8_t dither[4][4]={{-4,0,-3,1},{2,-2,3,-1},{-3,1,-4,0},{3,-1,2,-2}};
     const int64_t unit=INT64_C(4294967296);
     uint32_t command=g_gpu.polygon_words[0];
@@ -1403,6 +1799,12 @@ static int GpuVramCopy(uint32_t source, uint32_t destination, uint32_t size)
         rows_remaining -= rows;
     }
 
+    if (g_shadow)
+        for (uint32_t row = 0; row < height; row++)
+            for (uint32_t col = 0; col < width; col++) {
+                uint32_t x = (destination_x + col) & 1023u, y = (destination_y + row) & 511u;
+                ShadowSeedPixel(x, y, g_gpu.vram[y * 1024u + x]);
+            }
     g_gpu.state.move_count++;
     g_gpu.state.move_source = source;
     g_gpu.state.move_destination = destination;

@@ -135,6 +135,98 @@ the Day-1 autopilot's Eve fight with God Mode off/on side by side (HP
 45 → 42 → 35 → 28 vs 45 throughout, everything else frame-identical), the
 rat fight with 1-Hit Kills off/on, and its results with EXP/BP x1 vs x3.
 
+## Graphics (dev menu ▸ Options ▸ Graphics)
+
+Graphics options change how the finished frame is shown, never what the game
+computes. They live in the same registry and `enhancements.conf`, and every
+one defaults to the retail presentation.
+
+| Row | Values | Default | Config line / env override | Suggested by |
+| --- | --- | --- | --- | --- |
+| Display Scaler | Nearest (retail), Sharp Bilinear, FSR 1 (CPU); A cycles, the last wraps to Nearest | Nearest | `display_scaler=<0\|1\|2>` / `PE_DISPLAY_SCALER` | the owner |
+| Internal Resolution | Native (retail), 2x, 3x, 4x; A cycles | Native | `internal_scale=<1\|2\|3\|4>` / `PE_INTERNAL_SCALE` | the owner |
+| Texture Filter | Nearest (retail), Bilinear (polygons) | Nearest | `texture_filter=<0\|1>` / `PE_TEXTURE_FILTER` | the owner |
+| Supersample AA | Off, On | Off | `ssaa=<0\|1>` / `PE_SSAA` | the owner |
+
+**Where it came from.** These four rows were built and gated on the
+2026-09-30 lineage, branch `claude/gfx-options` (8ea0d39e3), and ported to the
+native lineage on 2026-10-20. Only the graphics hunks were carried over,
+three-way merged over the native tree:
+
+- the registry rows;
+- the presenter scaler (`pc_port/platform/host_upscale.h`, `HostWindow_Blit`
+  in `host_window.c` and `host_window_win32.c`);
+- the shadow render surface in `pe_gpu.c`;
+- the second scan-out in `host_framebuffer.c`;
+- `BlitPresentationFrame` in `port_main.c`.
+
+HD Backgrounds (`pe_hdbg*`) was **not** ported: it needs owner-local packs and
+its own loader threads. The design and the remaining stages (frame
+interpolation, sub-pixel geometry, widescreen) are in
+[GRAPHICS_OPTIONS.md](GRAPHICS_OPTIONS.md).
+
+**Display Scaler** picks the filter that fits the 320x240 frame into the
+window. It runs after `HostFB_GetPixels`, so emulated VRAM, the present
+buffer, screenshots, the VBlank and present counters and guest RAM are
+byte-identical whatever the setting; only window pixels differ.
+
+- **Nearest** is the retail path: `HostWindow_ScaleBGRA`, or the
+  pixel-identical XRender transform, synchronous on the game thread exactly
+  as before.
+- **Sharp Bilinear** pre-scales by the largest whole factor that fits, then
+  interpolates only between those big texels. That gives crisp pixels
+  without the shimmer nearest shows at non-integer window sizes.
+- **FSR 1** is a CPU port of AMD FidelityFX Super Resolution 1.0 (EASU plus
+  RCAS, MIT reference, licence in
+  `pc_port/third_party/FidelityFX-FSR-LICENSE.txt`). It is a spatial upscaler
+  of the 2D frame and adds no geometry detail.
+- The filtered modes run on a presenter thread with one present of latency.
+  A slow filter drops frames rather than slowing the game.
+- Windows offers only Nearest and Sharp Bilinear.
+- Cost measured on the source lineage's devbox (Xeon E5-1650 v2), 1280x800,
+  8 workers: Sharp Bilinear about 4 ms and FSR 1 about 44 ms per frame. FSR 1
+  is therefore a frame-dropping presenter on a CPU, not a 60 Hz one. Not yet
+  re-measured on the current host.
+
+**Internal Resolution** renders into a separate 2x/3x/4x shadow surface. The
+original 1024x512 VRAM stays the authority for game readbacks, texture
+fetches and captures.
+
+- Polygons (actors, battle arenas) gain finer edge coverage.
+- Background tiles and UI keep nearest sampling, so they look the same as
+  with window scaling.
+- Integer projection and affine texture mapping remain; there is no
+  sub-pixel geometry yet.
+- Movies expand the original decoded pixels.
+- The developer overlay uses the native frame.
+- An allocation failure falls back to native.
+- `PE_ROUTE_PRESENTATION_SHOTS=1` with `PE_ROUTE_SHOT_RANGE` also writes the
+  presentation frame (`f<N>-presentation.ppm`); ordinary captures stay native.
+- Cost: the CPU rasterizer does S² times the pixel work. On the source
+  lineage a bounded 18881-frame run took 303 s at 4x against 31 s native.
+
+**Texture Filter** filters polygon texels on the shadow surface only, after
+the CLUT lookup. It keeps the nearest texel's transparency and STP class and
+excludes incompatible neighbours. Background sprites and UI stay nearest.
+
+**Supersample AA** box-filters the shadow into a separate native-sized
+presentation frame.
+
+Either of these last two selects a 2x surface by itself when Internal
+Resolution is Native; an explicit 2x/3x/4x choice is kept.
+
+**Tests on the native lineage (2026-10-20):**
+
+| Check | Result |
+| --- | --- |
+| Native suite | `Results: 1689 run, 1689 passed, 0 failed, 0 skipped`, which includes `test_ASSIST_option_registry` (9 options, 4 graphics, labels, env overrides, the scale/filter/SSAA coupling) and `test_ASSIST_dev_menu_graphics_page` (Options ▸ Graphics rows, BACK to Options row 2, Enhancements still row 1) |
+| CTest | 10/10: `upscale-filters`, `upscale-filters-single-thread`, `upscale-no-threads`, `window-scaler-failures`, `scaler-windows-policy`, `gpu-shadow-parity`, `framebuffer-shadow-parity`, `gpu-filter-parity`, `framebuffer-ssaa-parity`, `window-scale-math` |
+| Identity of 1x VRAM and the 320x240 frame with the shadow on | `gpu-shadow-parity`, `framebuffer-shadow-parity`, `gpu-filter-parity` and `framebuffer-ssaa-parity` (shadow on and off over the same primitives) |
+| NOT RUN | a default-build Day-1 route identity run, a route run with each row forced on (`PE_ENH_AT`), live window and device checks, and a cost re-measurement on the current host |
+
+The build was a local `zig cc` (clang) build: the current devbox has no
+system GCC. See `docs/ai_context/ACTIVE_HANDOFF.md`.
+
 ## The option registry (how options are added)
 
 Every player-facing option is registered once, in `k_options` in

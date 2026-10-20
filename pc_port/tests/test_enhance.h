@@ -18,6 +18,10 @@ static void enh_isolate(void)
     setenv("PE_ENH_CONFIG", enh_conf, 1);
     unsetenv("PE_MOVE_SPEED");
     unsetenv("PE_ALWAYS_RUN");
+    unsetenv("PE_DISPLAY_SCALER");
+    unsetenv("PE_INTERNAL_SCALE");
+    unsetenv("PE_TEXTURE_FILTER");
+    unsetenv("PE_SSAA");
     pe_enh_reset();
 }
 

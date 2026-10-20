@@ -31,6 +31,14 @@ disc-time test compares them with the user's EXE ranges listed in
 `configs/USA/psyq_data_ranges.tsv`. `tools/analysis/psyq_port_guard.py`
 fails if their bytes appear in a port binary.
 
+## AMD FidelityFX Super Resolution 1.0 (adapted kernels)
+
+| field | value |
+|---|---|
+| upstream | https://github.com/GPUOpen-Effects/FidelityFX-FSR (the public reference EASU and RCAS kernels) |
+| licence | MIT, Copyright (c) 2021 Advanced Micro Devices, Inc. The notice is kept in `pc_port/third_party/FidelityFX-FSR-LICENSE.txt`, and packaged builds must ship it beside the other licences. |
+| use | A CPU port of the two kernels is compiled into `pc_port/platform/host_upscale.h` as the Display Scaler's FSR 1 mode. That mode is optional and off by default (docs/port/ENHANCEMENTS.md). No AMD source file is fetched or vendored. |
+
 ## System libraries (not bundled)
 
 These are needed only once PsyCross is integrated:

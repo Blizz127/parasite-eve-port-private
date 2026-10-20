@@ -292,10 +292,54 @@ static void test_ASSIST_dev_menu_rows(void)
     PASS();
 }
 
+/* OPTIONS > GRAPHICS (OPTIONS row 2): the four GRAPHICS registry rows. */
+static void test_ASSIST_dev_menu_graphics_page(void)
+{
+    static uint8_t fb[320 * 240 * 3];
+    TEST("ASSIST_dev_menu_graphics_page");
+    enh_isolate();
+    setenv("PE_DEV_MENU", "1", 1);
+    pe_plat_cheats_reset();
+    (void)pe_plat_cheats_key(PE_CHEAT_KEY_DEV_MENU, 1);
+    for (int i = 0; i < 6; i++) (void)pe_plat_cheats_key(PE_CHEAT_KEY_DOWN, 1);   /* OPTIONS (row 7) */
+    (void)pe_plat_cheats_key(PE_CHEAT_KEY_ENTER, 1);                             /* -> OPTIONS */
+    (void)pe_plat_cheats_key(PE_CHEAT_KEY_DOWN, 1);                              /* GRAPHICS */
+    (void)pe_plat_cheats_key(PE_CHEAT_KEY_ENTER, 1);                             /* -> GRAPHICS */
+    ASSERT(pe_plat_cheats_overlay(fb, 320, 240) != fb, "graphics page draws");
+    (void)pe_plat_cheats_key(PE_CHEAT_KEY_ENTER, 1);
+    ASSERT(pe_enh_display_scaler() == PE_ENH_SCALER_SHARP_BILINEAR, "row 1 cycles the display scaler");
+    (void)pe_plat_cheats_key(PE_CHEAT_KEY_DOWN, 1);
+    (void)pe_plat_cheats_key(PE_CHEAT_KEY_ENTER, 1);
+    ASSERT(pe_enh_internal_scale() == 2 && PE_GPU_GetRenderScale() == 2, "row 2 cycles the internal resolution");
+    for (int i = 0; i < 3; i++) (void)pe_plat_cheats_key(PE_CHEAT_KEY_ENTER, 1);
+    ASSERT(pe_enh_internal_scale() == 1 && PE_GPU_GetRenderScale() == 1, "4X wraps to NATIVE");
+    (void)pe_plat_cheats_key(PE_CHEAT_KEY_DOWN, 1);
+    (void)pe_plat_cheats_key(PE_CHEAT_KEY_ENTER, 1);
+    ASSERT(PE_GPU_GetTextureFilter() == 1 && PE_GPU_GetRenderScale() == 2, "row 3 turns on the polygon filter at 2x");
+    (void)pe_plat_cheats_key(PE_CHEAT_KEY_ENTER, 1);
+    (void)pe_plat_cheats_key(PE_CHEAT_KEY_DOWN, 1);
+    (void)pe_plat_cheats_key(PE_CHEAT_KEY_ENTER, 1);
+    ASSERT(HostFB_GetSSAA() == 1 && PE_GPU_GetRenderScale() == 2, "row 4 turns on supersample AA at 2x");
+    (void)pe_plat_cheats_key(PE_CHEAT_KEY_ENTER, 1);
+    ASSERT(!HostFB_GetSSAA() && PE_GPU_GetRenderScale() == 1, "AA off restores native rendering");
+    (void)pe_plat_cheats_key(PE_CHEAT_KEY_BACK, 1);                              /* -> OPTIONS row 2 */
+    (void)pe_plat_cheats_key(PE_CHEAT_KEY_UP, 1);
+    (void)pe_plat_cheats_key(PE_CHEAT_KEY_ENTER, 1);                             /* -> ENHANCEMENTS */
+    (void)pe_plat_cheats_key(PE_CHEAT_KEY_ENTER, 1);
+    ASSERT(pe_enh_move_speed_pct() == 125, "BACK returns to OPTIONS, whose row 1 is still ENHANCEMENTS");
+    (void)pe_plat_cheats_key(PE_CHEAT_KEY_DEV_MENU, 1);
+    pe_enh_set_display_scaler(PE_ENH_SCALER_NEAREST);
+    unsetenv("PE_DEV_MENU");
+    pe_plat_cheats_reset();
+    unlink(enh_conf); pe_enh_reset();
+    PASS();
+}
+
 static void test_ASSIST_option_registry(void);
 static void test_ASSIST_all(void)
 {
     test_ASSIST_option_registry();
+    test_ASSIST_dev_menu_graphics_page();
     test_ASSIST_defaults_are_retail();
     test_ASSIST_one_hit_kills();
     test_ASSIST_exp_mult();
@@ -313,9 +357,9 @@ static void test_ASSIST_option_registry(void)
     int n = pe_enh_option_count();
     TEST("ASSIST_option_registry");
     enh_isolate();
-    ASSERT(n == 5, "five registered options");
+    ASSERT(n == 9, "nine registered options");
     ASSERT(pe_enh_category_count(PE_ENH_CAT_GAMEPLAY) == 2 && pe_enh_category_count(PE_ENH_CAT_ASSIST) == 3 &&
-           pe_enh_category_count(PE_ENH_CAT_GRAPHICS) == 0, "categories: 2 gameplay, 3 assists, 0 graphics");
+           pe_enh_category_count(PE_ENH_CAT_GRAPHICS) == 4, "categories: 2 gameplay, 3 assists, 4 graphics");
     for (int i = 0; i < n; i++) {
         const PeEnhOption *o = pe_enh_option(i);
         ASSERT(o && o->id && o->label && o->env && o->values && o->nvalues >= 2, "option is fully described");
@@ -329,7 +373,74 @@ static void test_ASSIST_option_registry(void)
     }
     ASSERT(pe_enh_category_option(PE_ENH_CAT_GAMEPLAY, 0) == pe_enh_option_index("move_speed") &&
            pe_enh_category_option(PE_ENH_CAT_ASSIST, 2) == pe_enh_option_index("exp_mult") &&
+           pe_enh_category_option(PE_ENH_CAT_GRAPHICS, 0) == pe_enh_option_index("display_scaler") &&
+           pe_enh_category_option(PE_ENH_CAT_GRAPHICS, 1) == pe_enh_option_index("internal_scale") &&
            pe_enh_category_option(PE_ENH_CAT_ASSIST, 3) == -1, "category order is the menu order");
+    {   /* the graphics row: named values, retail first, env override, labels */
+        int g = pe_enh_option_index("display_scaler");
+        const PeEnhOption *o = pe_enh_option(g);
+        int highest = o->values[o->nvalues - 1];
+#ifdef _WIN32
+        ASSERT(o->nvalues == 2 && highest == PE_ENH_SCALER_SHARP_BILINEAR, "Windows excludes unavailable FSR");
+#else
+        ASSERT(o->nvalues == 3 && highest == PE_ENH_SCALER_FSR1, "threaded presenter offers FSR");
+#endif
+        ASSERT(o && o->format == PE_ENH_FMT_NAMED && o->names &&
+               o->values[0] == PE_ENH_SCALER_NEAREST && o->category == PE_ENH_CAT_GRAPHICS, "display_scaler is a named graphics option");
+        ASSERT(pe_enh_display_scaler() == PE_ENH_SCALER_NEAREST, "default display scaler is NEAREST (retail)");
+        pe_enh_option_label(g, label, sizeof label);
+        ASSERT(strcmp(label, "DISPLAY SCALER: NEAREST (RETAIL)") == 0, "label names the retail value");
+        pe_enh_option_cycle(g);
+        pe_enh_option_label(g, label, sizeof label);
+        ASSERT(pe_enh_display_scaler() == PE_ENH_SCALER_SHARP_BILINEAR && strcmp(label, "DISPLAY SCALER: SHARP BILINEAR") == 0,
+               "A cycles to SHARP BILINEAR");
+        pe_enh_option_cycle(g);
+        pe_enh_option_label(g, label, sizeof label);
+        if (highest == PE_ENH_SCALER_FSR1) {
+            ASSERT(pe_enh_display_scaler() == PE_ENH_SCALER_FSR1 && strcmp(label, "DISPLAY SCALER: FSR 1 (CPU)") == 0, "then FSR 1");
+            pe_enh_option_cycle(g);
+        }
+        ASSERT(pe_enh_display_scaler() == PE_ENH_SCALER_NEAREST, "available modes wrap to NEAREST");
+        pe_enh_set_display_scaler(7);
+        ASSERT(pe_enh_display_scaler() == highest, "set snaps to the largest supported value");
+        pe_enh_set_display_scaler(0);
+        setenv("PE_DISPLAY_SCALER", "2", 1); pe_enh_reset();
+        ASSERT(pe_enh_display_scaler() == highest, "PE_DISPLAY_SCALER env override respects capability");
+        unsetenv("PE_DISPLAY_SCALER"); pe_enh_reset();
+        ASSERT(pe_enh_display_scaler() == PE_ENH_SCALER_NEAREST, "env override is not written back");
+    }
+    {
+        int g = pe_enh_option_index("internal_scale");
+        ASSERT(pe_enh_internal_scale() == 1, "internal scale defaults native");
+        pe_enh_option_label(g, label, sizeof label);
+        ASSERT(strcmp(label, "INTERNAL RESOLUTION: NATIVE (RETAIL)") == 0, "native resolution labeled");
+        pe_enh_set_internal_scale(4);
+        pe_enh_reset();
+        ASSERT(pe_enh_internal_scale() == 4, "internal scale persists");
+        setenv("PE_INTERNAL_SCALE", "2", 1); pe_enh_reset();
+        ASSERT(pe_enh_internal_scale() == 2, "internal scale env overrides config");
+        unsetenv("PE_INTERNAL_SCALE"); pe_enh_reset();
+        ASSERT(pe_enh_internal_scale() == 4, "internal scale env does not overwrite config");
+        pe_enh_set_internal_scale(1);
+    }
+    {
+        int aa = pe_enh_option_index("ssaa");
+        pe_enh_option_set(aa, 1);
+        ASSERT(pe_enh_internal_scale() == 1 && PE_GPU_GetRenderScale() == 2 && HostFB_GetSSAA(),
+               "SSAA alone renders at 2x without overwriting the selected scale");
+        pe_enh_set_internal_scale(3);
+        ASSERT(PE_GPU_GetRenderScale() == 3, "explicit internal scale remains authoritative");
+        pe_enh_option_set(aa, 0);
+        ASSERT(PE_GPU_GetRenderScale() == 3 && !HostFB_GetSSAA(), "AA off preserves explicit scale");
+        pe_enh_set_internal_scale(1);
+        ASSERT(PE_GPU_GetRenderScale() == 1, "all graphics defaults restore native rendering");
+        int filter = pe_enh_option_index("texture_filter");
+        pe_enh_option_set(filter, 1);
+        ASSERT(PE_GPU_GetRenderScale() == 2 && pe_enh_internal_scale() == 1,
+               "polygon filtering alone selects a 2x shadow");
+        pe_enh_option_set(filter, 0);
+        ASSERT(PE_GPU_GetRenderScale() == 1, "filter off restores native scale");
+    }
     ASSERT(pe_enh_option(pe_enh_option_index("move_speed"))->credit != NULL &&
            pe_enh_option(pe_enh_option_index("god_mode"))->credit != NULL, "credits recorded");
     pe_enh_option_set(pe_enh_option_index("move_speed"), 160);
