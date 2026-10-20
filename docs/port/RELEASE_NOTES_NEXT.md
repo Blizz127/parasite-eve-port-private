@@ -68,7 +68,8 @@ These change only what you see and hear. The game itself, its timing and
 saves are untouched. Higher internal resolutions and FSR 1 cost CPU time; if
 the game slows down, step them back.
 
-Also, Eve's flash effect in the first Eve fight now tracks two more retail
-stack writers: the weapon-hit draw 800CDD0C and the update callback 800CA540.
-They were the two logged reasons for its approximation in the last Day-1 run.
-Whether the approximation still triggers has not been checked in play yet.
+Also, Eve's flash effect in the first Eve fight now tracks every retail stack
+writer the Day-1 route reaches: the weapon-hit draw 800CDD0C and the
+frameless update callbacks of the pistol, hit and club effects. In the
+automated Day-1 route (pads only) the approximation no longer triggered up to
+the route's end in that fight. Later play is not verified yet.

@@ -1407,6 +1407,19 @@ substitutes in production instead of stopping (it logs each cause).
       - They are bound in one table, `k_frameless_update`, each guarded on
         its span.
       - Test: `FLASHVEC_frameless_update_table_preserves`.
+    - **Result (049784820, binary 2fd26b8c, packet
+      `/home/blizz/scratch/pe-modern-route-049784820/`): `DAY1_SHIM 0`.**
+      - For the first time the flash shim did not fire on the Day-1 route.
+        Every borrowed-vector writer the route reaches is now bound from
+        retail bytes, so F710 reads modelled bytes rather than the
+        owner-joint substitute.
+      - The route is identical to all seven references (11d7, e2r, e2w,
+        6474, be90, 941d, 9ba4) with the shim lines excluded.
+      - CPU_BOUNDARY 0, STOP 0, stubs 0. No `enhancements.conf` was created.
+      - **Scope:** the route ends at the known game over at 44602, a
+        pad-timing desync, inside the first Eve fight. Later flash draws, and
+        weapons whose update tables the route never reaches, are not
+        exercised. This is not evidence that the shim can be removed.
 - **m0005i hand ports versus generated TUs.** 8018F018, 8018F330 and 8018FB84
   now have matched C (harvested), but the effect dispatcher still sends
   m0005i's own bytes to the hand ports. Those hand ports are checked against

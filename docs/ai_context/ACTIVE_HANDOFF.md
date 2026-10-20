@@ -1,3 +1,22 @@
+## UPDATE 2026-10-20 07:30 UTC: the m0023i flash shim no longer fires on the Day-1 route
+
+HEAD 049784820 (claude/modern-20261020), gcc build.
+
+- The shim cause chain was walked on this devbox, one Day-1 route per
+  binding, with re-pinned kits under `/home/blizz/scratch/pe-modern-route-*`:
+  - CDD0C and CA540 bound;
+  - then the cause was named by address: CA4B4;
+  - CA4B4 bound;
+  - then CA4A8.
+- All three weapon update tables were then classified from the retail
+  bytes, and their seven frameless leaves are bound in `k_frameless_update`.
+- Route of 049784820 (binary 2fd26b8c): `DAY1_SHIM 0`, identical to all
+  seven references with the shim lines excluded, CPU_BOUNDARY, STOP and
+  stubs 0, no `enhancements.conf`.
+- Scope: up to the known game over at 44602 only, so this is not shim
+  removal (NATIVE_COMPLETION.md).
+- Native suite 1700/1700 on gcc.
+
 ## UPDATE 2026-10-20 06:50 UTC: integrated modern features (graphics, audio, controls) on claude/modern-20261020
 
 HEAD 941d6878c (worktree `build/wt-native-20261017`). Nothing is pushed or
