@@ -49,10 +49,20 @@ the original (retail) setting, and choices are saved in
     scenes get finer edges; backgrounds and menus stay pixel-exact.
   - **Texture Filter**: smooths 3D textures.
   - **Supersample AA**.
-  - **Dithering**: Retail, Fine or Off.
+  - **Dithering**: Retail, Fine or Off (high-resolution surface only).
 - **Audio:**
   - **Master Volume**.
   - **Movie Audio Volume**: movies and the ending credits.
+  - **Music Volume** and **SFX Volume**, set separately.
+- **Controls:**
+  - **Analog Stick**: play with the left stick as on a DualShock with the
+    Analog light on. Half tilt walks and full tilt runs, as the original
+    game does in analog mode. As in the original, the d-pad then does not
+    move Aya or the menu cursor.
+- **Button remapping:** an optional `~/.config/parasite-eve-port/controls.conf`
+  can swap controller buttons (for example Cross and Circle) or rebind
+  keyboard keys. Esc, F1-F8 and the Back+Start menu combo always keep
+  working. The format is in docs/port/ENHANCEMENTS.md.
 
 These change only what you see and hear. The game itself, its timing and
 saves are untouched. Higher internal resolutions and FSR 1 cost CPU time; if

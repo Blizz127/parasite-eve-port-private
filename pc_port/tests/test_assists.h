@@ -544,9 +544,11 @@ static void test_ASSIST_option_registry(void)
             pe_enh_set_move_speed_pct(100); pe_enh_set_master_volume(100);
         }
     }
-    {   /* MUSIC / SFX VOLUME: the last two rows, SPU voice gains by class */
+    {   /* MUSIC / SFX VOLUME: the audio page's rows 3 and 4, SPU voice gains by class */
         int mu = pe_enh_option_index("music_volume"), sf = pe_enh_option_index("sfx_volume");
-        ASSERT(mu == n - 2 && sf == n - 1, "music and SFX rows close the registry");
+        ASSERT(pe_enh_category_option(PE_ENH_CAT_AUDIO, 2) == mu && pe_enh_category_option(PE_ENH_CAT_AUDIO, 3) == sf &&
+               sf == mu + 1 && pe_enh_category_option(PE_ENH_CAT_AUDIO, 4) == -1,
+               "music and SFX are the audio page's last two rows");
         ASSERT(pe_enh_option(mu)->category == PE_ENH_CAT_AUDIO && pe_enh_option(sf)->category == PE_ENH_CAT_AUDIO &&
                pe_enh_option(mu)->format == PE_ENH_FMT_PERCENT && pe_enh_option(sf)->format == PE_ENH_FMT_PERCENT &&
                pe_enh_option(mu)->nvalues == 11 && pe_enh_option(sf)->nvalues == 11 &&

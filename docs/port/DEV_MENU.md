@@ -43,10 +43,12 @@ The root contains God Mode, Infinite Ammo + Full PE, Instant Win, Area Key
 Items, Fast-forward Speed, Warp by Day, Options, and Assists. Options ▸
 Enhancements holds the opt-in gameplay enhancements (Movement Speed, Always
 Run); Options ▸ Graphics holds the display options (Display Scaler, Internal
-Resolution, Texture Filter, Supersample AA); Assists holds 1-Hit Kills, God
-Mode (No Damage) and the EXP/BP Multiplier. All three pages persist in a
-config file, default to retail, and are described in
-[ENHANCEMENTS.md](ENHANCEMENTS.md). These call the existing keyboard
+Resolution, Texture Filter, Supersample AA, Dithering); Options ▸ Audio holds
+Master, Movie Audio, Music and SFX Volume; Options ▸ Controls holds Analog
+Stick (retail DualShock analog mode); Assists holds 1-Hit Kills, God Mode (No
+Damage) and the EXP/BP Multiplier. Every page persists in a config file,
+defaults to retail, and is described in [ENHANCEMENTS.md](ENHANCEMENTS.md).
+Button remapping is a separate file, `controls.conf` (same document). These call the existing keyboard
 cheat actions. Warp by Day lists Day 1 through Day 6 in order; empty days show
 no selectable checkpoints. EX/Chrysler entries are not supplied yet. Current
 checkpoint metadata belongs to the separate warp-sweep lane; the menu consumes
