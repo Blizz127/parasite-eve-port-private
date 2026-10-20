@@ -255,8 +255,9 @@ regression is the whole-game identity check.
 ## Controls: remapping
 
 Opt-in, config-file driven; there is no menu row and no registry entry. With no
-file the pad word and the keyboard table are exactly the retail-port behaviour
-(below). Nothing here ever creates the file.
+file the pad word and the keyboard table are exactly what the port did before
+remapping existed (the default keys are listed below). Nothing here ever
+creates the file.
 
 **File:** `$XDG_CONFIG_HOME/parasite-eve-port/controls.conf`
 (`~/.config/parasite-eve-port/controls.conf` when unset, next to
