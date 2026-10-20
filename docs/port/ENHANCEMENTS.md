@@ -252,6 +252,99 @@ file is created by queries. `test_ENH_default_is_retail` (native suite,
 `0x168000` velocities through the real handlers. The default Day-1 route
 regression is the whole-game identity check.
 
+## Controls: remapping
+
+Opt-in, config-file driven; there is no menu row and no registry entry. With no
+file the pad word and the keyboard table are exactly the retail-port behaviour
+(below). Nothing here ever creates the file.
+
+**File:** `$XDG_CONFIG_HOME/parasite-eve-port/controls.conf`
+(`~/.config/parasite-eve-port/controls.conf` when unset, next to
+`enhancements.conf`; `%APPDATA%\parasite-eve-port\controls.conf` on Windows).
+`PE_CONTROLS_CONFIG=<path>` reads a different file (`/dev/null` for a clean run).
+It is read once, when the window opens, and logs one
+`[CONTROLS] loaded N remaps from <path>` line; headless runs never read it.
+
+**Format:** one setting per line; `#` starts a comment; blank lines, spaces
+around `=` and `,`, and CRLF line ends are fine; names are case-insensitive.
+
+| Line | Meaning |
+| --- | --- |
+| `pad.<psx>=<psx>` | the PS1 button `<psx>` that a connected controller produces is delivered to the game as the other one |
+| `key.<psx>=<key>[,<key>...]` | the keyboard keys for `<psx>`; the line **replaces** that button's default keys (at most 16 keys) |
+
+`<psx>` is one of `cross circle square triangle l1 r1 l2 r2 select start up
+down left right`. `<key>` is an X11 keysym name or `0x<hex keysym>`: a letter or
+digit, `Return Tab BackSpace space Left Up Right Down Home End Prior Next
+Page_Up Page_Down Insert Delete`, `KP_0`..`KP_9 KP_Enter KP_Add KP_Subtract
+KP_Multiply KP_Divide KP_Decimal` and the keypad navigation names (`KP_Left`,
+`KP_End`, ...), `F9`..`F12`, `Shift_L Shift_R Control_L Control_R Alt_L Alt_R`,
+and `comma period slash semicolon apostrophe bracketleft bracketright backslash
+minus equal grave`. A letter binds both cases (`z` is `z` and `Z`).
+
+Default keys (what you get for any button without a `key.` line): Cross =
+Return, Space, Z, X; Circle = C; Triangle = V; Square = S; L1/R1 = Q/E; L2/R2 =
+1/3; Select = Tab; Start = P; arrows = the d-pad.
+
+Example, swapping confirm/cancel on the controller and adding a WASD d-pad on
+the keyboard (the arrows stay listed; Square moves off `S`, which Down now takes):
+
+```
+# controller: the A button confirms as Circle, B cancels as Cross
+pad.cross=circle
+pad.circle=cross
+
+# keyboard
+key.up=w,Up
+key.left=a,Left
+key.down=s,Down
+key.right=d,Right
+key.square=f
+```
+
+**Rules**
+- An unknown or invalid line is ignored and logs one warning,
+  `[CONTROLS] <file>:<line>: <reason>`; the rest of the file still applies. One
+  bad key name ignores that whole `key.` line.
+- A repeated `pad.<x>` or `key.<x>` line replaces the earlier one, with a warning.
+- A key drives one button: an explicit `key.` line takes its keys from whichever
+  button had them (a default, or an earlier line), whatever the line order.
+  `key.cross=c` therefore leaves Circle without its default `C`.
+- `pad.` is per physical press, never chained (a rotation `cross→circle→square→cross`
+  works), and two buttons may share a destination. It acts on the controller
+  only; the keyboard is remapped only by `key.`.
+- **Esc and F1–F8 can never be bound** (quit, the cheat console, F6
+  fast-forward): such a name is rejected with a warning, and the lookup refuses
+  them even if they reach it. Menu navigation (arrows/Enter/Esc in the warp menu,
+  Up/Down/Cross/Circle in the controller dev menu) is unaffected.
+- The dev-menu combo (Back/View + Start/Menu on one controller) reads the
+  controller's **unremapped** bits, so no remap can lock you out of the menu.
+  With the dev menu on, a button remapped *from* Select or Start still has its
+  lone press held back for up to 300 ms, because that filter runs on the
+  physical buttons.
+
+**Platform notes**
+- X11 reports a key by its unshifted keysym (`XLookupKeysym` index 0), so a
+  keypad key has its NumLock-off name (`KP_End` for keypad 1, `KP_Up` for 8). Run
+  `xev` to see the name of any key.
+- The SDL/joystick mapping (`PE_PAD_SWAP_XY`, `PE_PAD_RAW_MAP`, a gamecontrollerdb
+  file) runs first; `pad.` lines apply to its result.
+- Windows: `key.` works through an explicit virtual-key table (letters, digits,
+  arrows, Return, Space, Tab, Home/End/Page Up/Page Down/Insert/Delete, keypad,
+  F9–F12 and the US-layout punctuation keys). Modifier keys cannot be bound
+  there, and `pad.` lines do nothing because that backend has no controller
+  input.
+
+**Checks:** `pc_port/tests/test_host_pad_remap.c` (ctest `host-pad-remap`): valid,
+invalid and duplicate lines; identity with no file through the real load path
+over all 65536 pad words (and the file and its directory are not created); the
+confirm/cancel swap over all 65536 words; the default key table equal to a
+verbatim copy of the old X11 key chain over 196,608 keysyms; key overrides;
+Esc/F1–F8 never bindable by name, by hex or at lookup time; the Windows
+virtual-key table equal to the old `vk_to_pad_bit` switch for every code; and the
+real combo state machine fed through the remap. The windowed paths themselves
+(a live key press, a live controller) were not run on this host.
+
 ## Evidence
 
 | Check | Result (2026-09-30, tree of the branch commit) |
