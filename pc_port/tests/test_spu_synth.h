@@ -218,6 +218,53 @@ static void test_AUDIO_gauss_and_cd_jitter(void)
     PASS();
 }
 
+/* MOVIE AUDIO VOLUME: the CD-input gain is exact at 100 (no multiply), halves
+ * the CD contribution at 50 and silences it at 0, and survives PE_Spu_Reset. */
+static void audio_cd_render(int gain, int16_t *out, int frames)
+{
+    int16_t cd[2 * 3000];
+    PE_Spu_SetActive(1);
+    PE_Spu_Reset();
+    PE_Spu_SetCdGain(gain);
+    PE_SpuRegister_StoreU16(0x180, 0x3FFF);
+    PE_SpuRegister_StoreU16(0x182, 0x3FFF);
+    for (int i = 0; i < 2 * 3000; i++) cd[i] = (int16_t)((i * 37) % 20000 - 10000);
+    PE_Spu_PushCdAudio(cd, 3000);
+    PE_Spu_PushCdAudio(cd, 3000);
+    PE_Spu_Render(out, frames);
+}
+static void test_AUDIO_cd_gain(void)
+{
+    static int16_t retail[2 * 400], again[2 * 400], half[2 * 400], none[2 * 400];
+    TEST("AUDIO_cd_gain");
+    ResetTestState();
+    ASSERT(PE_Spu_CdGain() == 100, "default CD gain is retail (100)");
+    audio_cd_render(100, retail, 400);
+    audio_cd_render(100, again, 400);
+    ASSERT(memcmp(retail, again, sizeof retail) == 0, "gain 100 renders identically");
+    audio_cd_render(50, half, 400);
+    audio_cd_render(0, none, 400);
+    int nonzero = 0, within = 1, silent = 1;
+    for (int i = 0; i < 2 * 400; i++) {
+        int want = retail[i] / 2, d = half[i] - want;
+        nonzero |= retail[i] != 0;
+        if (d < -2 || d > 2) within = 0;
+        if (none[i] != 0) silent = 0;
+    }
+    ASSERT(nonzero, "the CD input reaches the mix");
+    ASSERT(within, "gain 50 halves the CD contribution (within rounding)");
+    ASSERT(silent, "gain 0 silences the CD input");
+    PE_Spu_SetCdGain(-3);
+    ASSERT(PE_Spu_CdGain() == 0, "gain clamps to 0..100");
+    PE_Spu_SetCdGain(70);
+    PE_Spu_Reset();
+    ASSERT(PE_Spu_CdGain() == 70, "the gain is a host option and survives PE_Spu_Reset");
+    PE_Spu_SetCdGain(100);
+    PE_Spu_SetActive(0);
+    PE_Spu_Reset();
+    PASS();
+}
+
 /* fmv lane: PE_Spu_CdInputStop (movie skip / stream end) drops the queued
  * CD input immediately and fades the last frame out over CD_FADE (64)
  * frames instead of playing ~1 s of buffered movie audio. */

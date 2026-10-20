@@ -12,6 +12,12 @@
 #include <time.h>
 #endif
 
+#ifndef _WIN32
+/* MASTER VOLUME (plat_enhance.c).  Weak so a consumer without the
+ * enhancement registry keeps the retail level. */
+extern int pe_enh_master_volume(void) __attribute__((weak));
+#endif
+
 /* ── WAV dump ──────────────────────────────────────────────────────── */
 
 static FILE *g_wav;
@@ -416,7 +422,21 @@ void HostAudio_Submit(const int16_t *stereo, int frames)
         }
     }
 #ifndef _WIN32
-    if (g_device) pulse_submit(stereo, frames);
+    if (g_device) {
+        int percent = pe_enh_master_volume ? pe_enh_master_volume() : 100;
+        static int16_t *scaled;
+        static int scaled_frames;
+        if (percent != 100 && frames > scaled_frames) {
+            int16_t *p = realloc(scaled, (size_t)frames * 4u);
+            if (p) { scaled = p; scaled_frames = frames; }
+        }
+        if (percent != 100 && frames <= scaled_frames) {
+            for (int i = 0; i < frames * 2; i++) scaled[i] = HostAudio_GainSample(stereo[i], percent);
+            pulse_submit(scaled, frames);
+        } else {
+            pulse_submit(stereo, frames);
+        }
+    }
 #endif
 }
 

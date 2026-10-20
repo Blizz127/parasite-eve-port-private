@@ -11,6 +11,7 @@
 #include "psx_compat.h"
 #include "pe_port_compat.h"
 #include "host_framebuffer.h"
+#include "host_audio.h"
 #include "host_vram.h"
 #include "game_port.h"
 #include "stub_registry.h"
@@ -41028,6 +41029,7 @@ int main(void)
     test_AUDIO_xa_decode();
     test_AUDIO_gauss_and_cd_jitter();
     test_AUDIO_cd_input_stop();
+    test_AUDIO_cd_gain();
     test_DAY2_music_consumer();
     test_DAY1_animation_sound_register();
     test_DAY1_m0034i_modes();

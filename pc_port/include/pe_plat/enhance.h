@@ -41,6 +41,7 @@ typedef enum {
     PE_ENH_CAT_GRAPHICS = 0,     /* rendering/presentation options */
     PE_ENH_CAT_GAMEPLAY,         /* quality-of-life gameplay options */
     PE_ENH_CAT_ASSIST,           /* cheat-style assists (god mode, EXP, 1-hit) */
+    PE_ENH_CAT_AUDIO,            /* output levels (master, movie/CD audio) */
     PE_ENH_CAT_COUNT
 } PeEnhCategory;
 
@@ -102,6 +103,17 @@ int  pe_enh_display_scaler(void);       /* PE_ENH_SCALER_NEAREST (default) .. FS
 void pe_enh_set_display_scaler(int mode);
 int  pe_enh_internal_scale(void);        /* 1 (native default), 2, 3, 4 */
 void pe_enh_set_internal_scale(int scale);
+
+/* ── Audio ───────────────────────────────────────────────────────────── */
+/* Levels in percent, 100 = retail, listed 100, 90, ..., 0.
+ * MASTER VOLUME scales the device feed only (host_audio.c); the mixer, the
+ * AKAO driver and the WAV dump are untouched.  MOVIE AUDIO VOLUME scales
+ * the SPU's CD-input contribution (movies, CD-XA streams such as the
+ * credits); at 100 the mixer skips the multiply. */
+int  pe_enh_master_volume(void);
+int  pe_enh_movie_volume(void);
+void pe_enh_set_master_volume(int percent);
+void pe_enh_set_movie_volume(int percent);
 
 /* ── Assists ─────────────────────────────────────────────────────────── */
 #define PE_ENH_EXP_MULT_MAX 3

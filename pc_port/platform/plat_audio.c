@@ -81,6 +81,7 @@ void pe_plat_audio_cd_push(const int16_t *stereo, int frames)
 }
 
 void pe_plat_audio_cd_stop(void) { PE_Spu_CdInputStop(); }
+void pe_plat_audio_set_cd_gain(int percent) { PE_Spu_SetCdGain(percent); }
 
 void pe_plat_audio_mix(int16_t *stereo_out, int frames)
 {

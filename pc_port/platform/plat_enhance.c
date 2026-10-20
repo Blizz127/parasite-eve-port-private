@@ -4,6 +4,7 @@
 #include "pe_guest_ram.h"
 #include "pe_gpu.h"
 #include "host_framebuffer.h"
+#include "pe_plat/audio.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,9 +25,11 @@ static const char *const k_scaler_names[] = {"NEAREST", "SHARP BILINEAR", "FSR 1
 static const int k_internal_scale[] = {1, 2, 3, 4};
 static const char *const k_internal_scale_names[] = {"NATIVE", "2X", "3X", "4X"};
 static const char *const k_texture_filter_names[] = {"NEAREST", "BILINEAR (POLYGONS)"};
+static const int k_volume[] = {100, 90, 80, 70, 60, 50, 40, 30, 20, 10, 0};
 
 /* The registry.  Order within a category is the menu order. */
-enum { OPT_DISPLAY_SCALER, OPT_INTERNAL_SCALE, OPT_TEXTURE_FILTER, OPT_SSAA, OPT_MOVE_SPEED, OPT_ALWAYS_RUN, OPT_ONE_HIT, OPT_GOD, OPT_EXP_MULT, OPT_COUNT };
+enum { OPT_DISPLAY_SCALER, OPT_INTERNAL_SCALE, OPT_TEXTURE_FILTER, OPT_SSAA, OPT_MOVE_SPEED, OPT_ALWAYS_RUN, OPT_ONE_HIT, OPT_GOD, OPT_EXP_MULT,
+       OPT_MASTER_VOLUME, OPT_MOVIE_VOLUME, OPT_COUNT };
 static const PeEnhOption k_options[OPT_COUNT] = {
     {"display_scaler", PE_ENH_CAT_GRAPHICS, "DISPLAY SCALER",      PE_ENH_FMT_NAMED,
         k_scaler, sizeof k_scaler / sizeof k_scaler[0], "PE_DISPLAY_SCALER", "the owner", k_scaler_names},
@@ -46,6 +49,10 @@ static const PeEnhOption k_options[OPT_COUNT] = {
         k_toggle, 2, "PE_GOD_MODE",      "u/SandmansSlave"},
     {"exp_mult",      PE_ENH_CAT_ASSIST,   "EXP/BP MULTIPLIER",    PE_ENH_FMT_MULT,
         k_mult, 3, "PE_EXP_MULT",       "u/SandmansSlave"},
+    {"master_volume", PE_ENH_CAT_AUDIO,   "MASTER VOLUME",        PE_ENH_FMT_PERCENT,
+        k_volume, 11, "PE_MASTER_VOLUME", "the owner"},
+    {"movie_volume",  PE_ENH_CAT_AUDIO,   "MOVIE AUDIO VOLUME",   PE_ENH_FMT_PERCENT,
+        k_volume, 11, "PE_MOVIE_VOLUME",  "the owner"},
 };
 
 #define GA_AYA_ACTOR  0x8009D254u   /* *(u32 *) = Aya's field actor */
@@ -65,15 +72,25 @@ static void sync_graphics(void)
     HostFB_SetSSAA(E.value[OPT_SSAA]);
 }
 
-/* Snap to a listed value: the largest listed value <= v, else the retail one. */
+/* MASTER VOLUME is read by host_audio.c on each device submit. */
+static void sync_audio(void)
+{
+    pe_plat_audio_set_cd_gain(E.value[OPT_MOVIE_VOLUME]);
+}
+
+/* Snap to a listed value: the largest listed value <= v, else the smallest
+ * listed one.  Lists that rise from the retail value (speed, multipliers)
+ * snap below-range input to retail; the volume lists fall from it. */
 static int snap(int i, int v)
 {
     const PeEnhOption *o = &k_options[i];
-    int best = o->values[0];
-    for (int k = 0; k < o->nvalues; k++)
-        if (o->values[k] <= v && o->values[k] >= best) best = o->values[k];
+    int best = 0, found = 0, lowest = o->values[0];
+    for (int k = 0; k < o->nvalues; k++) {
+        if (o->values[k] < lowest) lowest = o->values[k];
+        if (o->values[k] <= v && (!found || o->values[k] > best)) { best = o->values[k]; found = 1; }
+    }
     if (o->format == PE_ENH_FMT_TOGGLE) return v != 0;
-    return best;
+    return found ? best : lowest;
 }
 
 static int config_path(char *out, size_t n)
@@ -151,6 +168,7 @@ void pe_enh_init(void)
         if (E.value[i] != k_options[i].values[0]) any = 1;
     }
     sync_graphics();
+    sync_audio();
     if (any) {
         fprintf(stderr, "[ENH]");
         for (int i = 0; i < OPT_COUNT; i++)
@@ -164,6 +182,7 @@ void pe_enh_reset(void) {
     PE_GPU_SetRenderScale(1);
     PE_GPU_SetTextureFilter(0);
     HostFB_SetSSAA(0);
+    pe_plat_audio_set_cd_gain(100);
 }
 
 /* ── registry access ─────────────────────────────────────────────────── */
@@ -200,6 +219,7 @@ void pe_enh_option_set(int i, int value)
     pe_enh_init();
     E.value[i] = snap(i, value);
     if (k_options[i].category == PE_ENH_CAT_GRAPHICS) sync_graphics();
+    if (k_options[i].category == PE_ENH_CAT_AUDIO) sync_audio();
     save_config();
 }
 void pe_enh_option_cycle(int i)
@@ -236,6 +256,10 @@ int  pe_enh_display_scaler(void)          { return pe_enh_option_value(OPT_DISPL
 void pe_enh_set_display_scaler(int mode)  { pe_enh_option_set(OPT_DISPLAY_SCALER, mode); }
 int  pe_enh_internal_scale(void)          { return pe_enh_option_value(OPT_INTERNAL_SCALE); }
 void pe_enh_set_internal_scale(int scale) { pe_enh_option_set(OPT_INTERNAL_SCALE, scale); }
+int  pe_enh_master_volume(void)           { return pe_enh_option_value(OPT_MASTER_VOLUME); }
+int  pe_enh_movie_volume(void)            { return pe_enh_option_value(OPT_MOVIE_VOLUME); }
+void pe_enh_set_master_volume(int pct)    { pe_enh_option_set(OPT_MASTER_VOLUME, pct); }
+void pe_enh_set_movie_volume(int pct)     { pe_enh_option_set(OPT_MOVIE_VOLUME, pct); }
 int  pe_enh_move_speed_pct(void)          { return pe_enh_option_value(OPT_MOVE_SPEED); }
 int  pe_enh_always_run(void)              { return pe_enh_option_value(OPT_ALWAYS_RUN); }
 void pe_enh_set_move_speed_pct(int pct)   { pe_enh_option_set(OPT_MOVE_SPEED, pct); }

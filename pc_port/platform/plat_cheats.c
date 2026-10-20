@@ -323,20 +323,33 @@ static int day_warp_count(int day)
     for (int i = 0; i < N_WARPS; i++) if (warp_day(i) == day) n++;
     return n;
 }
-/* Registry pages: 5 ENHANCEMENTS, 6 ASSISTS, 7 GRAPHICS. */
+/* OPTIONS (page 4) lists one registry page per row; ASSISTS (page 6) is
+ * reached from the root.  Rows keep this order (tests count keys). */
+static const struct { int page; PeEnhCategory category; const char *label; } k_option_pages[] = {
+    {5, PE_ENH_CAT_GAMEPLAY, "ENHANCEMENTS"},
+    {7, PE_ENH_CAT_GRAPHICS, "GRAPHICS"},
+    {8, PE_ENH_CAT_AUDIO,    "AUDIO"},
+};
+#define N_OPTION_PAGES ((int)(sizeof k_option_pages / sizeof k_option_pages[0]))
+static int option_row(int page)
+{
+    for (int i = 0; i < N_OPTION_PAGES; i++) if (k_option_pages[i].page == page) return i;
+    return -1;
+}
+static int registry_page(int page) { return page == 6 || option_row(page) >= 0; }
 static PeEnhCategory page_category(int page)
 {
-    return page == 5 ? PE_ENH_CAT_GAMEPLAY : page == 6 ? PE_ENH_CAT_ASSIST : PE_ENH_CAT_GRAPHICS;
+    int row = option_row(page);
+    return row >= 0 ? k_option_pages[row].category : PE_ENH_CAT_ASSIST;
 }
 static int dev_rows(void)
 {
     switch (C.dev_page) {
     case 1: return 8;                        /* cheats, FF speed, warp, options, assists */
+    case 2: return 6;                        /* DAY 1..6 */
     case 3: return day_warp_count(C.dev_day);
-    case 4:                                  /* OPTIONS: ENHANCEMENTS, GRAPHICS */
-        return 1 + (pe_enh_category_count(PE_ENH_CAT_GRAPHICS) > 0);
-    case 5: case 6: case 7: return pe_enh_category_count(page_category(C.dev_page));
-    default: return 6;                       /* DAY 1..6 */
+    case 4: return N_OPTION_PAGES;           /* OPTIONS */
+    default: return registry_page(C.dev_page) ? pe_enh_category_count(page_category(C.dev_page)) : 6;
     }
 }
 
@@ -384,8 +397,7 @@ int pe_plat_cheats_key(PeCheatKey key, int pressed)
         if (pressed) {
             if (C.dev_page == 3) { C.dev_page = 2; C.dev_index = C.dev_day - 1; }
             else if (C.dev_page == 2) { C.dev_page = 1; C.dev_index = 5; }
-            else if (C.dev_page == 5) { C.dev_page = 4; C.dev_index = 0; }
-            else if (C.dev_page == 7) { C.dev_page = 4; C.dev_index = 1; }
+            else if (option_row(C.dev_page) >= 0) { C.dev_index = option_row(C.dev_page); C.dev_page = 4; }
             else if (C.dev_page == 4) { C.dev_page = 1; C.dev_index = 6; }
             else if (C.dev_page == 6) { C.dev_page = 1; C.dev_index = 7; }
             else { C.menu = 0; C.dev_page = 0; }
@@ -407,8 +419,8 @@ int pe_plat_cheats_key(PeCheatKey key, int pressed)
                 else if (C.dev_index == 6) { C.dev_page = 4; C.dev_index = 0; }
                 else { C.dev_page = 6; C.dev_index = 0; }
             } else if (C.dev_page == 4) {
-                C.dev_page = C.dev_index == 1 ? 7 : 5; C.dev_index = 0;
-            } else if (C.dev_page >= 5 && C.dev_page <= 7) {
+                C.dev_page = k_option_pages[C.dev_index].page; C.dev_index = 0;
+            } else if (registry_page(C.dev_page)) {
                 /* the registry pages list the option registry by category */
                 int opt = pe_enh_category_option(page_category(C.dev_page), C.dev_index);
                 if (opt >= 0) {
@@ -816,8 +828,8 @@ const uint8_t *pe_plat_cheats_overlay(const uint8_t *rgb, int w, int h)
                 if (k_ff_mult[C.ff_index]) snprintf(label, sizeof label, "FAST-FORWARD SPEED: %dX", k_ff_mult[C.ff_index]);
                 else snprintf(label, sizeof label, "FAST-FORWARD SPEED: MAX");
             } else if (C.dev_page == 1) snprintf(label, sizeof label, "%s", rows[i]);
-            else if (C.dev_page == 4) snprintf(label, sizeof label, i ? "GRAPHICS" : "ENHANCEMENTS");
-            else if (C.dev_page >= 5 && C.dev_page <= 7)
+            else if (C.dev_page == 4) snprintf(label, sizeof label, "%s", k_option_pages[i].label);
+            else if (registry_page(C.dev_page))
                 pe_enh_option_label(pe_enh_category_option(page_category(C.dev_page), i),
                                     label, sizeof label);
             else if (C.dev_page == 2) snprintf(label, sizeof label, "DAY %d (%d WARPS)", i + 1, day_warp_count(i + 1));

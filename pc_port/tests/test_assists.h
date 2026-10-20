@@ -3,6 +3,7 @@
  * func_8001D340 / func_80020288 (player HP), func_80028E94 (EXP/BP award).
  * Uses the ATK17 / ATK18 retail fixtures (test_damage.h, test_defeat.h) and
  * enh_isolate() (test_enhance.h). */
+#include "pe_spu.h"
 
 #define AST_ACTOR   0x80141000u
 #define AST_BODY    0x80143000u
@@ -292,7 +293,7 @@ static void test_ASSIST_dev_menu_rows(void)
     PASS();
 }
 
-/* OPTIONS > GRAPHICS (OPTIONS row 2): the four GRAPHICS registry rows. */
+/* OPTIONS > GRAPHICS (row 2) and OPTIONS > AUDIO (row 3) registry pages. */
 static void test_ASSIST_dev_menu_graphics_page(void)
 {
     static uint8_t fb[320 * 240 * 3];
@@ -323,10 +324,22 @@ static void test_ASSIST_dev_menu_graphics_page(void)
     (void)pe_plat_cheats_key(PE_CHEAT_KEY_ENTER, 1);
     ASSERT(!HostFB_GetSSAA() && PE_GPU_GetRenderScale() == 1, "AA off restores native rendering");
     (void)pe_plat_cheats_key(PE_CHEAT_KEY_BACK, 1);                              /* -> OPTIONS row 2 */
+    (void)pe_plat_cheats_key(PE_CHEAT_KEY_DOWN, 1);
+    (void)pe_plat_cheats_key(PE_CHEAT_KEY_ENTER, 1);                             /* -> AUDIO (row 3) */
+    ASSERT(pe_plat_cheats_overlay(fb, 320, 240) != fb, "audio page draws");
+    (void)pe_plat_cheats_key(PE_CHEAT_KEY_ENTER, 1);
+    ASSERT(pe_enh_master_volume() == 90, "audio row 1 steps the master volume");
+    (void)pe_plat_cheats_key(PE_CHEAT_KEY_DOWN, 1);
+    (void)pe_plat_cheats_key(PE_CHEAT_KEY_ENTER, 1);
+    ASSERT(pe_enh_movie_volume() == 90 && PE_Spu_CdGain() == 90, "audio row 2 steps the movie volume");
+    (void)pe_plat_cheats_key(PE_CHEAT_KEY_BACK, 1);                              /* -> OPTIONS row 3 */
+    (void)pe_plat_cheats_key(PE_CHEAT_KEY_UP, 1);
     (void)pe_plat_cheats_key(PE_CHEAT_KEY_UP, 1);
     (void)pe_plat_cheats_key(PE_CHEAT_KEY_ENTER, 1);                             /* -> ENHANCEMENTS */
     (void)pe_plat_cheats_key(PE_CHEAT_KEY_ENTER, 1);
     ASSERT(pe_enh_move_speed_pct() == 125, "BACK returns to OPTIONS, whose row 1 is still ENHANCEMENTS");
+    pe_enh_set_master_volume(100);
+    pe_enh_set_movie_volume(100);
     (void)pe_plat_cheats_key(PE_CHEAT_KEY_DEV_MENU, 1);
     pe_enh_set_display_scaler(PE_ENH_SCALER_NEAREST);
     unsetenv("PE_DEV_MENU");
@@ -357,9 +370,10 @@ static void test_ASSIST_option_registry(void)
     int n = pe_enh_option_count();
     TEST("ASSIST_option_registry");
     enh_isolate();
-    ASSERT(n == 9, "nine registered options");
+    ASSERT(n == 11, "eleven registered options");
     ASSERT(pe_enh_category_count(PE_ENH_CAT_GAMEPLAY) == 2 && pe_enh_category_count(PE_ENH_CAT_ASSIST) == 3 &&
-           pe_enh_category_count(PE_ENH_CAT_GRAPHICS) == 4, "categories: 2 gameplay, 3 assists, 4 graphics");
+           pe_enh_category_count(PE_ENH_CAT_GRAPHICS) == 4 && pe_enh_category_count(PE_ENH_CAT_AUDIO) == 2,
+           "categories: 2 gameplay, 3 assists, 4 graphics, 2 audio");
     for (int i = 0; i < n; i++) {
         const PeEnhOption *o = pe_enh_option(i);
         ASSERT(o && o->id && o->label && o->env && o->values && o->nvalues >= 2, "option is fully described");
@@ -440,6 +454,34 @@ static void test_ASSIST_option_registry(void)
                "polygon filtering alone selects a 2x shadow");
         pe_enh_option_set(filter, 0);
         ASSERT(PE_GPU_GetRenderScale() == 1, "filter off restores native scale");
+    }
+    {   /* audio rows: percent levels falling from the retail 100 */
+        int m = pe_enh_option_index("master_volume"), v = pe_enh_option_index("movie_volume");
+        ASSERT(m >= 0 && v >= 0 && pe_enh_option(m)->category == PE_ENH_CAT_AUDIO, "audio rows registered");
+        ASSERT(pe_enh_master_volume() == 100 && pe_enh_movie_volume() == 100 && PE_Spu_CdGain() == 100,
+               "audio defaults are retail and the CD gain is unity");
+        pe_enh_option_label(m, label, sizeof label);
+        ASSERT(strcmp(label, "MASTER VOLUME: 100% (RETAIL)") == 0, "master volume label");
+        pe_enh_option_cycle(m);
+        ASSERT(pe_enh_master_volume() == 90, "A steps the level down by 10");
+        pe_enh_set_master_volume(55);
+        ASSERT(pe_enh_master_volume() == 50, "a level snaps down to a listed step (55 -> 50)");
+        pe_enh_set_master_volume(-5);
+        ASSERT(pe_enh_master_volume() == 0, "below the list snaps to 0");
+        pe_enh_set_master_volume(150);
+        ASSERT(pe_enh_master_volume() == 100, "above the list snaps to 100");
+        pe_enh_set_movie_volume(40);
+        ASSERT(pe_enh_movie_volume() == 40 && PE_Spu_CdGain() == 40, "movie volume drives the CD gain");
+        pe_enh_reset();
+        ASSERT(pe_enh_movie_volume() == 40 && PE_Spu_CdGain() == 40, "movie volume persists and re-applies");
+        setenv("PE_MOVIE_VOLUME", "70", 1); pe_enh_reset();
+        ASSERT(pe_enh_movie_volume() == 70 && PE_Spu_CdGain() == 70, "env override applies");
+        unsetenv("PE_MOVIE_VOLUME"); pe_enh_reset();
+        ASSERT(pe_enh_movie_volume() == 40, "env override is not written back");
+        pe_enh_set_movie_volume(100);
+        ASSERT(PE_Spu_CdGain() == 100, "100 restores the unity CD gain");
+        ASSERT(HostAudio_GainSample(12345, 100) == 12345 && HostAudio_GainSample(-32768, 50) == -16384 &&
+               HostAudio_GainSample(32767, 0) == 0, "device-sink gain helper");
     }
     ASSERT(pe_enh_option(pe_enh_option_index("move_speed"))->credit != NULL &&
            pe_enh_option(pe_enh_option_index("god_mode"))->credit != NULL, "credits recorded");

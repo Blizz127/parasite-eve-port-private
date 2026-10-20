@@ -43,6 +43,13 @@ void HostAudio_SetFastForward(int on);
  * -1 when no device is open. */
 int  HostAudio_QueueFrames(void);
 
+/* MASTER VOLUME (enhancement registry) is applied to the device feed only;
+ * the WAV dump stays retail.  At 100 the samples pass through untouched. */
+static inline int16_t HostAudio_GainSample(int16_t sample, int percent)
+{
+    return (int16_t)((int32_t)sample * percent / 100);
+}
+
 #ifdef __cplusplus
 }
 #endif

@@ -73,6 +73,10 @@ int  pe_plat_audio_open_host_output(int want_device);
 
 void pe_plat_audio_stats(PePlatAudioStats *out);
 
+/* MOVIE AUDIO VOLUME (enhancement registry): CD-input gain in percent,
+ * 100 = retail. */
+void pe_plat_audio_set_cd_gain(int percent);
+
 /* Apply voice/register writes the game made through direct pointers into
  * the sound device's register block.  Those writes are held until the next
  * device access; callers that snapshot or compare the device state (the

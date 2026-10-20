@@ -70,6 +70,11 @@ void PE_Spu_XaReset(void);
 /* Stream stop / movie skip (fmv lane): flush the queued CD input, fade
  * the last output frame out over CD_FADE (64) frames, reset XA history. */
 void PE_Spu_CdInputStop(void);
+/* Host option (MOVIE AUDIO VOLUME): scales the CD-input contribution, dry
+ * and reverb send, by percent/100.  100 is retail and skips the multiply.
+ * Kept across PE_Spu_Reset. */
+void PE_Spu_SetCdGain(int percent);
+int  PE_Spu_CdGain(void);
 uint64_t PE_Spu_XaSectors(void);
 /* Print key SPU registers (FILE *) — diagnostics. */
 void PE_Spu_DebugSummary(void *file);

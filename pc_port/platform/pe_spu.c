@@ -95,6 +95,13 @@ static int16_t clamp16(int32_t v)
     return (int16_t)(v < -0x8000 ? -0x8000 : v > 0x7FFF ? 0x7FFF : v);
 }
 
+static int g_cd_gain = 100;   /* host option, not SPU state: survives Reset */
+void PE_Spu_SetCdGain(int percent)
+{
+    g_cd_gain = percent < 0 ? 0 : percent > 100 ? 100 : percent;
+}
+int PE_Spu_CdGain(void) { return g_cd_gain; }
+
 void PE_Spu_SetActive(int active) { S.active = active ? 1 : 0; }
 int PE_Spu_Active(void) { return S.active; }
 
@@ -650,6 +657,10 @@ void PE_Spu_Render(int16_t *out, int frames)
             if (!cd_written || (cnt & 1)) {
                 int32_t vl = cd_written ? RS(0x1B0) : 0x7FFF;
                 int32_t vr = cd_written ? RS(0x1B2) : 0x7FFF;
+                if (g_cd_gain != 100) {
+                    vl = vl * g_cd_gain / 100;
+                    vr = vr * g_cd_gain / 100;
+                }
                 int32_t l = (cl * vl) >> 15, rr = (cr * vr) >> 15;
                 mix[0] += l;
                 mix[1] += rr;
