@@ -227,6 +227,53 @@ Resolution is Native; an explicit 2x/3x/4x choice is kept.
 The build was a local `zig cc` (clang) build: the current devbox has no
 system GCC. See `docs/ai_context/ACTIVE_HANDOFF.md`.
 
+## Audio (dev menu ▸ Options ▸ Audio)
+
+Audio options set output levels only. The sound driver (AKAO, matched C),
+the SPU synthesis (voices, gaussian interpolation, reverb) and every
+emulated register stay retail.
+
+| Row | Values | Default | Config line / env override | Suggested by |
+| --- | --- | --- | --- | --- |
+| Master Volume | 100 % (retail), 90 % … 0 %; A steps down by 10, 0 % wraps to 100 % | 100 % | `master_volume=<0..100>` / `PE_MASTER_VOLUME` | the owner |
+| Movie Audio Volume | 100 % (retail), 90 % … 0 % | 100 % | `movie_volume=<0..100>` / `PE_MOVIE_VOLUME` | the owner |
+
+**Master Volume** scales the samples handed to the PulseAudio device
+(`HostAudio_Submit` in `host_audio.c`, through `HostAudio_GainSample`).
+
+- The SPU mix, the `PE_AUDIO_WAV` dump and every test capture stay at the
+  retail level.
+- At 100 % the samples pass through untouched.
+- Windows has no audio device backend yet, so the row has no effect there.
+
+**Movie Audio Volume** scales the SPU's CD-input contribution: FMV
+soundtracks and CD-XA streams such as the ending credits.
+
+- It covers both the dry signal and the CD reverb send, at the one point
+  where CD samples meet the CD volume registers (`pe_spu.c`,
+  `PE_Spu_SetCdGain`).
+- At 100 % the mixer skips the multiply, so the mix is bit-identical.
+- The gain is a host option, not SPU state, so `PE_Spu_Reset` keeps it.
+
+The volume lists fall from the retail value, which is the largest. So
+`snap()` now picks the largest listed value at or below the input, or else
+the smallest listed one. That is unchanged for every list that rises from
+retail.
+
+**Tests** (native suite):
+
+- `AUDIO_cd_gain`:
+  - 100 renders identically;
+  - 50 halves the CD contribution within rounding;
+  - 0 is silent;
+  - the gain clamps and survives a reset.
+- `ASSIST_option_registry`:
+  - rows, labels, stepping and snapping (55 → 50, -5 → 0, 150 → 100);
+  - persistence, and an env override that is not written back;
+  - the CD-gain coupling;
+  - the device-sink gain helper.
+- `ASSIST_dev_menu_graphics_page`: Options ▸ Audio (row 3) steps both levels.
+
 ## The option registry (how options are added)
 
 Every player-facing option is registered once, in `k_options` in
@@ -234,7 +281,9 @@ Every player-facing option is registered once, in `k_options` in
 its config key, a category (Graphics, Gameplay/QoL, Assists), a menu label,
 its values in cycle order with the retail value first, an env override and a
 "suggested by" credit. The registry drives the config file, the env overrides,
-the two dev-menu pages (which list a category each) and the identity rule:
+the dev-menu pages (Options ▸ Enhancements / Graphics / Audio and the root
+Assists page, each listing one category; the Options rows come from
+`k_option_pages` in `plat_cheats.c`) and the identity rule:
 every option's default is its retail value, and a value the player did not
 set never touches the game. The registry is meant to be listed by a future
 standalone Options/Enhancements menu unchanged; the dev menu is only where it

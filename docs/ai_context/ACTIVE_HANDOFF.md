@@ -1,3 +1,65 @@
+## UPDATE 2026-10-20 06:00 UTC: native bindings plus opt-in graphics and audio options
+
+Lane: `claude/modern-20261020` (worktree `build/wt-native-20261017`, from
+`claude/native-complete-20261017` 0a9434171). The owner set this goal in the
+terminal at 04:44Z: "work on 100% native port start adding modern features
+graphics sound controls etc". Coordinator task 66dfde9298c6 then relayed an
+owner-direct resume and moved builds and tests onto this devbox. Nothing is
+pushed or published.
+
+- **Toolchain.** This replacement devbox has no system gcc or clang. Builds
+  use `zig cc` 0.13.0 (clang 18) through the wrapper `build/zigcc/cc`.
+  - 8 test targets link with `-Wl,--wrap`, which zig's linker rejects (disc
+    loader, ambient reload, music bank, five transition tests). They are not
+    built here.
+  - Binaries are therefore not gcc-identical to earlier builds.
+- **648fe2f89: m0023i flash.** Binds the two shim causes from the
+  2026-10-19 Day-1 diagnostic run, both proven from retail bytes:
+  - CDD0C preserves at the weapon-draw depth;
+  - CA540 is a frameless leaf, kept unless its stores reach crt0's stack
+    reservation.
+  - Six FLASHVEC tests. Prediction: neither cause appears in the next Day-1
+    run. The shim itself is unchanged (NATIVE_COMPLETION.md).
+- **03d473d72: Options ▸ Graphics.** Display Scaler (Nearest, Sharp
+  Bilinear, FSR 1), Internal Resolution 2x/3x/4x, Texture Filter and
+  Supersample AA.
+  - Ported from `claude/gfx-options` 8ea0d39e3 by filtering each file's
+    diff to its graphics hunks and three-way merging them (0 conflicts).
+  - HD backgrounds was not ported. The GRAPHICS page was hand-ported as
+    Options row 2.
+  - The FSR notice is in THIRD_PARTY.md. Packaging must ship
+    `pc_port/third_party/FidelityFX-FSR-LICENSE.txt`.
+- **be90460eb plus the docs commit: Options ▸ Audio.**
+  - Master Volume applies at the PulseAudio sink only; the WAV dump stays
+    retail.
+  - Movie Audio Volume applies the CD-input gain in `pe_spu.c`; unity skips
+    the multiply.
+  - `snap()` is generalized for lists that fall from the retail value.
+  - The Options pages are now table-driven (`k_option_pages`).
+- **Gates (local zig build):**
+  - native suite 1690 run, 1690 passed, 0 failed, 0 skipped;
+  - CTest 25 of the 35 entries pass (the 10 graphics tests, the host-pad
+    and window tests, gte, park and `psyq-port-guard`);
+  - the other 10: `leaf-oracle` and `akao-tick-oracle` are skipped, the 8
+    `--wrap` targets did not run, and route-boot-day2 and the duplicate
+    native-tests entry were not run.
+- **Helpers (owner fan-out, 05:40Z).** Each has its own worktree off
+  be90460eb:
+  - `pe-analog` (Opus): retail DualShock analog mode, `build/wt-h-analog`;
+  - `pe-mixsplit` (Opus): music/SFX volume, `build/wt-h-mixsplit`;
+  - `pe-remap` (Sonnet): `controls.conf` remapping, `build/wt-h-remap`;
+  - `pe-route` (Sonnet): Day-1 route identity run of pinned binary
+    `/home/blizz/scratch/pe-modern-pin-be90460eb/parasite-eve-port`
+    (sha256 56c8eb73…);
+  - `pe-review` (Sonnet, read-only): review of 0a9434171..be90460eb.
+  - The lead merges them one at a time, each with a full suite.
+- **Owed:**
+  - a default-build route identity run (pe-route) and a route run with each
+    option forced on (`PE_ENH_AT`);
+  - live window and audio-device checks on the owner's devices;
+  - a gcc build for release identity;
+  - integration and packaging by the Decomp Bot, via the coordinator.
+
 ## UPDATE 2026-10-19 04:40 UTC: owner decisions; coincide recipe and pilot
 
 Lane: claude/native-complete-20261017. Nothing pushed or published; no game
