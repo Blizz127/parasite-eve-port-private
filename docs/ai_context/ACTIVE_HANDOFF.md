@@ -1,3 +1,38 @@
+## UPDATE 2026-10-20 21:47 UTC: integration candidate (owner decision 59040a1d, task 1d4ad9bd5d62)
+
+The owner designated this lane the sole Devbox PE integrator and packager (approval 59040a1d, ALLOW
+2026-10-20T20:55:39Z). Nothing is pushed or published; the launcher publisher is cf586a04.
+
+- **Branch** `claude/pe-int-20261020` in worktree `build/wt-pe-int-20261020`, created at 4ed2d1407
+  (claude/modern-20261020, untouched) with no merges. It contains the live build's source db9ca12b and
+  the Decomp Bot head 52bade3d5. This commit adds docs only.
+- **Identity:** the generated trees were regenerated from empty (EXE 1051 TUs; rooms 2951, ovl_0700 45,
+  ovl_0457 27, ovl_03D2 26, ovl_03C9 18, ovl_03C5 8; 5776 thunks) and are byte-identical to the
+  reference tree. Zero-fingerprint rows 2206 = 2206. The fresh gcc 15.2 build is byte-identical to
+  `c0c298fc…`.
+- **Gates on that binary:**
+  - native suite 1700/1700, 0 skipped; CTest 38/38 (`-E 'route-boot-day2|^native-tests$'`);
+  - psyq_port_guard PASS relative to the allowlist (976 known findings, 445 linked functions, the same
+    set as the live build except the owner-approved 0x8007BF44 row move); strict FAIL;
+  - retail_data_guard --strict OK on the 451 files changed since db9ca12b.
+- **Day-1 route, pad only, defaults:** FAIL at eve1_victory, game over at frame 44602 (0 stops, 0 stubs,
+  DAY1_SHIM 0), identical to 8 earlier logs.
+  - **Control:** the same route on the live build's binary a0eda223 (native-only-db9ca12b-test1)
+    gives the same frames and identical behaviour lines, and the same final frame 12c810bd. The game
+    over is inherited, not new. The cause recorded in DAY1_FIDELITY_GAPS.md (replayed pads vs the
+    09-28 retail battle-entry timing) is still not proven by a re-recording.
+- **movies_day2_check as the repo runs it** (WITH the existing harness route aids, so regression and
+  boundary coverage only, not play evidence): MOVIES_DAY2=PASS. 5 Day-1 movies, 0 dropped; Day-1 end
+  at frame 66610; Day 2 (story 0x88) at 67967; 0 stops. In that aid-assisted fight Eve's flash
+  approximation fired twice, with the cause logged as callback 800CDFE0 (KNOWN_DIVERGENCES #17, open).
+- **Docs:** THIRD_PARTY.md now states the guard's Psy-Q classification, the vendored khasinski code and
+  the dlopened system libraries. DEV_MENU.md now matches `host_pad_combo.c`: a lone Start or Select
+  reaches the game in every mode.
+- **Packet:** `/home/blizz/scratch/pe-int-candidate-20261020` (README.md, IDENTITY.txt, gates/,
+  route/, package/, helpers/).
+- **Next:** package (runtime plus owner-port, with the FSR licence and a 394-row vendor list), seal,
+  and hand off to cf586a04 for upload, readback and launcher verification. Device checks stay NOT RUN.
+
 ## UPDATE 2026-10-20 11:03 UTC: Sub-pixel Geometry, this-host costs, device-check block
 
 Branch `claude/modern-20261020` (worktree `build/wt-native-20261017`), gcc 15.2.

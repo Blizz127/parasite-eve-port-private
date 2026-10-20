@@ -7,14 +7,15 @@ list); `PE_CHEATS=0` hard-disables both the menu and the keyboard console. The m
 
 | `PE_DEV_MENU` | Mode | Behaviour |
 | --- | --- | --- |
-| unset (packaged default) | player | Hold Back/View, then press Start/Menu to open. Start alone still reaches the game; a short Back tap is delivered to the game as Select, and Back held alone for 0.4 s passes through as held Select. F8 opens the menu from the keyboard. |
-| `1` | developer | Back/View and Start/Menu are reserved immediately (original behaviour below); developer env warps (`PE_WARP_*`) are honoured. |
+| unset | player | Press Back/View and Start/Menu together on one controller to open (the second within 0.3 s of the first). A lone Back or Start still reaches the game: it is held back for up to 0.3 s, then a tap is delivered late as a short press and a longer hold passes through. F8 opens the menu from the keyboard. |
+| `1` (the preview launcher's default) | developer | The same controller and keyboard behaviour (`host_dev_menu.c` always runs the `host_pad_combo.c` machine); in addition, developer env warps (`PE_WARP_*`) are honoured. |
 | `0` | off | Dev menu disabled; the F1–F8 keyboard console keeps its original flat menus. |
 
 ## Opening it
 
-- Controller: **hold Back/View (Select), then press Start/Menu.** The same
-  combo closes it; B backs out one page and closes at the root.
+- Controller: **press Back/View (Select) and Start/Menu together on one
+  controller** (either first; the second within 0.3 s). The same combo
+  closes it; B backs out one page and closes at the root.
 - Keyboard: **F8** opens the menu; Up/Down, Enter and Escape navigate.
 
 ## Controls
@@ -29,9 +30,10 @@ On a mapped SDL GameController (Xbox labels, including Steam Input):
 | B | Back one page; close at the root |
 | Keyboard Up/Down, Enter, Escape | Navigate, confirm, back when open |
 
-In developer mode (`PE_DEV_MENU=1`), Back/View and Start/Menu are reserved immediately
-when either is pressed, so the opening combo does not also send Select/Start
-into the game. Release both before pressing the combo again. Directions and
+In every mode a lone Back/View or Start/Menu is withheld for up to 0.3 s
+(`HOST_PAD_COMBO_WINDOW_MS` in `host_pad_combo.h`). When the combo opens the
+menu, the game sees neither button and nothing until both are released.
+Directions and
 A/B are consumed while the menu is open; after closing, held controller buttons
 must return to neutral before gameplay input resumes. Controllers connected
 with buttons held must return to neutral before they can operate the menu.
