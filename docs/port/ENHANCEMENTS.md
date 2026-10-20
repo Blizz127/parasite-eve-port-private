@@ -186,10 +186,26 @@ byte-identical whatever the setting; only window pixels differ.
 - The filtered modes run on a presenter thread with one present of latency.
   A slow filter drops frames rather than slowing the game.
 - Windows offers only Nearest and Sharp Bilinear.
-- Cost measured on the source lineage's devbox (Xeon E5-1650 v2), 1280x800,
-  8 workers: Sharp Bilinear about 4 ms and FSR 1 about 44 ms per frame. FSR 1
-  is therefore a frame-dropping presenter on a CPU, not a 60 Hz one. Not yet
-  re-measured on the current host.
+- Cost on this devbox, measured 2026-10-20: an Intel Xeon Gold 6338N at
+  2.2 GHz, shared with other work at load 16-25. Each figure is the best of
+  5 from this branch's `pe-upscale-tests --demo` on a 320x240 route
+  screenshot, with the default pool (8 threads here). Two runs (10:12Z and
+  10:50Z) gave the ranges shown.
+
+  | Window | Sharp Bilinear | FSR 1 |
+  | --- | --- | --- |
+  | 1280x800 | 3.1-3.2 ms | 23.7-25.7 ms |
+  | 1920x1080 | 5.2-5.8 ms | 42.0-43.6 ms |
+  | 2560x1600 | 12.3-12.7 ms | 97.7-102.9 ms |
+  | 3840x2160 | 22.9-25.4 ms | 170.5-177.5 ms |
+
+  On one thread FSR 1 took 135-151 ms at 1280x800 and 902-1052 ms at
+  3840x2160.
+  The game shows a new frame every 33 ms, because it draws at 30 Hz: 39,998
+  VBlanks for 20,000 presents in the runs below. FSR 1 keeps up at
+  1280x800 here. At 1080p and above the presenter shows fewer filtered
+  frames, while the game itself keeps its speed. The owner's devices have
+  other CPUs, so these figures hold for this host only.
 
 **Internal Resolution** renders into a separate 2x/3x/4x shadow surface. The
 original 1024x512 VRAM stays the authority for game readbacks, texture
@@ -210,8 +226,28 @@ fetches and captures.
 - An allocation failure falls back to native.
 - `PE_ROUTE_PRESENTATION_SHOTS=1` with `PE_ROUTE_SHOT_RANGE` also writes the
   presentation frame (`f<N>-presentation.ppm`); ordinary captures stay native.
-- Cost: the CPU rasterizer does S² times the pixel work. On the source
-  lineage a bounded 18881-frame run took 303 s at 4x against 31 s native.
+- Cost: the CPU rasterizer does S² times the pixel work, on the game
+  thread. Measured on this devbox on 2026-10-20 with binary 2fd26b8c
+  (049784820, before Sub-pixel Geometry) over the first 20,000 presents of
+  the scripted Day-1 route: movies skipped, field rooms and in-engine
+  scenes, no battle. Four runs went at once on one core each, with the host
+  at load about 22. CPU time was read inside the sandbox; the wall range
+  spans that set and an earlier one timed from outside it.
+
+  | Internal Resolution | CPU per present | Wall per present | Peak RSS |
+  | --- | --- | --- | --- |
+  | Native | 4.8 ms | 4.8 ms | 8.7 MB |
+  | 2x | 15.6 ms | 15.6-16.7 ms | 13.4 MB |
+  | 3x | 26.5 ms | 26.6-28.7 ms | 19.4 MB |
+  | 4x | 41.3 ms | 41.3-45.9 ms | 28.4 MB |
+
+  The budget is 33 ms per present. Above it the game runs slower than
+  real time, because the window's pacer drops the backlog instead of
+  catching up. On this host that means 4x, before any battle; a battle
+  draws more polygons than this segment. Two sets of runs gave the same
+  result: each 2x/3x/4x log matched the native one line for line (the
+  `[ENH]` line aside), and every run ended on the same native screenshot
+  (sha256 17461834…). So 2x-4x did not change the game over that segment.
 
 **Texture Filter** filters polygon texels on the shadow surface only, after
 the CLUT lookup. It keeps the nearest texel's transparency and STP class and
@@ -266,6 +302,10 @@ its 16.16 screen result drops.
 - Like the Texture Filter, it selects a 2x surface when Internal Resolution
   is Native. The effect grows with the scale: at 2x a vertex can sit on two
   positions per original pixel, at 4x on four.
+- Cost: in the capture runs below (binary c0c298fc, four runs at once),
+  turning the row on added 0.6 % wall time at 2x (44,210 presents: 658.5 s
+  to 662.4 s) and 1.8 % at 4x (4,810 presents: 199.7 s to 203.2 s). That is
+  within the noise of runs sharing the host.
 - The actor models are projected by `func_8003AC90`
   (`game/boot/func_8003A088_port.c`), a native translation, not matched C.
   This row is an enhancement on top of that path, not a fix to it.
@@ -286,7 +326,8 @@ kept.
 | Identity of 1x VRAM and the 320x240 frame with the shadow on | `gpu-shadow-parity`, `framebuffer-shadow-parity`, `gpu-filter-parity` and `framebuffer-ssaa-parity` (shadow on and off over the same primitives) |
 | Day-1 route, defaults (2026-10-20, binary 2fd26b8c from 049784820) | No textual or behavioural difference against seven earlier route logs, with flash-shim lines excluded. Route packet `/home/blizz/scratch/pe-modern-route-049784820` |
 | Day-1 route, rows forced on (same binary) | Internal Resolution 2x, Texture Filter, Fine dithering, SSAA, and Movie/Music/SFX Volume 50 %, set by env in the sandbox. Packet `/home/blizz/scratch/pe-modern-route-049784820-forced`. Results below |
-| NOT RUN | live window and device checks, and a cost re-measurement on the current host. Display Scaler and Master Volume act only in a window or audio device, so headless runs do not cover them. Analog Stick and controls.conf are window-only too |
+| Day-1 route, rows and Sub-pixel Geometry forced on (binary c0c298fc from 304457606) | The same rows plus Sub-pixel Geometry. Packet `/home/blizz/scratch/pe-modern-route-304457606-subpixel`, compared with nine references: the eight used for the forced-on run above, plus that run. The only log difference is the `[ENH]` line: +1/−0 against the eight default-option runs, +1/−1 against the forced-on one. Same checkpoints (field_start 963, eve1_room 42707), same frame-44602 game over, same final native screenshot (sha256 12c810bd…). CPU_BOUNDARY, STOP, stubs and DAY1_SHIM 0; no `enhancements.conf`. 12 min 8 s wall, sampled port peak RSS 14.0 MB |
+| NOT RUN | live window and device checks. Display Scaler and Master Volume act only in a window or audio device, so headless runs do not cover them. Analog Stick and controls.conf are window-only too. The costs above are headless and for this devbox only |
 
 Results of the forced-on route:
 
@@ -296,8 +337,10 @@ Results of the forced-on route:
 - The headless route runs the native SPU and AKAO driver, so the volume gains were executed in the mixer.
 - Cost: 16 min 18 s wall time against about 3.5 min for the defaults (CPU capped at 2 cores), with a peak port RSS of 13.7 MB against 8.6 MB.
 
-The build was a local `zig cc` (clang) build: the current devbox has no
-system GCC. See `docs/ai_context/ACTIVE_HANDOFF.md`.
+The first graphics gates (03d473d72) ran on a local `zig cc` (clang) build,
+before this devbox had a system GCC. Every later gate and the route
+binaries above (2fd26b8c, c0c298fc) are GCC 15.2 builds (`readelf -p
+.comment`: `GCC: (Ubuntu 15.2.0-16ubuntu1) 15.2.0`).
 
 ## Audio (dev menu ▸ Options ▸ Audio)
 

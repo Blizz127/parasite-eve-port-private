@@ -1,3 +1,51 @@
+## UPDATE 2026-10-20 11:03 UTC: Sub-pixel Geometry, this-host costs, device-check block
+
+Branch `claude/modern-20261020` (worktree `build/wt-native-20261017`), gcc 15.2.
+Nothing is pushed or published. The Decomp Bot integrates.
+
+- **304457606: Options ▸ Graphics ▸ Sub-pixel Geometry** (off by default).
+  - The GTE records the MAC0 fraction of each RTPS/RTPT result under its
+    packed SXY word, in a host-only table in `pe_gte_commands.c`.
+  - The shadow rasterizer places a polygon at those fractions only when
+    every vertex word was recorded. Native VRAM and game state are
+    untouched.
+- **Gates:**
+  - native suite 1700/1700, 0 skipped;
+  - CTest 38/38, with `-E 'route-boot-day2|^native-tests$'`; leaf and
+    akao oracles skip;
+  - `gte-native-hardware` replays the 1,100 real-console cases with
+    recording off and on.
+- **Captures** (binary c0c298fc): field at 4x and the Eve fight at 2x, row
+  off and on.
+  - Logs and native frames are identical.
+  - Presentation frames differ only on the 3D characters and their shadows.
+- **Day-1 route, forced on** (binary c0c298fc; 2x shadow, filter, fine
+  dither, SSAA, Sub-pixel, CD/music/SFX 50 %):
+  - no behavioural difference against nine reference logs; only the
+    `[ENH]` line differs;
+  - same frame-44602 game over and the same final screenshot 12c810bd…;
+  - DAY1_SHIM, STOP and CPU_BOUNDARY 0.
+  - Packet: `/home/blizz/scratch/pe-modern-route-304457606-subpixel`.
+- **Costs on this devbox** (headless; ENHANCEMENTS.md):
+  - CPU per present, against a 33 ms budget: native 4.8 ms, 2x 15.6, 3x 26.5,
+    4x 41.3. Every scale gave identical logs and screenshots.
+  - FSR 1 with 8 threads: 23.7-25.7 ms at 1280x800, 42-44 ms at 1080p.
+- **RELEASE_NOTES_NEXT.md:**
+  - device-check table: controller, window, keyboard, and the new rows, all
+    NOT RUN;
+  - the build ID, source commit and package SHA256 are left for the
+    integrator.
+- **Not run:**
+  - `route-boot-day2-control-flow`, excluded by standing instruction. One
+    accidental run stopped at frame 2 on an unbound `0x8003E91C`; not
+    investigated.
+- **Next:**
+  - owner device checks after private distribution;
+  - Decomp Bot integration and packaging, which must ship
+    `pc_port/third_party/FidelityFX-FSR-LICENSE.txt`;
+  - perspective-correct texturing (the 1/sz half of GRAPHICS_OPTIONS 4.4) is
+    not done.
+
 ## UPDATE 2026-10-20 07:30 UTC: the m0023i flash shim no longer fires on the Day-1 route
 
 HEAD 049784820 (claude/modern-20261020), gcc build.

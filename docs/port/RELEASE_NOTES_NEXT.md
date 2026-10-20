@@ -63,11 +63,20 @@ and choices are saved in `~/.config/parasite-eve-port/enhancements.conf`.
 The Graphics and Audio rows are designed to change only what you see and
 hear: the game itself, its timing and saves are untouched. This was checked
 on the automated Day-1 route with internal resolution 2x, the texture filter,
-fine dithering, SSAA and the movie/music/SFX levels all switched on. Game
-behaviour and the native screenshots were identical to the default run.
+fine dithering, SSAA, sub-pixel geometry and the movie/music/SFX levels all
+switched on. Game behaviour and the native screenshots were identical to the
+default run.
 
-Higher internal resolutions and FSR 1 cost CPU time. If the game slows down,
-step them back.
+Higher internal resolutions and FSR 1 cost CPU time. They act differently
+when the CPU cannot keep up:
+
+- **FSR 1** in a large window shows fewer frames per second, but the game
+  keeps its speed.
+- **Internal Resolution** set too high slows the game itself.
+
+On the development server, FSR 1 kept up in a 1280x800 window and 4x was
+too slow; your device's CPU may do better or worse. If the game slows down,
+step Internal Resolution back.
 
 - **Controls** (these change how you play):
   - **Analog Stick**: play with the left stick as on a DualShock with the
@@ -84,3 +93,22 @@ writer the Day-1 route reaches: the weapon-hit draw 800CDD0C and the
 frameless update callbacks of the pistol, hit and club effects. In the
 automated Day-1 route (pads only) the approximation no longer triggered up to
 the route's end in that fight. Later play is not verified yet.
+
+## Device checks for this build
+
+This file is a branch draft and nothing is packaged yet. The integrator
+fills in the build ID, source commit and package SHA256 when it packages
+the build. Every check stays NOT RUN until the owner reports PASS or FAIL
+from a device, with the device, OS, Game Mode/Gamescope, controller and
+Steam Input setup.
+
+| Check | Result |
+| --- | --- |
+| Controller works out of the box through SDL gamepad / Steam Input, in menus and gameplay, with no manual remap or keyboard workaround | NOT RUN |
+| Window is borderless/fullscreen with no white border | NOT RUN |
+| Focusing a text field opens the on-screen keyboard | NOT RUN. The only text entry is the game's own name entry at New Game: the original letter grid, driven by the controller. The port has no system text field (no SDL or X11 text-input call in `pc_port/`), so nothing asks for the on-screen keyboard; the device run should confirm the name entry works with the controller alone |
+| Display Scaler: Sharp Bilinear and FSR 1 change the picture in the window | NOT RUN |
+| Master Volume changes the level at the audio device | NOT RUN |
+| Analog Stick: half tilt walks, full tilt runs, and the d-pad does not move Aya while it is on | NOT RUN |
+| controls.conf: a swapped button pair takes effect, and Esc, F1-F8 and Back+Start still work | NOT RUN |
+| Sub-pixel Geometry at 2x-4x: character edges move in finer steps, with no gaps or flicker on models, menus or text | NOT RUN |
