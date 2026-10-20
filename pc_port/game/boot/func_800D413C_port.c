@@ -112,27 +112,34 @@ static int effect_stack_retail_stack(pe_addr_t ea,unsigned n)
     for(unsigned i=0;i<n;i++)if(((ea+i)&0x1FFFFFu)>=0x1FDFF8u)return 1;
     return 0;
 }
+/* Frameless retail update leaves of the three weapon record tables
+ * (D_800E0AA4 pistol, D_800E0F38 hit, D_800E0FCC club): no sp access and no
+ * calls, so they write no stack at any depth.  Their only stores go through
+ * a1 (rec+1) and a2 (data+[lo, hi)); the bounds were read from the retail
+ * bytes.  The fourth entry of D_800E0F38, 800CDFE0, has a frame and calls the
+ * RNG, so it is not listed. */
+static const struct { pe_addr_t fn; uint8_t lo, hi; } k_frameless_update[] = {
+    {0x800CA4A8u, 0, 0},    /* li v0,2; sb v0,1(a1): retire */
+    {0x800CA4B4u, 1, 20},   /* data+1,+2,+8..+13,+18..+19 */
+    {0x800CA540u, 4, 6},    /* sh 4(a2) */
+    {0x800CDF40u, 0, 0},    /* retire */
+    {0x800CDF4Cu, 1, 64},   /* data+1,+3 and data+16..+63 (3 x 8 halfwords) */
+    {0x800CE464u, 0, 0},    /* retire */
+    {0x800CE470u, 3, 4},    /* sb 3(a2) */
+};
 /* A record callback that PE_WeaponCallback dispatches at the weapon-update
- * depth. Unbound callbacks forget the bytes and are recorded by address, so
- * the flash shim's cause line names the writer to bind next. */
+ * depth.  The frameless leaves above keep the bytes while none of their
+ * stores can land in the retail stack reservation.  Every other callback
+ * forgets them and is recorded by address, so the flash shim's cause line
+ * names the next writer to bind. */
 void PE_EffectStackWeaponUpdateCallback(pe_addr_t fn,pe_addr_t rec,pe_addr_t data)
 {
     if(!effect_stack.active || effect_stack.context!=EFFECT_STACK_WEAPON_UPDATE)return;
-    switch(fn) {
-    case 0x800CA540u:
-        /* Retail 800CA540..800CA570 is a frameless leaf: no sp access and
-         * no calls, so it writes no stack at any depth. Its only stores are
-         * sh 4(a2) (data+4) and sb 1(a1) (rec+1), which C251C points into
-         * the slot's record table and command arena. Keep the bytes while
-         * neither store can land in the retail stack reservation. */
-        if(!effect_stack_retail_stack(data+4u,2u) && !effect_stack_retail_stack(rec+1u,1u))return;
-        break;
-    case 0x800CA4B4u:
-        /* Retail 800CA4B4..800CA53C is a frameless leaf too: no sp access,
-         * no calls.  Its stores go through a2 (data+1, +2, +8..+13, +18..+19)
-         * and a1 (rec+1).  The 2026-10-20 Day-1 run named it as the last
-         * clearer before the flash shim, once CA540 was bound. */
-        if(!effect_stack_retail_stack(data+1u,19u) && !effect_stack_retail_stack(rec+1u,1u))return;
+    for(unsigned k=0;k<sizeof k_frameless_update/sizeof k_frameless_update[0];k++) {
+        if(k_frameless_update[k].fn!=fn)continue;
+        unsigned lo=k_frameless_update[k].lo,hi=k_frameless_update[k].hi;
+        if(!effect_stack_retail_stack(rec+1u,1u) &&
+           (lo==hi || !effect_stack_retail_stack(data+lo,hi-lo)))return;
         break;
     }
     /* fn 0 (a zeroed callbacks table) or a reserved marker value is not an

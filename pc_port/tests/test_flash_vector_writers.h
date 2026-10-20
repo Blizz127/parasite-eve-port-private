@@ -5,8 +5,9 @@
  *   - CDE90 and CDD0C at the weapon-draw depth write none of the bytes;
  *   - C2758's C2B90 call leaves the return address low half 0x2858 in Z
  *     and C2758's s4 (unknown here) in X/Y;
- *   - the update leaves CA540 and CA4B4 are frameless, so they keep them
- *     unless a record store could reach crt0's stack reservation;
+ *   - the frameless update leaves of the three weapon tables (CA4A8,
+ *     CA4B4, CA540, CDF40, CDF4C, CE464, CE470) keep them unless a record
+ *     store could reach crt0's stack reservation;
  *   - other callbacks and direct C2B90 calls keep forgetting. */
 #define FVW_SLOT 0x801F0000u
 #define FVW_PROG (FVW_SLOT+0xE00u)
@@ -221,14 +222,46 @@ static const char *fvw_case_other_update_callback_forgets(void)
 {
     const char *error=fvw_spawn_update();
     if (!error) {
-        /* CDF4C (a particle fade) has no binding, so it forgets. */
-        PE_StoreU32(0x800E0F38u,0x800CDF4Cu);
-        PE_StoreU8(FVW_SLOT+128u,0u);PE_StoreU8(FVW_SLOT+129u,1u);PE_StoreU8(FVW_SLOT+512u+1u,100u);
+        /* A callback outside the frameless update list forgets, by address.
+         * CDD04 (an empty draw leaf PE_WeaponCallback returns from) keeps
+         * the pass free of side effects; the RNG-calling CDFE0 would advance
+         * the host rand seed for later tests. */
+        PE_StoreU32(0x800E0F38u,0x800CDD04u);
+        PE_StoreU8(FVW_SLOT+128u,0u);PE_StoreU8(FVW_SLOT+129u,1u);
         (void)PE_EffectStackWeaponUpdate(0x800CD8F0u,FVW_SLOT);
-        error=fvw_cause(0u,0x800CDF4Cu,
-            "unknown XYZ, last cleared by callback 800CDF4C in context weapon-update");
+        error=fvw_cause(0u,0x800CDD04u,
+            "unknown XYZ, last cleared by callback 800CDD04 in context weapon-update");
     }
     PE_EffectStackEnd();return error;
+}
+
+/* Every frameless leaf of the three weapon update tables keeps a bound Z
+ * when C251C dispatches it after the spawn pass. */
+static const char *fvw_case_frameless_update_table(void)
+{
+    static const pe_addr_t leaves[] = {0x800CA4A8u, 0x800CA4B4u, 0x800CA540u, 0x800CDF40u,
+                                       0x800CDF4Cu, 0x800CE464u, 0x800CE470u};
+    static char buf[320];
+    for (unsigned k = 0; k < sizeof leaves / sizeof leaves[0]; k++) {
+        int16_t position[3];
+        pe_addr_t data=FVW_SLOT+512u;
+        const char *error=fvw_spawn_update();
+        if (!error) {
+            PE_StoreU32(0x800E0F38u,leaves[k]);
+            PE_StoreU8(FVW_SLOT+128u,0u);PE_StoreU8(FVW_SLOT+129u,1u);PE_StoreU16(FVW_SLOT+132u,0u);
+            PE_StoreU8(data+1u,100u);PE_StoreU8(data+2u,5u);PE_StoreU16(data+4u,100u);
+            (void)PE_EffectStackWeaponUpdate(0x800CD8F0u,FVW_SLOT);
+            error=fvw_cause(4u,0x800C2B90u,"last cleared by callback 800C2B90 in context weapon-update");
+            PE_EffectStackPosition(position);
+            if (!error && position[2]!=0x2858) error="Z changed";
+        }
+        PE_EffectStackEnd();
+        if (error) {
+            snprintf(buf,sizeof buf,"leaf %08X: %s",(unsigned)leaves[k],error);
+            return buf;
+        }
+    }
+    return NULL;
 }
 
 /* C2B90 reached directly (here as C251C's record callback through the
@@ -268,6 +301,7 @@ static void test_FLASHVEC_borrowed_vector_writers(void)
     fvw_run("FLASHVEC_ca540_stack_record_forgets",fvw_case_ca540_stack_record_forgets);
     fvw_run("FLASHVEC_ca540_below_stack_preserves",fvw_case_ca540_below_stack_preserves);
     fvw_run("FLASHVEC_ca4b4_update_preserves_known_z",fvw_case_ca4b4_update_preserves_known_z);
+    fvw_run("FLASHVEC_frameless_update_table_preserves",fvw_case_frameless_update_table);
     fvw_run("FLASHVEC_other_update_callback_forgets",fvw_case_other_update_callback_forgets);
     fvw_run("FLASHVEC_direct_c2b90_call_does_not_bind",fvw_case_direct_c2b90_does_not_bind);
 }

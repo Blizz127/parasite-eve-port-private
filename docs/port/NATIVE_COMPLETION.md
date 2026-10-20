@@ -1387,6 +1387,26 @@ substitutes in production instead of stopping (it logs each cause).
         the retail update itself (x += vx, vy += 3, age++, life--). The
         unbound control is now CDF4C.
       - Prediction for the next run: CA4B4 is no longer the named cause.
+    - **Result (9ba4868f6, binary cc81d5db, packet
+      `/home/blizz/scratch/pe-modern-route-9ba4868f6/`).**
+      - Confirmed: CA4B4 is no longer named.
+      - The route is again identical to all six references (now including
+        be90460eb and 941d6878c).
+      - The cause moved to `callback 800CA4A8`, the third entry of the same
+        pistol update table `D_800E0AA4`.
+    - **All weapon update tables classified from retail bytes** (scratchpad
+      `leafscan.py`, a stores-by-base-register scan with move aliases, and a
+      manual check of each body):
+      - `D_800E0AA4` (pistol, C9B90): CA4A8, CA4B4 and CA540.
+      - `D_800E0F38` (hit, CD8F0): CDF40 and CDF4C. Its third entry, CDFE0,
+        has a frame and calls the RNG, so it stays unbound.
+      - `D_800E0FCC` (club, CE16C): CE464 and CE470.
+      - All seven listed leaves are frameless: no sp access and no calls.
+      - They store only `rec+1` and `data+[lo, hi)`: CA4B4 1..20, CA540
+        4..6, CDF4C 1..64, CE470 3..4, none for the three retire-only leaves.
+      - They are bound in one table, `k_frameless_update`, each guarded on
+        its span.
+      - Test: `FLASHVEC_frameless_update_table_preserves`.
 - **m0005i hand ports versus generated TUs.** 8018F018, 8018F330 and 8018FB84
   now have matched C (harvested), but the effect dispatcher still sends
   m0005i's own bytes to the hand ports. Those hand ports are checked against
