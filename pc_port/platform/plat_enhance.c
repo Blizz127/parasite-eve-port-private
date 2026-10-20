@@ -3,6 +3,7 @@
 #include "pe_plat/enhance.h"
 #include "pe_guest_ram.h"
 #include "pe_gpu.h"
+#include "pe_gte_commands.h"
 #include "host_framebuffer.h"
 #include "pe_plat/audio.h"
 #include <stdio.h>
@@ -30,7 +31,7 @@ static const char *const k_dither_names[] = {"RETAIL", "FINE (SCALED)", "OFF"};
 static const int k_volume[] = {100, 90, 80, 70, 60, 50, 40, 30, 20, 10, 0};
 
 /* The registry.  Order within a category is the menu order. */
-enum { OPT_DISPLAY_SCALER, OPT_INTERNAL_SCALE, OPT_TEXTURE_FILTER, OPT_SSAA, OPT_DITHER, OPT_MOVE_SPEED, OPT_ALWAYS_RUN, OPT_ONE_HIT, OPT_GOD, OPT_EXP_MULT,
+enum { OPT_DISPLAY_SCALER, OPT_INTERNAL_SCALE, OPT_TEXTURE_FILTER, OPT_SSAA, OPT_DITHER, OPT_SUBPIXEL, OPT_MOVE_SPEED, OPT_ALWAYS_RUN, OPT_ONE_HIT, OPT_GOD, OPT_EXP_MULT,
        OPT_MASTER_VOLUME, OPT_MOVIE_VOLUME, OPT_MUSIC_VOLUME, OPT_SFX_VOLUME, OPT_ANALOG_STICK, OPT_COUNT };
 static const PeEnhOption k_options[OPT_COUNT] = {
     {"display_scaler", PE_ENH_CAT_GRAPHICS, "DISPLAY SCALER",      PE_ENH_FMT_NAMED,
@@ -43,6 +44,8 @@ static const PeEnhOption k_options[OPT_COUNT] = {
         k_toggle, 2, "PE_SSAA", "the owner", NULL},
     {"dithering", PE_ENH_CAT_GRAPHICS, "DITHERING", PE_ENH_FMT_NAMED,
         k_dither, 3, "PE_DITHERING", "the owner", k_dither_names},
+    {"subpixel_geometry", PE_ENH_CAT_GRAPHICS, "SUB-PIXEL GEOMETRY", PE_ENH_FMT_TOGGLE,
+        k_toggle, 2, "PE_SUBPIXEL_GEOMETRY", "the owner", NULL},
     {"move_speed",    PE_ENH_CAT_GAMEPLAY, "MOVEMENT SPEED",       PE_ENH_FMT_PERCENT,
         pe_enh_move_speed_steps, PE_ENH_MOVE_SPEED_COUNT, "PE_MOVE_SPEED",    "u/stellarola"},
     {"always_run",    PE_ENH_CAT_GAMEPLAY, "ALWAYS RUN",           PE_ENH_FMT_TOGGLE,
@@ -77,11 +80,16 @@ static struct {
 static void sync_graphics(void)
 {
     int scale = E.value[OPT_INTERNAL_SCALE];
-    if ((E.value[OPT_SSAA] || E.value[OPT_TEXTURE_FILTER] || E.value[OPT_DITHER]) && scale == 1) scale = 2;
+    if ((E.value[OPT_SSAA] || E.value[OPT_TEXTURE_FILTER] || E.value[OPT_DITHER] || E.value[OPT_SUBPIXEL]) &&
+        scale == 1) scale = 2;
     PE_GPU_SetRenderScale(scale);
     PE_GPU_SetTextureFilter(E.value[OPT_TEXTURE_FILTER]);
     PE_GPU_SetShadowDither(E.value[OPT_DITHER]);
     HostFB_SetSSAA(E.value[OPT_SSAA]);
+    /* Sub-pixel geometry: the GTE records screen fractions, the shadow
+     * rasterizer reads them.  Neither touches guest-visible state. */
+    PE_GTE_SetSubpixelCapture(E.value[OPT_SUBPIXEL]);
+    PE_GPU_SetSubpixelLookup(E.value[OPT_SUBPIXEL] ? PE_GTE_SubpixelLookup : NULL);
 }
 
 /* MASTER VOLUME is read by host_audio.c on each device submit. */
@@ -219,6 +227,8 @@ void pe_enh_reset(void) {
     PE_GPU_SetTextureFilter(0);
     PE_GPU_SetShadowDither(0);
     HostFB_SetSSAA(0);
+    PE_GTE_SetSubpixelCapture(0);
+    PE_GPU_SetSubpixelLookup(NULL);
     pe_plat_audio_set_cd_gain(100);
     pe_plat_audio_set_voice_gains(100, 100);
 }

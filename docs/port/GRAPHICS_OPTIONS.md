@@ -427,6 +427,12 @@ effects separately. No new lighting screenshots or timing results exist yet.
    state is reachable; native-rate fallback otherwise), with the present
    counter kept on logic frames.
 6. **Sub-pixel geometry / perspective correction** (PGXP-style side table).
+   Sub-pixel vertex positions are done on the native lineage (2026-10-20,
+   branch `claude/modern-20261020`, row SUB-PIXEL GEOMETRY): the sidecar is
+   keyed by the packed SXY word as designed in 4.4, holds the MAC0 fraction
+   only, and refines a polygon only when every one of its vertex words hits.
+   Perspective-correct texturing (the `1/sz` half of 4.4) is not done; see
+   [ENHANCEMENTS.md](ENHANCEMENTS.md).
 7. **HD background replacement** on the shadow surface (reuses `tools/hdbg`
    output) is implemented in 9ac4f811. A validated packet context binds current
    native source/palette words to the room/layer/ordinal pack. OFF is default;

@@ -131,6 +131,42 @@ static void fixed_cases(void)
     }
 }
 
+/* Sub-pixel sidecar (Graphics > Sub-pixel Geometry): RTPS records the
+ * fraction of its 16.16 screen position under the SXY word it writes; a
+ * saturated axis records 0; every GTE register is the same with capture on. */
+static void project(int16_t x, int16_t y, int16_t z, uint32_t regs[64])
+{
+    reset(); identity(g_pe_gte.rt);
+    g_pe_gte.h = 1000;
+    g_pe_gte.ofx = 160 * 65536 + 0x8000;   /* 160.5 */
+    g_pe_gte.ofy = 120 * 65536 + 0x4000;   /* 120.25 */
+    PE_GTE_SetV0(x, y, z);
+    PE_GTE_Command(0x180001u);              /* RTPS sf=1 */
+    snapshot(regs);
+}
+
+static void subpixel_cases(void)
+{
+    uint32_t off[64], on[64], frac = 0;
+    CHECK(!PE_GTE_GetSubpixelCapture(), "sub-pixel capture is off by default");
+    project(0, 0, 1000, off);
+    CHECK(!PE_GTE_SubpixelLookup(off[14], &frac), "nothing is recorded while capture is off");
+    PE_GTE_SetSubpixelCapture(1);
+    CHECK(PE_GTE_GetSubpixelCapture(), "sub-pixel capture on");
+    project(0, 0, 1000, on);
+    CHECK(memcmp(off, on, sizeof off) == 0, "RTPS registers are identical with capture on");
+    CHECK(on[14] == 0x007800A0u, "SXY2 is (160,120): %08X", (unsigned)on[14]);
+    CHECK(PE_GTE_SubpixelLookup(on[14], &frac) && frac == (0x80u | (0x40u << 8)),
+          "fraction x 0.5, y 0.25 recorded under SXY2: %04X", (unsigned)frac);
+    project(2000, 0, 100, on);                /* x saturates at 0x3FF */
+    CHECK((on[63] & (1u << 14)) && (on[14] & 0xFFFFu) == 0x3FFu, "SX2 saturates (FLAG 14)");
+    CHECK(PE_GTE_SubpixelLookup(on[14], &frac) && frac == (0x40u << 8),
+          "a saturated axis records fraction 0: %04X", (unsigned)frac);
+    CHECK(!PE_GTE_SubpixelLookup(0x12345678u, &frac), "an unknown word is not found");
+    PE_GTE_SetSubpixelCapture(0);
+    CHECK(!PE_GTE_SubpixelLookup(0x007800A0u, &frac), "switching capture off clears the table");
+}
+
 static void load_registers(const uint32_t in[64])
 {
     for (unsigned n = 0; n < 32u; ++n) PE_GTE_WriteData(n, in[n]);
@@ -250,7 +286,17 @@ int main(int argc, char **argv)
         fprintf(stderr, "usage: %s [--hardware-log FILE]\n", argv[0]); return 2;
     }
     fixed_cases();
-    if (argc == 3) hardware_log(argv[2]);
+    subpixel_cases();
+    PE_GTE_SetSubpixelCapture(1);           /* the sidecar changes no GTE result */
+    fixed_cases();
+    PE_GTE_SetSubpixelCapture(0);
+    if (argc == 3) {
+        hardware_log(argv[2]);
+        PE_GTE_SetSubpixelCapture(1);
+        hardware_log(argv[2]);
+        PE_GTE_SetSubpixelCapture(0);
+        puts("hardware log replayed with sub-pixel capture off and on");
+    }
     else puts("hardware log: NOT RUN (fixed cases only)");
     printf("native GTE: %u checks, %u failures\n", checks, failures);
     return failures ? 1 : 0;

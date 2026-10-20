@@ -852,6 +852,7 @@ static void DrawMonoRectangle(uint32_t size)
 typedef struct {
     int32_t x, y, u, v;
     int32_t color[3];
+    int32_t fx, fy;     /* sub-pixel fraction (1/256 px), shadow surface only */
 } PePolygonVertex;
 
 static int64_t PolygonEdge(const PePolygonVertex *a, const PePolygonVertex *b, int32_t x, int32_t y)
@@ -980,7 +981,11 @@ static void ShadowPolygonTriangle(PePolygonVertex a, PePolygonVertex b, PePolygo
 {
     static const int8_t dither[4][4] = {{-4,0,-3,1},{2,-2,3,-1},{-3,1,-4,0},{3,-1,2,-2}};
     const int scale = g_render_scale;
-    a.x *= scale; a.y *= scale; b.x *= scale; b.y *= scale; c.x *= scale; c.y *= scale;
+    /* A sub-pixel fraction rounds to the nearest shadow pixel of its native
+     * pixel (0 for the integer path, so the shape is unchanged then). */
+    a.x = a.x * scale + ((a.fx * scale + 128) >> 8); a.y = a.y * scale + ((a.fy * scale + 128) >> 8);
+    b.x = b.x * scale + ((b.fx * scale + 128) >> 8); b.y = b.y * scale + ((b.fy * scale + 128) >> 8);
+    c.x = c.x * scale + ((c.fx * scale + 128) >> 8); c.y = c.y * scale + ((c.fy * scale + 128) >> 8);
     int64_t area = PolygonEdge(&a,&b,c.x,c.y), half;
     int32_t minx, maxx, miny, maxy, x, y;
     int textured = (command & 0x04000000u) != 0u;
@@ -1047,19 +1052,24 @@ static void ShadowPolygonTriangle(PePolygonVertex a, PePolygonVertex b, PePolygo
     }
 }
 
+/* Sub-pixel geometry (shadow only): the GTE sidecar lookup, NULL when off. */
+static int (*g_subpixel_lookup)(uint32_t xy, uint32_t *frac);
+void PE_GPU_SetSubpixelLookup(int (*lookup)(uint32_t xy, uint32_t *frac)) { g_subpixel_lookup = lookup; }
+
 static void DrawPolygon(void)
 {
     PePolygonVertex vertices[4];
-    uint32_t command = g_gpu.polygon_words[0], clut = 0u;
+    uint32_t command = g_gpu.polygon_words[0], clut = 0u, words[4];
     uint32_t color = command;
     unsigned int i, ch, cursor = 1u, count = (command & 0x08000000u) ? 4u : 3u;
     for (i = 0; i < count; i++) {
         uint32_t xy, uv;
         if (i && (command & 0x10000000u)) color = g_gpu.polygon_words[cursor++];
-        xy = g_gpu.polygon_words[cursor++];
+        xy = words[i] = g_gpu.polygon_words[cursor++];
         vertices[i].x = SignExtend11(xy) + SignExtend11(g_gpu.state.drawing_offset);
         vertices[i].y = SignExtend11(xy >> 16) + SignExtend11(g_gpu.state.drawing_offset >> 11);
         vertices[i].u = vertices[i].v = 0;
+        vertices[i].fx = vertices[i].fy = 0;
         for (ch=0; ch<3u; ch++) vertices[i].color[ch] = (color >> (ch*8u)) & 255u;
         if (command & 0x04000000u) {
             uv = g_gpu.polygon_words[cursor++];
@@ -1079,6 +1089,18 @@ static void DrawPolygon(void)
                     vertices[i].u, vertices[i].v, (unsigned)vertices[i].color[0],
                     (unsigned)vertices[i].color[1], (unsigned)vertices[i].color[2]);
         fputc('\n', g_prim_log);
+    }
+    /* Sub-pixel geometry refines a polygon only when the GTE recorded every
+     * one of its vertex words: 2D primitives (menus, text boxes) built from
+     * CPU coordinates keep the integer shape even if one corner happens to
+     * equal a projected vertex.  Native VRAM always uses the integer path. */
+    if (g_shadow && g_subpixel_lookup) {
+        uint32_t frac[4];
+        for (i = 0; i < count && g_subpixel_lookup(words[i], &frac[i]); i++) {}
+        if (i == count)
+            for (i = 0; i < count; i++) {
+                vertices[i].fx = (int32_t)(frac[i] & 255u); vertices[i].fy = (int32_t)((frac[i] >> 8) & 255u);
+            }
     }
     if (g_shadow) {
         ShadowPolygonTriangle(vertices[0],vertices[1],vertices[2],command,clut);

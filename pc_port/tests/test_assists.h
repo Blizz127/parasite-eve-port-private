@@ -330,6 +330,11 @@ static void test_ASSIST_dev_menu_graphics_page(void)
     ASSERT(PE_GPU_GetShadowDither() == 2 && PE_GPU_GetRenderScale() == 2, "then dithering off");
     (void)pe_plat_cheats_key(PE_CHEAT_KEY_ENTER, 1);
     ASSERT(PE_GPU_GetShadowDither() == 0 && PE_GPU_GetRenderScale() == 1, "retail dithering restores native rendering");
+    (void)pe_plat_cheats_key(PE_CHEAT_KEY_DOWN, 1);
+    (void)pe_plat_cheats_key(PE_CHEAT_KEY_ENTER, 1);
+    ASSERT(PE_GTE_GetSubpixelCapture() == 1 && PE_GPU_GetRenderScale() == 2, "row 6 turns on sub-pixel geometry at 2x");
+    (void)pe_plat_cheats_key(PE_CHEAT_KEY_ENTER, 1);
+    ASSERT(PE_GTE_GetSubpixelCapture() == 0 && PE_GPU_GetRenderScale() == 1, "sub-pixel off restores native rendering");
     (void)pe_plat_cheats_key(PE_CHEAT_KEY_BACK, 1);                              /* -> OPTIONS row 2 */
     (void)pe_plat_cheats_key(PE_CHEAT_KEY_DOWN, 1);
     (void)pe_plat_cheats_key(PE_CHEAT_KEY_ENTER, 1);                             /* -> AUDIO (row 3) */
@@ -386,11 +391,11 @@ static void test_ASSIST_option_registry(void)
     int n = pe_enh_option_count();
     TEST("ASSIST_option_registry");
     enh_isolate();
-    ASSERT(n == 15, "fifteen registered options");
+    ASSERT(n == 16, "sixteen registered options");
     ASSERT(pe_enh_category_count(PE_ENH_CAT_GAMEPLAY) == 2 && pe_enh_category_count(PE_ENH_CAT_ASSIST) == 3 &&
-           pe_enh_category_count(PE_ENH_CAT_GRAPHICS) == 5 && pe_enh_category_count(PE_ENH_CAT_AUDIO) == 4 &&
+           pe_enh_category_count(PE_ENH_CAT_GRAPHICS) == 6 && pe_enh_category_count(PE_ENH_CAT_AUDIO) == 4 &&
            pe_enh_category_count(PE_ENH_CAT_CONTROLS) == 1,
-           "categories: 2 gameplay, 3 assists, 5 graphics, 4 audio, 1 controls");
+           "categories: 2 gameplay, 3 assists, 6 graphics, 4 audio, 1 controls");
     {   /* the controls row: ANALOG STICK, a retail-OFF toggle, last in the registry */
         int a = pe_enh_option_index("analog_stick");
         const PeEnhOption *o = pe_enh_option(a);
@@ -488,6 +493,27 @@ static void test_ASSIST_option_registry(void)
         ASSERT(PE_GPU_GetShadowDither() == 1 && PE_GPU_GetRenderScale() == 2, "fine dithering alone selects a 2x shadow");
         pe_enh_option_set(dither, 0);
         ASSERT(PE_GPU_GetShadowDither() == 0 && PE_GPU_GetRenderScale() == 1, "retail dithering restores native scale");
+        int sp = pe_enh_option_index("subpixel_geometry");
+        const PeEnhOption *so = pe_enh_option(sp);
+        ASSERT(sp >= 0 && pe_enh_category_option(PE_ENH_CAT_GRAPHICS, 5) == sp && so->format == PE_ENH_FMT_TOGGLE &&
+               strcmp(so->env, "PE_SUBPIXEL_GEOMETRY") == 0, "sub-pixel geometry is the sixth graphics row");
+        pe_enh_option_label(sp, label, sizeof label);
+        ASSERT(strcmp(label, "SUB-PIXEL GEOMETRY: OFF") == 0 && !PE_GTE_GetSubpixelCapture(),
+               "sub-pixel geometry defaults off and the GTE records nothing");
+        pe_enh_option_set(sp, 1);
+        ASSERT(PE_GTE_GetSubpixelCapture() && PE_GPU_GetRenderScale() == 2 && pe_enh_internal_scale() == 1,
+               "sub-pixel geometry alone selects a 2x shadow and turns GTE capture on");
+        pe_enh_set_internal_scale(4);
+        ASSERT(PE_GPU_GetRenderScale() == 4 && PE_GTE_GetSubpixelCapture(), "explicit 4x keeps sub-pixel geometry");
+        pe_enh_set_internal_scale(1);
+        setenv("PE_SUBPIXEL_GEOMETRY", "0", 1); pe_enh_reset();
+        ASSERT(pe_enh_option_value(sp) == 0 && !PE_GTE_GetSubpixelCapture() && PE_GPU_GetRenderScale() == 1,
+               "PE_SUBPIXEL_GEOMETRY=0 overrides the saved ON");
+        unsetenv("PE_SUBPIXEL_GEOMETRY"); pe_enh_reset();
+        ASSERT(pe_enh_option_value(sp) == 1 && PE_GTE_GetSubpixelCapture() && PE_GPU_GetRenderScale() == 2,
+               "the saved ON returns; env is not written back");
+        pe_enh_option_set(sp, 0);
+        ASSERT(!PE_GTE_GetSubpixelCapture() && PE_GPU_GetRenderScale() == 1, "sub-pixel off restores native scale");
     }
     {   /* audio rows: percent levels falling from the retail 100 */
         int m = pe_enh_option_index("master_volume"), v = pe_enh_option_index("movie_volume");

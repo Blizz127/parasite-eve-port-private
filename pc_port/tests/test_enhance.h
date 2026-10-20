@@ -38,6 +38,7 @@ static void enh_isolate(void)
     unsetenv("PE_TEXTURE_FILTER");
     unsetenv("PE_SSAA");
     unsetenv("PE_DITHERING");
+    unsetenv("PE_SUBPIXEL_GEOMETRY");
     unsetenv("PE_MASTER_VOLUME");
     unsetenv("PE_MOVIE_VOLUME");
     unsetenv("PE_ANALOG_STICK");

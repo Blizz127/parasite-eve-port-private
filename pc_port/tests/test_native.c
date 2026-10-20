@@ -105,6 +105,7 @@
 #include "retail_vblank_cases.h"
 #include "pe_spu_dma.h"
 #include "pe_gpu.h"
+#include "pe_gte_commands.h"
 #include "pe_cdreg.h"
 #include "pe_irq.h"
 #include "pe_irq_delivery.h"

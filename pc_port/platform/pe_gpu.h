@@ -171,6 +171,11 @@ int PE_GPU_GetTextureFilter(void);
  * (pattern at shadow resolution), 2 off.  Native VRAM is never affected. */
 void PE_GPU_SetShadowDither(int mode);
 int PE_GPU_GetShadowDither(void);
+/* Sub-pixel geometry on the shadow surface: a polygon whose every vertex
+ * word has a fraction from lookup (x | y << 8, 1/256 px) is placed at it at
+ * the shadow's resolution.  Other polygons, native VRAM and scale 1 are
+ * unchanged.  NULL (the default) is off. */
+void PE_GPU_SetSubpixelLookup(int (*lookup)(uint32_t xy, uint32_t *frac));
 /* Invalidates cached host scan-out when Init or a scale change reseeds VRAM. */
 uint64_t PE_GPU_GetRenderGeneration(void);
 /* Coordinates are in scaled VRAM units; never wraps. */

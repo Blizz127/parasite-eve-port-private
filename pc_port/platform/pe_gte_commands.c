@@ -8,6 +8,7 @@
  */
 #include "pe_sdk.h"
 #include "pe_gte_commands.h"
+#include <string.h>
 
 /* ── FLAG accumulation (psx-spx "cop2r63 - FLAG") ─────────────────────── */
 static uint32_t g_flag;
@@ -86,6 +87,50 @@ static uint32_t pack16(int32_t lo, int32_t hi)
     return (uint32_t)(uint16_t)lo | ((uint32_t)(uint16_t)hi << 16);
 }
 
+/* ── sub-pixel sidecar (host presentation only) ───────────────────────── */
+/* Graphics > Sub-pixel Geometry.  While capture is on, each RTPS/RTPT
+ * result also keeps the fraction of its 16.16 screen position (MAC0, the
+ * value SX2/SY2 truncate) under the packed SXY word it writes.  The shadow
+ * rasterizer looks polygon vertex words up here.  No GTE register, FLAG or
+ * guest-visible value changes.  A saturated coordinate keeps fraction 0,
+ * its integer result.  The same key is replaced in place (the last
+ * projection wins); a new key takes the least recently written slot of its
+ * probe run. */
+#define SUBPIXEL_SLOTS 8192u
+#define SUBPIXEL_PROBES 8u
+static struct { uint32_t key, frac, stamp; } g_subpixel[SUBPIXEL_SLOTS];
+static int g_subpixel_on;
+static uint32_t g_subpixel_stamp;
+
+void PE_GTE_SetSubpixelCapture(int on)
+{
+    on = on != 0;
+    if (on != g_subpixel_on) { memset(g_subpixel, 0, sizeof g_subpixel); g_subpixel_stamp = 0; }
+    g_subpixel_on = on;
+}
+int PE_GTE_GetSubpixelCapture(void) { return g_subpixel_on; }
+static unsigned subpixel_slot(uint32_t key) { return (key * 2654435761u) >> 19; }
+static void subpixel_record(uint32_t key, uint32_t frac)
+{
+    unsigned base = subpixel_slot(key), victim = base;
+    if (!++g_subpixel_stamp) { memset(g_subpixel, 0, sizeof g_subpixel); g_subpixel_stamp = 1; }
+    for (unsigned i = 0; i < SUBPIXEL_PROBES; i++) {
+        unsigned k = (base + i) & (SUBPIXEL_SLOTS - 1u);
+        if (g_subpixel[k].stamp && g_subpixel[k].key == key) { victim = k; break; }
+        if (g_subpixel[k].stamp < g_subpixel[victim].stamp) victim = k;
+    }
+    g_subpixel[victim].key = key; g_subpixel[victim].frac = frac; g_subpixel[victim].stamp = g_subpixel_stamp;
+}
+int PE_GTE_SubpixelLookup(uint32_t sxy, uint32_t *frac)
+{
+    unsigned base = subpixel_slot(sxy);
+    for (unsigned i = 0; i < SUBPIXEL_PROBES; i++) {
+        unsigned k = (base + i) & (SUBPIXEL_SLOTS - 1u);
+        if (g_subpixel[k].stamp && g_subpixel[k].key == sxy) { *frac = g_subpixel[k].frac; return 1; }
+    }
+    return 0;
+}
+
 /* ── division (psx-spx "GTE Division Inaccuracy") ─────────────────────── */
 static uint32_t gte_divide(uint32_t h, uint32_t sz3)
 {
@@ -130,13 +175,16 @@ static void rtp(const int16_t *v, int sf, int lm, int last)
     int64_t m = (int64_t)n * (int16_t)g_pe_gte.ir[0] + g_pe_gte.ofx;
     g_pe_gte.mac0 = mac0_chk(m);
     int64_t sx = m >> 16;
+    uint32_t fx = (uint32_t)(m & 0xFFFF);
     m = (int64_t)n * (int16_t)g_pe_gte.ir[1] + g_pe_gte.ofy;
     g_pe_gte.mac0 = mac0_chk(m);
     int64_t sy = m >> 16;
-    if (sx < -0x400) { sx = -0x400; g_flag |= 1u << 14; } else if (sx > 0x3FF) { sx = 0x3FF; g_flag |= 1u << 14; }
-    if (sy < -0x400) { sy = -0x400; g_flag |= 1u << 13; } else if (sy > 0x3FF) { sy = 0x3FF; g_flag |= 1u << 13; }
+    uint32_t fy = (uint32_t)(m & 0xFFFF);
+    if (sx < -0x400) { sx = -0x400; fx = 0; g_flag |= 1u << 14; } else if (sx > 0x3FF) { sx = 0x3FF; fx = 0; g_flag |= 1u << 14; }
+    if (sy < -0x400) { sy = -0x400; fy = 0; g_flag |= 1u << 13; } else if (sy > 0x3FF) { sy = 0x3FF; fy = 0; g_flag |= 1u << 13; }
     g_pe_gte.sxy[0] = g_pe_gte.sxy[1]; g_pe_gte.sxy[1] = g_pe_gte.sxy[2];
     g_pe_gte.sxy[2] = pack16((int32_t)sx, (int32_t)sy);
+    if (g_subpixel_on) subpixel_record(g_pe_gte.sxy[2], (fx >> 8) | ((fy >> 8) << 8));
     if (last) {                                              /* depth cueing */
         m = (int64_t)n * (int16_t)g_pe_gte.dqa + g_pe_gte.dqb;
         g_pe_gte.mac0 = mac0_chk(m);

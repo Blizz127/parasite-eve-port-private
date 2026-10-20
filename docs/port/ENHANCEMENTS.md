@@ -148,6 +148,7 @@ one defaults to the retail presentation.
 | Texture Filter | Nearest (retail), Bilinear (polygons) | Nearest | `texture_filter=<0\|1>` / `PE_TEXTURE_FILTER` | the owner |
 | Supersample AA | Off, On | Off | `ssaa=<0\|1>` / `PE_SSAA` | the owner |
 | Dithering | Retail, Fine (scaled), Off | Retail | `dithering=<0\|1\|2>` / `PE_DITHERING` | the owner |
+| Sub-pixel Geometry | Off, On | Off | `subpixel_geometry=<0\|1>` / `PE_SUBPIXEL_GEOMETRY` | the owner |
 
 **Where it came from.** These four rows were built and gated on the
 2026-09-30 lineage, branch `claude/gfx-options` (8ea0d39e3), and ported to the
@@ -162,8 +163,9 @@ three-way merged over the native tree:
 - `BlitPresentationFrame` in `port_main.c`.
 
 HD Backgrounds (`pe_hdbg*`) was **not** ported: it needs owner-local packs and
-its own loader threads. The design and the remaining stages (frame
-interpolation, sub-pixel geometry, widescreen) are in
+its own loader threads. Sub-pixel Geometry was added on this lineage
+(below). The design and the remaining stages (frame interpolation,
+perspective-correct texturing, widescreen) are in
 [GRAPHICS_OPTIONS.md](GRAPHICS_OPTIONS.md).
 
 **Display Scaler** picks the filter that fits the 320x240 frame into the
@@ -196,8 +198,8 @@ fetches and captures.
 - Polygons (actors, battle arenas) gain finer edge coverage.
 - Background tiles and UI keep nearest sampling, so they look the same as
   with window scaling.
-- Integer projection and affine texture mapping remain; there is no
-  sub-pixel geometry yet.
+- Projection stays integer unless Sub-pixel Geometry is on, and texture
+  mapping stays affine (no perspective correction).
 - Movies present the native 320x240 decoded frame: a larger copy adds
   nothing, and the native frame keeps the X11 XRender fast path. The
   Display Scaler still applies.
@@ -228,7 +230,47 @@ always does.
 - **Off** skips it. Gradients are smooth, but 15-bit banding shows in dark
   ramps.
 
-Texture Filter, Supersample AA and Dithering each select a 2x surface by
+**Sub-pixel Geometry** places 3D polygons on the shadow surface at the
+position the GTE computed before it rounded down to whole pixels. Vertices
+land on the nearest half, third or quarter pixel (at 2x, 3x, 4x) instead of
+a whole pixel, so moving edges step in finer increments. Geometry very close
+to the camera still steps by a pixel or more, as on the original: the GTE's
+view-space coordinates are whole units, and the kept fraction is only what
+its 16.16 screen result drops.
+
+- The GTE's projection (RTPS/RTPT) computes each screen coordinate in 16.16
+  fixed point (MAC0) and keeps only the integer part in SXY. With the row on,
+  `pe_gte_commands.c` also records the dropped fraction, under the packed
+  SXY word it wrote, in a host-only table. Every GTE register and FLAG bit
+  stays the same; the hardware-log replay checks that with recording on.
+- When a polygon reaches the GPU, `pe_gpu.c` looks up each vertex word. If
+  every vertex was recorded, the polygon is drawn on the shadow surface at
+  those fractions, rounded to the nearest shadow pixel inside the original
+  pixel. If any vertex is missing, the whole polygon keeps the integer shape.
+  Menus, text boxes and other 2D primitives are built from CPU coordinates,
+  so they stay pixel-exact even when one corner equals a projected vertex.
+- Native VRAM, captures and game state never see it. Vertices that share a
+  word get the same answer, so adjoining recorded polygons meet without gaps.
+  A polygon with an unrecorded vertex next to a recorded one can show a seam
+  under one native pixel wide.
+- The all-or-nothing rule was chosen from a count over the Day-1 route
+  segment (44,600 presents up to the frame-44602 game over), taken with a
+  measurement-only prototype of the same lookup (4,096 slots, saturated
+  coordinates not recorded, no drawing change). Of the textured polygons,
+  22,386,108 had every vertex recorded (99.87 %), 4,763 some (0.02 %) and
+  25,081 none. Of the untextured ones, 836,682 had all, 863 some and
+  23,824 none. The shipped table is larger (8,192 slots) and also records
+  saturated coordinates; it was not re-counted.
+- It does not change texture mapping: textures stay affine, so large floor
+  polygons still warp as on the original hardware.
+- Like the Texture Filter, it selects a 2x surface when Internal Resolution
+  is Native. The effect grows with the scale: at 2x a vertex can sit on two
+  positions per original pixel, at 4x on four.
+- The actor models are projected by `func_8003AC90`
+  (`game/boot/func_8003A088_port.c`), a native translation, not matched C.
+  This row is an enhancement on top of that path, not a fix to it.
+
+Texture Filter, Supersample AA, Dithering and Sub-pixel Geometry each select a 2x surface by
 themselves when Internal Resolution is Native; an explicit 2x/3x/4x choice is
 kept.
 
@@ -237,7 +279,9 @@ kept.
 | Check | Result |
 | --- | --- |
 | Native suite | `Results: 1690 run, 1690 passed, 0 failed, 0 skipped` (with Dithering and Audio), which includes `test_ASSIST_option_registry` (9 options, 4 graphics, labels, env overrides, the scale/filter/SSAA coupling) and `test_ASSIST_dev_menu_graphics_page` (Options ▸ Graphics rows, BACK to Options row 2, Enhancements still row 1) |
-| CTest | 11/11: `upscale-filters`, `upscale-filters-single-thread`, `upscale-no-threads`, `window-scaler-failures`, `scaler-windows-policy`, `gpu-shadow-parity`, `framebuffer-shadow-parity`, `gpu-filter-parity`, `gpu-dither-parity`, `framebuffer-ssaa-parity`, `window-scale-math` |
+| CTest | 12/12: `upscale-filters`, `upscale-filters-single-thread`, `upscale-no-threads`, `window-scaler-failures`, `scaler-windows-policy`, `gpu-shadow-parity`, `framebuffer-shadow-parity`, `gpu-filter-parity`, `gpu-dither-parity`, `gpu-subpixel-parity`, `framebuffer-ssaa-parity`, `window-scale-math` |
+| Sub-pixel Geometry, unit level | `gpu-subpixel-parity` (scales 2-4): native VRAM is identical with the lookup on and off. A polygon whose vertex words are all known moves by its fraction on the shadow; one with an unknown vertex keeps the integer shadow; scale 1 never consults the table. `gte-native-fixed` and `gte-native-hardware`: every fixed case and all 1,100 real-console cases pass again with recording on (463,492 checks, 0 failures), plus record/lookup cases for the fraction, a saturated axis, an unknown word and the clear on switch-off. The suite checks the sixth graphics row, its default, env override and the automatic 2x |
+| Sub-pixel Geometry, captures (binary c0c298fc) | Day-1 route with `PE_ROUTE_PRESENTATION_SHOTS`: field rooms at 4x (frames 2200-4800 every 650) and the Eve fight at 2x (frames 43000-44200 every 300), row off and on. Logs match line for line apart from the `[ENH]` line (4,810 and 44,210 presents), and every native frame is identical. The presentation frames differ only on the 3D characters and their shadows (3.7-5.6 % of pixels; frame 2200 not at all). Backgrounds, the battle HUD and dialogue text are pixel-identical, and a zoomed crop shows no gaps |
 | Dithering | `gpu-dither-parity` covers scales 2-4. Native VRAM is identical in all three modes. Retail is the magnified native pattern, Fine follows the 4x4 pattern at shadow resolution, and Off is flat. The suite checks the row's label, its default and the automatic 2x |
 | Identity of 1x VRAM and the 320x240 frame with the shadow on | `gpu-shadow-parity`, `framebuffer-shadow-parity`, `gpu-filter-parity` and `framebuffer-ssaa-parity` (shadow on and off over the same primitives) |
 | Day-1 route, defaults (2026-10-20, binary 2fd26b8c from 049784820) | No textual or behavioural difference against seven earlier route logs, with flash-shim lines excluded. Route packet `/home/blizz/scratch/pe-modern-route-049784820` |

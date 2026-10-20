@@ -50,6 +50,11 @@ and choices are saved in `~/.config/parasite-eve-port/enhancements.conf`.
   - **Texture Filter**: smooths 3D textures.
   - **Supersample AA**.
   - **Dithering**: Retail, Fine or Off (high-resolution surface only).
+  - **Sub-pixel Geometry**: at 2x-4x, characters and 3D scenes are placed
+    on half to quarter pixels instead of whole pixels, so their edges move
+    in finer steps. Geometry very close to the camera still steps as on the
+    original. Menus and text stay pixel-exact, and textures on large
+    polygons still warp as on the original.
 - **Audio:**
   - **Master Volume**.
   - **Movie Audio Volume**: movies and the ending credits.
