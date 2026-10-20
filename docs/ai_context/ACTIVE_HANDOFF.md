@@ -1,3 +1,54 @@
+## UPDATE 2026-10-20 06:50 UTC: integrated modern features (graphics, audio, controls) on claude/modern-20261020
+
+HEAD 941d6878c (worktree `build/wt-native-20261017`). Nothing is pushed or
+published, and the Decomp Bot integrates. The toolchain note in the 06:00
+entry is outdated: system gcc 15.2 has been installed since 05:11, and all
+results below are gcc builds unless stated.
+
+What the branch adds over `claude/native-complete-20261017` (0a9434171):
+
+- **Native:**
+  - m0023i flash: CDD0C and CA540 are bound from retail bytes (648fe2f89).
+  - An unbound weapon-update callback now names itself in the shim cause
+    (013358c68).
+- **Graphics** (Options ▸ Graphics): Display Scaler (Nearest, Sharp
+  Bilinear, FSR 1), Internal Resolution 2x/3x/4x, Texture Filter,
+  Supersample AA, and Dithering (retail, fine, off) on the shadow surface.
+- **Audio** (Options ▸ Audio): Master Volume (device sink only) and Movie
+  Audio Volume (CD-input gain). Music and SFX Volume are per-voice classes
+  latched at key-on from the AKAO SFX mask; merged from helper pe-mixsplit.
+- **Controls:**
+  - Options ▸ Controls ▸ Analog Stick, retail DualShock analog mode
+    (helper pe-analog). It needs an SDL GameController. The d-pad and
+    Circle-run are inert in that mode, as in retail.
+  - `controls.conf` pad and keyboard remapping (helper pe-remap).
+- **Review fixes** (7d520d43d), from helper pe-review:
+  - the CHEATS badge no longer disables the graphics options;
+  - movies keep XRender;
+  - the test suite is hermetic, so it never reads the user's config;
+  - strict option parsing and atomic config saves;
+  - an env override is never persisted;
+  - the master volume never fails open and ramps across changes;
+  - the presenter drops a stale filtered frame.
+
+Gates (gcc): native suite 1698/1698, 0 failed, 0 skipped. CTest 37/37, with
+leaf-oracle and akao-tick-oracle skipped. That includes the eight
+`-Wl,--wrap` control-flow tests, host-pad-remap, psyq-port-guard and
+retail-data-guard.
+
+Day-1 route of be90460eb (zig build, helper pe-route): the outcome matches
+all four references, and the shim-excluded logs and final screenshot are
+identical. CDD0C is gone. One generic weapon-update cause remains, now named
+by address (NATIVE_COMPLETION.md).
+
+Owed:
+- the Day-1 route identity run of the integrated gcc binary f686f4fe (in
+  progress, `/home/blizz/scratch/pe-modern-route-941d6878c`);
+- route runs with the new options forced on (`PE_ENH_AT`);
+- live window, audio and controller checks (owner devices);
+- integration and packaging by the Decomp Bot. It must ship
+  `pc_port/third_party/FidelityFX-FSR-LICENSE.txt`.
+
 ## UPDATE 2026-10-20 06:00 UTC: native bindings plus opt-in graphics and audio options
 
 Lane: `claude/modern-20261020` (worktree `build/wt-native-20261017`, from

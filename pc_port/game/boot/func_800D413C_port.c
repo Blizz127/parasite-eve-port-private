@@ -127,6 +127,13 @@ void PE_EffectStackWeaponUpdateCallback(pe_addr_t fn,pe_addr_t rec,pe_addr_t dat
          * neither store can land in the retail stack reservation. */
         if(!effect_stack_retail_stack(data+4u,2u) && !effect_stack_retail_stack(rec+1u,1u))return;
         break;
+    case 0x800CA4B4u:
+        /* Retail 800CA4B4..800CA53C is a frameless leaf too: no sp access,
+         * no calls.  Its stores go through a2 (data+1, +2, +8..+13, +18..+19)
+         * and a1 (rec+1).  The 2026-10-20 Day-1 run named it as the last
+         * clearer before the flash shim, once CA540 was bound. */
+        if(!effect_stack_retail_stack(data+1u,19u) && !effect_stack_retail_stack(rec+1u,1u))return;
+        break;
     }
     /* fn 0 (a zeroed callbacks table) or a reserved marker value is not an
      * address to name; record the generic marker for it. */

@@ -1369,6 +1369,24 @@ substitutes in production instead of stopping (it logs each cause).
         and CA540's later clear had masked it.
       - Unbound update callbacks are therefore recorded by address since the
         commit after be90460eb, so the next run names that writer.
+    - **Integrated gcc build (941d6878c, binary f686f4fe, the same route;
+      packet `/home/blizz/scratch/pe-modern-route-941d6878c/`).**
+      - No textual and no behavioural difference against any of five
+        references (11d7, e2r, e2w, 6474 and be90460eb), with the shim lines
+        excluded.
+      - CPU_BOUNDARY 0, STOP 0, stubs 0. No `enhancements.conf` was created.
+      - All new options were at their defaults; the analog, remap and
+        music/SFX code was merged.
+      - The single remaining shim line now names its writer:
+        `callback 800CA4B4`, the moving-particle update leaf.
+    - **CA4B4** (`800ca4b4..800ca53c`) is another frameless leaf: no sp
+      access and no calls.
+      - It stores through a2 (data+1, +2, +8..+13, +18..+19) and a1 (rec+1).
+      - It is bound like CA540, guarded on that span.
+      - Test: `FLASHVEC_ca4b4_update_preserves_known_z`, which also checks
+        the retail update itself (x += vx, vy += 3, age++, life--). The
+        unbound control is now CDF4C.
+      - Prediction for the next run: CA4B4 is no longer the named cause.
 - **m0005i hand ports versus generated TUs.** 8018F018, 8018F330 and 8018FB84
   now have matched C (harvested), but the effect dispatcher still sends
   m0005i's own bytes to the hand ports. Those hand ports are checked against
