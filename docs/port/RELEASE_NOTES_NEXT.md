@@ -36,3 +36,28 @@ It holds God Mode, Infinite Ammo + Full PE, Instant Win, Area Key Items,
 Fast-forward Speed, Warp by Day, Options and Assists.  All cheats start off.
 `PE_DEV_MENU=0` turns it off (`PE_CHEATS=0` disables all cheats); `PE_DEV_MENU=1` is developer mode.  See
 docs/port/DEV_MENU.md.
+
+## New: Options ▸ Graphics, Audio (branch `claude/modern-20261020`)
+
+The dev menu's Options page now lists three pages. Every new row starts at
+the original (retail) setting, and choices are saved in
+`~/.config/parasite-eve-port/enhancements.conf`.
+
+- **Graphics:**
+  - **Display Scaler**: Nearest (original), Sharp Bilinear, or FSR 1 (CPU).
+  - **Internal Resolution**: Native, 2x, 3x or 4x. Characters and 3D
+    scenes get finer edges; backgrounds and menus stay pixel-exact.
+  - **Texture Filter**: smooths 3D textures.
+  - **Supersample AA**.
+  - **Dithering**: Retail, Fine or Off.
+- **Audio:**
+  - **Master Volume**.
+  - **Movie Audio Volume**: movies and the ending credits.
+
+These change only what you see and hear. The game itself, its timing and
+saves are untouched. Higher internal resolutions and FSR 1 cost CPU time; if
+the game slows down, step them back.
+
+Also: Eve's flash effect in the first Eve fight now tracks two more retail
+stack writers (weapon-hit draw 800CDD0C, update callback 800CA540), so it
+falls back to its approximation less often.
