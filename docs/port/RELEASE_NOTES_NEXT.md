@@ -58,6 +58,7 @@ These change only what you see and hear. The game itself, its timing and
 saves are untouched. Higher internal resolutions and FSR 1 cost CPU time; if
 the game slows down, step them back.
 
-Also: Eve's flash effect in the first Eve fight now tracks two more retail
-stack writers (weapon-hit draw 800CDD0C, update callback 800CA540), so it
-falls back to its approximation less often.
+Also, Eve's flash effect in the first Eve fight now tracks two more retail
+stack writers: the weapon-hit draw 800CDD0C and the update callback 800CA540.
+They were the two logged reasons for its approximation in the last Day-1 run.
+Whether the approximation still triggers has not been checked in play yet.
