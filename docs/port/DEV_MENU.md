@@ -30,9 +30,12 @@ On a mapped SDL GameController (Xbox labels, including Steam Input):
 | B | Back one page; close at the root |
 | Keyboard Up/Down, Enter, Escape | Navigate, confirm, back when open |
 
-In every mode a lone Back/View or Start/Menu is withheld for up to 0.3 s
-(`HOST_PAD_COMBO_WINDOW_MS` in `host_pad_combo.h`). When the combo opens the
-menu, the game sees neither button and nothing until both are released.
+In both modes where the menu is reachable (unset and `1`) a lone Back/View
+or Start/Menu is withheld for up to 0.3 s (`HOST_PAD_COMBO_WINDOW_MS` in
+`host_pad_combo.h`). When the combo opens the menu, the game sees neither
+button and nothing until both are released. With `PE_DEV_MENU=0`,
+`HostDevMenu_Step` bypasses the combo machine and every button reaches the
+game at once.
 Directions and
 A/B are consumed while the menu is open; after closing, held controller buttons
 must return to neutral before gameplay input resumes. Controllers connected
