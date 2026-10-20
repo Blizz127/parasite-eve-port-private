@@ -40,8 +40,11 @@ Nothing is pushed or published. The Decomp Bot integrates.
   - the build ID, source commit and package SHA256 are left for the
     integrator.
 - **Not run:**
-  - movies with the options on: the route pad skips them, so the
-    MDEC/rgb24 presentation path is unverified with the options on;
+  - movies in the Day-1 route: the route pad skips them. A separate
+    real-boot pair covers the title-screen movie, headless: options off and
+    forced on give identical logs, first-frame hash, movie frames and
+    screenshot (packet `movie/`). The windowed presenter during movies is
+    not covered;
   - `day1_end_80`, unreachable because of the frame-44602 game over;
     movies into Day 2 were not run either;
   - `route-boot-day2-control-flow`, excluded by standing instruction. One

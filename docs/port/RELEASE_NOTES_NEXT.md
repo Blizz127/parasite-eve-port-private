@@ -62,10 +62,11 @@ and choices are saved in `~/.config/parasite-eve-port/enhancements.conf`.
 
 The Graphics and Audio rows are designed to change only what you see and
 hear: the game itself, its timing and saves are untouched. This was checked
-on the automated Day-1 route, which skips the movies, with internal
-resolution 2x, the texture filter, fine dithering, SSAA, sub-pixel geometry
-and the movie/music/SFX levels all switched on. Game behaviour and the
-native screenshots were identical to the default run.
+with internal resolution 2x, the texture filter, fine dithering, SSAA,
+sub-pixel geometry and the movie/music/SFX levels all switched on, in two
+places. One was the automated Day-1 route, which skips the movies. The other
+was a normal boot that plays the title-screen movie. Game behaviour, the
+movie frames and the native screenshots were identical to the default runs.
 
 Higher internal resolutions and FSR 1 cost CPU time. They act differently
 when the CPU cannot keep up:
