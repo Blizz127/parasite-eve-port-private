@@ -372,7 +372,7 @@ static void sweep_default_keys(const HostPadRemap *r)
 
 static void test_identity_no_file(void)
 {
-    char dir[512], path[700], sub[700];
+    char dir[512], sub[700], path[1024];
     HostPadRemap d;
     const HostPadRemap *g;
     struct stat st;
