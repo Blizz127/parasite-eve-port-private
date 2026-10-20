@@ -76,6 +76,10 @@ void pe_plat_audio_stats(PePlatAudioStats *out);
 /* MOVIE AUDIO VOLUME (enhancement registry): CD-input gain in percent,
  * 100 = retail. */
 void pe_plat_audio_set_cd_gain(int percent);
+/* MUSIC VOLUME / SFX VOLUME (enhancement registry): voice gains in percent
+ * by class, 100 = retail.  A voice's class is latched at its key-on from the
+ * sound driver's sound-effect voice ownership. */
+void pe_plat_audio_set_voice_gains(int music_percent, int sfx_percent);
 
 /* Apply voice/register writes the game made through direct pointers into
  * the sound device's register block.  Those writes are held until the next

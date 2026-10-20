@@ -24,6 +24,8 @@ static void enh_isolate(void)
     unsetenv("PE_SSAA");
     unsetenv("PE_MASTER_VOLUME");
     unsetenv("PE_MOVIE_VOLUME");
+    unsetenv("PE_MUSIC_VOLUME");
+    unsetenv("PE_SFX_VOLUME");
     pe_enh_reset();
 }
 

@@ -41030,6 +41030,8 @@ int main(void)
     test_AUDIO_gauss_and_cd_jitter();
     test_AUDIO_cd_input_stop();
     test_AUDIO_cd_gain();
+    test_AUDIO_voice_class_gains();
+    test_AUDIO_one_tick_sfx_class();
     test_DAY2_music_consumer();
     test_DAY1_animation_sound_register();
     test_DAY1_m0034i_modes();

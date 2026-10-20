@@ -39,6 +39,7 @@ typedef struct {
     int32_t vol_level[2];
     int32_t vol_counter[2];
     int on;
+    int sfx;                 /* class latched at key-on: 0 music, 1 SFX */
 } Voice;
 
 static struct {
@@ -101,6 +102,26 @@ void PE_Spu_SetCdGain(int percent)
     g_cd_gain = percent < 0 ? 0 : percent > 100 ? 100 : percent;
 }
 int PE_Spu_CdGain(void) { return g_cd_gain; }
+
+/* MUSIC VOLUME / SFX VOLUME (pe_spu.h): host options, not SPU state, so
+ * they survive Reset like g_cd_gain.  Index = Voice.sfx. */
+static int g_voice_gain[2] = {100, 100};
+static PeSpuSfxMaskFn g_sfx_source;
+void PE_Spu_SetVoiceGains(int music_percent, int sfx_percent)
+{
+    g_voice_gain[0] = music_percent < 0 ? 0 : music_percent > 100 ? 100 : music_percent;
+    g_voice_gain[1] = sfx_percent < 0 ? 0 : sfx_percent > 100 ? 100 : sfx_percent;
+}
+int PE_Spu_MusicGain(void) { return g_voice_gain[0]; }
+int PE_Spu_SfxGain(void) { return g_voice_gain[1]; }
+void PE_Spu_SetSfxMaskSource(PeSpuSfxMaskFn source) { g_sfx_source = source; }
+uint32_t PE_Spu_SfxVoices(void)
+{
+    uint32_t m = 0;
+    for (int n = 0; n < NVOICE; n++)
+        if (S.v[n].sfx) m |= 1u << n;
+    return m;
+}
 
 void PE_Spu_SetActive(int active) { S.active = active ? 1 : 0; }
 int PE_Spu_Active(void) { return S.active; }
@@ -367,10 +388,15 @@ void PE_Spu_OnRegisterWrite(uint32_t offset, uint16_t value)
     switch (offset) {
     case 0x188: case 0x18A: {
         uint32_t mask = offset == 0x188 ? value : (uint32_t)value << 16;
+        uint32_t sfx;
         mask &= 0xFFFFFFu;
+        /* MUSIC/SFX VOLUME: class each keyed voice by the driver's SFX
+         * ownership at this write (pe_audio_driver.c explains why now). */
+        sfx = mask && g_sfx_source ? g_sfx_source() : 0u;
         for (int n = 0; n < NVOICE; n++)
             if (mask & (1u << n)) {
                 key_on(n);
+                S.v[n].sfx = (int)((sfx >> n) & 1u);
                 S.stats.kon_events++;
             }
         if (mask && S.kon_hook) S.kon_hook(mask);
@@ -596,6 +622,11 @@ void PE_Spu_Render(int16_t *out, int frames)
             {
                 int32_t vl = volume_step(r[0], &v->vol_level[0], &v->vol_counter[0]);
                 int32_t vr = volume_step(r[1], &v->vol_level[1], &v->vol_counter[1]);
+                int gain = g_voice_gain[v->sfx];
+                if (gain != 100) {   /* MUSIC/SFX VOLUME; dry and reverb send */
+                    vl = vl * gain / 100;
+                    vr = vr * gain / 100;
+                }
                 int32_t l = (o * vl) >> 15, rr = (o * vr) >> 15;
                 mix[0] += l;
                 mix[1] += rr;

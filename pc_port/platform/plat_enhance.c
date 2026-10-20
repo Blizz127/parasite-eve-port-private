@@ -29,7 +29,7 @@ static const int k_volume[] = {100, 90, 80, 70, 60, 50, 40, 30, 20, 10, 0};
 
 /* The registry.  Order within a category is the menu order. */
 enum { OPT_DISPLAY_SCALER, OPT_INTERNAL_SCALE, OPT_TEXTURE_FILTER, OPT_SSAA, OPT_MOVE_SPEED, OPT_ALWAYS_RUN, OPT_ONE_HIT, OPT_GOD, OPT_EXP_MULT,
-       OPT_MASTER_VOLUME, OPT_MOVIE_VOLUME, OPT_COUNT };
+       OPT_MASTER_VOLUME, OPT_MOVIE_VOLUME, OPT_MUSIC_VOLUME, OPT_SFX_VOLUME, OPT_COUNT };
 static const PeEnhOption k_options[OPT_COUNT] = {
     {"display_scaler", PE_ENH_CAT_GRAPHICS, "DISPLAY SCALER",      PE_ENH_FMT_NAMED,
         k_scaler, sizeof k_scaler / sizeof k_scaler[0], "PE_DISPLAY_SCALER", "the owner", k_scaler_names},
@@ -53,6 +53,10 @@ static const PeEnhOption k_options[OPT_COUNT] = {
         k_volume, 11, "PE_MASTER_VOLUME", "the owner"},
     {"movie_volume",  PE_ENH_CAT_AUDIO,   "MOVIE AUDIO VOLUME",   PE_ENH_FMT_PERCENT,
         k_volume, 11, "PE_MOVIE_VOLUME",  "the owner"},
+    {"music_volume",  PE_ENH_CAT_AUDIO,   "MUSIC VOLUME",         PE_ENH_FMT_PERCENT,
+        k_volume, 11, "PE_MUSIC_VOLUME",  "the owner"},
+    {"sfx_volume",    PE_ENH_CAT_AUDIO,   "SFX VOLUME",           PE_ENH_FMT_PERCENT,
+        k_volume, 11, "PE_SFX_VOLUME",    "the owner"},
 };
 
 #define GA_AYA_ACTOR  0x8009D254u   /* *(u32 *) = Aya's field actor */
@@ -76,6 +80,7 @@ static void sync_graphics(void)
 static void sync_audio(void)
 {
     pe_plat_audio_set_cd_gain(E.value[OPT_MOVIE_VOLUME]);
+    pe_plat_audio_set_voice_gains(E.value[OPT_MUSIC_VOLUME], E.value[OPT_SFX_VOLUME]);
 }
 
 /* Snap to a listed value: the largest listed value <= v, else the smallest
@@ -183,6 +188,7 @@ void pe_enh_reset(void) {
     PE_GPU_SetTextureFilter(0);
     HostFB_SetSSAA(0);
     pe_plat_audio_set_cd_gain(100);
+    pe_plat_audio_set_voice_gains(100, 100);
 }
 
 /* ── registry access ─────────────────────────────────────────────────── */
@@ -260,6 +266,10 @@ int  pe_enh_master_volume(void)           { return pe_enh_option_value(OPT_MASTE
 int  pe_enh_movie_volume(void)            { return pe_enh_option_value(OPT_MOVIE_VOLUME); }
 void pe_enh_set_master_volume(int pct)    { pe_enh_option_set(OPT_MASTER_VOLUME, pct); }
 void pe_enh_set_movie_volume(int pct)     { pe_enh_option_set(OPT_MOVIE_VOLUME, pct); }
+int  pe_enh_music_volume(void)            { return pe_enh_option_value(OPT_MUSIC_VOLUME); }
+int  pe_enh_sfx_volume(void)              { return pe_enh_option_value(OPT_SFX_VOLUME); }
+void pe_enh_set_music_volume(int pct)     { pe_enh_option_set(OPT_MUSIC_VOLUME, pct); }
+void pe_enh_set_sfx_volume(int pct)       { pe_enh_option_set(OPT_SFX_VOLUME, pct); }
 int  pe_enh_move_speed_pct(void)          { return pe_enh_option_value(OPT_MOVE_SPEED); }
 int  pe_enh_always_run(void)              { return pe_enh_option_value(OPT_ALWAYS_RUN); }
 void pe_enh_set_move_speed_pct(int pct)   { pe_enh_option_set(OPT_MOVE_SPEED, pct); }
