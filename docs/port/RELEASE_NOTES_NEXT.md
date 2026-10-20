@@ -37,11 +37,11 @@ Fast-forward Speed, Warp by Day, Options and Assists.  All cheats start off.
 `PE_DEV_MENU=0` turns it off (`PE_CHEATS=0` disables all cheats); `PE_DEV_MENU=1` is developer mode.  See
 docs/port/DEV_MENU.md.
 
-## New: Options ▸ Graphics, Audio (branch `claude/modern-20261020`)
+## New: Options ▸ Graphics, Audio, Controls (branch `claude/modern-20261020`)
 
-The dev menu's Options page now lists three pages. Every new row starts at
-the original (retail) setting, and choices are saved in
-`~/.config/parasite-eve-port/enhancements.conf`.
+The dev menu's Options page now lists four pages: Enhancements, Graphics,
+Audio and Controls. Every new row starts at the original (retail) setting,
+and choices are saved in `~/.config/parasite-eve-port/enhancements.conf`.
 
 - **Graphics:**
   - **Display Scaler**: Nearest (original), Sharp Bilinear, or FSR 1 (CPU).
@@ -54,7 +54,12 @@ the original (retail) setting, and choices are saved in
   - **Master Volume**.
   - **Movie Audio Volume**: movies and the ending credits.
   - **Music Volume** and **SFX Volume**, set separately.
-- **Controls:**
+
+The Graphics and Audio rows are designed to change only what you see and
+hear. The game itself, its timing and saves are untouched. Higher internal
+resolutions and FSR 1 cost CPU time; if the game slows down, step them back.
+
+- **Controls** (these change how you play):
   - **Analog Stick**: play with the left stick as on a DualShock with the
     Analog light on. Half tilt walks and full tilt runs, as the original
     game does in analog mode. As in the original, the d-pad then does not
@@ -63,10 +68,6 @@ the original (retail) setting, and choices are saved in
   can swap controller buttons (for example Cross and Circle) or rebind
   keyboard keys. Esc, F1-F8 and the Back+Start menu combo always keep
   working. The format is in docs/port/ENHANCEMENTS.md.
-
-These change only what you see and hear. The game itself, its timing and
-saves are untouched. Higher internal resolutions and FSR 1 cost CPU time; if
-the game slows down, step them back.
 
 Also, Eve's flash effect in the first Eve fight now tracks every retail stack
 writer the Day-1 route reaches: the weapon-hit draw 800CDD0C and the
