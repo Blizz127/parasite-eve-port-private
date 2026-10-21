@@ -1,3 +1,32 @@
+## UPDATE 2026-10-21 00:13 UTC: 800CDFE0 bound in the flash model (branch claude/pe-cdfe0-20261020)
+
+Branch `claude/pe-cdfe0-20261020` (worktree `build/wt-pe-cdfe0-20261020`) on `c7254fb50`. Not pushed and not
+packaged. The owner-private candidate is the text-only `native-only-c7254fb5-p3` (binary c0c298fc, without
+this change); its publication waits on the owner's Psy-Q decision (coordinator task 1d4ad9bd5d62).
+
+- `7fa5400ce` DEV_MENU.md: the lone Back/Start hold-back applies only where the menu is reachable (unset and
+  `1`); `PE_DEV_MENU=0` bypasses the combo machine. This corrects the 21:47 entry's "a lone Start or Select
+  reaches the game in every mode".
+- `9f13cb73c` binds the framed weapon-update callback 800CDFE0 (`k_framed_update` in
+  `func_800D413C_port.c`; its frame stays above the borrowed window). Test
+  `FLASHVEC_cdfe0_update_preserves_known_z`; `PE_BiosRandSeed` lets it restore the rand seed.
+- **Gates on the fresh build** (`fcab4d4c…`, generated trees regenerated from empty and identical to the
+  reference, zero-fingerprint rows 2206):
+  - suite 1701/1701, 0 skipped;
+  - CTest 36 passed, 2 skipped, of 38;
+  - Psy-Q finding sets identical to c0c298fc's (default PASS, strict FAIL 976);
+  - retail-data strict OK.
+- **Routes:**
+  - The pad-only Day-1 route log is byte-identical to c0c298fc's: the inherited 44602 game over, DAY1_SHIM 0.
+  - The aid-assisted movies route gives MOVIES_DAY2=PASS. Flash approximations went from 2 (both 800CDFE0) to 0, with identical behaviour lines.
+- **Gate checklist: 5 of 7 green, so this is not a gated port commit.** `day1_end_80` FAILs (inherited,
+  byte-identical to c0c298fc), and the movies run passes only with the harness aids.
+- **Correction to the 21:47 entry:** "CTest 38/38" was the selected count. The log shows 36 passed and 2 skipped
+  (leaf-oracle, akao-tick-oracle).
+- **Evidence:** `docs/evidence/flash-cdfe0-20261021/REPORT.md`. KNOWN_DIVERGENCES #17 stays Open (no oracle
+  frame for the flash; later play unverified).
+- **Next:** taking this branch into a later candidate needs its own decision. It is not adopted into p3.
+
 ## UPDATE 2026-10-20 21:47 UTC: integration candidate (owner decision 59040a1d, task 1d4ad9bd5d62)
 
 The owner designated this lane the sole Devbox PE integrator and packager (approval 59040a1d, ALLOW
